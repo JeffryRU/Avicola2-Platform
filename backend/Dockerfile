@@ -16,6 +16,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY alembic.ini ./
+COPY config ./config
 COPY app ./app
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh && useradd --system --uid 1000 app && mkdir -p /data/lakehouse && chown app /data/lakehouse

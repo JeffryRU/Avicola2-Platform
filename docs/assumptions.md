@@ -11,8 +11,9 @@ Mientras un punto no se confirme con el equipo o con Avícola 2, se elige la opc
   - Supuesto inicial: entrenar con pedidos e incluir un indicador de recorte como feature, o excluir esos días si se marcan.
 
 ## Dominio
-- **`yield_factor`:** rendimiento de pollo vivo a producto beneficiado. Se usa un valor de referencia configurable hasta tener el real.
-- **`avg_live_weight_kg`:** peso vivo promedio por ave. Configurable.
+- **`yield_factor`:** rendimiento de pollo vivo a producto beneficiado. Valor de referencia `YIELD_FACTOR=0.75`, configurable.
+- **`avg_live_weight_kg`:** peso vivo promedio por ave. Valor de referencia `AVG_LIVE_WEIGHT_KG=2.6`, configurable.
+- **Catálogo de canales y productos** (`backend/config/catalog.yaml`) y **niveles de los datos sintéticos** (unas 15 t/día de producto): inventados y plausibles, por validar.
 - **Margen de seguridad** de la saca sugerida (qué percentil del intervalo usar).
 - Si **"Distribución"** (pollo vivo a planta) y **"despacho"** (producto terminado) son áreas distintas.
 - **A quién se pide la recarga** (granja o proveedor).

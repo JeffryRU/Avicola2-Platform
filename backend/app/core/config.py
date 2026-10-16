@@ -1,7 +1,9 @@
 """Configuración de la aplicación, leída desde variables de entorno (.env)."""
 
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,8 +21,15 @@ class Settings(BaseSettings):
     # Raíz del lakehouse Delta: ruta local (./data/lakehouse) o gs://bucket/lakehouse.
     lakehouse_uri: str = "./data/lakehouse"
 
+    # Carpeta con catalog.yaml (y luego schemas.yaml).
+    config_dir: Path = Path(__file__).resolve().parents[2] / "config"
+
     # Estados permitidos para un plan de saca (configurables, ver ADR / docs/assumptions.md).
     saca_plan_statuses: list[str] = ["draft", "proposed", "approved", "rejected"]
+
+    # Conversión de kg de producto a saca (pollo vivo). Valores de referencia por validar.
+    yield_factor: float = Field(0.75, gt=0, le=1)  # kg de producto por kg vivo
+    avg_live_weight_kg: float = Field(2.6, gt=0)  # peso vivo promedio por ave
 
 
 @lru_cache

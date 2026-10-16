@@ -13,6 +13,11 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
 - Backend FastAPI con `/health`, SQLAlchemy 2 y migraciones de Alembic (esquema `app`).
 - Base de datos en **Supabase Cloud** (app en el esquema `app`, n8n en el esquema `n8n`).
 
+**Paso 2 del MVP (datos sintéticos y plantilla) listo:**
+- `scripts/generate_synthetic.py`: 18 meses de pedidos, proyecciones, saca y excedentes en `data/synthetic/`, más 5 Excel de ejemplo en `data/samples/`.
+- `scripts/generate_template.py`: plantilla de carga con listas desplegables y validaciones en `data/templates/`.
+- Catálogo de canales y productos configurable en `backend/config/catalog.yaml`.
+
 ## Requisitos
 
 - Docker Desktop (con Compose v2.20 o superior).
@@ -41,6 +46,16 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
    ```bash
    docker compose --profile localdb up -d
    ```
+
+## Datos sintéticos y plantilla
+
+Desde la raíz del repo:
+
+```bash
+uv run --project backend python scripts/generate_template.py
+uv run --project backend python scripts/generate_synthetic.py            # histórico hasta ayer
+uv run --project backend python scripts/generate_synthetic.py --end 2026-10-14 --seed 42
+```
 
 ## Desarrollo del backend
 

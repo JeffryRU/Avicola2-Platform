@@ -1,0 +1,20 @@
+# Catálogo de canales y productos.
+# SUPUESTO: es un catálogo de referencia para datos sintéticos y para la plantilla Excel.
+# El catálogo real de Avícola 2 está por validar (docs/assumptions.md). Si cambia, se edita aquí.
+
+channels:
+  - Horeca
+  - Supermercados
+  - Tiendas
+
+products:
+  - Pollo brasa
+  - Pollo entero
+  - Pechuga
+  - Pierna
+  - Alas
+  - Menudencia
+
+record_types:
+  - proyeccion
+  - pedido

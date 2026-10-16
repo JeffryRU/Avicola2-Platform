@@ -18,6 +18,8 @@ dist/
 data/inbox/*
 data/lakehouse/*
 data/samples/*.xlsx
+data/synthetic/
+data/templates/*.xlsx
 !data/**/.gitkeep
 
 # Artefactos de ML

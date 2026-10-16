@@ -121,6 +121,8 @@ Avicola2-Platform/
 ## Comandos (a completar cuando exista el código)
 - Levantar en local: `docker compose up -d` (perfil lite contra Supabase) · sin internet: `docker compose --profile localdb up -d`
 - Migraciones: `cd backend && uv run alembic upgrade head` (el contenedor backend también las aplica al arrancar)
+- Datos sintéticos y Excel de ejemplo: `uv run --project backend python scripts/generate_synthetic.py`
+- Plantilla Excel: `uv run --project backend python scripts/generate_template.py`
 - Entrenar: `docker compose run --rm ml-train`
 - Backend: `uv run ruff check . && uv run pytest`
 - Frontend: `pnpm lint && pnpm build`
