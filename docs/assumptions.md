@@ -24,6 +24,7 @@ Mientras un punto no se confirme con el equipo o con Avícola 2, se elige la opc
 ## Infraestructura
 - **Especificaciones de la laptop antigua**, si se usa. El perfil `lite` apunta a menos de unos 2.5 GB de RAM.
 - **Proyecto, región, presupuesto y créditos de GCP** disponibles para el despliegue.
+- **Proyecto de Supabase:** región (cerca de la VM de GCP) y si el plan gratuito alcanza (500 MB, pausa por inactividad).
 - **Dominio para HTTPS en GCP:** dominio propio o un servicio de DNS comodín (tipo sslip.io).
 - **Qué warehouse o lakehouse tiene un compañero del grupo.** Si se usa el suyo, solo cambia la capa `backend/app/lakehouse/`.
 - **Si la rúbrica del curso exige** almacenamiento de objetos o lakehouse. GCS lo cubre en el despliegue ([ADR 0001](adr/0001-almacenamiento-gcs-y-despliegue-en-vm.md)).

@@ -13,19 +13,20 @@ Plataforma de **planificación de saca** para **Avícola 2** (taller universitar
 - **n8n es obligatorio** como orquestador.
 - **Hay que integrar IA generativa**, además del modelo de forecast.
 - **Funciona en local** (Windows + Docker Desktop) y **se despliega en GCP** (una VM de Compute Engine + GCS).
+- **Base de datos: Supabase Cloud** ([ADR 0002](docs/adr/0002-supabase-como-base-de-datos.md)), conectada por el pooler en modo sesión.
 - **Hardware limitado:** el perfil `lite` debe consumir menos de unos 2.5 GB de RAM (con `mem_limit` por servicio).
 - **Interfaz en español. Código en inglés** (variables, funciones, tablas, columnas).
 - **Commits sin atribución a Claude:** sin `Co-Authored-By` ni enlaces de sesión (configurado en `.claude/settings.json`).
 
 ## Arquitectura en una línea
-`Excel / Telegram → n8n → FastAPI → Lakehouse Delta (LAKEHOUSE_URI: ./data/lakehouse o gs://...) + PostgreSQL ← React`
+`Excel / Telegram → n8n → FastAPI → Lakehouse Delta (LAKEHOUSE_URI: ./data/lakehouse o gs://...) + Supabase (Postgres) ← React`
 
 | Componente | Hace | No hace |
 |---|---|---|
 | **n8n** | Detectar archivos, guardar crudos en bronze, llamar endpoints, cron, notificaciones, flujos con LLM | Transformar datos, lógica de negocio, escribir en la base de la app |
 | **FastAPI** | API, lógica de negocio, bronze→silver→gold, predicción, DuckDB, `ingestion_log` | Programar tareas ni enviar mensajes |
 | **ml-train** | Entrenar y hacer backtest (contenedor de un solo uso) | Atender peticiones de usuario |
-| **PostgreSQL** | Estado de la app (bases `app` y `n8n` en un solo contenedor) | Histórico analítico |
+| **Supabase Cloud (Postgres)** | Estado de la app (esquema `app`) y de n8n (esquema `n8n`) | Histórico analítico. Auth, Storage y Data API **no** se usan |
 | **Lakehouse (Delta)** | Histórico analítico y archivos crudos | Datos transaccionales |
 | **React** | UI por rol (estáticos servidos por FastAPI) | Lógica de negocio |
 
@@ -59,6 +60,12 @@ Plataforma de **planificación de saca** para **Avícola 2** (taller universitar
 - **Nunca entrenar dentro de una petición HTTP:** el entrenamiento corre en `ml-train`, lanzado por el cron.
 - **Saca sugerida:** `forecast + margen → / yield_factor → / avg_live_weight_kg`, en kg y en aves. Los factores son configurables.
 
+**Base de datos (Supabase)**
+- **Tablas de la app siempre en el esquema `app`**, nunca en `public` (Supabase expone `public` por su Data API). Todo cambio de esquema, por migración de Alembic.
+- **Conexión por el pooler en modo sesión** (puerto 5432, IPv4, `sslmode=require`). No usar la conexión directa (solo IPv6) ni el puerto 6543.
+- **Hosts de Postgres en `.env` como `127.0.0.1`**, no `localhost` (en Windows `localhost` resuelve a IPv6 y Docker no responde ahí).
+- **Sin internet:** perfil `localdb` (Postgres local que imita a Supabase).
+
 **App**
 - **Usuarios con rol `canal`:** siempre filtrados por su `channel`.
 - **Estados del plan de saca:** `varchar` validado desde la configuración, no un ENUM de Postgres.
@@ -79,6 +86,7 @@ Plataforma de **planificación de saca** para **Avícola 2** (taller universitar
 - **Local File Trigger de n8n en Windows + Docker:** sin **polling** no detecta archivos. Hay que verificar además que el nodo esté habilitado en la versión de n8n.
 - **Telegram Trigger:** necesita HTTPS público. En local hace falta un túnel o `getUpdates`; en GCP lo resuelve Caddy.
 - **StatsForecast (numba):** la primera ejecución compila con JIT y genera picos de RAM y tiempo. Esa es una razón más para que `ml-train` vaya aparte.
+- **Supabase gratuito se pausa** tras ~1 semana sin uso: reactivarlo antes de una demo.
 - **Demanda censurada:** los días con recorte no reflejan la demanda real (ver `docs/assumptions.md`).
 
 ---
@@ -111,7 +119,8 @@ Avicola2-Platform/
 ```
 
 ## Comandos (a completar cuando exista el código)
-- Levantar en local: `docker compose --profile lite up -d`
+- Levantar en local: `docker compose up -d` (perfil lite contra Supabase) · sin internet: `docker compose --profile localdb up -d`
+- Migraciones: `cd backend && uv run alembic upgrade head` (el contenedor backend también las aplica al arrancar)
 - Entrenar: `docker compose run --rm ml-train`
 - Backend: `uv run ruff check . && uv run pytest`
 - Frontend: `pnpm lint && pnpm build`

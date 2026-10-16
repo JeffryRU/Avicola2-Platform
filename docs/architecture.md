@@ -50,7 +50,7 @@ flowchart LR
   end
   API[FastAPI<br/>backend + DuckDB]
   ML[ml-train<br/>contenedor de un solo uso]
-  PG[(PostgreSQL<br/>app y n8n)]
+  PG[(Supabase Cloud<br/>esquemas app y n8n)]
   FE[React<br/>estáticos servidos por FastAPI]
   LLM[LLM por API<br/>Ollama solo en local full]
 
@@ -74,13 +74,14 @@ flowchart LR
 | **n8n** | Detectar archivos, guardar crudos en bronze, llamar endpoints, cron, notificaciones, flujos con LLM | Transformar datos, aplicar lógica de negocio ni escribir en la base de la app |
 | **FastAPI** | API, lógica de negocio, bronze→silver→gold, predicción, consultas con DuckDB, `ingestion_log` | Programar tareas ni enviar mensajes |
 | **ml-train** | Entrenamiento y backtest (mismo código del backend, otro proceso) | Atender peticiones de usuario |
-| **PostgreSQL** | Estado transaccional de la app (bases `app` y `n8n`) | Histórico analítico |
+| **Supabase (Postgres)** | Estado transaccional de la app (esquema `app`) y de n8n (esquema `n8n`) | Histórico analítico, Auth, Storage, Data API |
 | **Lakehouse** | Histórico analítico y archivos crudos | Datos transaccionales |
 | **React** | UI por rol | Lógica de negocio |
 
 ### Stack
 - **Frontend:** React + Vite + TypeScript, shadcn/ui + Tailwind, TanStack Query, Recharts, pnpm. Refine es opcional (solo si el equipo ya lo conoce).
-- **Backend:** Python 3.12, FastAPI, SQLAlchemy 2 + Alembic, Pydantic v2, uv, ruff.
+- **Backend:** Python 3.12, FastAPI, SQLAlchemy 2 + Alembic, psycopg 3, Pydantic v2, uv, ruff.
+- **Base de datos:** Supabase Cloud (Postgres gestionado).
 - **Datos:** `deltalake` (delta-rs), DuckDB (extensión `delta`), pandas, openpyxl.
 - **ML:** statsforecast, lightgbm, scikit-learn (métricas), `holidays` (feriados de Perú).
 - **Orquestación e IA:** n8n self-hosted. LLM configurable (`anthropic` | `ollama`).
@@ -112,7 +113,10 @@ Raíz: `LAKEHOUSE_URI`. En local es `./data/lakehouse`; en GCP, `gs://<bucket>/l
 
 ---
 
-## 4. PostgreSQL (app)
+## 4. Base de datos de la app (Supabase, esquema `app`)
+
+Ver [ADR 0002](adr/0002-supabase-como-base-de-datos.md). Todas las tablas van en el esquema `app`, nunca en `public`.
+
 
 - `users` (id, name, email, role, **channel**, password_hash).
   - Roles: `comercial`, `produccion`, `distribucion`, `canal`, `admin`.
@@ -124,7 +128,7 @@ Raíz: `LAKEHOUSE_URI`. En local es `./data/lakehouse`; en GCP, `gs://<bucket>/l
 - `column_mappings` (source_signature, mapping_json, status, confirmed_by): mapeos propuestos por el LLM y confirmados por una persona.
 - `alerts` (id, date, type, message, severity, acknowledged_by).
 
-Migraciones con Alembic. Un solo contenedor de Postgres con dos bases: `app` y `n8n`.
+Migraciones con Alembic (`alembic_version` en el esquema `app`). n8n guarda sus tablas en el esquema `n8n` del mismo proyecto. Conexión por el pooler de Supabase en modo sesión (puerto 5432, IPv4, `sslmode=require`).
 
 ---
 
@@ -280,7 +284,7 @@ Se exportan como JSON en `n8n/workflows/`.
 
 | Servicio | Puerto | `lite` | `full` | Notas |
 |---|---|---|---|---|
-| `postgres` | 5432 (solo red interna) | ✓ | ✓ | Bases `app` y `n8n` |
+| `postgres` | 5432 (solo 127.0.0.1) | — | — | Solo con el perfil `localdb` (sin internet / tests). La base normal es Supabase Cloud |
 | `n8n` | 5678 | ✓ | ✓ | |
 | `backend` | 8000 | ✓ | ✓ | Sirve el frontend compilado |
 | `ml-train` | — | ✓ (se ejecuta bajo demanda) | ✓ | `docker compose run --rm ml-train` |
@@ -300,7 +304,7 @@ Se exportan como JSON en `n8n/workflows/`.
 Ver [ADR 0001](adr/0001-almacenamiento-gcs-y-despliegue-en-vm.md). En resumen:
 - **Compute Engine:** una VM (referencia `e2-medium`) con Docker y el perfil `lite` + `caddy`.
 - **Almacenamiento:** un bucket de GCS para el lakehouse (`LAKEHOUSE_URI=gs://...`), con autenticación por la cuenta de servicio de la VM.
-- **Postgres:** en contenedor, sobre disco persistente, con `pg_dump` diario al bucket.
+- **Base de datos:** Supabase Cloud (ADR 0002), en una región cercana a la VM.
 - **Red:** firewall abierto solo en 80 y 443.
 
 ---
@@ -308,7 +312,7 @@ Ver [ADR 0001](adr/0001-almacenamiento-gcs-y-despliegue-en-vm.md). En resumen:
 ## 14. Plan de construcción
 
 **MVP (fase 1), como camino vertical primero:**
-1. Infra: compose `lite`, Postgres con Alembic y `LAKEHOUSE_URI` local.
+1. Infra: compose `lite`, Supabase con Alembic (esquema `app`) y `LAKEHOUSE_URI` local.
 2. `scripts/generate_synthetic.py` y la plantilla Excel.
 3. Ingesta: `/ingest/upload` y `/ingest/transform` (bronze → silver → gold) + workflow `01`.
 4. ML: baseline + StatsForecast con backtest, `ml-train`, `/ml/predict` y workflows `03` y `04`.

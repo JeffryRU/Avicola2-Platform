@@ -1,0 +1,116 @@
+# Base de datos: Supabase Cloud (app en esquema `app`, n8n en esquema `n8n`). Ver docs/adr/0002.
+# Perfil lite (por defecto): n8n + backend. Meta: < ~2.5 GB de RAM.
+#   docker compose up -d                       (equivale a --profile lite)
+# Perfil full: agrega servicios pesados (Ollama).
+#   docker compose --profile full up -d
+# Perfil localdb: Postgres local en lugar de Supabase (sin internet / tests).
+#   docker compose --profile localdb up -d
+
+name: avicola2
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+
+services:
+  # Postgres local OPCIONAL (perfil localdb): solo para trabajar sin internet o en tests.
+  # Imita a Supabase: base `postgres`, usuario `postgres`. La base principal es Supabase Cloud.
+  postgres:
+    image: postgres:17.11-alpine
+    profiles: [localdb]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LOCALDB_PASSWORD:-postgres}
+      POSTGRES_DB: postgres
+    command: >
+      postgres -c shared_buffers=64MB -c work_mem=4MB -c max_connections=40
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${LOCALDB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 384m
+    logging: *logging
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.43.6
+    restart: unless-stopped
+    environment:
+      # Base de n8n: mismo proyecto de Supabase, esquema `n8n` (pooler en modo sesión, IPv4).
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: ${N8N_DB_HOST}
+      DB_POSTGRESDB_PORT: ${N8N_DB_PORT:-5432}
+      DB_POSTGRESDB_DATABASE: ${N8N_DB_DATABASE:-postgres}
+      DB_POSTGRESDB_USER: ${N8N_DB_USER}
+      DB_POSTGRESDB_PASSWORD: ${N8N_DB_PASSWORD}
+      DB_POSTGRESDB_SCHEMA: n8n
+      DB_POSTGRESDB_POOL_SIZE: ${N8N_DB_POOL_SIZE:-2}
+      DB_POSTGRESDB_SSL_ENABLED: ${N8N_DB_SSL_ENABLED:-true}
+      DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED: ${N8N_DB_SSL_REJECT_UNAUTHORIZED:-false}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678/}
+      N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE:-false}
+      GENERIC_TIMEZONE: ${TZ:-America/Lima}
+      TZ: ${TZ:-America/Lima}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_RESTRICT_FILE_ACCESS_TO: /data/inbox
+      # n8n 2.x desactiva LocalFileTrigger por defecto; lo habilitamos y dejamos bloqueado ExecuteCommand.
+      NODES_EXCLUDE: '["n8n-nodes-base.executeCommand"]'
+      BACKEND_URL: http://backend:8000
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./data/inbox:/data/inbox
+      - ./n8n/workflows:/data/workflows:ro
+    ports:
+      - "127.0.0.1:${N8N_PORT:-5678}:5678"
+    depends_on:
+      postgres: {condition: service_healthy, required: false}
+    mem_limit: ${N8N_MEM_LIMIT:-768m}
+    logging: *logging
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      # Supabase (pooler en modo sesión). Con el perfil localdb se usa DATABASE_URL_CONTAINER.
+      DATABASE_URL: ${DATABASE_URL_CONTAINER:-${DATABASE_URL}}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      # Dentro del contenedor el lakehouse local está montado en /data/lakehouse.
+      LAKEHOUSE_URI: ${LAKEHOUSE_URI_CONTAINER:-/data/lakehouse}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-1}
+    volumes:
+      - ./data/lakehouse:/data/lakehouse
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres: {condition: service_healthy, required: false}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    mem_limit: ${BACKEND_MEM_LIMIT:-512m}
+    logging: *logging
+
+  ollama:
+    image: ollama/ollama:0.40.5
+    profiles: [full]
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    logging: *logging
+
+volumes:
+  postgres_data:
+  n8n_data:
+  ollama_data:

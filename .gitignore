@@ -1,0 +1,34 @@
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+
+# Datos (no subir datos reales ni el lakehouse)
+data/inbox/*
+data/lakehouse/*
+data/samples/*.xlsx
+!data/**/.gitkeep
+
+# Artefactos de ML
+backend/models/*
+!backend/models/.gitkeep
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code (configuración local)
+.claude/settings.local.json

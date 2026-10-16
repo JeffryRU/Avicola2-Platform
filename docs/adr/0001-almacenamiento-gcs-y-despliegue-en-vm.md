@@ -23,7 +23,7 @@ El diseño inicial guardaba el lakehouse (bronze, silver, gold) en **MinIO** con
 3. **Despliegue en GCP con una sola VM de Compute Engine** que corre el mismo `docker compose` (perfil `lite`) que en local:
    - VM pequeña (referencia: `e2-medium`, 2 vCPU y 4 GB). El tamaño final se valida con el consumo real.
    - **GCS** para el lakehouse (un bucket con los prefijos `bronze/`, `silver/` y `gold/`).
-   - **PostgreSQL en contenedor** en la VM, sobre disco persistente, con `pg_dump` diario a GCS como respaldo.
+   - ~~**PostgreSQL en contenedor** en la VM, sobre disco persistente, con `pg_dump` diario a GCS como respaldo.~~ **Reemplazado por el [ADR 0002](0002-supabase-como-base-de-datos.md):** la base es Supabase Cloud.
    - **Caddy** como proxy inverso con HTTPS automático (Let's Encrypt) delante del backend y de n8n. Solo se abren los puertos 80 y 443. Postgres y los puertos internos no se exponen.
    - Autenticación a GCS con la **cuenta de servicio de la VM** (ADC), con permisos solo sobre el bucket. No se guardan claves JSON en el repositorio.
 4. **Un solo escritor de Delta:** solo el backend escribe en las tablas Delta, y las escrituras se serializan. n8n solo escribe en bronze.
@@ -53,6 +53,6 @@ El diseño inicial guardaba el lakehouse (bronze, silver, gold) en **MinIO** con
   - leer con `deltalake` (`DeltaTable(...).to_pyarrow_dataset()`) y consultar ese dataset con DuckDB, sin necesidad de HMAC (opción preferida);
   - crear un `SECRET` de tipo `gcs` con HMAC guardadas en `.env` o Secret Manager.
 - **No ejecutar `VACUUM`** con una retención que borre versiones referenciadas por modelos registrados.
-- **Una VM es un único punto de falla.** Es aceptable para un taller. Se mitiga con respaldos de Postgres y con el lakehouse en GCS.
+- **Una VM es un único punto de falla.** Es aceptable para un taller. Se mitiga con la base en Supabase y el lakehouse en GCS: la VM se puede recrear sin perder datos.
 - **Costo:** la VM cobra mientras está encendida. Se puede detener fuera de las demos. Hay que revisar los créditos gratuitos o educativos y la calculadora de precios de GCP.
 - **En la nube no existe la carpeta `data/inbox` de las laptops.** La ingesta en la nube será por subida desde la app (`/ingest/upload`) y, opcionalmente, por una carpeta compartida de Google Drive con el trigger de Google Drive de n8n. En local se mantiene `data/inbox` con un trigger por **polling**.
