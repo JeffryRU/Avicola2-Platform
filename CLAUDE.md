@@ -23,7 +23,7 @@ Plataforma de **planificación de saca** para **Avícola 2** (taller universitar
 
 | Componente | Hace | No hace |
 |---|---|---|
-| **n8n** | Detectar archivos, guardar crudos en bronze, llamar endpoints, cron, notificaciones, flujos con LLM | Transformar datos, lógica de negocio, escribir en la base de la app |
+| **n8n** | Detectar archivos y enviarlos a `/ingest/upload`, llamar endpoints, cron, notificaciones, flujos con LLM | Escribir en el lakehouse, transformar datos, lógica de negocio, escribir en la base de la app |
 | **FastAPI** | API, lógica de negocio, bronze→silver→gold, predicción, DuckDB, `ingestion_log` | Programar tareas ni enviar mensajes |
 | **ml-train** | Entrenar y hacer backtest (contenedor de un solo uso) | Atender peticiones de usuario |
 | **Supabase Cloud (Postgres)** | Estado de la app (esquema `app`) y de n8n (esquema `n8n`) | Histórico analítico. Auth, Storage y Data API **no** se usan |
@@ -49,7 +49,8 @@ Plataforma de **planificación de saca** para **Avícola 2** (taller universitar
 **Lakehouse**
 - **Toda ruta del lakehouse sale de `LAKEHOUSE_URI`.** Nunca escribir rutas locales ni `gs://` fijas en el código.
 - **Escrituras con `merge` (upsert)** por clave natural; nunca hacer append ciego.
-- **Un solo escritor de Delta** (backend o ml-train), con escrituras serializadas. n8n solo escribe en bronze.
+- **Un solo escritor del lakehouse** (backend o ml-train), con escrituras serializadas. Bronze también lo escribe el backend ([ADR 0003](docs/adr/0003-ingesta-el-backend-escribe-bronze.md)).
+- **La ingesta es una sola ruta:** `IngestService` (bronze → `pipeline.parse` → silver → gold). Los scripts y endpoints la reutilizan; no escribir silver por otro camino.
 - **`model_version` guarda la versión Delta** del dataset de entrenamiento. No ejecutar `VACUUM` sobre versiones referenciadas.
 - **DuckDB con `memory_limit` y `threads`** desde `.env`. Sobre GCS, leer con `deltalake` → Arrow → DuckDB (sin HMAC).
 
@@ -123,6 +124,8 @@ Avicola2-Platform/
 - Migraciones: `cd backend && uv run alembic upgrade head` (el contenedor backend también las aplica al arrancar)
 - Datos sintéticos y Excel de ejemplo: `uv run --project backend python scripts/generate_synthetic.py`
 - Plantilla Excel: `uv run --project backend python scripts/generate_template.py`
+- Cargar el histórico sintético en el lakehouse: `uv run --project backend python scripts/load_synthetic.py`
+- Importar workflows de n8n: ver `n8n/workflows/README.md`
 - Entrenar: `docker compose run --rm ml-train`
 - Backend: `uv run ruff check . && uv run pytest`
 - Frontend: `pnpm lint && pnpm build`

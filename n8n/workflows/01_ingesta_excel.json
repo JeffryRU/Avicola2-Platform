@@ -1,0 +1,172 @@
+{
+  "id": "avicola2IngestaExcel01",
+  "name": "01_ingesta_excel",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerOn": "folder",
+        "path": "/data/inbox",
+        "events": ["add", "change"],
+        "options": {
+          "awaitWriteFinish": true,
+          "usePolling": true,
+          "ignored": "**/{.gitkeep,~$*,*.tmp}"
+        }
+      },
+      "id": "5b0c8f0e-1a01-4a5e-9c01-000000000001",
+      "name": "Archivo nuevo en inbox",
+      "type": "n8n-nodes-base.localFileTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "notes": "Polling: en Windows + Docker los eventos del sistema de archivos no llegan al contenedor."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "a6f1c1d2-0001-4c0e-9f00-00000000000a",
+              "leftValue": "={{ $json.path }}",
+              "rightValue": "\\.(xlsx|xls|csv)$",
+              "operator": { "type": "string", "operation": "regex" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5b0c8f0e-1a01-4a5e-9c01-000000000002",
+      "name": "¿Es Excel o CSV?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $json.path }}",
+        "options": {}
+      },
+      "id": "5b0c8f0e-1a01-4a5e-9c01-000000000003",
+      "name": "Leer archivo",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [440, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/ingest/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-Api-Token", "value": "={{ $env.INGEST_API_TOKEN }}" }]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "parameterType": "formBinaryData", "name": "file", "inputDataFieldName": "data" },
+            { "name": "source", "value": "inbox" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "neverError": true } },
+          "timeout": 300000
+        }
+      },
+      "id": "5b0c8f0e-1a01-4a5e-9c01-000000000004",
+      "name": "Cargar en el backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, -100],
+      "notes": "El backend guarda el crudo en bronze, valida, escribe silver/gold y registra en ingestion_log."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "a6f1c1d2-0002-4c0e-9f00-00000000000b",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ok",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5b0c8f0e-1a01-4a5e-9c01-000000000005",
+      "name": "¿Hubo problemas?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [880, -100]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b7e2d3f4-0001-4a1b-8c00-00000000000c",
+              "name": "aviso",
+              "value": "=⚠️ Ingesta de {{ $json.file_name || $('Archivo nuevo en inbox').item.json.path }}: {{ $json.status || 'error' }}. {{ $json.message || JSON.stringify($json.detail || $json) }}{{ $json.rows_error ? '\\nPrimeros errores: ' + $json.errors.slice(0, 5).map(e => 'fila ' + e.row + ' (' + e.column + '): ' + e.message).join('; ') : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "b7e2d3f4-0002-4a1b-8c00-00000000000d",
+              "name": "log_id",
+              "value": "={{ $json.log_id }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5b0c8f0e-1a01-4a5e-9c01-000000000006",
+      "name": "Preparar aviso",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1100, -200],
+      "notes": "Paso 6 del MVP: enviar este aviso por Telegram. Mientras tanto queda en la ejecución y en ingestion_log."
+    },
+    {
+      "parameters": {},
+      "id": "5b0c8f0e-1a01-4a5e-9c01-000000000007",
+      "name": "Carga correcta",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {},
+      "id": "5b0c8f0e-1a01-4a5e-9c01-000000000008",
+      "name": "Ignorar (no es Excel/CSV)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [440, 100]
+    }
+  ],
+  "connections": {
+    "Archivo nuevo en inbox": { "main": [[{ "node": "¿Es Excel o CSV?", "type": "main", "index": 0 }]] },
+    "¿Es Excel o CSV?": {
+      "main": [
+        [{ "node": "Leer archivo", "type": "main", "index": 0 }],
+        [{ "node": "Ignorar (no es Excel/CSV)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Leer archivo": { "main": [[{ "node": "Cargar en el backend", "type": "main", "index": 0 }]] },
+    "Cargar en el backend": { "main": [[{ "node": "¿Hubo problemas?", "type": "main", "index": 0 }]] },
+    "¿Hubo problemas?": {
+      "main": [
+        [{ "node": "Preparar aviso", "type": "main", "index": 0 }],
+        [{ "node": "Carga correcta", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1", "timezone": "America/Lima" },
+  "active": false,
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": true }
+}

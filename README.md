@@ -18,6 +18,13 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
 - `scripts/generate_template.py`: plantilla de carga con listas desplegables y validaciones en `data/templates/`.
 - Catálogo de canales y productos configurable en `backend/config/catalog.yaml`.
 
+**Paso 3 del MVP (ingesta) listo:**
+- `backend/config/schemas.yaml`: esquemas de silver, alias de columnas, claves de merge y ruteo por `tipo`.
+- `/ingest/upload` y `/ingest/transform`: bronze → validación por fila → silver (Delta, merge por clave) → `gold.daily_demand`, con registro en `ingestion_log`.
+- Mapeo de columnas: alias → mapeo confirmado → pendiente (`/ingest/mappings`), con reproceso automático al confirmar.
+- Workflow `n8n/workflows/01_ingesta_excel.json`: vigila `data/inbox` y envía cada Excel o CSV al backend.
+- `scripts/load_synthetic.py`: carga el histórico sintético por la misma ruta de ingesta.
+
 ## Requisitos
 
 - Docker Desktop (con Compose v2.20 o superior).
@@ -55,7 +62,18 @@ Desde la raíz del repo:
 uv run --project backend python scripts/generate_template.py
 uv run --project backend python scripts/generate_synthetic.py            # histórico hasta ayer
 uv run --project backend python scripts/generate_synthetic.py --end 2026-10-14 --seed 42
+uv run --project backend python scripts/load_synthetic.py               # carga el histórico en el lakehouse
 ```
+
+## Ingesta
+
+- **Manual:** deja un `.xlsx`, `.xls` o `.csv` en `data/inbox/`. El workflow `01_ingesta_excel` de n8n lo envía al backend (cómo importarlo y activarlo: [`n8n/workflows/README.md`](n8n/workflows/README.md)).
+- **Por API:** necesitas el token `INGEST_API_TOKEN` del `.env`:
+  ```bash
+  curl -H "X-Api-Token: $INGEST_API_TOKEN" -F file=@data/samples/Horeca_comercial1_20261014.xlsx http://127.0.0.1:8000/ingest/upload
+  ```
+- **Mapeos pendientes:** `GET /ingest/mappings`. Para confirmar uno, `POST /ingest/mappings/{id}/confirm` con `{"mapping": {"Peso neto (kg)": "qty_kg", "=type": "proyeccion"}}`.
+- **Documentación interactiva:** http://127.0.0.1:8000/docs
 
 ## Desarrollo del backend
 

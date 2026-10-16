@@ -6,7 +6,9 @@ Mientras un punto no se confirme con el equipo o con Avícola 2, se elige la opc
 - **Columnas, formato y granularidad reales** de los Excel de cada área. Mientras tanto se usan datos sintéticos (declarado como limitación).
 - **Catálogo real** de productos y canales, y la unidad de medida (kg o aves).
 - **Cuánta historia real existe** y con qué granularidad.
-- **Qué es la "demanda real"** para entrenar: pedidos, despachos o ventas.
+- **Archivos sin columna `tipo`:** se tratan como pedidos, salvo que un mapeo confirmado fije `=type` (ADR 0003).
+- **Archivos semanales** (como el resumen de Tiendas): quedan pendientes de mapeo hasta saber si los datos reales son diarios o semanales.
+- **Qué es la "demanda real" para entrenar: pedidos, despachos o ventas.
   - Los días con **recorte** (F5) registran menos de lo que se pidió: la demanda está *censurada*.
   - Supuesto inicial: entrenar con pedidos e incluir un indicador de recorte como feature, o excluir esos días si se marcan.
 

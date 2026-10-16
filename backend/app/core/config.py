@@ -21,7 +21,10 @@ class Settings(BaseSettings):
     # Raíz del lakehouse Delta: ruta local (./data/lakehouse) o gs://bucket/lakehouse.
     lakehouse_uri: str = "./data/lakehouse"
 
-    # Carpeta con catalog.yaml (y luego schemas.yaml).
+    # Token que n8n envía en X-Api-Token a /ingest/* (vacío = sin control; provisional hasta JWT).
+    ingest_api_token: str | None = None
+
+    # Carpeta con catalog.yaml y schemas.yaml.
     config_dir: Path = Path(__file__).resolve().parents[2] / "config"
 
     # Estados permitidos para un plan de saca (configurables, ver ADR / docs/assumptions.md).

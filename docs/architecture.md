@@ -71,7 +71,7 @@ flowchart LR
 
 | Componente | Hace | No hace |
 |---|---|---|
-| **n8n** | Detectar archivos, guardar crudos en bronze, llamar endpoints, cron, notificaciones, flujos con LLM | Transformar datos, aplicar lógica de negocio ni escribir en la base de la app |
+| **n8n** | Detectar archivos y enviarlos a `/ingest/upload`, llamar endpoints, cron, notificaciones, flujos con LLM | Escribir en el lakehouse, transformar datos, aplicar lógica de negocio ni escribir en la base de la app |
 | **FastAPI** | API, lógica de negocio, bronze→silver→gold, predicción, consultas con DuckDB, `ingestion_log` | Programar tareas ni enviar mensajes |
 | **ml-train** | Entrenamiento y backtest (mismo código del backend, otro proceso) | Atender peticiones de usuario |
 | **Supabase (Postgres)** | Estado transaccional de la app (esquema `app`) y de n8n (esquema `n8n`) | Histórico analítico, Auth, Storage, Data API |
@@ -250,7 +250,7 @@ Se exportan como JSON en `n8n/workflows/`.
 
 | Workflow | Trigger | Pasos |
 |---|---|---|
-| `01_ingesta_excel` | Local: Local File Trigger **con polling** sobre `/data/inbox`. GCP: Google Drive Trigger (opcional) | Guarda en bronze → `POST /ingest/transform` → avisa los errores que devuelve el backend |
+| `01_ingesta_excel` | Local: Local File Trigger **con polling** sobre `/data/inbox`. GCP: Google Drive Trigger (opcional) | Lee el archivo → `POST /ingest/upload` (el backend escribe bronze, silver y gold) → arma un aviso si el estado no es `ok` ([ADR 0003](adr/0003-ingesta-el-backend-escribe-bronze.md)) |
 | `02_captura_mensajes` | Telegram Trigger | LLM extrae → valida → bronze → `POST /ingest/message` → confirma al remitente |
 | `03_forecast_diario` | Cron diario (madrugada) | `POST /ml/predict` → desviaciones → alertas → notifica |
 | `04_reentrenamiento` | Cron semanal | `POST /ml/train` → notifica métricas |
@@ -268,7 +268,13 @@ Se exportan como JSON en `n8n/workflows/`.
 ## 10. Backend (FastAPI): módulos
 
 - `auth`: login con JWT, roles y filtro por `channel`.
-- `ingest`: `/ingest/upload`, `/ingest/transform`, `/ingest/message`, `/ingest/mappings` (listar y confirmar). Escribe `ingestion_log`.
+- `ingest` (implementado en el paso 3, protegido con `X-Api-Token` hasta el JWT):
+  - `POST /ingest/upload`: multipart `file`, `source` y `table` opcional → bronze → silver → gold.
+  - `POST /ingest/transform`: `{bronze_path}`, reprocesa un archivo de bronze.
+  - `GET /ingest/log`.
+  - `GET /ingest/mappings`, `PUT /ingest/mappings/{id}/proposal` y `POST /ingest/mappings/{id}/confirm` (confirma y reprocesa los archivos pendientes).
+  - `/ingest/message` llega en el paso 6.
+  - Estados de una carga: `ok`, `partial`, `failed` y `needs_mapping`.
 - `ml`: train, predict y metrics.
 - `saca`: CRUD de planes, flujo de aprobación, comentarios y cálculo de la saca sugerida (sección 6).
 - `analytics`: consultas a gold (forecast vs. plan, histórico, excedentes) y `/analytics/query` con lista blanca.

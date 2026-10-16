@@ -1,0 +1,64 @@
+# Esquemas de las tablas silver. Ningún esquema va fijo en el código: si cambian los datos
+# reales de Avícola 2, se edita este archivo (docs/architecture.md §5).
+#
+# Por columna:
+#   type:          date | string | float | int
+#   required:      si falta la columna o el valor, la fila (o el archivo) no se puede cargar
+#   default:       valor cuando la columna no existe o la celda está vacía
+#   aliases:       nombres alternativos (se comparan normalizados: minúsculas, sin tildes, "_")
+#   catalog:       channels | products → el valor debe estar en backend/config/catalog.yaml
+#   allowed:       lista cerrada de valores
+#   from_filename: si la columna no existe, se toma del nombre {canal}_{responsable}_{AAAAMMDD}
+#   min:           valor mínimo
+#
+# SUPUESTO: si un archivo no trae la columna `tipo`, sus filas se tratan como pedidos.
+
+granularity: daily  # daily | weekly
+
+# Columna que decide a qué tabla va cada fila de un Excel de carga.
+routing:
+  field: type
+  aliases: [tipo, tipo_registro]
+  default: pedido
+  tables:
+    pedido: orders
+    proyeccion: projections
+
+tables:
+  orders:
+    merge_keys: [date, channel, customer, product]
+    columns:
+      date:         {type: date,   required: true,  aliases: [fecha, fecha_pedido, fecha_de_pedido, dia]}
+      channel:      {type: string, required: true,  catalog: channels, from_filename: true, aliases: [canal, area]}
+      customer:     {type: string, required: false, default: "", aliases: [cliente, local, tienda]}
+      product:      {type: string, required: true,  catalog: products, default: TOTAL, aliases: [producto, item]}
+      qty_kg:       {type: float,  required: true,  min: 0, aliases: [cantidad_kg, cantidad, kilos, kg, peso, ordered_kg]}
+      delivered_kg: {type: float,  required: false, min: 0, aliases: [entregado_kg, despachado_kg]}
+      responsible:  {type: string, required: false, aliases: [responsable]}
+
+  projections:
+    merge_keys: [date, channel, customer, product]
+    columns:
+      date:        {type: date,   required: true,  aliases: [fecha, dia]}
+      channel:     {type: string, required: true,  catalog: channels, from_filename: true, aliases: [canal, area]}
+      customer:    {type: string, required: false, default: "", aliases: [cliente, local, tienda]}
+      product:     {type: string, required: true,  catalog: products, default: TOTAL, aliases: [producto, item]}
+      qty_kg:      {type: float,  required: true,  min: 0, aliases: [cantidad_kg, cantidad, kilos, kg, peso]}
+      source:      {type: string, required: false, default: excel, allowed: [excel, message], aliases: [fuente]}
+      responsible: {type: string, required: false, aliases: [responsable]}
+
+  saca:
+    merge_keys: [date]
+    columns:
+      date:          {type: date,  required: true,  aliases: [fecha]}
+      planned_birds: {type: int,   required: false, min: 0, aliases: [aves_planificadas, aves]}
+      planned_kg:    {type: float, required: true,  min: 0, aliases: [kg_planificados, saca_kg]}
+      actual_kg:     {type: float, required: false, min: 0, aliases: [kg_reales, saca_real_kg]}
+
+  surplus_events:
+    merge_keys: [date, product, destination]
+    columns:
+      date:        {type: date,   required: true,  aliases: [fecha]}
+      product:     {type: string, required: true,  catalog: products, default: TOTAL, aliases: [producto]}
+      qty_kg:      {type: float,  required: true,  min: 0, aliases: [cantidad_kg, kilos, kg]}
+      destination: {type: string, required: true,  allowed: [recategorize, next_day, discard], aliases: [destino]}

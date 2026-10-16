@@ -2,7 +2,8 @@
 
 from fastapi import FastAPI
 
-from app.api import health
+from app.api import health, ingest
 
 app = FastAPI(title="Avícola 2 — Planificación de saca", version="0.1.0")
 app.include_router(health.router)
+app.include_router(ingest.router)

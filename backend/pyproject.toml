@@ -5,13 +5,16 @@ description = "Backend de la plataforma de planificación de saca de Avícola 2"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.0",
+    "deltalake>=1.6.6",
     "fastapi[standard]>=0.143.2",
     "holidays>=0.106",
     "numpy>=2.5.4",
     "openpyxl>=3.1.5",
     "pandas>=3.0.6",
     "psycopg[binary]>=3.3.6",
+    "pyarrow>=26.0.0",
     "pydantic-settings>=2.16.0",
+    "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
     "sqlalchemy>=2",
 ]

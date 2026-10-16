@@ -64,6 +64,9 @@ services:
       # n8n 2.x desactiva LocalFileTrigger por defecto; lo habilitamos y dejamos bloqueado ExecuteCommand.
       NODES_EXCLUDE: '["n8n-nodes-base.executeCommand"]'
       BACKEND_URL: http://backend:8000
+      # Token para llamar a /ingest/*; el workflow lo lee con $env (por eso se permite el acceso a env).
+      INGEST_API_TOKEN: ${INGEST_API_TOKEN:-}
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:
       - n8n_data:/home/node/.n8n
       - ./data/inbox:/data/inbox
@@ -83,6 +86,7 @@ services:
       # Supabase (pooler en modo sesión). Con el perfil localdb se usa DATABASE_URL_CONTAINER.
       DATABASE_URL: ${DATABASE_URL_CONTAINER:-${DATABASE_URL}}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      INGEST_API_TOKEN: ${INGEST_API_TOKEN:-}
       # Dentro del contenedor el lakehouse local está montado en /data/lakehouse.
       LAKEHOUSE_URI: ${LAKEHOUSE_URI_CONTAINER:-/data/lakehouse}
       UVICORN_WORKERS: ${UVICORN_WORKERS:-1}

@@ -75,11 +75,16 @@ class IngestionLog(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     file_name: Mapped[str] = mapped_column(String(255))
-    source: Mapped[str] = mapped_column(String(32))  # excel | message | upload
+    source: Mapped[str] = mapped_column(String(32))  # upload | inbox | message | synthetic
     rows_ok: Mapped[int] = mapped_column(default=0)
     rows_error: Mapped[int] = mapped_column(default=0)
     errors_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON)
-    status: Mapped[str] = mapped_column(String(32))
+    # ok | partial | failed | needs_mapping
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    bronze_path: Mapped[str | None] = mapped_column(String(512))
+    source_signature: Mapped[str | None] = mapped_column(String(64), index=True)
+    # Filas cargadas por tabla y versión Delta resultante: {"orders": {"rows": 60, "version": 3}}
+    tables_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
 
 class ColumnMapping(TimestampMixin, Base):
@@ -87,9 +92,18 @@ class ColumnMapping(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     source_signature: Mapped[str] = mapped_column(String(128), unique=True)
-    mapping_json: Mapped[dict[str, str]] = mapped_column(JSON)
+    # Encabezados tal como venían en el archivo (para mostrarlos al confirmar).
+    source_columns: Mapped[list[str] | None] = mapped_column(JSON)
+    # Encabezado normalizado → campo. Mientras está pendiente, es la propuesta (alias o LLM).
+    mapping_json: Mapped[dict[str, str] | None] = mapped_column(JSON)
+    missing_fields: Mapped[list[str] | None] = mapped_column(JSON)
     status: Mapped[str] = mapped_column(String(32), default="pending")  # pending | confirmed
+    proposed_by: Mapped[str | None] = mapped_column(String(16))  # alias | llm | user
+    sample_file: Mapped[str | None] = mapped_column(String(255))
     confirmed_by: Mapped[int | None] = mapped_column(ForeignKey("app.users.id"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class Alert(TimestampMixin, Base):
