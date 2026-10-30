@@ -1,0 +1,20 @@
+{
+  "name": "noraves-planificacion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mockup funcional de proyección de demanda de Noraves conectado a Azure SQL",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "demo": "node -e \"process.env.DB_MODO='memoria';require('./server.js')\"",
+    "db:init": "node db.js init",
+    "db:seed": "node db.js seed",
+    "db:ver": "node db.js ver",
+    "db:limpiar": "node db.js limpiar"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "mssql": "^11.0.1"
+  }
+}
