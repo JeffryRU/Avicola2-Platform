@@ -34,7 +34,8 @@ export function DashboardFilters() {
   const { week, seller, setWeek, setSeller } = useDashboardFilters()
   const sellers = useSellers().data ?? []
   // Un vendedor solo ve sus datos (lo filtra el backend): el selector es solo del supervisor.
-  const team = isSupervisor(useRequiredSession().seller)
+  const me = useRequiredSession().seller
+  const team = isSupervisor(me)
   return (
     <div className="flex flex-wrap gap-2 px-4 pb-1 dsk:gap-3 dsk:p-0">
       <div className={boxCls}>
@@ -55,6 +56,17 @@ export function DashboardFilters() {
           </SelectContent>
         </Select>
       </div>
+      {!team && (
+        <div className={boxCls}>
+          <span className="mb-1.5 ml-0.5 block text-[13px] font-bold">Vendedor</span>
+          <div className={cn(triggerCls, 'flex items-center gap-2.5 border px-3')}>
+            <Users className="size-[18px] flex-none text-ink-2" />
+            <span className="min-w-0 truncate">
+              {me.name} <small className="hidden font-normal text-muted-foreground dsk:inline">· solo tus proyecciones</small>
+            </span>
+          </div>
+        </div>
+      )}
       {team && (
         <div className={boxCls}>
           <label className="mb-1.5 ml-0.5 block text-[13px] font-bold" id="f-seller">
