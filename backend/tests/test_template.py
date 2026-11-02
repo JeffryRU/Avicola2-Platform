@@ -3,8 +3,8 @@ from datetime import date
 import pandas as pd
 from openpyxl import load_workbook
 
-from app.core.catalog import get_catalog
-from app.ingest.template import (
+from app.ingest.infrastructure.config import get_catalog
+from app.ingest.infrastructure.files.template import (
     DATA_SHEET,
     HEADERS,
     LISTS_SHEET,
@@ -12,8 +12,8 @@ from app.ingest.template import (
     file_name,
     fill_rows,
 )
-from app.synthetic.generator import SyntheticConfig, generate
-from app.synthetic.samples import write_samples
+from app.ingest.infrastructure.synthetic.generator import SyntheticConfig, generate
+from app.ingest.infrastructure.synthetic.samples import write_samples
 
 
 def test_template_structure_and_validations(tmp_path) -> None:

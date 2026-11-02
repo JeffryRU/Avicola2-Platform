@@ -20,7 +20,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from app.ml import calendar as cal
+from app.shared.domain import calendar as cal
+from app.shared.infrastructure.calendar import special_days
 
 # kg de producto por día, por canal y producto (nivel base al inicio de la serie).
 BASE_KG: dict[str, dict[str, float]] = {
@@ -201,7 +202,7 @@ def generate(cfg: SyntheticConfig) -> SyntheticDataset:
     """Genera el dataset completo de forma determinista según cfg.seed."""
     rng = np.random.default_rng(cfg.seed)
     dates = pd.date_range(cfg.start, cfg.end, freq="D")
-    events = cal.special_days(cfg.start, cfg.end)
+    events = special_days(cfg.start, cfg.end)
 
     demand = _series_index(dates)
     demand["expected_kg"] = _expected_demand(demand, cfg, events)

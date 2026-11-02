@@ -1,8 +1,10 @@
 import pytest
 
-from app.ingest.service import IngestService
-from app.lakehouse.store import Lakehouse
-from app.lakehouse.tables import GOLD, SILVER
+from app.core.config import get_settings
+from app.ingest.application.service import IngestService
+from app.ingest.bootstrap import build_service
+from app.ingest.infrastructure.lakehouse import GOLD, SILVER
+from app.shared.infrastructure.lakehouse import Lakehouse
 
 
 @pytest.fixture
@@ -11,8 +13,8 @@ def lakehouse(tmp_path) -> Lakehouse:
 
 
 @pytest.fixture
-def service(lakehouse, fake_repo, schema, catalog) -> IngestService:
-    return IngestService(lakehouse, fake_repo, schema, catalog)
+def service(lakehouse, fake_repo) -> IngestService:
+    return build_service(fake_repo, get_settings(), lakehouse)
 
 
 def test_upload_writes_bronze_silver_gold_and_log(service, lakehouse, fake_repo, sample) -> None:

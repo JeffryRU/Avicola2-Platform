@@ -16,9 +16,9 @@ import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-from app.core.catalog import Catalog
-from app.ingest.template import build_template, file_name, fill_rows
-from app.synthetic.generator import SyntheticDataset
+from app.ingest.domain.catalog import Catalog
+from app.ingest.infrastructure.files.template import build_template, file_name, fill_rows
+from app.ingest.infrastructure.synthetic.generator import SyntheticDataset
 
 
 @dataclass(frozen=True)

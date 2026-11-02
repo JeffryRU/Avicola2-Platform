@@ -15,12 +15,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from app.core.catalog import get_catalog  # noqa: E402
-from app.db.session import SessionLocal  # noqa: E402
-from app.ingest.repository import SqlIngestRepository  # noqa: E402
-from app.ingest.schema import get_schema  # noqa: E402
-from app.ingest.service import IngestService  # noqa: E402
-from app.lakehouse.store import get_lakehouse  # noqa: E402
+from app.core.config import get_settings  # noqa: E402
+from app.ingest.bootstrap import build_service  # noqa: E402
+from app.ingest.infrastructure.persistence.repository import SqlIngestRepository  # noqa: E402
+from app.shared.infrastructure.database.session import SessionLocal  # noqa: E402
+from app.shared.infrastructure.lakehouse import get_lakehouse  # noqa: E402
 
 FILES = {
     "orders.csv": "orders",
@@ -39,12 +38,11 @@ def main() -> None:
     if missing:
         sys.exit(f"Faltan {missing} en {args.dir}. Corre antes scripts/generate_synthetic.py")
 
-    lakehouse = get_lakehouse()
+    settings = get_settings()
+    lakehouse = get_lakehouse(settings)
     print(f"Lakehouse: {lakehouse.uri}")
     with SessionLocal() as session:
-        service = IngestService(
-            lakehouse, SqlIngestRepository(session), get_schema(), get_catalog()
-        )
+        service = build_service(SqlIngestRepository(session), settings, lakehouse)
         for name, table in FILES.items():
             start = time.perf_counter()
             result = service.ingest((args.dir / name).read_bytes(), name, "synthetic", table)

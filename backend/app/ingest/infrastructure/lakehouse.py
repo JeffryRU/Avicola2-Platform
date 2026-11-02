@@ -1,4 +1,4 @@
-"""Escritura de silver según schemas.yaml y recálculo de gold."""
+"""Adaptador Delta de la ingesta: escritura de silver según schemas.yaml y recálculo de gold."""
 
 from collections.abc import Iterable
 from datetime import UTC, date, datetime
@@ -6,8 +6,22 @@ from datetime import UTC, date, datetime
 import pandas as pd
 import pyarrow as pa
 
-from app.ingest.schema import TableSpec
-from app.lakehouse.store import ARROW_TYPES, LINEAGE_FIELDS, Lakehouse
+from app.ingest.domain.models import Row
+from app.ingest.domain.schema import TableSpec
+from app.shared.infrastructure.lakehouse import Lakehouse
+
+ARROW_TYPES: dict[str, pa.DataType] = {
+    "date": pa.date32(),
+    "string": pa.string(),
+    "float": pa.float64(),
+    "int": pa.int64(),
+}
+# Columnas de linaje que se agregan a toda tabla silver.
+LINEAGE_FIELDS = [
+    pa.field("source_file", pa.string()),
+    pa.field("source_ref", pa.string()),
+    pa.field("ingested_at", pa.timestamp("us", tz="UTC")),
+]
 
 SILVER = "silver"
 GOLD = "gold"
@@ -33,10 +47,10 @@ def silver_schema(spec: TableSpec) -> pa.Schema:
 
 
 def write_silver(
-    lh: Lakehouse, table: str, spec: TableSpec, df: pd.DataFrame, source_file: str, source_ref: str
+    lh: Lakehouse, table: str, spec: TableSpec, rows: list[Row], source_file: str, source_ref: str
 ) -> int:
     """Upsert de filas ya validadas en silver.{table}. Devuelve la versión Delta resultante."""
-    data = df.copy()
+    data = pd.DataFrame.from_records(rows, columns=list(spec.columns))
     data["source_file"] = source_file
     data["source_ref"] = source_ref
     data["ingested_at"] = pd.Timestamp(datetime.now(UTC))
@@ -70,3 +84,18 @@ def refresh_daily_demand(lh: Lakehouse, dates: Iterable[date]) -> int | None:
     gold["updated_at"] = pd.Timestamp(datetime.now(UTC))
     arrow = pa.Table.from_pandas(gold, schema=DAILY_DEMAND_SCHEMA, preserve_index=False)
     return lh.upsert(GOLD, DAILY_DEMAND, arrow, DAILY_DEMAND_KEYS)
+
+
+class DeltaAnalyticsStore:
+    """Adaptador del puerto AnalyticsStore sobre el lakehouse Delta."""
+
+    def __init__(self, lakehouse: Lakehouse) -> None:
+        self.lakehouse = lakehouse
+
+    def write_silver(
+        self, table: str, spec: TableSpec, rows: list[Row], source_file: str, source_ref: str
+    ) -> int:
+        return write_silver(self.lakehouse, table, spec, rows, source_file, source_ref)
+
+    def refresh_daily_demand(self, dates: Iterable[date]) -> int | None:
+        return refresh_daily_demand(self.lakehouse, dates)

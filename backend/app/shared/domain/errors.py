@@ -15,3 +15,7 @@ class NotFoundError(DomainError):
 
 class AuthenticationError(DomainError):
     """Credenciales o token inválidos."""
+
+
+class ConflictError(DomainError):
+    """La operación choca con el estado actual del recurso."""

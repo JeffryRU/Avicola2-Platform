@@ -166,7 +166,7 @@ tables:
 
 ### Plantilla Excel estándar
 
-`scripts/generate_template.py` → `data/templates/plantilla_carga.xlsx` (lógica en `backend/app/ingest/template.py`, listas desde `backend/config/catalog.yaml`).
+`scripts/generate_template.py` → `data/templates/plantilla_carga.xlsx` (lógica en `backend/app/ingest/infrastructure/files/template.py`, listas desde `backend/config/catalog.yaml`).
 
 - Hoja `datos` con las columnas: `fecha | canal | cliente | producto | cantidad_kg | tipo | responsable`.
   - `canal`: Horeca / Supermercados / Tiendas.
@@ -222,14 +222,14 @@ aves         = kg_vivo / avg_live_weight_kg
   - `POST /ml/predict?horizon=14`: escribe en `gold.forecast`.
   - `GET /ml/metrics`.
 - **Artefactos:** en `backend/models/` (local) o en `{LAKEHOUSE_URI}/models/` (GCP), en joblib con metadatos.
-- **Datos sintéticos:** `scripts/generate_synthetic.py` (lógica en `backend/app/synthetic/`) genera 18 meses diarios (3 canales, 6 productos, 13 series, clientes ficticios) en `data/synthetic/`:
+- **Datos sintéticos:** `scripts/generate_synthetic.py` (lógica en `backend/app/ingest/infrastructure/synthetic/`) genera 18 meses diarios (3 canales, 6 productos, 13 series, clientes ficticios) en `data/synthetic/`:
   - `orders.csv`: `ordered_kg` (demanda real) y `delivered_kg` (lo entregado tras un recorte, es decir, la demanda censurada);
   - `projections.csv`: proyecciones de los canales, con sesgo y error;
   - `saca.csv`: saca planificada por "Producción" con un naive semanal ajustado por calendario. Los recortes y excedentes salen de comparar esa saca con la demanda;
   - `surplus_events.csv`: excedentes con su destino;
   - `metadata.json`: parámetros y resumen.
 
-  Incluye tendencia, perfil semanal por canal, feriados de Perú y fechas pico (`backend/app/ml/calendar.py`). También genera los Excel de ejemplo de `data/samples/` (ver su README).
+  Incluye tendencia, perfil semanal por canal, feriados de Perú y fechas pico (`backend/app/shared/domain/calendar.py` y `backend/app/shared/infrastructure/calendar.py`). También genera los Excel de ejemplo de `data/samples/` (ver su README).
 
 ---
 

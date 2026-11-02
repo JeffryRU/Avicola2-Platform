@@ -1,7 +1,7 @@
 import pandas as pd
 
-from app.ingest.pipeline import channel_from_filename, parse
-from app.ingest.reader import read_file
+from app.ingest.domain.pipeline import channel_from_filename, parse
+from app.ingest.infrastructure.files.reader import read_file
 
 
 def _parse(path, schema, catalog, confirmed=None, table=None):
@@ -12,7 +12,7 @@ def _parse(path, schema, catalog, confirmed=None, table=None):
 def test_standard_template_loads(sample, schema, catalog) -> None:
     _, out = _parse(sample("Horeca_comercial1"), schema, catalog)
     assert out.status == "ok"
-    orders = out.tables["orders"]
+    orders = pd.DataFrame(out.tables["orders"])
     assert out.rows_ok == len(orders) == 60
     assert set(orders["channel"]) == {"Horeca"}
     assert orders["qty_kg"].gt(0).all()
@@ -57,7 +57,7 @@ def test_confirmed_mapping_with_constants_routes_to_projections(sample, schema, 
     _, out = _parse(sample("Horeca_horeca-wsp"), schema, catalog, confirmed)
     assert out.status == "ok"
     assert list(out.tables) == ["projections"]
-    proj = out.tables["projections"]
+    proj = pd.DataFrame(out.tables["projections"])
     assert set(proj["source"]) == {"message"}
     assert set(proj["channel"]) == {"Horeca"}  # tomado del nombre del archivo
     assert set(proj["product"]) <= set(catalog.products)  # "POLLO BRASA" → "Pollo brasa"
@@ -83,7 +83,7 @@ def test_duplicate_keys_are_summed(schema, catalog) -> None:
     raw = read_file(csv, "x.csv", schema.known_names())
     out = parse(raw, "x.csv", schema, catalog)
     assert out.status == "ok"
-    orders = out.tables["orders"]
+    orders = pd.DataFrame(out.tables["orders"])
     assert len(orders) == 1
     assert orders.iloc[0]["qty_kg"] == 15.0
     assert orders.iloc[0]["customer"] == "HOR-01"
@@ -94,7 +94,7 @@ def test_missing_product_defaults_to_total(schema, catalog) -> None:
     raw = read_file(csv, "Tiendas_x_20261002.csv", schema.known_names())
     out = parse(raw, "Tiendas_x_20261002.csv", schema, catalog)
     assert out.status == "ok"
-    orders = out.tables["orders"]
+    orders = pd.DataFrame(out.tables["orders"])
     assert set(orders["product"]) == {"TOTAL"}
     assert set(orders["channel"]) == {"Tiendas"}
     assert orders["date"].tolist() == [

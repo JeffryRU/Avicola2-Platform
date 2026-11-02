@@ -1,44 +1,15 @@
-"""Lectura de Excel/CSV: elige la hoja y la fila de encabezado más probables."""
+"""Lectura de Excel/CSV con pandas: elige la hoja y la fila de encabezado más probables."""
 
-import hashlib
 import io
-from dataclasses import dataclass
 
 import pandas as pd
 
-from app.ingest.normalize import is_blank, normalize_header
+from app.ingest.domain.models import RawTable, UnreadableFile
+from app.ingest.domain.normalize import is_blank, normalize_header
 
 HEADER_SCAN_ROWS = 15
 # Solo la celda vacía es "vacía": textos como "n/a" o "NA" deben llegar a la validación.
 _NA = {"keep_default_na": False, "na_values": [""]}
-
-
-class UnreadableFile(Exception):
-    """El archivo no se puede leer como Excel o CSV."""
-
-
-@dataclass
-class RawTable:
-    """Datos crudos con encabezados normalizados."""
-
-    df: pd.DataFrame  # columnas = encabezados normalizados, valores sin convertir
-    source_columns: list[str]  # encabezados tal como venían
-    sheet: str | None
-    header_row: int  # índice 0 de la fila de encabezado en la hoja
-
-    def display_name(self, header: str) -> str:
-        """Encabezado original (como lo escribió el usuario) a partir del normalizado."""
-        return dict(zip(self.df.columns, self.source_columns, strict=True)).get(header, header)
-
-    @property
-    def signature(self) -> str:
-        """Firma del conjunto de columnas, para reutilizar mapeos confirmados."""
-        key = "|".join(sorted(self.df.columns))
-        return hashlib.sha1(key.encode()).hexdigest()[:16]
-
-    def excel_row(self, index: int) -> int:
-        """Número de fila (1-based, como lo ve el usuario en Excel) de la fila `index` de df."""
-        return self.header_row + 2 + index
 
 
 def _header_score(row: pd.Series, known: set[str]) -> int:
@@ -69,7 +40,7 @@ def _to_table(raw: pd.DataFrame, header_row: int, sheet: str | None) -> RawTable
         names.append(name)
     body.columns = names
     body = body.astype(object).where(body.notna(), None)
-    return RawTable(body, source_columns, sheet, header_row)
+    return RawTable(names, source_columns, body.to_dict("records"), sheet, header_row)
 
 
 def read_file(content: bytes, filename: str, known: set[str]) -> RawTable:
@@ -106,3 +77,10 @@ def read_file(content: bytes, filename: str, known: set[str]) -> RawTable:
         raise UnreadableFile(f"{filename} no tiene datos")
     _, sheet, row = best
     return _to_table(sheets[sheet], row, sheet)
+
+
+class PandasFileReader:
+    """Adaptador del puerto FileReader."""
+
+    def read(self, content: bytes, filename: str, known: set[str]) -> RawTable:
+        return read_file(content, filename, known)

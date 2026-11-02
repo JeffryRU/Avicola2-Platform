@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 import pytest
 
-from app.ingest.normalize import (
+from app.ingest.domain.normalize import (
     CellError,
     normalize_header,
     normalize_key,

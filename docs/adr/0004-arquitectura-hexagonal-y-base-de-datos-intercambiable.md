@@ -17,10 +17,18 @@
 ```
 backend/app/
 ├── shared/                         núcleo compartido
-│   ├── domain/errors.py            DomainError, NotFoundError, AuthenticationError
+│   ├── domain/                     errores (DomainError, NotFoundError, AuthenticationError,
+│   │                               ConflictError) y calendario de fechas pico
 │   └── infrastructure/
 │       ├── database/               engine por motor, nombres de tablas, metadata, sesión
-│       └── http/                   errores → HTTP, servir la PWA
+│       ├── http/                   errores → HTTP, /health, servir la PWA
+│       ├── lakehouse.py            bronze y tablas Delta (único que conoce LAKEHOUSE_URI)
+│       └── calendar.py             feriados de Perú (calendario puro en shared/domain/calendar.py)
+├── ingest/                         ingesta de Excel/CSV: bronze → silver → gold
+│   ├── domain/                     esquema, catálogo, normalización, parseo y mapeos (Python puro)
+│   ├── application/                puertos (Protocol), IngestService y casos de uso de mapeos/log
+│   ├── infrastructure/             adaptadores: lector pandas, Delta, SQL, HTTP, plantilla, sintéticos
+│   └── bootstrap.py                raíz de composición
 └── planning/                       planificación de demanda (la app de vendedores)
     ├── domain/                     entidades y reglas (Python puro)
     ├── application/                puertos (Protocol) y casos de uso
@@ -30,7 +38,7 @@ backend/app/
 
 - **Dependencias hacia adentro:** `domain` no importa nada externo; `application` solo `domain` y sus puertos. `tests/test_architecture.py` lo verifica en cada `pytest`.
 - **Puertos de salida** (`application/ports.py`): repositorios, `SalesSource`, `DemandForecaster`, `PasswordHasher`, `TokenService`, `Clock`. Cambiar una fuente (ERP real, modelo de ML) es escribir otro adaptador y tocar solo `bootstrap.py`.
-- La ingesta existente (`app/ingest`, `app/lakehouse`, `app/api`) **se mantiene como estaba** por ahora; se migrará a la misma estructura en un cambio aparte.
+- **La ingesta ya migró a esta estructura** (antes `app/ingest`, `app/lakehouse`, `app/api`, `app/synthetic` y `app/ml`); ver [Migración de la ingesta](#migración-de-la-ingesta).
 
 ### Base de datos independiente del motor
 
@@ -69,7 +77,7 @@ frontend/src/
 - **Mantener Node + Azure SQL del mockup:** dos backends y dos bases para una misma plataforma; el ML vive en Python.
 - **Un repositorio SQL distinto por motor:** duplicaría la lógica (contra DRY). SQLAlchemy ya abstrae los dialectos; solo las diferencias reales (conexión, esquemas) van en el perfil.
 - **Next.js o una app nativa:** el SSR no aporta (FastAPI sirve los estáticos) y una PWA cubre instalación, offline y cámara/micrófono a futuro.
-- **Reescribir también la ingesta ahora:** mayor riesgo sin beneficio inmediato para la app de vendedores; queda como paso siguiente.
+- **Reescribir también la ingesta en el mismo cambio:** mayor riesgo sin beneficio inmediato para la app de vendedores; se hizo después, en un cambio aparte (ver abajo).
 
 ## Consecuencias
 
@@ -77,3 +85,11 @@ frontend/src/
 - "Sugerir con historial" usa el **promedio del mismo día de la semana** (`WeekdayAverageForecaster`); el modelo de ML lo reemplazará por otro adaptador del mismo puerto.
 - Los vendedores tienen su propia tabla (`np_sellers`) y login con JWT; el vendedor sale del token, nunca del cuerpo de la petición. Los hashes scrypt son compatibles con los del mockup.
 - TypeScript queda en la versión 6 porque typescript-eslint aún no soporta TypeScript 7.
+
+## Migración de la ingesta
+
+- **Fecha:** 2026-11-02. La ingesta se reorganizó con las mismas capas, **sin cambiar el comportamiento**: los endpoints `/ingest/*` y `/health` (los que usa n8n) responden igual, incluido el OpenAPI, y `IngestService` sigue siendo la única ruta bronze → silver → gold.
+- **Dominio puro:** `schemas.yaml` y `catalog.yaml` se modelan con dataclasses; pydantic los valida al cargarlos (`ingest/infrastructure/config.py`, con `TypeAdapter`). El parseo trabaja con filas (`list[dict]`) en vez de DataFrames; el agregado de claves repetidas replica la suma de `groupby.sum` de pandas (compensación de Kahan, vacíos ignorados) para dar los mismos números.
+- **Puertos** (`ingest/application/ports.py`): `FileReader`, `BronzeStore`, `AnalyticsStore` (silver y gold), `IngestRepository`, `IngestionLogRepository` y `MappingRepository`. La validación de mapeos pasó del endpoint al dominio (`domain/mapping.py`) y sus errores llegan a HTTP por el manejador compartido (se sumó `ConflictError` → 409).
+- **Compartido:** el acceso al lakehouse (`shared/infrastructure/lakehouse.py`), el `/health` y el calendario de Perú quedan en `shared`, porque también los usarán el forecast y otros contextos.
+- **Verificado:** las respuestas de 56 llamadas a la API y el contenido de las tablas Delta resultantes son idénticos byte a byte antes y después del cambio; `tests/test_architecture.py` cubre ahora `ingest` y prohíbe pandas, pyarrow, deltalake, DuckDB, openpyxl y la configuración en `domain` y `application`.

@@ -1,6 +1,6 @@
 """Acceso al lakehouse: archivos crudos (bronze) y tablas Delta (silver, gold).
 
-Es la única capa que conoce LAKEHOUSE_URI (disco local o gs://…), ver ADR 0001.
+Es el único módulo que conoce LAKEHOUSE_URI (disco local o gs://…), ver ADR 0001.
 Un solo escritor: todas las escrituras Delta pasan por un lock de proceso, y el backend
 corre con un único worker (UVICORN_WORKERS=1).
 """
@@ -20,22 +20,9 @@ import pyarrow.fs as pafs
 from deltalake import DeltaTable, write_deltalake
 from deltalake.exceptions import TableNotFoundError
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 
 _write_lock = threading.Lock()
-
-ARROW_TYPES: dict[str, pa.DataType] = {
-    "date": pa.date32(),
-    "string": pa.string(),
-    "float": pa.float64(),
-    "int": pa.int64(),
-}
-# Columnas de linaje que se agregan a toda tabla silver.
-LINEAGE_FIELDS = [
-    pa.field("source_file", pa.string()),
-    pa.field("source_ref", pa.string()),
-    pa.field("ingested_at", pa.timestamp("us", tz="UTC")),
-]
 
 
 def _safe_name(filename: str) -> str:
@@ -136,9 +123,9 @@ class Lakehouse:
         return dataset.to_table(columns=list(columns) if columns else None, filter=expr).to_pandas()
 
 
-def get_lakehouse() -> Lakehouse:
+def get_lakehouse(settings: Settings | None = None) -> Lakehouse:
     """Lakehouse configurado. Las rutas relativas se resuelven desde la raíz del repo."""
-    settings = get_settings()
+    settings = settings or get_settings()
     uri = settings.lakehouse_uri
     if "://" not in uri and not Path(uri).is_absolute():
         uri = str((settings.config_dir.parents[1] / uri).resolve())

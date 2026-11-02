@@ -3,8 +3,8 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from app.core.catalog import get_catalog
-from app.synthetic.generator import BASE_KG, SyntheticConfig, generate
+from app.ingest.infrastructure.config import get_catalog
+from app.ingest.infrastructure.synthetic.generator import BASE_KG, SyntheticConfig, generate
 
 END = date(2026, 10, 14)
 

@@ -13,10 +13,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from app.core.catalog import get_catalog  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
-from app.synthetic.generator import SyntheticConfig, generate, write_dataset  # noqa: E402
-from app.synthetic.samples import write_samples  # noqa: E402
+from app.ingest.infrastructure.config import get_catalog  # noqa: E402
+from app.ingest.infrastructure.synthetic.generator import (  # noqa: E402
+    SyntheticConfig,
+    generate,
+    write_dataset,
+)
+from app.ingest.infrastructure.synthetic.samples import write_samples  # noqa: E402
 
 
 def main() -> None:

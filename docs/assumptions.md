@@ -32,6 +32,6 @@ Mientras un punto no se confirme con el equipo o con Avícola 2, se elige la opc
 - **Proyecto, región, presupuesto y créditos de GCP** disponibles para el despliegue.
 - **Proyecto de Supabase:** región (cerca de la VM de GCP) y si el plan gratuito alcanza (500 MB, pausa por inactividad).
 - **Dominio para HTTPS en GCP:** dominio propio o un servicio de DNS comodín (tipo sslip.io).
-- **Qué warehouse o lakehouse tiene un compañero del grupo.** Si se usa el suyo, solo cambia la capa `backend/app/lakehouse/`.
+- **Qué warehouse o lakehouse tiene un compañero del grupo.** Si se usa el suyo, solo cambian los adaptadores del lakehouse (`backend/app/shared/infrastructure/lakehouse.py` y `backend/app/ingest/infrastructure/lakehouse.py`).
 - **Azure SQL en producción:** queda configurado (driver opcional y perfil de motor) pero **no se probó contra un SQL Server real**; probarlo antes de usarlo ([ADR 0004](adr/0004-arquitectura-hexagonal-y-base-de-datos-intercambiable.md)).
 - **Si la rúbrica del curso exige** almacenamiento de objetos o lakehouse. GCS lo cubre en el despliegue ([ADR 0001](adr/0001-almacenamiento-gcs-y-despliegue-en-vm.md)).

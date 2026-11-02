@@ -1,15 +1,21 @@
-"""Orquestación de una carga: bronze → validación → silver → gold, y registro en ingestion_log."""
+"""Orquestación de una carga: bronze → validación → silver → gold, y registro en ingestion_log.
+
+Es la única ruta de la ingesta: endpoints y scripts la reutilizan (se arma en bootstrap.py).
+"""
 
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.core.catalog import Catalog
-from app.ingest.pipeline import ParseOutcome, parse
-from app.ingest.reader import UnreadableFile, read_file
-from app.ingest.repository import IngestRepository, LogEntry, PendingMapping
-from app.ingest.schema import IngestSchema
-from app.lakehouse.store import Lakehouse
-from app.lakehouse.tables import refresh_daily_demand, write_silver
+from app.ingest.application.ports import (
+    AnalyticsStore,
+    BronzeStore,
+    FileReader,
+    IngestRepository,
+)
+from app.ingest.domain.catalog import Catalog
+from app.ingest.domain.models import LogEntry, ParseOutcome, PendingMapping, UnreadableFile
+from app.ingest.domain.pipeline import parse
+from app.ingest.domain.schema import IngestSchema
 
 MAX_RETURNED_ERRORS = 50
 
@@ -47,12 +53,16 @@ def _message(o: ParseOutcome) -> str:
 class IngestService:
     def __init__(
         self,
-        lakehouse: Lakehouse,
+        bronze: BronzeStore,
+        analytics: AnalyticsStore,
+        reader: FileReader,
         repo: IngestRepository,
         schema: IngestSchema,
         catalog: Catalog,
     ) -> None:
-        self.lh = lakehouse
+        self.bronze = bronze
+        self.analytics = analytics
+        self.reader = reader
         self.repo = repo
         self.schema = schema
         self.catalog = catalog
@@ -61,14 +71,14 @@ class IngestService:
         self, content: bytes, file_name: str, source: str, table: str | None = None
     ) -> IngestResult:
         """Guarda el archivo en bronze y lo procesa."""
-        bronze_path = self.lh.put_bronze(source, file_name, content)
+        bronze_path = self.bronze.put_bronze(source, file_name, content)
         return self._process(content, file_name, source, bronze_path, table)
 
     def reprocess(
         self, bronze_path: str, source: str = "reprocess", table: str | None = None
     ) -> IngestResult:
         """Vuelve a procesar un archivo que ya está en bronze (p. ej., tras confirmar un mapeo)."""
-        content = self.lh.get_bronze(bronze_path)
+        content = self.bronze.get_bronze(bronze_path)
         file_name = bronze_path.rsplit("/", 1)[-1].split("_", 2)[-1]
         return self._process(content, file_name, source, bronze_path, table)
 
@@ -76,7 +86,7 @@ class IngestService:
         self, content: bytes, file_name: str, source: str, bronze_path: str, table: str | None
     ) -> IngestResult:
         try:
-            raw = read_file(content, file_name, self.schema.known_names())
+            raw = self.reader.read(content, file_name, self.schema.known_names())
         except UnreadableFile as exc:
             log_id = self.repo.log(
                 LogEntry(
@@ -85,13 +95,13 @@ class IngestService:
                     "failed",
                     0,
                     0,
-                    [{"message": str(exc)}],
+                    [{"message": exc.message}],
                     bronze_path,
                     None,
                     {},
                 )
             )
-            return IngestResult(log_id, file_name, "failed", bronze_path, message=str(exc))
+            return IngestResult(log_id, file_name, "failed", bronze_path, message=exc.message)
 
         confirmed = self.repo.confirmed_mapping(raw.signature)
         outcome = parse(raw, file_name, self.schema, self.catalog, confirmed, table)
@@ -110,15 +120,15 @@ class IngestService:
 
         tables: dict[str, Any] = {}
         affected_dates = set()
-        for name, df in outcome.tables.items():
-            version = write_silver(
-                self.lh, name, self.schema.tables[name], df, file_name, bronze_path
+        for name, rows in outcome.tables.items():
+            version = self.analytics.write_silver(
+                name, self.schema.tables[name], rows, file_name, bronze_path
             )
-            tables[name] = {"rows": len(df), "version": version}
+            tables[name] = {"rows": len(rows), "version": version}
             if name == "orders":
-                affected_dates |= set(df["date"])
+                affected_dates |= {row["date"] for row in rows}
         if affected_dates:
-            gold_version = refresh_daily_demand(self.lh, affected_dates)
+            gold_version = self.analytics.refresh_daily_demand(affected_dates)
             tables["gold.daily_demand"] = {"dates": len(affected_dates), "version": gold_version}
 
         errors = [e.as_dict() for e in outcome.errors]

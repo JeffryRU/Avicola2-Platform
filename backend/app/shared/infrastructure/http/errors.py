@@ -3,11 +3,17 @@
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-from app.shared.domain.errors import AuthenticationError, DomainError, NotFoundError
+from app.shared.domain.errors import (
+    AuthenticationError,
+    ConflictError,
+    DomainError,
+    NotFoundError,
+)
 
 STATUS_BY_ERROR: dict[type[DomainError], int] = {
     AuthenticationError: status.HTTP_401_UNAUTHORIZED,
     NotFoundError: status.HTTP_404_NOT_FOUND,
+    ConflictError: status.HTTP_409_CONFLICT,
     DomainError: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 

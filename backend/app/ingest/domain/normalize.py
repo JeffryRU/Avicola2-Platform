@@ -5,8 +5,6 @@ import unicodedata
 from datetime import date, datetime, timedelta
 from typing import Any
 
-import pandas as pd
-
 _EXCEL_EPOCH = date(1899, 12, 30)
 
 
@@ -32,15 +30,17 @@ def normalize_key(value: str) -> str:
 def is_blank(value: Any) -> bool:
     if value is None:
         return True
-    if isinstance(value, float) and pd.isna(value):
-        return True
-    if value is pd.NaT:
-        return True
-    return isinstance(value, str) and not value.strip()
+    if isinstance(value, str):
+        return not value.strip()
+    # NaN y NaT (de pandas) son los únicos valores distintos de sí mismos.
+    try:
+        return bool(value != value)
+    except TypeError:  # valores sin comparación booleana (p. ej. pd.NA): no se tratan como vacíos
+        return False
 
 
 def parse_date(value: Any) -> date:
-    if isinstance(value, datetime | pd.Timestamp):
+    if isinstance(value, datetime):  # incluye pd.Timestamp, que hereda de datetime
         return value.date()
     if isinstance(value, date):
         return value
@@ -61,7 +61,7 @@ def parse_number(value: Any) -> float:
     if isinstance(value, bool):
         raise CellError(f"número no válido: {value!r}")
     if isinstance(value, int | float):
-        if pd.isna(value):
+        if value != value:  # NaN
             raise CellError("número vacío")
         return float(value)
     if isinstance(value, str):

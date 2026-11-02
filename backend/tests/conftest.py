@@ -9,11 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from app.core.catalog import get_catalog
-from app.ingest.repository import LogEntry, PendingMapping
-from app.ingest.schema import get_schema
-from app.synthetic.generator import SyntheticConfig, generate
-from app.synthetic.samples import write_samples
+from app.ingest.domain.models import LogEntry, PendingMapping
+from app.ingest.infrastructure.config import get_catalog, get_schema
+from app.ingest.infrastructure.synthetic.generator import SyntheticConfig, generate
+from app.ingest.infrastructure.synthetic.samples import write_samples
 
 
 class FakeIngestRepository:

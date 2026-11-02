@@ -1,17 +1,17 @@
 """Mapeo de columnas, validación por fila y reparto en tablas silver.
 
-Es lógica pura (sin base de datos ni lakehouse), para poder probarla con los Excel de ejemplo.
-Orden de mapeo: alias del YAML → mapeo confirmado (column_mappings) → pendiente para el LLM.
+Es lógica pura (sin base de datos, lakehouse ni pandas), para poder probarla con los Excel de
+ejemplo. Orden de mapeo: alias del YAML → mapeo confirmado (column_mappings) → pendiente para
+el LLM.
 """
 
-from dataclasses import dataclass, field
 from pathlib import PurePath
-from typing import Any, Literal
+from typing import Any
 
-import pandas as pd
-
-from app.core.catalog import Catalog
-from app.ingest.normalize import (
+from app.ingest.domain.catalog import Catalog
+from app.ingest.domain.mapping import IGNORE, split_mapping
+from app.ingest.domain.models import ParseOutcome, RawTable, Row, RowError
+from app.ingest.domain.normalize import (
     CellError,
     is_blank,
     normalize_header,
@@ -19,39 +19,7 @@ from app.ingest.normalize import (
     parse_date,
     parse_number,
 )
-from app.ingest.reader import RawTable
-from app.ingest.schema import ColumnSpec, IngestSchema, TableSpec
-
-Status = Literal["ok", "partial", "failed", "needs_mapping"]
-IGNORE = ""  # en un mapeo confirmado, la columna se ignora
-# En un mapeo, una clave "=campo" fija un valor constante para todo el archivo,
-# p. ej. {"=type": "proyeccion"} para un Excel de proyecciones sin columna tipo.
-CONSTANT_PREFIX = "="
-
-
-@dataclass
-class RowError:
-    row: int
-    column: str | None
-    value: Any
-    message: str
-
-    def as_dict(self) -> dict[str, Any]:
-        value = self.value if isinstance(self.value, str | int | float | None) else str(self.value)
-        return {"row": self.row, "column": self.column, "value": value, "message": self.message}
-
-
-@dataclass
-class ParseOutcome:
-    status: Status
-    signature: str
-    source_columns: list[str]
-    mapping: dict[str, str]  # encabezado normalizado → campo
-    missing_fields: list[str] = field(default_factory=list)
-    tables: dict[str, pd.DataFrame] = field(default_factory=dict)
-    errors: list[RowError] = field(default_factory=list)
-    rows_total: int = 0
-    rows_ok: int = 0
+from app.ingest.domain.schema import ColumnSpec, IngestSchema, TableSpec
 
 
 def channel_from_filename(filename: str, catalog: Catalog) -> str | None:
@@ -75,17 +43,6 @@ def auto_mapping(headers: list[str], schema: IngestSchema, tables: list[str]) ->
         if target and target not in mapping.values():
             mapping[header] = target
     return mapping
-
-
-def split_mapping(mapping: dict[str, str]) -> tuple[dict[str, str], dict[str, str]]:
-    """Separa un mapeo en {encabezado: campo} y {campo: valor constante}."""
-    columns = {h: t for h, t in mapping.items() if not h.startswith(CONSTANT_PREFIX)}
-    constants = {
-        h.removeprefix(CONSTANT_PREFIX): v
-        for h, v in mapping.items()
-        if h.startswith(CONSTANT_PREFIX)
-    }
-    return columns, constants
 
 
 def _route(schema: IngestSchema, value: str) -> str | None:
@@ -150,18 +107,46 @@ def _convert(label: str, col: ColumnSpec, value: Any, catalog: Catalog) -> Any:
     return text
 
 
-def _aggregate(df: pd.DataFrame, spec: TableSpec) -> pd.DataFrame:
+def _sum(values: list[Any]) -> Any:
+    """Suma que ignora vacíos, con la misma compensación de Kahan que `groupby.sum` de pandas."""
+    total: Any = 0
+    compensation: Any = 0
+    for value in values:
+        if value is None:
+            continue
+        y = value - compensation
+        t = total + y
+        compensation = t - total - y
+        if compensation != compensation:  # NaN (con infinitos)
+            compensation = 0
+        total = t
+    return total
+
+
+def _first(values: list[Any]) -> Any:
+    return next((v for v in values if v is not None), None)
+
+
+def _aggregate(rows: list[Row], spec: TableSpec) -> list[Row]:
     """Si el archivo repite una clave, suma las cantidades y conserva el primer valor del resto."""
-    if not df.duplicated(spec.merge_keys).any():
-        return df
-    agg = {
-        c: ("sum" if spec.columns[c].type in ("float", "int") else "first")
-        for c in df.columns
-        if c not in spec.merge_keys
-    }
-    return df.groupby(spec.merge_keys, as_index=False, sort=False, dropna=False).agg(agg)[
-        list(df.columns)
-    ]
+    groups: dict[tuple[Any, ...], list[Row]] = {}
+    for row in rows:
+        groups.setdefault(tuple(row[k] for k in spec.merge_keys), []).append(row)
+    if len(groups) == len(rows):
+        return rows
+    merged: list[Row] = []
+    for group in groups.values():
+        out: Row = {}
+        for name, col in spec.columns.items():
+            values = [r[name] for r in group]
+            if name in spec.merge_keys:
+                out[name] = values[0]
+            elif col.type in ("float", "int"):
+                out[name] = _sum(values)
+            else:
+                out[name] = _first(values)
+        merged.append(out)
+    return merged
 
 
 def parse(
@@ -175,7 +160,7 @@ def parse(
     """Convierte la tabla cruda en DataFrames validados por tabla silver."""
     if table is not None and table not in schema.tables:
         raise ValueError(f"tabla desconocida: {table}")
-    headers = list(raw.df.columns)
+    headers = list(raw.columns)
     candidate_tables = [table] if table else schema.routed_tables()
     mapping = auto_mapping(headers, schema, candidate_tables)
     confirmed_columns, constants = split_mapping(confirmed_mapping or {})
@@ -200,9 +185,9 @@ def parse(
         return outcome
 
     header_of = {target: header for header, target in mapping.items()}
-    rows: dict[str, list[dict[str, Any]]] = {t: [] for t in targets}
+    rows: dict[str, list[Row]] = {t: [] for t in targets}
 
-    for i, record in enumerate(raw.df.to_dict("records")):
+    for i, record in enumerate(raw.rows):
         if all(is_blank(v) for v in record.values()):
             continue
         outcome.rows_total += 1
@@ -229,7 +214,7 @@ def parse(
                         )
                     )
 
-        clean: dict[str, Any] = {}
+        clean: Row = {}
         if target is not None:
             for name, col in schema.tables[target].columns.items():
                 header = header_of.get(name)
@@ -263,9 +248,7 @@ def parse(
 
     for name, records in rows.items():
         if records:
-            spec = schema.tables[name]
-            df = pd.DataFrame.from_records(records, columns=list(spec.columns))
-            outcome.tables[name] = _aggregate(df, spec)
+            outcome.tables[name] = _aggregate(records, schema.tables[name])
 
     if outcome.rows_ok == 0:
         outcome.status = "failed"

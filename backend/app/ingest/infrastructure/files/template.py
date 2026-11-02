@@ -15,7 +15,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.worksheet import Worksheet
 
-from app.core.catalog import Catalog
+from app.ingest.domain.catalog import Catalog
 
 DATA_SHEET = "datos"
 LISTS_SHEET = "listas"

@@ -2,9 +2,10 @@
 
 from fastapi import FastAPI
 
-from app.api import health, ingest
 from app.core.config import get_settings
+from app.ingest.infrastructure.http import router as ingest
 from app.planning.infrastructure.http import router as planning
+from app.shared.infrastructure.http import health
 from app.shared.infrastructure.http.errors import register_error_handlers
 from app.shared.infrastructure.http.spa import mount_spa
 

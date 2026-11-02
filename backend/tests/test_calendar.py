@@ -1,6 +1,7 @@
 from datetime import date
 
-from app.ml import calendar as cal
+from app.shared.domain import calendar as cal
+from app.shared.infrastructure.calendar import special_days
 
 
 def test_mothers_day_is_second_sunday_of_may() -> None:
@@ -14,7 +15,7 @@ def test_pollo_a_la_brasa_is_third_sunday_of_july() -> None:
 
 
 def test_special_days_include_peru_holidays_and_peaks() -> None:
-    days = cal.special_days(date(2026, 7, 1), date(2026, 7, 31))
+    days = special_days(date(2026, 7, 1), date(2026, 7, 31))
     events = set(zip(days["date"].dt.date, days["event"], strict=True))
     assert (date(2026, 7, 28), cal.HOLIDAY) in events
     assert (date(2026, 7, 28), cal.FIESTAS_PATRIAS) in events

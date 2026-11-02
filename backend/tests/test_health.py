@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
-from app.db.session import get_session
 from app.main import app
+from app.shared.infrastructure.database.session import get_session
 
 
 class _FakeSession:
