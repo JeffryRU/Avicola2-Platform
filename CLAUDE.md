@@ -78,6 +78,12 @@ Plataforma de **planificación de saca** para **Avícola 2** (taller universitar
 - **Nombres de tablas solo desde `backend/config/tables.yaml`** (`TABLES["..."]`).
 - **Frontend:** validar con zod formularios, respuestas de la API y lo que se lee del almacenamiento local.
 
+**Seguridad** ([ADR 0005](docs/adr/0005-seguridad-de-sesion-y-cuentas.md))
+- **Sesión solo en la cookie HttpOnly `nv_session`:** nunca devolver el token en un cuerpo ni guardarlo en `localStorage`.
+- **Autorización en el backend:** el vendedor sale de la sesión. Un vendedor solo ve lo suyo; el supervisor administra las cuentas.
+- **Cambiar o restablecer la contraseña, o desactivar la cuenta, sube `token_version`.**
+- **Cuentas detrás de puertos** (`SellerRepository`, `AccountsGateway`): la app será un módulo de ARIS.
+
 **Proceso**
 - **El flujo As-Is no está confirmado.** No acoplar la lógica a un orden de pasos. Ante una duda, elegir la opción más simple, dejarla configurable y registrarla en `docs/assumptions.md` o en un ADR.
 - **Mantener independientes ingesta, ML y app**, de modo que se pueda rehacer una sin tocar las otras.

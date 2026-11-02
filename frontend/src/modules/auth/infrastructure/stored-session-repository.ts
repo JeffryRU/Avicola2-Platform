@@ -4,7 +4,10 @@ import { sessionSchema, type Session } from '@/modules/auth/domain/session'
 
 const KEY = 'nv_session'
 
-/** "Recordarme" guarda en el dispositivo; si no, solo mientras la pestaña siga abierta. */
+/**
+ * Solo el perfil (nombre, zona, rol), nunca el token ni la contraseña. "Recordarme" lo guarda
+ * en el dispositivo; si no, solo mientras la pestaña siga abierta.
+ */
 export class StoredSessionRepository implements SessionRepository {
   private readonly persistent: KeyValueStore
   private readonly tab: KeyValueStore
@@ -13,8 +16,11 @@ export class StoredSessionRepository implements SessionRepository {
     this.tab = tab
   }
 
-  load(): Session | null {
-    return this.persistent.get(KEY, sessionSchema) ?? this.tab.get(KEY, sessionSchema)
+  load() {
+    const remembered = this.persistent.get(KEY, sessionSchema)
+    if (remembered) return { session: remembered, remember: true }
+    const session = this.tab.get(KEY, sessionSchema)
+    return session ? { session, remember: false } : null
   }
 
   save(session: Session, remember: boolean) {

@@ -3,6 +3,8 @@ import { NavLink, useSearchParams } from 'react-router'
 import { addDays, today, weekLabel, weekStart, type IsoDate } from '@/core/domain/dates'
 import { pct1 } from '@/core/domain/format'
 import { DASHBOARDS } from '@/app/routes'
+import { isSupervisor } from '@/modules/auth/domain/session'
+import { useRequiredSession } from '@/modules/auth/ui/use-session'
 import { useSellers } from '@/modules/planning/ui/hooks'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/components/shadcn/select'
 import { cn } from '@/ui/lib/utils'
@@ -31,6 +33,8 @@ const triggerCls =
 export function DashboardFilters() {
   const { week, seller, setWeek, setSeller } = useDashboardFilters()
   const sellers = useSellers().data ?? []
+  // Un vendedor solo ve sus datos (lo filtra el backend): el selector es solo del supervisor.
+  const team = isSupervisor(useRequiredSession().seller)
   return (
     <div className="flex flex-wrap gap-2 px-4 pb-1 dsk:gap-3 dsk:p-0">
       <div className={boxCls}>
@@ -51,25 +55,27 @@ export function DashboardFilters() {
           </SelectContent>
         </Select>
       </div>
-      <div className={boxCls}>
-        <label className="mb-1.5 ml-0.5 block text-[13px] font-bold" id="f-seller">
-          Vendedor
-        </label>
-        <Select value={seller} onValueChange={setSeller}>
-          <SelectTrigger aria-labelledby="f-seller" className={triggerCls}>
-            <Users className="size-[18px] text-ink-2" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los vendedores</SelectItem>
-            {sellers.map((s) => (
-              <SelectItem key={s.username} value={s.username}>
-                {s.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {team && (
+        <div className={boxCls}>
+          <label className="mb-1.5 ml-0.5 block text-[13px] font-bold" id="f-seller">
+            Vendedor
+          </label>
+          <Select value={seller} onValueChange={setSeller}>
+            <SelectTrigger aria-labelledby="f-seller" className={triggerCls}>
+              <Users className="size-[18px] text-ink-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los vendedores</SelectItem>
+              {sellers.map((s) => (
+                <SelectItem key={s.username} value={s.username}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,9 +1,12 @@
 import { ErrorReporter } from '@/core/application/error-reporter'
 import type { KeyValueStore } from '@/core/application/ports'
 import { BrowserStore } from '@/core/infrastructure/browser-store'
+import { clearCachedApiData } from '@/core/infrastructure/cached-data'
 import { FetchHttpClient } from '@/core/infrastructure/fetch-http-client'
 import { installGlobalErrorCapture } from '@/core/infrastructure/global-error-capture'
 import { HttpLogSink } from '@/core/infrastructure/http-log-sink'
+import type { AccountsGateway } from '@/modules/accounts/application/ports'
+import { HttpAccountsGateway } from '@/modules/accounts/infrastructure/http-accounts-gateway'
 import { AuthService } from '@/modules/auth/application/auth-service'
 import { HttpAuthGateway } from '@/modules/auth/infrastructure/http-auth-gateway'
 import { StoredSessionRepository } from '@/modules/auth/infrastructure/stored-session-repository'
@@ -34,13 +37,14 @@ export interface Container {
   files: FileSaver
   preferences: KeyValueStore
   errors: ErrorReporter
+  accounts: AccountsGateway
 }
 
 /** Raíz de composición del frontend: el único lugar que conoce los adaptadores. */
 export function createContainer(): Container {
   const local = new BrowserStore(() => localStorage)
   const tab = new BrowserStore(() => sessionStorage)
-  // El cliente HTTP necesita el token de la sesión y la sesión necesita el cliente: se enlazan aquí.
+  // El cliente HTTP avisa a la sesión cuando el servidor la rechaza, y la sesión usa el cliente.
   let auth: AuthService | null = null
   const baseUrl = import.meta.env.VITE_API_BASE ?? '/api'
   const errors = new ErrorReporter(new HttpLogSink(baseUrl), {
@@ -51,10 +55,16 @@ export function createContainer(): Container {
   const http = new FetchHttpClient({
     baseUrl,
     timeoutMs: 15_000,
-    getToken: () => auth?.token() ?? null,
-    onUnauthorized: () => auth?.logout(),
+    onUnauthorized: () => auth?.expire(),
   })
-  auth = new AuthService(new HttpAuthGateway(http), new StoredSessionRepository(local, tab))
+  const drafts = new StoredDraftRepository(local)
+  // Al cerrar sesión se borran el borrador y las respuestas guardadas; la cola offline se
+  // conserva (es de cada vendedor y aún no llegó al servidor).
+  const cleanup = () => {
+    drafts.clear()
+    return clearCachedApiData()
+  }
+  auth = new AuthService(new HttpAuthGateway(http), new StoredSessionRepository(local, tab), cleanup)
   const gateway = new HttpPlanningGateway(http)
   const queue = new StoredSubmissionQueue(local)
   return {
@@ -62,10 +72,11 @@ export function createContainer(): Container {
     gateway,
     queue,
     planning: new PlanningService(gateway, queue, () => crypto.randomUUID()),
-    drafts: new StoredDraftRepository(local),
+    drafts,
     readNotifications: new StoredReadNotifications(local),
     files: new BrowserFileSaver(),
     preferences: local,
     errors,
+    accounts: new HttpAccountsGateway(http),
   }
 }

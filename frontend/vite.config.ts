@@ -39,7 +39,8 @@ export default defineConfig({
         // Catálogo y vendedores: se pueden leer sin conexión con la última copia.
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname === '/api/catalog' || url.pathname === '/api/sellers',
+            // Solo el catálogo (igual para todos). Se borra al cerrar sesión (core/infrastructure/cached-data.ts).
+            urlPattern: ({ url }) => url.pathname === '/api/catalog',
             handler: 'StaleWhileRevalidate',
             options: { cacheName: 'api-master-data' },
           },

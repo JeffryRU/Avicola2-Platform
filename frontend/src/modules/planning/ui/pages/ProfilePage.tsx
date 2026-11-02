@@ -1,8 +1,9 @@
-import { ChevronRight, Layers, LogOut, Send } from 'lucide-react'
+import { ChevronRight, KeyRound, Layers, LogOut, Send } from 'lucide-react'
 import { Link } from 'react-router'
 import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { initials } from '@/core/domain/format'
+import { roleLabel } from '@/modules/auth/domain/session'
 import { useRequiredSession } from '@/modules/auth/ui/use-session'
 import { useQueue } from '@/modules/planning/ui/hooks'
 import { BRANDS, useBrand, type BrandId } from '@/ui/components/brand'
@@ -35,7 +36,7 @@ export function ProfilePage({ onBrandChange }: { onBrandChange: () => void }) {
           </div>
           <div>
             <b className="block text-xl">{seller.name}</b>
-            <span className="text-muted-foreground">Vendedor, {seller.zone}</span>
+            <span className="text-muted-foreground">{roleLabel(seller)}</span>
           </div>
         </Section>
         <Section>
@@ -68,6 +69,16 @@ export function ProfilePage({ onBrandChange }: { onBrandChange: () => void }) {
               ))}
             </div>
           </div>
+          <Link to={paths.password} className={optCls}>
+            <span className={cn(tileCls, 'bg-warn-soft text-warn')}>
+              <KeyRound />
+            </span>
+            <span className="min-w-0 flex-1">
+              <b className="block">Cambiar contraseña</b>
+              <small className="text-muted-foreground">Cierra tus sesiones en otros equipos</small>
+            </span>
+            <ChevronRight className="size-[18px]" />
+          </Link>
           <Link to={paths.connection} className={optCls}>
             <span className={cn(tileCls, 'bg-ok-soft text-ok')}>
               <Send />

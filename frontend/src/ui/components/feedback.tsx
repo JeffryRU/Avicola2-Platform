@@ -124,7 +124,7 @@ export function Note({
     <div
       role={tone === 'bad' ? 'alert' : undefined}
       className={cn(
-        'flex flex-wrap items-start gap-3.5 rounded-[14px] p-4 text-ink-2 [overflow-wrap:anywhere] [&_b]:text-foreground [&>svg]:mt-0.5 [&>svg]:size-[22px] [&>svg]:flex-none',
+        'flex flex-wrap items-start gap-3.5 rounded-[14px] p-4 [overflow-wrap:anywhere] text-ink-2 [&_b]:text-foreground [&>svg]:mt-0.5 [&>svg]:size-[22px] [&>svg]:flex-none',
         tones[tone],
         className,
       )}

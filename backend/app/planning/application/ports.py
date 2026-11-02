@@ -3,6 +3,7 @@
 Los adaptadores de infrastructure/ los implementan; la aplicación nunca los importa.
 """
 
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Protocol
 
@@ -14,8 +15,17 @@ class ProductRepository(Protocol):
 
 
 class SellerRepository(Protocol):
-    def get_account(self, username: str) -> SellerAccount | None: ...
+    """Cuentas de usuario. Hoy en la base de la app; cuando la app sea un módulo de ARIS,
+    un adaptador de ARIS puede implementar este mismo puerto."""
+
+    def get_account(self, username: str, active_only: bool = True) -> SellerAccount | None: ...
     def list_active(self) -> list[Seller]: ...
+    def list_accounts(self) -> list[SellerAccount]: ...
+    def create(self, account: SellerAccount) -> None: ...
+
+    def save_security(self, account: SellerAccount) -> None:
+        """Guarda hash, cambio obligatorio, intentos, bloqueo, versión de sesión y estado."""
+        ...
 
 
 class ProjectionRepository(Protocol):
@@ -46,13 +56,29 @@ class DemandForecaster(Protocol):
 
 
 class PasswordHasher(Protocol):
+    # Hash con el formato válido que no corresponde a ninguna contraseña: verificarlo cuesta
+    # lo mismo que uno real (sirve para no revelar qué usuarios existen).
+    dummy_hash: str
+
     def hash(self, password: str) -> str: ...
     def verify(self, password: str, stored: str) -> bool: ...
 
 
+@dataclass(frozen=True)
+class TokenClaims:
+    username: str
+    version: int
+
+
 class TokenService(Protocol):
-    def issue(self, username: str) -> str: ...
-    def subject(self, token: str) -> str | None: ...
+    def issue(self, username: str, version: int) -> str: ...
+    def decode(self, token: str) -> TokenClaims | None: ...
+
+
+class TemporaryPasswords(Protocol):
+    """Contraseñas temporales que entrega el supervisor (se cambian al primer ingreso)."""
+
+    def generate(self) -> str: ...
 
 
 class Clock(Protocol):

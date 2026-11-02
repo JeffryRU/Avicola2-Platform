@@ -10,17 +10,56 @@ from pydantic import BaseModel, Field
 class LoginIn(BaseModel):
     username: str = Field(min_length=1, max_length=50)
     password: str = Field(min_length=1, max_length=200)
+    # Recordarme: cookie persistente (hasta que venza el token); si no, se borra al cerrar.
+    remember: bool = False
 
 
 class SellerOut(BaseModel):
     username: str
     name: str
     zone: str | None
+    role: str
 
 
-class LoginOut(BaseModel):
-    token: str
+class AccountOut(BaseModel):
+    """La sesión no viaja en el cuerpo: el token va solo en la cookie HttpOnly."""
+
     seller: SellerOut
+    must_change_password: bool
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=1, max_length=200)
+    remember: bool = False
+
+
+class AdminAccountOut(BaseModel):
+    username: str
+    name: str
+    zone: str | None
+    role: str
+    is_active: bool
+    must_change_password: bool
+    locked_until: datetime | None
+
+
+class CreateAccountIn(BaseModel):
+    username: str = Field(min_length=3, max_length=30)
+    name: str = Field(min_length=1, max_length=100)
+    zone: str | None = Field(None, max_length=50)
+    role: str = Field("seller", max_length=20)
+
+
+class NewCredentialsOut(BaseModel):
+    """La contraseña temporal se muestra una sola vez; no se puede volver a consultar."""
+
+    account: AdminAccountOut
+    temporary_password: str
+
+
+class SetActiveIn(BaseModel):
+    active: bool
 
 
 class ProductOut(BaseModel):

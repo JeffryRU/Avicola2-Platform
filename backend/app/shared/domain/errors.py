@@ -17,5 +17,9 @@ class AuthenticationError(DomainError):
     """Credenciales o token inválidos."""
 
 
+class ForbiddenError(DomainError):
+    """El usuario está identificado pero no tiene permiso para la operación."""
+
+
 class ConflictError(DomainError):
     """La operación choca con el estado actual del recurso."""

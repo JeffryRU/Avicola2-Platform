@@ -1,7 +1,7 @@
 """Repositorios SQL de la planificación: SQLAlchemy Core portable, sirve para cualquier motor."""
 
 from collections import defaultdict
-from datetime import date
+from datetime import UTC, date, datetime
 
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.orm import Session
@@ -31,22 +31,73 @@ class SqlProductRepository:
 
 
 def _seller(row) -> Seller:
-    return Seller(row["username"], row["name"], row["zone"])
+    return Seller(row["username"], row["name"], row["zone"], row["role"])
+
+
+def _aware(value: datetime | None) -> datetime | None:
+    # SQLite devuelve fechas sin zona: se guardan en UTC.
+    return value.replace(tzinfo=UTC) if value and value.tzinfo is None else value
+
+
+def _account(row) -> SellerAccount:
+    return SellerAccount(
+        _seller(row),
+        row["password_hash"],
+        must_change_password=row["must_change_password"],
+        failed_logins=row["failed_logins"],
+        locked_until=_aware(row["locked_until"]),
+        token_version=row["token_version"],
+        is_active=row["is_active"],
+    )
+
+
+def _security_values(account: SellerAccount) -> dict:
+    locked = account.locked_until
+    return {
+        "password_hash": account.password_hash,
+        "must_change_password": account.must_change_password,
+        "failed_logins": account.failed_logins,
+        "locked_until": locked.astimezone(UTC) if locked else None,
+        "token_version": account.token_version,
+        "is_active": account.is_active,
+    }
 
 
 class SqlSellerRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def get_account(self, username: str) -> SellerAccount | None:
-        row = (
-            self.session.execute(
-                select(sellers).where(sellers.c.username == username, sellers.c.is_active.is_(True))
+    def get_account(self, username: str, active_only: bool = True) -> SellerAccount | None:
+        query = select(sellers).where(sellers.c.username == username)
+        if active_only:
+            query = query.where(sellers.c.is_active.is_(True))
+        row = self.session.execute(query).mappings().first()
+        return _account(row) if row else None
+
+    def list_accounts(self) -> list[SellerAccount]:
+        rows = self.session.execute(select(sellers).order_by(sellers.c.id)).mappings()
+        return [_account(r) for r in rows]
+
+    def create(self, account: SellerAccount) -> None:
+        s = account.seller
+        self.session.execute(
+            insert(sellers).values(
+                username=s.username,
+                name=s.name,
+                zone=s.zone,
+                role=s.role,
+                **_security_values(account),
             )
-            .mappings()
-            .first()
         )
-        return SellerAccount(_seller(row), row["password_hash"]) if row else None
+        self.session.commit()
+
+    def save_security(self, account: SellerAccount) -> None:
+        self.session.execute(
+            update(sellers)
+            .where(sellers.c.username == account.seller.username)
+            .values(_security_values(account))
+        )
+        self.session.commit()
 
     def list_active(self) -> list[Seller]:
         rows = self.session.execute(

@@ -9,7 +9,9 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.planning.application import accounts as acc
 from app.planning.application import use_cases as uc
+from app.planning.domain.accounts import LockoutPolicy
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.forecast import WeekdayAverageForecaster
 from app.planning.infrastructure.persistence.repositories import (
@@ -19,15 +21,24 @@ from app.planning.infrastructure.persistence.repositories import (
 )
 from app.planning.infrastructure.persistence.status import SqlStatusProbe
 from app.planning.infrastructure.sales import SimulatedSalesSource
-from app.planning.infrastructure.security import JwtTokenService, ScryptPasswordHasher
+from app.planning.infrastructure.security import (
+    JwtTokenService,
+    RandomTemporaryPasswords,
+    ScryptPasswordHasher,
+)
 from app.shared.infrastructure.database.engine import physical_schema
 from app.shared.infrastructure.database.metadata import APP_SCHEMA
 
 
 @dataclass(frozen=True)
 class PlanningUseCases:
-    authenticate: uc.Authenticate
-    current_seller: uc.CurrentSeller
+    authenticate: acc.Authenticate
+    current_account: acc.CurrentAccount
+    change_password: acc.ChangePassword
+    list_accounts: acc.ListAccounts
+    create_account: acc.CreateAccount
+    reset_password: acc.ResetPassword
+    set_account_active: acc.SetAccountActive
     get_catalog: uc.GetCatalog
     list_sellers: uc.ListSellers
     list_projections: uc.ListProjections
@@ -43,11 +54,18 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     projections = SqlProjectionRepository(session)
     clock = ZoneClock(settings.tz)
     tokens = JwtTokenService(settings.auth_secret, settings.auth_token_ttl_hours)
+    hasher, passwords = ScryptPasswordHasher(), RandomTemporaryPasswords()
+    lockout = LockoutPolicy(settings.login_max_attempts, settings.login_lock_minutes)
     forecaster = WeekdayAverageForecaster(projections, settings.planning_suggestion_weeks)
     schema = physical_schema(settings.database_url, APP_SCHEMA, settings.db_schema)
     return PlanningUseCases(
-        authenticate=uc.Authenticate(sellers, ScryptPasswordHasher(), tokens),
-        current_seller=uc.CurrentSeller(sellers, tokens),
+        authenticate=acc.Authenticate(sellers, hasher, tokens, clock, lockout),
+        current_account=acc.CurrentAccount(sellers, tokens),
+        change_password=acc.ChangePassword(sellers, hasher, tokens),
+        list_accounts=acc.ListAccounts(sellers),
+        create_account=acc.CreateAccount(sellers, hasher, passwords),
+        reset_password=acc.ResetPassword(sellers, hasher, passwords),
+        set_account_active=acc.SetAccountActive(sellers),
         get_catalog=uc.GetCatalog(products),
         list_sellers=uc.ListSellers(sellers),
         list_projections=uc.ListProjections(projections),

@@ -11,54 +11,18 @@ from uuid import UUID, uuid4
 from app.planning.application.ports import (
     Clock,
     DemandForecaster,
-    PasswordHasher,
     ProductRepository,
     ProjectionRepository,
     SalesSource,
     SellerRepository,
-    TokenService,
 )
 from app.planning.domain.catalog import Catalog
-from app.planning.domain.models import DailyUnits, Product, Projection, Seller
-from app.shared.domain.errors import AuthenticationError, DomainError
+from app.planning.domain.models import SELLER, DailyUnits, Product, Projection, Seller
+from app.shared.domain.errors import DomainError, ForbiddenError
 
 logger = logging.getLogger(__name__)
 
 MAX_RANGE_DAYS = 400
-
-
-@dataclass(frozen=True)
-class Session:
-    token: str
-    seller: Seller
-
-
-class Authenticate:
-    def __init__(self, sellers: SellerRepository, hasher: PasswordHasher, tokens: TokenService):
-        self.sellers, self.hasher, self.tokens = sellers, hasher, tokens
-
-    def __call__(self, username: str, password: str) -> Session:
-        account = self.sellers.get_account(username.strip())
-        if account is None or not self.hasher.verify(password, account.password_hash):
-            # Nunca se registra la contraseña: solo el usuario intentado.
-            logger.warning("Login rechazado para %r", username.strip())
-            raise AuthenticationError("Usuario o contraseña incorrectos.")
-        logger.info("Login de %s", account.seller.username)
-        return Session(self.tokens.issue(account.seller.username), account.seller)
-
-
-class CurrentSeller:
-    """Resuelve el vendedor dueño de un token."""
-
-    def __init__(self, sellers: SellerRepository, tokens: TokenService):
-        self.sellers, self.tokens = sellers, tokens
-
-    def __call__(self, token: str) -> Seller:
-        username = self.tokens.subject(token)
-        account = self.sellers.get_account(username) if username else None
-        if account is None:
-            raise AuthenticationError("Sesión inválida o vencida.")
-        return account.seller
 
 
 class GetCatalog:
@@ -69,12 +33,19 @@ class GetCatalog:
         return Catalog(self.products.list_active()).products
 
 
+def visible_seller(viewer: Seller, requested: str | None) -> str | None:
+    """Un vendedor solo ve lo suyo; el supervisor, a todos o al que filtre."""
+    return requested if viewer.is_supervisor else viewer.username
+
+
 class ListSellers:
     def __init__(self, sellers: SellerRepository):
         self.sellers = sellers
 
-    def __call__(self) -> list[Seller]:
-        return self.sellers.list_active()
+    def __call__(self, viewer: Seller) -> list[Seller]:
+        if not viewer.is_supervisor:
+            return [viewer]
+        return [s for s in self.sellers.list_active() if s.role == SELLER]
 
 
 def _check_range(date_from: date, date_to: date) -> None:
@@ -88,9 +59,11 @@ class ListProjections:
     def __init__(self, projections: ProjectionRepository):
         self.projections = projections
 
-    def __call__(self, date_from: date, date_to: date, seller: str | None) -> list[Projection]:
+    def __call__(
+        self, viewer: Seller, date_from: date, date_to: date, seller: str | None
+    ) -> list[Projection]:
         _check_range(date_from, date_to)
-        return self.projections.find(date_from, date_to, seller)
+        return self.projections.find(date_from, date_to, visible_seller(viewer, seller))
 
 
 @dataclass(frozen=True)
@@ -115,6 +88,8 @@ class SubmitProjection:
     def __call__(
         self, seller: Seller, category: str, days: list[DayUnits], submission_id: UUID | None
     ) -> list[Projection]:
+        if seller.is_supervisor:
+            raise ForbiddenError("Las proyecciones las registra cada vendedor.")
         if not 1 <= len(days) <= self.max_days:
             raise DomainError(f"Debe enviar entre 1 y {self.max_days} días.")
         if len({d.date for d in days}) != len(days):
@@ -152,9 +127,11 @@ class GetSales:
     def __init__(self, sales: SalesSource):
         self.sales = sales
 
-    def __call__(self, date_from: date, date_to: date, seller: str | None) -> list[DailyUnits]:
+    def __call__(
+        self, viewer: Seller, date_from: date, date_to: date, seller: str | None
+    ) -> list[DailyUnits]:
         _check_range(date_from, date_to)
-        return self.sales.daily_units(date_from, date_to, seller)
+        return self.sales.daily_units(date_from, date_to, visible_seller(viewer, seller))
 
 
 class SuggestProjection:

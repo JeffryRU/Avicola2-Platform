@@ -1,9 +1,22 @@
 import { useEffect, useState } from 'react'
-import { BarChart3, Bell, Box, ChevronDown, ClipboardList, Home, LogOut, Plus, Settings, User } from 'lucide-react'
+import {
+  BarChart3,
+  Bell,
+  Box,
+  ChevronDown,
+  ClipboardList,
+  Home,
+  LogOut,
+  Plus,
+  Settings,
+  User,
+  Users,
+} from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { useContainer } from '@/app/di'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
 import { initials } from '@/core/domain/format'
+import { isSupervisor, roleLabel } from '@/modules/auth/domain/session'
 import { useRequiredSession } from '@/modules/auth/ui/use-session'
 import { useUnreadCount } from '@/modules/planning/ui/notifications'
 import { Logo } from '@/ui/components/brand'
@@ -47,14 +60,16 @@ function Sidebar() {
   const inDash = pathname.startsWith('/dashboards')
   const [open, setOpen] = useState(true)
   const expanded = open || inDash
+  // El supervisor no registra proyecciones: administra usuarios y ve los dashboards del equipo.
+  const supervisor = isSupervisor(seller)
   return (
     <aside className="sticky top-0 hidden h-dvh w-[268px] flex-none flex-col overflow-y-auto border-r bg-side px-3.5 pt-[22px] pb-4 dsk:flex">
       <div className="px-2.5 pb-[22px]">
         <Logo />
       </div>
       <nav className="grid gap-0.5" aria-label="Principal">
-        <SideItem to={paths.home} end icon={<Home />} label="Inicio" />
-        <SideItem to={paths.register} icon={<Plus />} label="Registrar" />
+        {!supervisor && <SideItem to={paths.home} end icon={<Home />} label="Inicio" />}
+        {!supervisor && <SideItem to={paths.register} icon={<Plus />} label="Registrar" />}
         <button
           type="button"
           aria-expanded={expanded}
@@ -83,20 +98,26 @@ function Sidebar() {
             ))}
           </div>
         )}
-        <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
+        {supervisor ? (
+          <SideItem to={paths.accounts} icon={<Users />} label="Usuarios" />
+        ) : (
+          <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
+        )}
         <SideItem to={paths.products} icon={<Box />} label="Productos" />
-        <SideItem
-          to={paths.notifications}
-          icon={<Bell />}
-          label="Notificaciones"
-          extra={
-            unread > 0 && (
-              <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1.5 text-[11px] font-extrabold text-white not-italic">
-                {unread}
-              </em>
-            )
-          }
-        />
+        {!supervisor && (
+          <SideItem
+            to={paths.notifications}
+            icon={<Bell />}
+            label="Notificaciones"
+            extra={
+              unread > 0 && (
+                <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1.5 text-[11px] font-extrabold text-white not-italic">
+                  {unread}
+                </em>
+              )
+            }
+          />
+        )}
       </nav>
       <div className="mt-auto grid gap-0.5 pt-4">
         <div className="mb-2 flex items-center gap-3 px-3 py-2.5">
@@ -105,7 +126,7 @@ function Sidebar() {
           </div>
           <div className="min-w-0 flex-1">
             <b className="block text-sm">{seller.name}</b>
-            <small className="text-muted-foreground">Vendedor, {seller.zone}</small>
+            <small className="text-muted-foreground">{roleLabel(seller)}</small>
           </div>
         </div>
         <SideItem to={paths.profile} icon={<Settings />} label="Configuración" />
@@ -124,14 +145,21 @@ const BOTTOM = [
   { to: paths.mine, icon: ClipboardList, label: 'Mis proyecciones' },
   { to: paths.profile, icon: User, label: 'Perfil' },
 ]
+const BOTTOM_SUPERVISOR = [
+  { to: paths.dashSummary, icon: BarChart3, label: 'Dashboards', end: false },
+  { to: paths.accounts, icon: Users, label: 'Usuarios', end: false },
+  { to: paths.products, icon: Box, label: 'Productos', end: false },
+  { to: paths.profile, icon: User, label: 'Perfil', end: false },
+]
 
 function BottomNav() {
+  const items = isSupervisor(useRequiredSession().seller) ? BOTTOM_SUPERVISOR : BOTTOM
   return (
     <nav
       aria-label="Navegación"
       className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-white/95 px-1.5 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))] backdrop-blur-md dsk:hidden"
     >
-      {BOTTOM.map(({ to, icon: Icon, label, end }) => (
+      {items.map(({ to, icon: Icon, label, end }) => (
         <NavLink
           key={to}
           to={to}

@@ -95,6 +95,9 @@ services:
       DB_SCHEMA: ${DB_SCHEMA:-}
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_TOKEN_TTL_HOURS: ${AUTH_TOKEN_TTL_HOURS:-12}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-}
+      LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-5}
+      LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
       TZ: ${TZ:-America/Lima}
       # Dentro del contenedor el lakehouse local está montado en /data/lakehouse.
       LAKEHOUSE_URI: ${LAKEHOUSE_URI_CONTAINER:-/data/lakehouse}

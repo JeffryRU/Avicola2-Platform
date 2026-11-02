@@ -8,3 +8,4 @@ Cada decisión de arquitectura relevante o supuesto de proceso se registra aquí
 | [0002](0002-supabase-como-base-de-datos.md) | Supabase Cloud como base de datos (app y n8n) | aceptado |
 | [0003](0003-ingesta-el-backend-escribe-bronze.md) | La ingesta pasa por el backend: n8n envía el archivo y el backend escribe bronze | aceptado |
 | [0004](0004-arquitectura-hexagonal-y-base-de-datos-intercambiable.md) | Arquitectura hexagonal, base de datos intercambiable y app de vendedores como PWA | aceptado |
+| [0005](0005-seguridad-de-sesion-y-cuentas.md) | Seguridad de sesión y cuentas: cookie HttpOnly, supervisor y recuperación asistida | aceptado |

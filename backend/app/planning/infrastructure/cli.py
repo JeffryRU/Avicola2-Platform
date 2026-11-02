@@ -1,6 +1,8 @@
 """Comandos de consola de la planificación (equivalen a los `npm run db:*` del mockup).
 
-    uv run python -m app.planning.infrastructure.cli init         productos y vendedores
+    uv run python -m app.planning.infrastructure.cli init         productos (+ usuarios de prueba)
+    uv run python -m app.planning.infrastructure.cli supervisor <usuario> "<nombre>"
+                                                        primer supervisor, con contraseña temporal
     uv run python -m app.planning.infrastructure.cli seed         3 semanas de ejemplo
     uv run python -m app.planning.infrastructure.cli show [n]     resumen y últimas n
     uv run python -m app.planning.infrastructure.cli clear --yes  borra las proyecciones
@@ -19,6 +21,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.planning.application.use_cases import DayUnits, SubmitProjection
+from app.planning.domain.accounts import check_username
+from app.planning.domain.models import SELLER, SUPERVISOR, Seller, SellerAccount
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.persistence.repositories import (
     SqlProductRepository,
@@ -31,7 +35,7 @@ from app.planning.infrastructure.persistence.tables import (
     projections,
     sellers,
 )
-from app.planning.infrastructure.security import ScryptPasswordHasher
+from app.planning.infrastructure.security import RandomTemporaryPasswords, ScryptPasswordHasher
 from app.shared.infrastructure.database.session import SessionLocal
 from app.shared.infrastructure.logging.setup import configure_from_settings
 
@@ -68,21 +72,48 @@ def init(session: Session, settings: Settings) -> None:
             else:
                 session.execute(insert(products).values(id=item["id"], **values))
             order += 1
+    session.commit()
+    print(f"OK: {order} productos listos.")
+    if not settings.is_local:
+        # Fuera de local no se crean cuentas con contraseña conocida.
+        print("Usuarios de prueba omitidos (APP_ENV no es local). Crea el primer supervisor con:")
+        print('  python -m app.planning.infrastructure.cli supervisor <usuario> "<nombre>"')
+        return
     password = os.environ.get("PLANNING_DEMO_PASSWORD", "demo1234")
     hasher = ScryptPasswordHasher()
-    for s in seed["sellers"]:
+    for s in seed["users"]:
         if not session.scalar(select(sellers.c.id).where(sellers.c.username == s["username"])):
             session.execute(
                 insert(sellers).values(
                     username=s["username"],
                     name=s["name"],
                     zone=s.get("zone"),
+                    role=s.get("role", SELLER),
                     password_hash=hasher.hash(password),
                     is_active=True,
                 )
             )
     session.commit()
-    print(f"OK: {order} productos y {len(seed['sellers'])} vendedores listos.")
+    print(f"OK: {len(seed['users'])} usuarios de prueba listos (solo local).")
+
+
+def create_supervisor(session: Session, username: str, name: str) -> None:
+    """Primer supervisor: luego él crea las demás cuentas desde la app."""
+    check_username(username)
+    repo = SqlSellerRepository(session)
+    if repo.get_account(username, active_only=False):
+        print(f"El usuario {username} ya existe.")
+        return
+    temporary = RandomTemporaryPasswords().generate()
+    repo.create(
+        SellerAccount(
+            Seller(username, name, None, SUPERVISOR),
+            ScryptPasswordHasher().hash(temporary),
+            must_change_password=True,
+        )
+    )
+    print(f"OK: supervisor {username} creado. Contraseña temporal (se pide cambiarla al entrar):")
+    print(f"  {temporary}")
 
 
 def seed_history(session: Session, settings: Settings) -> None:
@@ -91,7 +122,7 @@ def seed_history(session: Session, settings: Settings) -> None:
     product_repo, projection_repo = SqlProductRepository(session), SqlProjectionRepository(session)
     brasa = [p for p in product_repo.list_active() if p.category == "BRASA"]
     total = 0
-    for seller in SqlSellerRepository(session).list_active():
+    for seller in [s for s in SqlSellerRepository(session).list_active() if not s.is_supervisor]:
         f = SELLER_FACTOR.get(seller.username, 1.0)
         for back in range(21, 0, -1):
             day = today - timedelta(days=back)
@@ -165,6 +196,8 @@ def main(argv: list[str]) -> int:
             init(session, settings)
         elif cmd == "seed":
             seed_history(session, settings)
+        elif cmd == "supervisor" and len(argv) == 3:
+            create_supervisor(session, argv[1].strip().lower(), argv[2].strip())
         elif cmd == "show":
             show(session, int(argv[1]) if len(argv) > 1 else 20)
         elif cmd == "clear" and "--yes" in argv:

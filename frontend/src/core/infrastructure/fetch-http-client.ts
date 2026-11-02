@@ -4,11 +4,15 @@ import { ApiError, type HttpClient } from '@/core/application/ports'
 interface Options {
   baseUrl: string
   timeoutMs: number
-  getToken: () => string | null
+  /** El servidor rechazó la sesión (401): la cookie venció o fue invalidada. */
   onUnauthorized: () => void
 }
 
-/** Cliente HTTP con fetch: timeout, token Bearer, errores en español y respuestas validadas. */
+/**
+ * Cliente HTTP con fetch: timeout, errores en español y respuestas validadas.
+ * La sesión va en una cookie HttpOnly que el navegador adjunta solo (mismo origen): este código
+ * nunca ve el token.
+ */
 export class FetchHttpClient implements HttpClient {
   private readonly options: Options
   constructor(options: Options) {
@@ -26,18 +30,21 @@ export class FetchHttpClient implements HttpClient {
     return this.request(path, { method: 'POST', body: JSON.stringify(body) }, schema)
   }
 
+  patch<T>(path: string, body: unknown, schema: z.ZodType<T>) {
+    return this.request(path, { method: 'PATCH', body: JSON.stringify(body) }, schema)
+  }
+
   private async request<T>(path: string, init: RequestInit, schema: z.ZodType<T>): Promise<T> {
-    const { baseUrl, timeoutMs, getToken, onUnauthorized } = this.options
-    const token = getToken()
+    const { baseUrl, timeoutMs, onUnauthorized } = this.options
     const headers: Record<string, string> = { Accept: 'application/json' }
     if (init.body) headers['Content-Type'] = 'application/json'
-    if (token) headers.Authorization = `Bearer ${token}`
 
     let response: Response
     try {
       response = await fetch(baseUrl + path, {
         ...init,
         headers,
+        credentials: 'same-origin',
         cache: 'no-store',
         signal: AbortSignal.timeout(timeoutMs),
       })
@@ -47,7 +54,7 @@ export class FetchHttpClient implements HttpClient {
     }
     const data: unknown = await response.json().catch(() => null)
     if (!response.ok) {
-      if (response.status === 401 && token) onUnauthorized()
+      if (response.status === 401) onUnauthorized()
       throw new ApiError(errorMessage(data) ?? `El servidor respondió ${response.status}.`, response.status)
     }
     const parsed = schema.safeParse(data)

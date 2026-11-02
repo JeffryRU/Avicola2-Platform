@@ -22,8 +22,11 @@ products:
     - {id: R5, name: Broaster 5, kg_per_unit: 1.50}
     - {id: R6, name: Broaster 6, kg_per_unit: 1.65}
 
-# La contraseña de prueba sale de PLANNING_DEMO_PASSWORD (por defecto demo1234).
-sellers:
+# Usuarios de prueba: solo se crean con APP_ENV=local. La contraseña sale de
+# PLANNING_DEMO_PASSWORD (por defecto demo1234). En producción, el primer supervisor se crea con
+# `cli supervisor` y él da de alta a los vendedores desde la app.
+users:
+  - {username: supervisor, name: Ana Torres, role: supervisor}
   - {username: jperez, name: Juan Pérez, zone: Zona Norte}
   - {username: mrios, name: María Ríos, zone: Zona Sur}
   - {username: cleon, name: Carlos León, zone: Zona Centro}

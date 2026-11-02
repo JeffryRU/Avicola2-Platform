@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import { paths } from '@/app/routes'
 import { dDM, dDow, greeting, today, weekDates, weekStart } from '@/core/domain/dates'
 import { sumUnits } from '@/modules/planning/domain/catalog'
+import { roleLabel } from '@/modules/auth/domain/session'
 import { useRequiredSession } from '@/modules/auth/ui/use-session'
 import { useCatalog, useMyDays } from '@/modules/planning/ui/hooks'
 import { useNotifications } from '@/modules/planning/ui/notifications'
@@ -72,7 +73,7 @@ export function HomePage() {
         <h1 className="text-[27px] font-extrabold">
           {greeting()}, {seller.name.split(' ')[0]}!
         </h1>
-        <p className="mt-1 text-base text-muted-foreground">Vendedor, {seller.zone}</p>
+        <p className="mt-1 text-base text-muted-foreground">{roleLabel(seller)}</p>
       </div>
 
       <div className="mt-3.5 px-4 dsk:px-0">

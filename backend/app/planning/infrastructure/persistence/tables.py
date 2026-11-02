@@ -16,6 +16,7 @@ from sqlalchemy import (
     Table,
     UniqueConstraint,
     Uuid,
+    false,
     func,
 )
 
@@ -29,6 +30,14 @@ sellers = Table(
     Column("name", String(100), nullable=False),
     Column("zone", String(50)),
     Column("password_hash", String(200), nullable=False),
+    # seller | supervisor: varchar validado por la app (domain/models.ROLES), no ENUM.
+    Column("role", String(20), nullable=False, server_default="seller"),
+    # Seguridad: cambio obligatorio (contraseña temporal), bloqueo por intentos y versión
+    # de sesión (al subirla se invalidan los tokens emitidos antes).
+    Column("must_change_password", Boolean, nullable=False, server_default=false()),
+    Column("failed_logins", Integer, nullable=False, server_default="0"),
+    Column("locked_until", DateTime(timezone=True)),
+    Column("token_version", Integer, nullable=False, server_default="0"),
     Column("is_active", Boolean, nullable=False, default=True),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )

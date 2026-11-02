@@ -5,6 +5,9 @@ from datetime import date, datetime
 from uuid import UUID
 
 CONFIRMED = "confirmed"
+# Roles (varchar validado por la app, no ENUM). El supervisor administra cuentas y ve a todos.
+SELLER, SUPERVISOR = "seller", "supervisor"
+ROLES = (SELLER, SUPERVISOR)
 
 
 @dataclass(frozen=True)
@@ -24,12 +27,28 @@ class Seller:
     username: str
     name: str
     zone: str | None = None
+    role: str = SELLER
+
+    @property
+    def is_supervisor(self) -> bool:
+        return self.role == SUPERVISOR
 
 
 @dataclass(frozen=True)
 class SellerAccount:
+    """Cuenta con sus datos de seguridad. `token_version` invalida las sesiones abiertas
+    al cambiarse (cambio o reseteo de contraseña, desactivación)."""
+
     seller: Seller
     password_hash: str
+    must_change_password: bool = False
+    failed_logins: int = 0
+    locked_until: datetime | None = None
+    token_version: int = 0
+    is_active: bool = True
+
+    def is_locked(self, now: datetime) -> bool:
+        return self.locked_until is not None and self.locked_until > now
 
 
 @dataclass(frozen=True)

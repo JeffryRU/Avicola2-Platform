@@ -7,6 +7,8 @@ import { AppShell } from '@/app/AppShell'
 import type { Container } from '@/app/container'
 import { ContainerProvider, useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
+import { isSupervisor } from '@/modules/auth/domain/session'
+import { ForcedPasswordChange } from '@/modules/auth/ui/ChangePasswordPage'
 import { LoginPage } from '@/modules/auth/ui/LoginPage'
 import { useSession } from '@/modules/auth/ui/use-session'
 import { BrandProvider, type BrandId } from '@/ui/components/brand'
@@ -15,6 +17,10 @@ import { Splash } from '@/ui/components/feedback'
 import { Toaster } from '@/ui/components/shadcn/sonner'
 
 /** Pantallas cargadas a demanda: el celular descarga solo lo que abre. */
+const AccountsPage = lazy(() => import('@/modules/accounts/ui/AccountsPage').then((m) => ({ default: m.AccountsPage })))
+const ChangePasswordPage = lazy(() =>
+  import('@/modules/auth/ui/ChangePasswordPage').then((m) => ({ default: m.ChangePasswordPage })),
+)
 const ConnectionPage = lazy(() =>
   import('@/modules/planning/ui/pages/ConnectionPage').then((m) => ({ default: m.ConnectionPage })),
 )
@@ -78,9 +84,24 @@ function useOutboxSync() {
   }, [planning, session, client])
 }
 
+/** Confirma la cookie al abrir la app y, al cerrar sesión, olvida los datos del usuario anterior. */
+function useSessionLifecycle() {
+  const { auth } = useContainer()
+  const session = useSession()
+  const client = useQueryClient()
+  const user = session?.seller.username
+  useEffect(() => {
+    void auth.verify()
+  }, [auth])
+  useEffect(() => {
+    if (!user) client.clear()
+  }, [user, client])
+}
+
 function Routed() {
   const session = useSession()
   const [splash, setSplash] = useState(true)
+  useSessionLifecycle()
   useOutboxSync()
   useEffect(() => {
     const t = setTimeout(() => setSplash(false), 2350)
@@ -95,6 +116,25 @@ function Routed() {
       <Splash visible={splash} durationS={2.2} />
       {!session ? (
         <LoginPage onLoggedIn={showSplash} />
+      ) : session.must_change_password ? (
+        <ForcedPasswordChange />
+      ) : isSupervisor(session.seller) ? (
+        <Suspense fallback={null}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route index element={<Navigate to={paths.dashSummary} replace />} />
+              <Route path={paths.accounts} element={<AccountsPage />} />
+              <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />
+              <Route path={paths.dashVersus} element={<DashboardVersusPage />} />
+              <Route path={paths.dashStatus} element={<DashboardStatusPage />} />
+              <Route path={paths.products} element={<ProductsPage />} />
+              <Route path={paths.profile} element={<ProfilePage onBrandChange={showSplash} />} />
+              <Route path={paths.password} element={<ChangePasswordPage />} />
+              <Route path={paths.connection} element={<ConnectionPage />} />
+              <Route path="*" element={<Navigate to={paths.dashSummary} replace />} />
+            </Route>
+          </Routes>
+        </Suspense>
       ) : (
         <Suspense fallback={null}>
           <Routes>
@@ -111,6 +151,7 @@ function Routed() {
               <Route path={paths.notifications} element={<NotificationsPage />} />
               <Route path={paths.profile} element={<ProfilePage onBrandChange={showSplash} />} />
               <Route path={paths.connection} element={<ConnectionPage />} />
+              <Route path={paths.password} element={<ChangePasswordPage />} />
               <Route path="*" element={<Navigate to={paths.home} replace />} />
             </Route>
           </Routes>

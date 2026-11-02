@@ -12,6 +12,9 @@ import { cn } from '@/ui/lib/utils'
 
 type FieldErrors = Partial<Record<'username' | 'password' | 'form', string>>
 
+/** Usuarios de prueba solo en desarrollo (o si el build lo pide): nunca en producción. */
+const DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_USERS === 'true'
+
 export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const { auth } = useContainer()
   const { brand } = useBrand()
@@ -91,7 +94,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               name="username"
               placeholder="Usuario"
               autoComplete="username"
-              defaultValue="jperez"
+              defaultValue={DEMO ? 'jperez' : undefined}
               aria-invalid={!!errors.username}
               className={fieldCls(errors.username)}
             />
@@ -147,14 +150,18 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
             <button
               type="button"
               className="font-bold text-primary hover:underline"
-              onClick={() => toast('Pide a tu supervisor que restablezca tu contraseña.')}
+              onClick={() =>
+                toast('Pide a tu supervisor que restablezca tu contraseña: te dará una temporal para entrar.')
+              }
             >
               ¿Olvidaste tu contraseña?
             </button>
           </div>
-          <p className="mt-4 text-[12.5px] text-muted-foreground">
-            Usuarios de prueba: jperez, mrios, cleon (contraseña demo1234).
-          </p>
+          {DEMO && (
+            <p className="mt-4 text-[12.5px] text-muted-foreground">
+              Usuarios de prueba: jperez, mrios, cleon y supervisor (contraseña demo1234).
+            </p>
+          )}
         </form>
       </div>
     </div>

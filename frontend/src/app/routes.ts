@@ -12,6 +12,8 @@ export const paths = {
   notifications: '/notificaciones',
   profile: '/perfil',
   connection: '/perfil/conexion',
+  password: '/perfil/contrasena',
+  accounts: '/usuarios',
 } as const
 
 export const DASHBOARDS = [
