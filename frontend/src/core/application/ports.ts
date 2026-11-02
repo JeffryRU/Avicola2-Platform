@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import type { ClientLogEntry } from '@/core/domain/client-log'
 
 /** Almacenamiento clave-valor del dispositivo (localStorage en el navegador). */
 export interface KeyValueStore {
@@ -25,4 +26,11 @@ export class ApiError extends Error {
   get isRejected() {
     return this.status >= 400 && this.status < 500 && this.status !== 408 && this.status !== 429
   }
+}
+
+/** Destino de los reportes de errores del navegador (el backend los guarda en logs/frontend.log). */
+export interface LogSink {
+  send(entries: ClientLogEntry[]): Promise<void>
+  /** Envío de último momento al cerrar la página (sin esperar respuesta). */
+  sendOnExit(entries: ClientLogEntry[]): boolean
 }

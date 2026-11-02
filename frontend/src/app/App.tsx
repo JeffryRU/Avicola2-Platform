@@ -10,6 +10,7 @@ import { paths } from '@/app/routes'
 import { LoginPage } from '@/modules/auth/ui/LoginPage'
 import { useSession } from '@/modules/auth/ui/use-session'
 import { BrandProvider, type BrandId } from '@/ui/components/brand'
+import { ErrorBoundary } from '@/ui/components/error-boundary'
 import { Splash } from '@/ui/components/feedback'
 import { Toaster } from '@/ui/components/shadcn/sonner'
 
@@ -123,16 +124,30 @@ const brandSchema = z.enum(['noraves', 'rocio'])
 
 export function App({ container }: { container: Container }) {
   const persistBrand = useCallback((b: BrandId) => container.preferences.set('nv_brand', b), [container])
+  const reportCrash = useCallback(
+    (error: unknown, componentStack: string) => {
+      const crash = error instanceof Error ? error : new Error(String(error))
+      crash.stack = `${crash.stack ?? crash.message}
+Componentes:${componentStack}`
+      container.errors.report(crash, 'react')
+    },
+    [container],
+  )
   return (
-    <ContainerProvider container={container}>
-      <QueryClientProvider client={queryClient}>
-        <BrandProvider initial={container.preferences.get('nv_brand', brandSchema) ?? 'noraves'} persist={persistBrand}>
-          <BrowserRouter>
-            <Routed />
-          </BrowserRouter>
-          <Toaster position="bottom-center" offset={96} mobileOffset={{ bottom: 96 }} />
-        </BrandProvider>
-      </QueryClientProvider>
-    </ContainerProvider>
+    <ErrorBoundary onError={reportCrash}>
+      <ContainerProvider container={container}>
+        <QueryClientProvider client={queryClient}>
+          <BrandProvider
+            initial={container.preferences.get('nv_brand', brandSchema) ?? 'noraves'}
+            persist={persistBrand}
+          >
+            <BrowserRouter>
+              <Routed />
+            </BrowserRouter>
+            <Toaster position="bottom-center" offset={96} mobileOffset={{ bottom: 96 }} />
+          </BrandProvider>
+        </QueryClientProvider>
+      </ContainerProvider>
+    </ErrorBoundary>
   )
 }

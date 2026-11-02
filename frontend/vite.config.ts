@@ -7,7 +7,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 // El backend (FastAPI) sirve el build; en desarrollo, Vite reenvía /api al backend.
 const backend = process.env.VITE_BACKEND_URL ?? 'http://127.0.0.1:8000'
 
+const version = `${process.env.npm_package_version ?? '0.0.0'}+${new Date().toISOString().slice(0, 16)}`
+
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
     react(),
     tailwindcss(),

@@ -121,3 +121,49 @@ def test_unwritable_log_dir_falls_back_to_console(tmp_path, caplog):
     configure_logging("INFO", "text", blocked / "logs")  # no debe tumbar la API
     assert "solo consola" in caplog.text
     configure_logging("INFO", "text", None)
+
+
+def _client_app() -> TestClient:
+    from app.shared.infrastructure.logging import client
+
+    client._limit = client._RateLimit(client.MAX_ENTRIES_PER_MINUTE)
+    app = FastAPI()
+    install_request_logging(app)
+    app.include_router(client.router)
+    return TestClient(app)
+
+
+def test_client_errors_go_to_frontend_log_only(log_dir):
+    r = _client_app().post(
+        "/api/client-logs",
+        json={
+            "entries": [
+                {
+                    "kind": "react",
+                    "message": "No se pudo leer 'units'\nFALSO 2026 ERROR",
+                    "stack": "TypeError: x\n    at Matrix (matrix.tsx:10)",
+                    "route": "/registrar",
+                    "user": "jperez",
+                }
+            ]
+        },
+    )
+    assert r.status_code == 204
+    front = _read(log_dir / "frontend.log")
+    assert "react en /registrar: No se pudo leer 'units' FALSO 2026 ERROR" in front
+    assert "user=jperez" in front and "\n        at Matrix (matrix.tsx:10)" in front
+    assert "No se pudo leer" not in _read(log_dir / "app.log")
+    assert _read(log_dir / ERROR_LOG) == ""  # errors.log es solo del backend
+
+
+def test_client_logs_are_validated_and_rate_limited(log_dir):
+    client = _client_app()
+    assert client.post("/api/client-logs", json={"entries": []}).status_code == 422
+    bad_user = {"entries": [{"message": "x", "user": "a b\nc"}]}
+    assert client.post("/api/client-logs", json=bad_user).status_code == 422
+    batch = {"entries": [{"message": f"error {i}"} for i in range(20)]}
+    assert client.post("/api/client-logs", json=batch).status_code == 204
+    assert client.post("/api/client-logs", json=batch).status_code == 204
+    front = _read(log_dir / "frontend.log")
+    assert front.count("error en ?: error") == 30
+    assert "10 reportes descartados" in _read(log_dir / "app.log")

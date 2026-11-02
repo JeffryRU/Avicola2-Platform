@@ -122,7 +122,7 @@ Avicola2-Platform/
 │   ├── lakehouse/            # Delta local (no se versiona)
 │   ├── templates/            # plantilla Excel
 │   └── samples/              # Excel de ejemplo
-├── logs/                     # app.log y errors.log del backend (no se versionan)
+├── logs/                     # app.log, errors.log y frontend.log (no se versionan)
 ├── scripts/                  # generate_synthetic.py, seed, deploy
 └── docs/                     # architecture.md, assumptions.md, adr/
 ```
