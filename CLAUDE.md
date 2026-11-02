@@ -86,6 +86,7 @@ Plataforma de **planificación de saca** para **Avícola 2** (taller universitar
 - **Todo parametrizado en `.env`;** `.env.example` documenta cada variable.
 - **LLM por API** (`LLM_PROVIDER=anthropic`) en la nube y en la laptop antigua. Ollama solo en el perfil `full`.
 - **Imágenes slim.**
+- **Logs con `logging.getLogger(__name__)`** (estándar, permitido en `application`); la configuración vive solo en `shared/infrastructure/logging/`. Nunca registrar contraseñas, tokens ni valores de formularios.
 
 ---
 
@@ -121,6 +122,7 @@ Avicola2-Platform/
 │   ├── lakehouse/            # Delta local (no se versiona)
 │   ├── templates/            # plantilla Excel
 │   └── samples/              # Excel de ejemplo
+├── logs/                     # app.log y errors.log del backend (no se versionan)
 ├── scripts/                  # generate_synthetic.py, seed, deploy
 └── docs/                     # architecture.md, assumptions.md, adr/
 ```

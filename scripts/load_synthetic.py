@@ -20,6 +20,7 @@ from app.ingest.bootstrap import build_service  # noqa: E402
 from app.ingest.infrastructure.persistence.repository import SqlIngestRepository  # noqa: E402
 from app.shared.infrastructure.database.session import SessionLocal  # noqa: E402
 from app.shared.infrastructure.lakehouse import get_lakehouse  # noqa: E402
+from app.shared.infrastructure.logging.setup import configure_from_settings  # noqa: E402
 
 FILES = {
     "orders.csv": "orders",
@@ -39,6 +40,7 @@ def main() -> None:
         sys.exit(f"Faltan {missing} en {args.dir}. Corre antes scripts/generate_synthetic.py")
 
     settings = get_settings()
+    configure_from_settings(settings)
     lakehouse = get_lakehouse(settings)
     print(f"Lakehouse: {lakehouse.uri}")
     with SessionLocal() as session:

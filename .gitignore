@@ -22,6 +22,11 @@ data/synthetic/
 data/templates/*.xlsx
 !data/**/.gitkeep
 
+# Logs del backend (la carpeta se versiona, los archivos no)
+logs/*
+!logs/.gitkeep
+!logs/README.md
+
 # Artefactos de ML
 backend/models/*
 !backend/models/.gitkeep

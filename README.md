@@ -123,6 +123,10 @@ uv run pytest
 
 > En Windows, usa `127.0.0.1` y no `localhost` en las URLs de base de datos del `.env`: `localhost` resuelve primero a IPv6 y la conexión se queda colgada.
 
+### Logs
+
+Los logs quedan en [`logs/`](logs/README.md): `app.log` (peticiones, logins, envíos, cargas) y `errors.log` (solo errores, con la traza). Cada respuesta trae la cabecera `X-Request-ID`; buscándola en los logs se ve todo lo que pasó en esa petición. Se ajustan con `LOG_LEVEL`, `LOG_FORMAT` (`text` | `json`) y `LOG_TO_FILES` en el `.env`. El código está en `backend/app/shared/infrastructure/logging/`.
+
 ## Estructura
 
 ```
@@ -133,5 +137,6 @@ backend/        FastAPI, SQLAlchemy, Alembic (app/db/migrations)
 frontend/       PWA (React + Vite + Tailwind + shadcn/ui + zod): core · modules · ui · app
 n8n/workflows/  workflows exportados
 data/           inbox (carpeta vigilada), lakehouse local, plantillas y ejemplos
+logs/           app.log y errors.log del backend (no se versionan)
 docs/           arquitectura, supuestos y ADR
 ```

@@ -3,6 +3,7 @@
 Cada clase hace una sola cosa y recibe sus dependencias como puertos.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
 from uuid import UUID, uuid4
@@ -21,6 +22,8 @@ from app.planning.domain.catalog import Catalog
 from app.planning.domain.models import DailyUnits, Product, Projection, Seller
 from app.shared.domain.errors import AuthenticationError, DomainError
 
+logger = logging.getLogger(__name__)
+
 MAX_RANGE_DAYS = 400
 
 
@@ -37,7 +40,10 @@ class Authenticate:
     def __call__(self, username: str, password: str) -> Session:
         account = self.sellers.get_account(username.strip())
         if account is None or not self.hasher.verify(password, account.password_hash):
+            # Nunca se registra la contraseña: solo el usuario intentado.
+            logger.warning("Login rechazado para %r", username.strip())
             raise AuthenticationError("Usuario o contraseña incorrectos.")
+        logger.info("Login de %s", account.seller.username)
         return Session(self.tokens.issue(account.seller.username), account.seller)
 
 
@@ -131,6 +137,14 @@ class SubmitProjection:
                 raise DomainError(f"El día {day.date:%d/%m/%Y} no tiene unidades.")
             result.append(projection)
         self.projections.replace(result)
+        logger.info(
+            "Proyección %s de %s guardada: %s, %d día(s), %d unidades",
+            submission,
+            seller.username,
+            category,
+            len(result),
+            sum(p.total_units for p in result),
+        )
         return result
 
 

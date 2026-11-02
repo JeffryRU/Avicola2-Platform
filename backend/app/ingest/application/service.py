@@ -3,6 +3,7 @@
 Es la única ruta de la ingesta: endpoints y scripts la reutilizan (se arma en bootstrap.py).
 """
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -16,6 +17,8 @@ from app.ingest.domain.catalog import Catalog
 from app.ingest.domain.models import LogEntry, ParseOutcome, PendingMapping, UnreadableFile
 from app.ingest.domain.pipeline import parse
 from app.ingest.domain.schema import IngestSchema
+
+logger = logging.getLogger(__name__)
 
 MAX_RETURNED_ERRORS = 50
 
@@ -88,6 +91,7 @@ class IngestService:
         try:
             raw = self.reader.read(content, file_name, self.schema.known_names())
         except UnreadableFile as exc:
+            logger.warning("Archivo ilegible %s (%s): %s", file_name, source, exc.message)
             log_id = self.repo.log(
                 LogEntry(
                     file_name,
@@ -132,6 +136,17 @@ class IngestService:
             tables["gold.daily_demand"] = {"dates": len(affected_dates), "version": gold_version}
 
         errors = [e.as_dict() for e in outcome.errors]
+        logger.log(
+            logging.INFO if outcome.status in ("ok", "partial") else logging.WARNING,
+            "Carga %s (%s): %s, %d/%d filas, %d errores, tablas %s",
+            file_name,
+            source,
+            outcome.status,
+            outcome.rows_ok,
+            outcome.rows_total,
+            len(errors),
+            sorted(tables),
+        )
         log_id = self.repo.log(
             LogEntry(
                 file_name,

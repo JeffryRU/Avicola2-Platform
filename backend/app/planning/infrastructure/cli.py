@@ -33,6 +33,7 @@ from app.planning.infrastructure.persistence.tables import (
 )
 from app.planning.infrastructure.security import ScryptPasswordHasher
 from app.shared.infrastructure.database.session import SessionLocal
+from app.shared.infrastructure.logging.setup import configure_from_settings
 
 # Unidades base por día de la semana (lun..dom) para BRASA 1..10, como en el mockup.
 BASE = [
@@ -158,6 +159,7 @@ def clear(session: Session) -> None:
 def main(argv: list[str]) -> int:
     cmd = argv[0] if argv else ""
     settings = get_settings()
+    configure_from_settings(settings)
     with SessionLocal() as session:
         if cmd == "init":
             init(session, settings)

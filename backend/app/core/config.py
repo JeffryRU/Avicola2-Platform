@@ -36,6 +36,15 @@ class Settings(BaseSettings):
     # Build del frontend (React) que sirve FastAPI; si no existe, no se monta.
     frontend_dist_dir: Path = Path(__file__).resolve().parents[3] / "frontend" / "dist"
 
+    # Logs: nivel (DEBUG|INFO|WARNING|ERROR), formato (text|json) y carpeta de archivos
+    # (app.log y errors.log, rotativos). LOG_TO_FILES=false = solo consola.
+    log_level: str = "INFO"
+    log_format: str = "text"
+    log_to_files: bool = True
+    log_dir: Path = Path(__file__).resolve().parents[3] / "logs"
+    log_max_mb: int = Field(10, ge=1)
+    log_backups: int = Field(5, ge=0)
+
     # Raíz del lakehouse Delta: ruta local (./data/lakehouse) o gs://bucket/lakehouse.
     lakehouse_uri: str = "./data/lakehouse"
 

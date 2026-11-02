@@ -35,7 +35,7 @@ COPY backend/config ./config
 COPY backend/app ./app
 COPY backend/docker-entrypoint.sh ./
 COPY --from=frontend /web/dist ./frontend/dist
-RUN chmod +x docker-entrypoint.sh && useradd --system --uid 1000 app && mkdir -p /data/lakehouse && chown app /data/lakehouse
+RUN chmod +x docker-entrypoint.sh && useradd --system --uid 1000 app && mkdir -p /data/lakehouse /data/logs && chown app /data/lakehouse /data/logs
 
 USER app
 EXPOSE 8000

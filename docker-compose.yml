@@ -99,8 +99,14 @@ services:
       # Dentro del contenedor el lakehouse local está montado en /data/lakehouse.
       LAKEHOUSE_URI: ${LAKEHOUSE_URI_CONTAINER:-/data/lakehouse}
       UVICORN_WORKERS: ${UVICORN_WORKERS:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      LOG_TO_FILES: ${LOG_TO_FILES:-true}
+      # Los archivos de log quedan en ./logs del host.
+      LOG_DIR: /data/logs
     volumes:
       - ./data/lakehouse:/data/lakehouse
+      - ./logs:/data/logs
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:
