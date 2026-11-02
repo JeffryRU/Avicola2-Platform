@@ -34,3 +34,8 @@ Thumbs.db
 
 # Claude Code (configuración local)
 .claude/settings.local.json
+
+# Frontend (PWA)
+frontend/dev-dist/
+*.tsbuildinfo
+.playwright-cli/

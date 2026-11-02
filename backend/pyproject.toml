@@ -14,9 +14,15 @@ dependencies = [
     "psycopg[binary]>=3.3.6",
     "pyarrow>=26.0.0",
     "pydantic-settings>=2.16.0",
+    "pyjwt>=2.15.1",
     "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
     "sqlalchemy>=2",
+]
+
+[project.optional-dependencies]
+azure = [
+    "pymssql>=2.4.6",
 ]
 
 [dependency-groups]

@@ -1,0 +1,29 @@
+# Datos maestros iniciales de la app de planificación (los del mockup).
+# `python -m app.planning.infrastructure.cli init` los carga o actualiza.
+# SUPUESTO: catálogo y vendedores de ejemplo; el real está por validar (docs/assumptions.md).
+
+products:
+  BRASA:
+    - {id: B1, name: Brasa 1, kg_per_unit: 1.20}
+    - {id: B2, name: Brasa 2, kg_per_unit: 1.50}
+    - {id: B3, name: Brasa 3, kg_per_unit: 1.80}
+    - {id: B4, name: Brasa 4, kg_per_unit: 2.00}
+    - {id: B5, name: Brasa 5, kg_per_unit: 1.50}
+    - {id: B6, name: Brasa 6, kg_per_unit: 1.80}
+    - {id: B7, name: Brasa 7, kg_per_unit: 2.20}
+    - {id: B8, name: Brasa 8, kg_per_unit: 2.50}
+    - {id: B9, name: Brasa 9, kg_per_unit: 2.80}
+    - {id: B10, name: Brasa 10, kg_per_unit: 3.00}
+  BROASTER:
+    - {id: R1, name: Broaster 1, kg_per_unit: 0.90}
+    - {id: R2, name: Broaster 2, kg_per_unit: 1.05}
+    - {id: R3, name: Broaster 3, kg_per_unit: 1.20}
+    - {id: R4, name: Broaster 4, kg_per_unit: 1.35}
+    - {id: R5, name: Broaster 5, kg_per_unit: 1.50}
+    - {id: R6, name: Broaster 6, kg_per_unit: 1.65}
+
+# La contraseña de prueba sale de PLANNING_DEMO_PASSWORD (por defecto demo1234).
+sellers:
+  - {username: jperez, name: Juan Pérez, zone: Zona Norte}
+  - {username: mrios, name: María Ríos, zone: Zona Sur}
+  - {username: cleon, name: Carlos León, zone: Zona Centro}

@@ -79,7 +79,12 @@ services:
     logging: *logging
 
   backend:
-    build: ./backend
+    # La imagen incluye el build de la PWA (frontend/), que FastAPI sirve en /.
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        DB_EXTRAS: ${DB_EXTRAS:-}
     restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV:-local}
@@ -87,6 +92,10 @@ services:
       DATABASE_URL: ${DATABASE_URL_CONTAINER:-${DATABASE_URL}}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
       INGEST_API_TOKEN: ${INGEST_API_TOKEN:-}
+      DB_SCHEMA: ${DB_SCHEMA:-}
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_TOKEN_TTL_HOURS: ${AUTH_TOKEN_TTL_HOURS:-12}
+      TZ: ${TZ:-America/Lima}
       # Dentro del contenedor el lakehouse local está montado en /data/lakehouse.
       LAKEHOUSE_URI: ${LAKEHOUSE_URI_CONTAINER:-/data/lakehouse}
       UVICORN_WORKERS: ${UVICORN_WORKERS:-1}

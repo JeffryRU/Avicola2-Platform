@@ -33,7 +33,7 @@ Plataforma de **planificación de saca** para **Avícola 2** (taller universitar
 **Stack:**
 - Python 3.12, FastAPI, SQLAlchemy 2 + Alembic, Pydantic v2, uv, ruff.
 - `deltalake` + DuckDB, statsforecast, lightgbm.
-- React + Vite + TS, shadcn/ui + Tailwind, TanStack Query, Recharts, pnpm.
+- React + Vite + TS, shadcn/ui + Tailwind v4, TanStack Query, zod, react-router, vite-plugin-pwa (PWA), pnpm. Gráficos SVG propios (del mockup).
 - Docker Compose. **Sin MinIO, Spark, Airflow ni Kafka.**
 
 ---
@@ -71,6 +71,12 @@ Plataforma de **planificación de saca** para **Avícola 2** (taller universitar
 - **Usuarios con rol `canal`:** siempre filtrados por su `channel`.
 - **Estados del plan de saca:** `varchar` validado desde la configuración, no un ENUM de Postgres.
 - **Text-to-SQL:** la lista blanca, el modo de solo lectura y el límite de filas los impone el backend, nunca el LLM.
+
+**Arquitectura de código** ([ADR 0004](docs/adr/0004-arquitectura-hexagonal-y-base-de-datos-intercambiable.md))
+- **Hexagonal estricta:** `domain` (puro) ← `application` (puertos y casos de uso) ← `infrastructure` (adaptadores). Solo la raíz de composición (`bootstrap.py` / `frontend/src/app/container.ts`) une puertos con adaptadores. `tests/test_architecture.py` y ESLint lo verifican.
+- **El backend no conoce el motor de base:** SQLAlchemy con tipos portables; diferencias por motor solo en `shared/infrastructure/database/engine.py`. Migraciones con `app_schema()` y `ref()`, nunca `"app"` fijo.
+- **Nombres de tablas solo desde `backend/config/tables.yaml`** (`TABLES["..."]`).
+- **Frontend:** validar con zod formularios, respuestas de la API y lo que se lee del almacenamiento local.
 
 **Proceso**
 - **El flujo As-Is no está confirmado.** No acoplar la lógica a un orden de pasos. Ante una duda, elegir la opción más simple, dejarla configurable y registrarla en `docs/assumptions.md` o en un ADR.
@@ -127,8 +133,9 @@ Avicola2-Platform/
 - Cargar el histórico sintético en el lakehouse: `uv run --project backend python scripts/load_synthetic.py`
 - Importar workflows de n8n: ver `n8n/workflows/README.md`
 - Entrenar: `docker compose run --rm ml-train`
+- Datos de la app de vendedores: `cd backend && uv run python -m app.planning.infrastructure.cli init` (y `seed` para ejemplos)
 - Backend: `uv run ruff check . && uv run pytest`
-- Frontend: `pnpm lint && pnpm build`
+- Frontend: `pnpm lint && pnpm test && pnpm build`
 
 ## Convenciones
 - **Python:** ruff (lint + format), type hints y docstrings breves.

@@ -25,10 +25,16 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
 - Workflow `n8n/workflows/01_ingesta_excel.json`: vigila `data/inbox` y envía cada Excel o CSV al backend.
 - `scripts/load_synthetic.py`: carga el histórico sintético por la misma ruta de ingesta.
 
+**App de planificación de demanda (vendedores) lista** — migración del mockup Noraves ([ADR 0004](docs/adr/0004-arquitectura-hexagonal-y-base-de-datos-intercambiable.md)):
+- PWA en `frontend/` (React + Vite + Tailwind + shadcn/ui + zod), pensada para el celular, instalable y con cola offline.
+- API `/api/*` en el backend con arquitectura hexagonal (`backend/app/planning`), login de vendedores con JWT.
+- Base de datos intercambiable por `DATABASE_URL`: Supabase hoy; Azure SQL configurado para más adelante. Nombres de tablas en `backend/config/tables.yaml`.
+
 ## Requisitos
 
 - Docker Desktop (con Compose v2.20 o superior).
 - [uv](https://docs.astral.sh/uv/), solo para correr el backend o los tests fuera de Docker.
+- Node 24 y pnpm, solo para desarrollar el frontend fuera de Docker.
 - Un proyecto en [Supabase](https://supabase.com) (plan gratuito), o usar el perfil `localdb` sin internet.
 
 ## Puesta en marcha
@@ -40,12 +46,14 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
    Completa en `.env`:
    - **Datos de conexión de Supabase.** En el dashboard: **Connect → Session pooler**. Se usa el host `aws-0-<region>.pooler.supabase.com`, el puerto `5432` y el usuario `postgres.<project-ref>`.
    - **`N8N_ENCRYPTION_KEY`** con una clave aleatoria larga (`openssl rand -hex 32`). No la cambies después, porque cifra las credenciales que guarda n8n.
+   - **`AUTH_SECRET`** con otra clave aleatoria larga: firma las sesiones de los vendedores.
 
 2. **Levantar los servicios:**
    ```bash
    docker compose up -d
    ```
    El backend aplica las migraciones al arrancar.
+   - App de vendedores (PWA): http://127.0.0.1:8000
    - Backend: http://127.0.0.1:8000/health · documentación de la API: http://127.0.0.1:8000/docs
    - n8n: http://127.0.0.1:5678
 
@@ -53,6 +61,32 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
    ```bash
    docker compose --profile localdb up -d
    ```
+
+4. **Datos de la app de vendedores** (productos, vendedores y, si quieres, 3 semanas de ejemplo):
+   ```bash
+   docker compose exec backend python -m app.planning.infrastructure.cli init
+   docker compose exec backend python -m app.planning.infrastructure.cli seed
+   ```
+   Usuarios de prueba: `jperez`, `mrios`, `cleon` (contraseña `PLANNING_DEMO_PASSWORD`, por defecto `demo1234`).
+
+## App de planificación de demanda
+
+- **Base de datos:** la elige `DATABASE_URL` (Supabase, Azure SQL, Postgres local o SQLite para demos). Para Azure SQL ver la sección correspondiente de `.env.example`.
+- **Nombres de tablas:** `backend/config/tables.yaml` (renombrar una tabla ya creada requiere una migración).
+- **Catálogo y vendedores iniciales:** `backend/config/planning_seed.yaml`.
+- **Comandos** (`cd backend`): `uv run python -m app.planning.infrastructure.cli init | seed | show [n] | clear --yes`.
+- **Venta real:** todavía simulada, como en el mockup. **"Sugerir con historial":** promedio del mismo día de la semana; ahí se conectará el modelo de ML.
+
+## Desarrollo del frontend
+
+```bash
+cd frontend
+pnpm install
+pnpm dev            # http://localhost:5173 (reenvía /api al backend en 127.0.0.1:8000)
+pnpm lint && pnpm test && pnpm build
+```
+
+Las capas (`domain`, `application`, `infrastructure`, `ui`) las vigila ESLint: el dominio no importa React y la interfaz no importa adaptadores.
 
 ## Datos sintéticos y plantilla
 
@@ -93,6 +127,10 @@ uv run pytest
 
 ```
 backend/        FastAPI, SQLAlchemy, Alembic (app/db/migrations)
+  app/shared/     núcleo hexagonal: errores de dominio, base de datos por motor, HTTP
+  app/planning/   app de vendedores: domain · application · infrastructure · bootstrap.py
+  config/         schemas.yaml, catalog.yaml, tables.yaml, planning_seed.yaml
+frontend/       PWA (React + Vite + Tailwind + shadcn/ui + zod): core · modules · ui · app
 n8n/workflows/  workflows exportados
 data/           inbox (carpeta vigilada), lakehouse local, plantillas y ejemplos
 docs/           arquitectura, supuestos y ADR

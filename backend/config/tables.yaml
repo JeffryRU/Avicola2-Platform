@@ -1,0 +1,22 @@
+# Fuente única de los nombres físicos de las tablas de la app.
+# El código usa siempre el nombre lógico (la clave); aquí se decide cómo se llama en la base.
+# Cambiar un nombre ya creado exige una migración de Alembic que renombre la tabla.
+
+# Esquema lógico de las tablas. En Supabase debe ser `app` (nunca `public`, que expone la Data API).
+# DB_SCHEMA en .env lo reemplaza por otro esquema físico (p. ej. `dbo` en Azure SQL).
+# En motores sin esquemas (SQLite, MySQL) se ignora.
+schema: app
+
+tables:
+  # Plataforma
+  users: users
+  saca_plans: saca_plans
+  saca_plan_comments: saca_plan_comments
+  ingestion_log: ingestion_log
+  column_mappings: column_mappings
+  alerts: alerts
+  # Planificación de demanda (app de vendedores)
+  sellers: np_sellers
+  products: np_products
+  projections: np_projections
+  projection_lines: np_projection_lines

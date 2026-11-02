@@ -1,3 +1,4 @@
+import app.planning.infrastructure.persistence.tables  # noqa: F401
 from app.db.models import APP_SCHEMA, Base
 
 
@@ -16,4 +17,8 @@ def test_expected_tables() -> None:
         "ingestion_log",
         "column_mappings",
         "alerts",
+        "np_sellers",
+        "np_products",
+        "np_projections",
+        "np_projection_lines",
     }

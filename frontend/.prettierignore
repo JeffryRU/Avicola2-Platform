@@ -1,0 +1,4 @@
+dist
+dev-dist
+src/ui/components/shadcn
+pnpm-lock.yaml

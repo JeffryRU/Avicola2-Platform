@@ -1,3 +1,9 @@
+import os
+
+# Los tests corren contra SQLite en memoria: prueba de que el backend no depende del motor.
+os.environ["DATABASE_URL"] = "sqlite://"
+os.environ["AUTH_SECRET"] = "secreto-de-tests-con-largo-suficiente"
+
 from datetime import date
 from pathlib import Path
 

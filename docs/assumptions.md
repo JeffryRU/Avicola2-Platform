@@ -20,6 +20,9 @@ Mientras un punto no se confirme con el equipo o con Avícola 2, se elige la opc
 - Si **"Distribución"** (pollo vivo a planta) y **"despacho"** (producto terminado) son áreas distintas.
 - **A quién se pide la recarga** (granja o proveedor).
 
+- **App de vendedores (mockup Noraves):** catálogo BRASA/BROASTER, pesos por unidad y vendedores de `planning_seed.yaml` son los del mockup, por validar. La **venta real es simulada** (90–102 % de lo proyectado) hasta tener el ERP. La **hora límite** de confirmación (10:00 a. m.) es solo un mensaje.
+- **Vendedores vs. usuarios de la plataforma:** los vendedores tienen su propia tabla (`np_sellers`). Si luego se unifican con `users` (rol `canal`), se migra en un ADR.
+
 ## Proceso
 - **El flujo As-Is** ([architecture.md §1](architecture.md)) y el flujo de datos (quién registra qué y cada cuánto) son preliminares.
 - **Estados del plan de saca:** se arranca con `draft → proposed → approved | rejected`, configurables.
@@ -30,4 +33,5 @@ Mientras un punto no se confirme con el equipo o con Avícola 2, se elige la opc
 - **Proyecto de Supabase:** región (cerca de la VM de GCP) y si el plan gratuito alcanza (500 MB, pausa por inactividad).
 - **Dominio para HTTPS en GCP:** dominio propio o un servicio de DNS comodín (tipo sslip.io).
 - **Qué warehouse o lakehouse tiene un compañero del grupo.** Si se usa el suyo, solo cambia la capa `backend/app/lakehouse/`.
+- **Azure SQL en producción:** queda configurado (driver opcional y perfil de motor) pero **no se probó contra un SQL Server real**; probarlo antes de usarlo ([ADR 0004](adr/0004-arquitectura-hexagonal-y-base-de-datos-intercambiable.md)).
 - **Si la rúbrica del curso exige** almacenamiento de objetos o lakehouse. GCS lo cubre en el despliegue ([ADR 0001](adr/0001-almacenamiento-gcs-y-despliegue-en-vm.md)).

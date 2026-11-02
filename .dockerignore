@@ -1,0 +1,17 @@
+# Contexto de build: raíz del repo (la imagen del backend incluye el build del frontend).
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/*.pyc
+**/node_modules
+frontend/dist
+frontend/dev-dist
+backend/tests
+backend/models
+data
+n8n
+docs
+.git
+.env
+.env.*

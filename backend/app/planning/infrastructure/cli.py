@@ -1,0 +1,177 @@
+"""Comandos de consola de la planificación (equivalen a los `npm run db:*` del mockup).
+
+    uv run python -m app.planning.infrastructure.cli init         productos y vendedores
+    uv run python -m app.planning.infrastructure.cli seed         3 semanas de ejemplo
+    uv run python -m app.planning.infrastructure.cli show [n]     resumen y últimas n
+    uv run python -m app.planning.infrastructure.cli clear --yes  borra las proyecciones
+
+Las tablas las crea Alembic (`uv run alembic upgrade head`).
+"""
+
+import os
+import random
+import sys
+from datetime import UTC, date, datetime, time, timedelta
+
+import yaml
+from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy.orm import Session
+
+from app.core.config import Settings, get_settings
+from app.planning.application.use_cases import DayUnits, SubmitProjection
+from app.planning.infrastructure.clock import ZoneClock
+from app.planning.infrastructure.persistence.repositories import (
+    SqlProductRepository,
+    SqlProjectionRepository,
+    SqlSellerRepository,
+)
+from app.planning.infrastructure.persistence.tables import (
+    products,
+    projection_lines,
+    projections,
+    sellers,
+)
+from app.planning.infrastructure.security import ScryptPasswordHasher
+from app.shared.infrastructure.database.session import SessionLocal
+
+# Unidades base por día de la semana (lun..dom) para BRASA 1..10, como en el mockup.
+BASE = [
+    [10, 15, 20, 12, 25, 18, 10, 14, 8, 5],
+    [8, 12, 18, 10, 20, 15, 8, 12, 6, 4],
+    [12, 18, 20, 15, 30, 22, 12, 18, 10, 6],
+    [10, 15, 18, 14, 28, 20, 10, 16, 8, 6],
+    [14, 20, 24, 16, 32, 24, 12, 18, 10, 7],
+    [16, 22, 26, 18, 35, 26, 14, 20, 12, 8],
+    [12, 16, 20, 12, 26, 18, 10, 14, 8, 5],
+]
+SELLER_FACTOR = {"jperez": 1.0, "mrios": 0.82, "cleon": 1.16}
+
+
+def init(session: Session, settings: Settings) -> None:
+    """Carga o actualiza productos y vendedores desde config/planning_seed.yaml (idempotente)."""
+    with (settings.config_dir / "planning_seed.yaml").open(encoding="utf-8") as fh:
+        seed = yaml.safe_load(fh)
+    order = 0
+    for category, items in seed["products"].items():
+        for item in items:
+            values = {
+                "category": category,
+                "name": item["name"],
+                "kg_per_unit": item["kg_per_unit"],
+                "sort_order": order,
+                "is_active": True,
+            }
+            exists = session.scalar(select(products.c.id).where(products.c.id == item["id"]))
+            if exists:
+                session.execute(update(products).where(products.c.id == item["id"]).values(values))
+            else:
+                session.execute(insert(products).values(id=item["id"], **values))
+            order += 1
+    password = os.environ.get("PLANNING_DEMO_PASSWORD", "demo1234")
+    hasher = ScryptPasswordHasher()
+    for s in seed["sellers"]:
+        if not session.scalar(select(sellers.c.id).where(sellers.c.username == s["username"])):
+            session.execute(
+                insert(sellers).values(
+                    username=s["username"],
+                    name=s["name"],
+                    zone=s.get("zone"),
+                    password_hash=hasher.hash(password),
+                    is_active=True,
+                )
+            )
+    session.commit()
+    print(f"OK: {order} productos y {len(seed['sellers'])} vendedores listos.")
+
+
+def seed_history(session: Session, settings: Settings) -> None:
+    """Proyecciones BRASA de los últimos 21 días para cada vendedor (para ver los dashboards)."""
+    today = ZoneClock(settings.tz).today()
+    product_repo, projection_repo = SqlProductRepository(session), SqlProjectionRepository(session)
+    brasa = [p for p in product_repo.list_active() if p.category == "BRASA"]
+    total = 0
+    for seller in SqlSellerRepository(session).list_active():
+        f = SELLER_FACTOR.get(seller.username, 1.0)
+        for back in range(21, 0, -1):
+            day = today - timedelta(days=back)
+            units = {
+                p.id: max(1, round(BASE[day.weekday()][i % 10] * f * random.uniform(0.92, 1.08)))
+                for i, p in enumerate(brasa)
+            }
+            # Reloj fijo en ese día: se guarda como si se hubiera enviado entonces.
+            submit = SubmitProjection(product_repo, projection_repo, _DayClock(day), 1)
+            submit(seller, "BRASA", [DayUnits(day, units)], None)
+            total += 1
+    print(f"OK: {total} proyecciones de ejemplo cargadas (últimos 21 días).")
+
+
+class _DayClock:
+    def __init__(self, day: date) -> None:
+        self.day = day
+
+    def today(self) -> date:
+        return self.day
+
+    def now(self) -> datetime:
+        return datetime.combine(self.day, time(8, 30), tzinfo=UTC)
+
+
+def show(session: Session, limit: int) -> None:
+    n, units, kg = session.execute(
+        select(
+            func.count(),
+            func.coalesce(func.sum(projections.c.total_units), 0),
+            func.coalesce(func.sum(projections.c.total_kg), 0),
+        )
+    ).one()
+    print(
+        f"Vendedores: {session.scalar(select(func.count()).select_from(sellers))} · "
+        f"productos: {session.scalar(select(func.count()).select_from(products))}"
+    )
+    print(f"Proyecciones: {n} · {units} unidades · {kg} kg\n")
+    rows = session.execute(
+        select(
+            projections.c.date,
+            sellers.c.username,
+            projections.c.category,
+            projections.c.total_units,
+            projections.c.total_kg,
+            projections.c.submitted_at,
+        )
+        .join(sellers, sellers.c.id == projections.c.seller_id)
+        .order_by(projections.c.submitted_at.desc())
+        .limit(limit)
+    ).all()
+    for r in rows:
+        print(
+            f"{r.date}  {r.username:<10} {r.category:<9} {r.total_units:>6} u  {r.total_kg:>9} kg"
+        )
+
+
+def clear(session: Session) -> None:
+    session.execute(delete(projection_lines))
+    session.execute(delete(projections))
+    session.commit()
+    print("OK: Proyecciones borradas.")
+
+
+def main(argv: list[str]) -> int:
+    cmd = argv[0] if argv else ""
+    settings = get_settings()
+    with SessionLocal() as session:
+        if cmd == "init":
+            init(session, settings)
+        elif cmd == "seed":
+            seed_history(session, settings)
+        elif cmd == "show":
+            show(session, int(argv[1]) if len(argv) > 1 else 20)
+        elif cmd == "clear" and "--yes" in argv:
+            clear(session)
+        else:
+            print(__doc__)
+            return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

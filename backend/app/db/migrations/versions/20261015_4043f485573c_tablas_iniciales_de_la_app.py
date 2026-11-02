@@ -11,6 +11,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
+from app.shared.infrastructure.database.migrations import app_schema, ref
+
 # revision identifiers, used by Alembic.
 revision: str = "4043f485573c"
 down_revision: str | Sequence[str] | None = None
@@ -33,11 +35,11 @@ def upgrade() -> None:
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_ingestion_log")),
-        schema="app",
+        schema=app_schema(),
     )
     op.create_table(
         "users",
@@ -51,12 +53,12 @@ def upgrade() -> None:
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_users")),
         sa.UniqueConstraint("email", name=op.f("uq_users_email")),
-        schema="app",
+        schema=app_schema(),
     )
     op.create_table(
         "alerts",
@@ -69,16 +71,18 @@ def upgrade() -> None:
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.ForeignKeyConstraint(
-            ["acknowledged_by"], ["app.users.id"], name=op.f("fk_alerts_acknowledged_by_users")
+            ["acknowledged_by"], [ref("users")], name=op.f("fk_alerts_acknowledged_by_users")
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_alerts")),
-        schema="app",
+        schema=app_schema(),
     )
-    op.create_index(op.f("ix_app_alerts_date"), "alerts", ["date"], unique=False, schema="app")
+    op.create_index(
+        op.f("ix_app_alerts_date"), "alerts", ["date"], unique=False, schema=app_schema()
+    )
     op.create_table(
         "column_mappings",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -89,15 +93,15 @@ def upgrade() -> None:
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.ForeignKeyConstraint(
-            ["confirmed_by"], ["app.users.id"], name=op.f("fk_column_mappings_confirmed_by_users")
+            ["confirmed_by"], [ref("users")], name=op.f("fk_column_mappings_confirmed_by_users")
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_column_mappings")),
         sa.UniqueConstraint("source_signature", name=op.f("uq_column_mappings_source_signature")),
-        schema="app",
+        schema=app_schema(),
     )
     op.create_table(
         "saca_plans",
@@ -115,26 +119,26 @@ def upgrade() -> None:
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.ForeignKeyConstraint(
-            ["approved_by"], ["app.users.id"], name=op.f("fk_saca_plans_approved_by_users")
+            ["approved_by"], [ref("users")], name=op.f("fk_saca_plans_approved_by_users")
         ),
         sa.ForeignKeyConstraint(
-            ["created_by"], ["app.users.id"], name=op.f("fk_saca_plans_created_by_users")
+            ["created_by"], [ref("users")], name=op.f("fk_saca_plans_created_by_users")
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_saca_plans")),
-        schema="app",
+        schema=app_schema(),
     )
     op.create_index(
-        op.f("ix_app_saca_plans_date"), "saca_plans", ["date"], unique=False, schema="app"
+        op.f("ix_app_saca_plans_date"), "saca_plans", ["date"], unique=False, schema=app_schema()
     )
     op.create_table(
         "saca_plan_comments",
@@ -145,20 +149,20 @@ def upgrade() -> None:
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=sa.func.now(),
             nullable=False,
         ),
         sa.ForeignKeyConstraint(
-            ["author_id"], ["app.users.id"], name=op.f("fk_saca_plan_comments_author_id_users")
+            ["author_id"], [ref("users")], name=op.f("fk_saca_plan_comments_author_id_users")
         ),
         sa.ForeignKeyConstraint(
             ["plan_id"],
-            ["app.saca_plans.id"],
+            [ref("saca_plans")],
             name=op.f("fk_saca_plan_comments_plan_id_saca_plans"),
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_saca_plan_comments")),
-        schema="app",
+        schema=app_schema(),
     )
     # ### end Alembic commands ###
 
@@ -166,12 +170,12 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_table("saca_plan_comments", schema="app")
-    op.drop_index(op.f("ix_app_saca_plans_date"), table_name="saca_plans", schema="app")
-    op.drop_table("saca_plans", schema="app")
-    op.drop_table("column_mappings", schema="app")
-    op.drop_index(op.f("ix_app_alerts_date"), table_name="alerts", schema="app")
-    op.drop_table("alerts", schema="app")
-    op.drop_table("users", schema="app")
-    op.drop_table("ingestion_log", schema="app")
+    op.drop_table("saca_plan_comments", schema=app_schema())
+    op.drop_index(op.f("ix_app_saca_plans_date"), table_name="saca_plans", schema=app_schema())
+    op.drop_table("saca_plans", schema=app_schema())
+    op.drop_table("column_mappings", schema=app_schema())
+    op.drop_index(op.f("ix_app_alerts_date"), table_name="alerts", schema=app_schema())
+    op.drop_table("alerts", schema=app_schema())
+    op.drop_table("users", schema=app_schema())
+    op.drop_table("ingestion_log", schema=app_schema())
     # ### end Alembic commands ###
