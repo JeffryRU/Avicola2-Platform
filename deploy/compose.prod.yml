@@ -1,0 +1,144 @@
+# Producción: backend (API + PWA) + n8n + respaldo diario de la base. Ver docs/deploy.md.
+#
+# Sirve igual para los tres caminos:
+#   - Dokploy / Coolify: apuntar a este archivo; el HTTPS y los dominios los pone la plataforma
+#     (Traefik), configurados en su panel: backend → puerto 8000, n8n → puerto 5678.
+#   - VPS sin panel o VM de GCP: sumar Caddy para el HTTPS:
+#       docker compose -f deploy/compose.prod.yml -f deploy/compose.caddy.yml --env-file .env up -d
+#
+# La base es Supabase Cloud. Los datos del servidor van en volúmenes con nombre (no rutas del
+# host), así los respaldos de volúmenes de Dokploy/Coolify los incluyen.
+
+name: avicola2
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "5"}
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      args:
+        DB_EXTRAS: ${DB_EXTRAS:-}
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:?Falta DATABASE_URL (Supabase, pooler en modo sesión)}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_SCHEMA: ${DB_SCHEMA:-}
+      # Fuera de local la API no arranca sin estos dos (ver docs/adr/0005).
+      AUTH_SECRET: ${AUTH_SECRET:?Falta AUTH_SECRET (openssl rand -hex 32)}
+      INGEST_API_TOKEN: ${INGEST_API_TOKEN:?Falta INGEST_API_TOKEN (openssl rand -hex 24)}
+      AUTH_TOKEN_TTL_HOURS: ${AUTH_TOKEN_TTL_HOURS:-12}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-}
+      LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-5}
+      LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
+      TZ: ${TZ:-America/Lima}
+      LAKEHOUSE_URI: ${LAKEHOUSE_URI:-/data/lakehouse}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-1}
+      # Solo el proxy (Traefik o Caddy) llega al contenedor: se confía en sus cabeceras
+      # X-Forwarded-* para conocer la IP real del cliente y el esquema https.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      LOG_TO_FILES: ${LOG_TO_FILES:-true}
+      LOG_DIR: /data/logs
+      YIELD_FACTOR: ${YIELD_FACTOR:-0.75}
+      AVG_LIVE_WEIGHT_KG: ${AVG_LIVE_WEIGHT_KG:-2.6}
+    volumes:
+      - lakehouse:/data/lakehouse
+      - logs:/data/logs
+    expose:
+      - "8000"
+    healthcheck:
+      # /health consulta la base cada 10 s: además mantiene activo el proyecto de Supabase.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    mem_limit: ${BACKEND_MEM_LIMIT:-768m}
+    logging: *logging
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.43.6
+    restart: unless-stopped
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: ${N8N_DB_HOST:?Falta N8N_DB_HOST}
+      DB_POSTGRESDB_PORT: ${N8N_DB_PORT:-5432}
+      DB_POSTGRESDB_DATABASE: ${N8N_DB_DATABASE:-postgres}
+      DB_POSTGRESDB_USER: ${N8N_DB_USER:?Falta N8N_DB_USER}
+      DB_POSTGRESDB_PASSWORD: ${N8N_DB_PASSWORD:?Falta N8N_DB_PASSWORD}
+      DB_POSTGRESDB_SCHEMA: n8n
+      DB_POSTGRESDB_POOL_SIZE: ${N8N_DB_POOL_SIZE:-2}
+      DB_POSTGRESDB_SSL_ENABLED: ${N8N_DB_SSL_ENABLED:-true}
+      DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED: ${N8N_DB_SSL_REJECT_UNAUTHORIZED:-false}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Falta N8N_ENCRYPTION_KEY (no cambiarla después)}
+      # URL pública de n8n (la que recibe los webhooks, p. ej., Telegram).
+      N8N_HOST: ${N8N_DOMAIN:?Falta N8N_DOMAIN}
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://${N8N_DOMAIN}/
+      N8N_SECURE_COOKIE: "true"
+      N8N_PROXY_HOPS: "1"
+      GENERIC_TIMEZONE: ${TZ:-America/Lima}
+      TZ: ${TZ:-America/Lima}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_RESTRICT_FILE_ACCESS_TO: /data/inbox
+      NODES_EXCLUDE: '["n8n-nodes-base.executeCommand"]'
+      BACKEND_URL: http://backend:8000
+      INGEST_API_TOKEN: ${INGEST_API_TOKEN}
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - inbox:/data/inbox
+    expose:
+      - "5678"
+    # Solo en el propio servidor: el editor se abre con un túnel SSH (docs/deploy.md).
+    ports:
+      - "127.0.0.1:${N8N_PORT:-5678}:5678"
+    depends_on:
+      backend: {condition: service_healthy}
+    mem_limit: ${N8N_MEM_LIMIT:-1g}
+    logging: *logging
+
+  # Respaldo diario de los esquemas `app` y `n8n` de Supabase (pg_dump), con retención.
+  # Queda en el volumen `backups`: cópialo fuera del servidor (docs/deploy.md).
+  db-backup:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_EVERY_HOURS: ${BACKUP_EVERY_HOURS:-24}
+      TZ: ${TZ:-America/Lima}
+    volumes:
+      - backups:/backups
+    # Va dentro del compose (no como archivo montado): Dokploy vuelve a clonar el repo en cada
+    # despliegue y los archivos montados desde él pueden quedar vacíos. `$$` = `$` literal.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        url=$$(echo "$$DATABASE_URL" | sed 's#^postgresql+[a-z0-9]*://#postgresql://#')
+        while true; do
+          file=/backups/avicola2-$$(date +%Y%m%d-%H%M).dump
+          if pg_dump "$$url" --schema=app --schema=n8n --no-owner --format=custom --file="$$file.tmp"; then
+            mv "$$file.tmp" "$$file" && echo "Respaldo listo: $$file"
+          else
+            rm -f "$$file.tmp" && echo "ERROR: falló el respaldo de la base" >&2
+          fi
+          find /backups -name 'avicola2-*.dump' -mtime +"$$BACKUP_KEEP_DAYS" -delete
+          sleep $$((BACKUP_EVERY_HOURS * 3600))
+        done
+    mem_limit: 256m
+    logging: *logging
+
+volumes:
+  lakehouse:
+  logs:
+  n8n_data:
+  inbox:
+  backups:

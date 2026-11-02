@@ -129,7 +129,8 @@ Avicola2-Platform/
 │   ├── templates/            # plantilla Excel
 │   └── samples/              # Excel de ejemplo
 ├── logs/                     # app.log, errors.log y frontend.log (no se versionan)
-├── scripts/                  # generate_synthetic.py, seed, deploy
+├── deploy/                   # producción: compose.prod.yml, compose.caddy.yml, bootstrap-vps.sh
+├── scripts/                  # generate_synthetic.py, generate_template.py, load_synthetic.py
 └── docs/                     # architecture.md, assumptions.md, adr/
 ```
 
@@ -141,6 +142,7 @@ Avicola2-Platform/
 - Cargar el histórico sintético en el lakehouse: `uv run --project backend python scripts/load_synthetic.py`
 - Importar workflows de n8n: ver `n8n/workflows/README.md`
 - Entrenar: `docker compose run --rm ml-train`
+- Producción: ver `docs/deploy.md` (Dokploy, Coolify o VPS/GCP con Caddy: `docker compose -f deploy/compose.prod.yml -f deploy/compose.caddy.yml --env-file .env up -d --build`)
 - Datos de la app de vendedores: `cd backend && uv run python -m app.planning.infrastructure.cli init` (y `seed` para ejemplos)
 - Backend: `uv run ruff check . && uv run pytest`
 - Frontend: `pnpm lint && pnpm test && pnpm build`

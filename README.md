@@ -117,6 +117,14 @@ uv run --project backend python scripts/load_synthetic.py               # carga 
 - **Mapeos pendientes:** `GET /ingest/mappings`. Para confirmar uno, `POST /ingest/mappings/{id}/confirm` con `{"mapping": {"Peso neto (kg)": "qty_kg", "=type": "proyeccion"}}`.
 - **Documentación interactiva:** http://127.0.0.1:8000/docs
 
+## Despliegue
+
+Ver [docs/deploy.md](docs/deploy.md). La carpeta `deploy/` sirve para tres caminos:
+- **Dokploy** (recomendado en un VPS) o **Coolify**: despliegan `deploy/compose.prod.yml` desde GitHub y se actualizan solos en cada `git push`.
+- **Sin panel** (VPS o VM de GCP): `deploy/bootstrap-vps.sh` prepara el servidor y Caddy pone el HTTPS.
+
+Sin dominio propio sirve sslip.io (`app.<ip>.sslip.io`). Incluye un respaldo diario de la base.
+
 ## Desarrollo del backend
 
 ```bash

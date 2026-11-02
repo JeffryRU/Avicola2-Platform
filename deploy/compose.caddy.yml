@@ -1,0 +1,54 @@
+# Solo para un VPS sin panel o la VM de GCP: Caddy pone el HTTPS (Let's Encrypt) delante.
+# Con Dokploy o Coolify NO se usa: ellos ya traen Traefik.
+#
+#   docker compose -f deploy/compose.prod.yml -f deploy/compose.caddy.yml --env-file .env up -d --build
+#
+# El Caddyfile va dentro del compose (configs.content) por la misma razón que el respaldo: no
+# depender de archivos del repo montados en el contenedor.
+
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Falta APP_DOMAIN}
+      N8N_DOMAIN: ${N8N_DOMAIN:?Falta N8N_DOMAIN}
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend: {condition: service_healthy}
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+
+configs:
+  caddyfile:
+    content: |
+      # App de vendedores (PWA) y API.
+      {$$APP_DOMAIN} {
+        encode zstd gzip
+        reverse_proxy backend:8000
+      }
+
+      # n8n: en público solo los webhooks (Telegram, formularios). El editor se abre con un
+      # túnel SSH a 127.0.0.1:5678 (docs/deploy.md), nunca desde internet.
+      {$$N8N_DOMAIN} {
+        @webhooks path /webhook/* /webhook-test/* /webhook-waiting/* /form/*
+        handle @webhooks {
+          reverse_proxy n8n:5678
+        }
+        respond 404
+      }
+
+volumes:
+  caddy_data:
+  caddy_config:

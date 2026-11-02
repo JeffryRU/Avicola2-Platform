@@ -16,7 +16,8 @@ def mount_spa(app: FastAPI, dist: Path) -> None:
         return
     root = dist.resolve()
 
-    @app.get("/{path:path}", include_in_schema=False)
+    # HEAD también: los monitores de disponibilidad suelen usarlo.
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     def spa(path: str) -> FileResponse:
         if path.startswith(API_PREFIXES):
             raise HTTPException(404)
