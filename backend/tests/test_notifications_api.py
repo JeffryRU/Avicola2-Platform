@@ -44,24 +44,24 @@ def _as(username: str) -> TestClient:
 
 def _submit(c: TestClient, offset: int = 0) -> None:
     day = (TODAY + timedelta(days=offset)).isoformat()
-    body = {"category": "BRASA", "days": [{"date": day, "units": {"B1": 5}}]}
+    body = {"category": "BRASA", "days": [{"date": day, "units": {"P0001": 5}}]}
     assert c.post("/api/projections", json=body).status_code == 201
 
 
 def test_supervisor_is_notified_when_a_seller_submits(client):
-    _submit(_as("jperez"))
+    _submit(_as("rnavarro"))
     supervisor = _as("supervisor")
     page = supervisor.get("/api/notifications").json()
     assert page["unread"] == 1
     n = page["items"][0]
-    assert n["kind"] == "projection_submitted" and n["title"] == "Proyección de Juan Pérez"
+    assert n["kind"] == "projection_submitted" and n["title"] == "Proyección de Roberto Navarro"
     assert "1 día de BRASA (5 unid.)" in n["body"] and n["link"] == "/dashboards/estado"
     # El vendedor no recibe su propia notificación.
-    assert _as("jperez").get("/api/notifications").json() == {"items": [], "unread": 0}
+    assert _as("rnavarro").get("/api/notifications").json() == {"items": [], "unread": 0}
 
 
 def test_mark_read_one_or_all(client):
-    seller = _as("jperez")
+    seller = _as("rnavarro")
     _submit(seller, 0)
     _submit(seller, 1)
     supervisor = _as("supervisor")
@@ -76,28 +76,28 @@ def test_mark_read_one_or_all(client):
 
 
 def test_cannot_mark_someone_elses_notifications(client):
-    _submit(_as("jperez"))
+    _submit(_as("rnavarro"))
     supervisor = _as("supervisor")
     ids = [n["id"] for n in supervisor.get("/api/notifications").json()["items"]]
-    assert _as("mrios").post("/api/notifications/read", json={"ids": ids}).json() == {"updated": 0}
+    assert _as("hdias").post("/api/notifications/read", json={"ids": ids}).json() == {"updated": 0}
     assert supervisor.get("/api/notifications").json()["unread"] == 1
 
 
 def test_daily_reminder_only_for_pending_sellers_and_once(client):
-    _submit(_as("jperez"))
+    _submit(_as("rnavarro"))
     r = client.post("/api/internal/notifications/projection-reminders")
-    assert r.json() == {"created": 2}  # mrios y cleon; jperez ya envió y el supervisor no proyecta
+    assert r.json() == {"created": 6}  # rnavarro ya envió y el supervisor no proyecta
     assert client.post("/api/internal/notifications/projection-reminders").json() == {"created": 0}
-    reminder = _as("mrios").get("/api/notifications").json()["items"][0]
+    reminder = _as("hdias").get("/api/notifications").json()["items"][0]
     assert reminder["title"] == "Proyección pendiente" and reminder["link"] == "/registrar"
-    assert _as("jperez").get("/api/notifications").json()["unread"] == 0
+    assert _as("rnavarro").get("/api/notifications").json()["unread"] == 0
 
 
 def test_announcements_from_n8n(client):
     body = {"audience": "sellers", "title": "Ventas actualizadas", "body": "Ya llegó el ERP."}
-    assert client.post("/api/internal/notifications", json=body).json() == {"created": 3}
+    assert client.post("/api/internal/notifications", json=body).json() == {"created": 7}
     assert _as("supervisor").get("/api/notifications").json()["unread"] == 0
-    one = {"audience": "cleon", "title": "Hola", "body": "Solo para ti."}
+    one = {"audience": "mcordova", "title": "Hola", "body": "Solo para ti."}
     assert client.post("/api/internal/notifications", json=one).json() == {"created": 1}
     missing = {"audience": "nadie", "title": "x", "body": "y"}
     assert client.post("/api/internal/notifications", json=missing).status_code == 404
@@ -123,7 +123,7 @@ def test_bus_delivers_only_to_the_audience_from_any_thread():
 
     async def scenario():
         async with (
-            bus.subscribe("jperez", "seller") as seller,
+            bus.subscribe("rnavarro", "seller") as seller,
             bus.subscribe("ana", "supervisor") as supervisor,
         ):
             # Publicar desde otro hilo, como hacen los endpoints síncronos.
@@ -150,9 +150,9 @@ def test_stream_sends_events_and_stops_on_session_revoked():
     bus = InMemoryEventBus()
 
     async def scenario():
-        async with bus.subscribe("jperez", "seller") as sub:
-            bus.publish(Event(NOTIFICATION_CREATED, Audience.users("jperez"), {"id": 7}))
-            bus.publish(Event(SESSION_REVOKED, Audience.users("jperez"), {"reason": "x"}))
+        async with bus.subscribe("rnavarro", "seller") as sub:
+            bus.publish(Event(NOTIFICATION_CREATED, Audience.users("rnavarro"), {"id": 7}))
+            bus.publish(Event(SESSION_REVOKED, Audience.users("rnavarro"), {"reason": "x"}))
             return [chunk async for chunk in _stream(_FakeRequest(10), sub)]
 
     chunks = asyncio.run(scenario())
@@ -169,9 +169,9 @@ def test_reset_password_revokes_open_streams(client):
     event_bus.publish = received.append  # type: ignore[method-assign]
     try:
         assert (
-            _as("supervisor").post("/api/admin/accounts/jperez/reset-password").status_code == 200
+            _as("supervisor").post("/api/admin/accounts/rnavarro/reset-password").status_code == 200
         )
     finally:
         event_bus.publish = original  # type: ignore[method-assign]
     assert [e.type for e in received] == [SESSION_REVOKED]
-    assert received[0].audience.usernames == {"jperez"}
+    assert received[0].audience.usernames == {"rnavarro"}

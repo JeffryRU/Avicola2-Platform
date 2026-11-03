@@ -20,7 +20,7 @@ export type Session = z.infer<typeof sessionSchema>
 
 export const isSupervisor = (seller: Seller) => seller.role === 'supervisor'
 
-/** "Supervisor" o "Vendedor, Zona Norte" (debajo del nombre). */
+/** "Supervisor" o "Vendedor, Trujillo" (debajo del nombre). */
 export const roleLabel = (seller: Seller) =>
   isSupervisor(seller) ? 'Supervisor' : seller.zone ? `Vendedor, ${seller.zone}` : 'Vendedor'
 

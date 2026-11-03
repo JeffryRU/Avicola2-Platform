@@ -146,7 +146,7 @@ export function Delta({
   )
 }
 
-/** Segmentos (Semana actual / Historial, BRASA / BROASTER...). */
+/** Segmentos (Semana actual / Historial, categorías...). */
 export function Segmented<T extends string>({
   value,
   options,

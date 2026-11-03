@@ -1,6 +1,7 @@
+import { Fragment } from 'react'
 import { dShort, relativeDay, type IsoDate } from '@/core/domain/dates'
 import { nf0, nf1 } from '@/core/domain/format'
-import { sumUnits, type Catalog } from '@/modules/planning/domain/catalog'
+import { bySubcategory } from '@/modules/planning/domain/catalog'
 import { parseCell, type Draft } from '@/modules/planning/domain/draft'
 import type { Product } from '@/modules/planning/domain/schemas'
 import { cn } from '@/ui/lib/utils'
@@ -9,7 +10,6 @@ interface Props {
   draft: Draft
   dates: IsoDate[]
   products: Product[]
-  catalog: Catalog
   invalid: IsoDate[]
   mobile: boolean
   onChange: (date: IsoDate, productId: string, units: number | null) => void
@@ -29,12 +29,20 @@ function onCellKey(e: React.KeyboardEvent<HTMLInputElement>, columns: number) {
 }
 
 /** Matriz producto × día para escribir unidades; los kg se calculan solos. */
-export function ProjectionMatrix({ draft, dates, products, catalog, invalid, mobile, onChange }: Props) {
+export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onChange }: Props) {
   const value = (d: IsoDate, p: Product) => draft.units[d]?.[p.id]
-  const dayKg = (d: IsoDate) => catalog.kg(draft.units[d] ?? {})
+  // Totales de los productos a la vista (con un tamaño elegido, solo los suyos).
+  const dayUnits = (d: IsoDate) => products.reduce((s, p) => s + (value(d, p) ?? 0), 0)
+  const dayKg = (d: IsoDate) => products.reduce((s, p) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0)
   const productUnits = (p: Product) => dates.reduce((s, d) => s + (value(d, p) ?? 0), 0)
-  const totalUnits = dates.reduce((s, d) => s + sumUnits(draft.units[d]), 0)
+  const totalUnits = dates.reduce((s, d) => s + dayUnits(d), 0)
   const totalKg = dates.reduce((s, d) => s + dayKg(d), 0)
+  // Subcategorías (Brasa chica, mediana, grande): una fila de encabezado con su subtotal por día.
+  const groups = bySubcategory(products)
+  const grouped = groups.length > 1
+  const groupUnits = (d: IsoDate, ps: Product[]) => ps.reduce((s, p) => s + (value(d, p) ?? 0), 0)
+  const groupKg = (d: IsoDate, ps: Product[]) => ps.reduce((s, p) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0)
+  const groupCls = '[&>td]:bg-side [&>td]:text-[11.5px] [&>td]:font-bold [&>td]:text-ink-2'
 
   const cell = (d: IsoDate, p: Product) => {
     const v = value(d, p)
@@ -96,30 +104,45 @@ export function ProjectionMatrix({ draft, dates, products, catalog, invalid, mob
               </tr>
             </thead>
             <tbody>
-              {products.map((p) => (
-                <tr key={p.id}>
-                  <td className={cn(stk, 'border-b border-muted py-[7px]')}>
-                    <b className="block text-[13.5px]">{p.name}</b>
-                    <small className="text-[10.5px] text-muted-foreground">{p.kg_per_unit.toFixed(2)} kg/unidad</small>
-                  </td>
-                  {dates.map((d) => (
-                    <td key={d} className="min-w-16 border-b border-muted px-1 py-[7px] text-center">
-                      {cell(d, p)}
-                    </td>
+              {groups.map((g) => (
+                <Fragment key={g.name ?? ''}>
+                  {grouped && (
+                    <tr className={cn(groupCls, '[&>td]:py-1.5 [&>td]:text-center')}>
+                      <td className={cn(stk, '!bg-side')}>{g.name ?? 'Otros'}</td>
+                      {dates.map((d) => (
+                        <td key={d}>{nf0(groupUnits(d, g.products))}</td>
+                      ))}
+                      <td className="pr-3">{nf0(dates.reduce((s, d) => s + groupUnits(d, g.products), 0))}</td>
+                    </tr>
+                  )}
+                  {g.products.map((p) => (
+                    <tr key={p.id}>
+                      <td className={cn(stk, 'border-b border-muted py-[7px]')}>
+                        <b className="block text-[13.5px]">{p.name}</b>
+                        <small className="text-[10.5px] text-muted-foreground">
+                          {p.kg_per_unit.toFixed(2)} kg/unidad
+                        </small>
+                      </td>
+                      {dates.map((d) => (
+                        <td key={d} className="min-w-16 border-b border-muted px-1 py-[7px] text-center">
+                          {cell(d, p)}
+                        </td>
+                      ))}
+                      <td className="min-w-[60px] border-b border-muted pr-3 text-center">
+                        <b className="text-sm font-extrabold">{nf0(productUnits(p))}</b>
+                        <small className="block text-[10.5px] font-semibold text-ink-2">
+                          {nf1(productUnits(p) && dates.reduce((s, d) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0))} kg
+                        </small>
+                      </td>
+                    </tr>
                   ))}
-                  <td className="min-w-[60px] border-b border-muted pr-3 text-center">
-                    <b className="text-sm font-extrabold">{nf0(productUnits(p))}</b>
-                    <small className="block text-[10.5px] font-semibold text-ink-2">
-                      {nf1(productUnits(p) && dates.reduce((s, d) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0))} kg
-                    </small>
-                  </td>
-                </tr>
+                </Fragment>
               ))}
               <tr className="[&>td]:border-0 [&>td]:bg-secondary [&>td]:py-[11px] [&>td]:text-center [&>td]:font-extrabold">
                 <td className={cn(stk, '!bg-secondary text-[12.5px]')}>Total por día</td>
                 {dates.map((d) => (
                   <td key={d}>
-                    <b className="text-sm">{nf0(sumUnits(draft.units[d]))}</b>
+                    <b className="text-sm">{nf0(dayUnits(d))}</b>
                     <small className="block text-[10.5px] font-semibold text-ink-2">{nf1(dayKg(d))} kg</small>
                   </td>
                 ))}
@@ -163,30 +186,45 @@ export function ProjectionMatrix({ draft, dates, products, catalog, invalid, mob
           </tr>
         </thead>
         <tbody>
-          {products.map((p) => (
-            <tr key={p.id} className="[&>td]:border-b [&>td]:border-muted [&>td]:px-2 [&>td]:py-1.5 [&>td]:text-center">
-              <td className="!text-left whitespace-nowrap">
-                <b className="block text-sm">{p.name}</b>
-                <small className="text-[11.5px] text-muted-foreground">{p.kg_per_unit.toFixed(2)} kg/unidad</small>
-              </td>
-              {dates.map((d) => [
-                <td key={`${d}u`}>{cell(d, p)}</td>,
-                <td key={`${d}k`} className="min-w-[52px] text-[13px] text-muted-foreground">
-                  {value(d, p) ? nf1((value(d, p) ?? 0) * p.kg_per_unit) : '-'}
-                </td>,
-              ])}
-              <td className="font-extrabold">{nf0(productUnits(p))}</td>
-              <td className="font-extrabold text-ink-2">
-                {nf1(dates.reduce((s, d) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0))}
-              </td>
-            </tr>
+          {groups.map((g) => (
+            <Fragment key={g.name ?? ''}>
+              {grouped && (
+                <tr className={cn(groupCls, '[&>td]:px-2 [&>td]:py-1.5 [&>td]:text-center')}>
+                  <td className="!text-left">{g.name ?? 'Otros'}</td>
+                  {dates.map((d) => [
+                    <td key={`${d}u`}>{nf0(groupUnits(d, g.products))}</td>,
+                    <td key={`${d}k`}>{nf1(groupKg(d, g.products))}</td>,
+                  ])}
+                  <td>{nf0(dates.reduce((s, d) => s + groupUnits(d, g.products), 0))}</td>
+                  <td>{nf1(dates.reduce((s, d) => s + groupKg(d, g.products), 0))}</td>
+                </tr>
+              )}
+              {g.products.map((p) => (
+                <tr
+                  key={p.id}
+                  className="[&>td]:border-b [&>td]:border-muted [&>td]:px-2 [&>td]:py-1.5 [&>td]:text-center"
+                >
+                  <td className="!text-left whitespace-nowrap">
+                    <b className="block text-sm">{p.name}</b>
+                    <small className="text-[11.5px] text-muted-foreground">{p.kg_per_unit.toFixed(2)} kg/unidad</small>
+                  </td>
+                  {dates.map((d) => [
+                    <td key={`${d}u`}>{cell(d, p)}</td>,
+                    <td key={`${d}k`} className="min-w-[52px] text-[13px] text-muted-foreground">
+                      {value(d, p) ? nf1((value(d, p) ?? 0) * p.kg_per_unit) : '-'}
+                    </td>,
+                  ])}
+                  <td className="font-extrabold">{nf0(productUnits(p))}</td>
+                  <td className="font-extrabold text-ink-2">
+                    {nf1(dates.reduce((s, d) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0))}
+                  </td>
+                </tr>
+              ))}
+            </Fragment>
           ))}
           <tr className="[&>td]:border-0 [&>td]:bg-secondary [&>td]:px-2 [&>td]:py-3 [&>td]:text-center [&>td]:font-extrabold">
             <td className="rounded-bl-[10px] !text-left">Total por día</td>
-            {dates.map((d) => [
-              <td key={`${d}u`}>{nf0(sumUnits(draft.units[d]))}</td>,
-              <td key={`${d}k`}>{nf1(dayKg(d))}</td>,
-            ])}
+            {dates.map((d) => [<td key={`${d}u`}>{nf0(dayUnits(d))}</td>, <td key={`${d}k`}>{nf1(dayKg(d))}</td>])}
             <td data-testid="grand-units">{nf0(totalUnits)}</td>
             <td className="rounded-br-[10px]">{nf1(totalKg)}</td>
           </tr>

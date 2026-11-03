@@ -68,6 +68,7 @@ class ProductOut(BaseModel):
     name: str
     kg_per_unit: float
     sort_order: int
+    subcategory: str | None = None
 
 
 class ProjectionOut(BaseModel):

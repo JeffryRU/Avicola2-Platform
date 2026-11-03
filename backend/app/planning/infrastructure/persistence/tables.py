@@ -48,6 +48,7 @@ products = Table(
     metadata,
     Column("id", String(10), primary_key=True),
     Column("category", String(30), nullable=False),
+    Column("subcategory", String(30)),
     Column("name", String(60), nullable=False),
     Column("kg_per_unit", Numeric(6, 2, asdecimal=False), nullable=False),
     Column("sort_order", Integer, nullable=False, default=0),

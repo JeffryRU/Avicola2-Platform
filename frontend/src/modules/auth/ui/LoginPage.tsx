@@ -88,7 +88,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               name="username"
               placeholder="Usuario"
               autoComplete="username"
-              defaultValue={DEMO ? 'jperez' : undefined}
+              defaultValue={DEMO ? 'rnavarro' : undefined}
               aria-invalid={!!errors.username}
               className={fieldCls(errors.username)}
             />
@@ -153,7 +153,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
           </div>
           {DEMO && (
             <p className="mt-4 text-[12.5px] text-muted-foreground">
-              Usuarios de prueba: jperez, mrios, cleon y supervisor (contraseña demo1234).
+              Usuarios de prueba: rnavarro, hdias, mcordova y supervisor (contraseña demo1234).
             </p>
           )}
         </form>

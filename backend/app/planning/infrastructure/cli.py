@@ -49,7 +49,15 @@ BASE = [
     [16, 22, 26, 18, 35, 26, 14, 20, 12, 8],
     [12, 16, 20, 12, 26, 18, 10, 14, 8, 5],
 ]
-SELLER_FACTOR = {"jperez": 1.0, "mrios": 0.82, "cleon": 1.16}
+SELLER_FACTOR = {
+    "rnavarro": 1.0,
+    "hdias": 0.82,
+    "mcordova": 1.16,
+    "gfernandez": 0.7,
+    "jgonzales": 0.9,
+    "cvillalobos": 1.05,
+    "eauleste": 0.95,
+}
 
 
 def init(session: Session, settings: Settings) -> None:
@@ -61,6 +69,7 @@ def init(session: Session, settings: Settings) -> None:
         for item in items:
             values = {
                 "category": category,
+                "subcategory": item.get("subcategory"),
                 "name": item["name"],
                 "kg_per_unit": item["kg_per_unit"],
                 "sort_order": order,
@@ -72,6 +81,9 @@ def init(session: Session, settings: Settings) -> None:
             else:
                 session.execute(insert(products).values(id=item["id"], **values))
             order += 1
+    # Lo que salió del catálogo se desactiva: las proyecciones antiguas lo siguen referenciando.
+    kept = [item["id"] for items in seed["products"].values() for item in items]
+    session.execute(update(products).where(products.c.id.not_in(kept)).values(is_active=False))
     session.commit()
     print(f"OK: {order} productos listos.")
     if not settings.is_local:

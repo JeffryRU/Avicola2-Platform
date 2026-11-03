@@ -17,6 +17,8 @@ class Product:
     name: str
     kg_per_unit: float
     sort_order: int = 0
+    # Agrupa productos dentro de la categoría (p. ej. Brasa chica/mediana/grande); solo informativo.
+    subcategory: str | None = None
 
     def kg(self, units: int) -> float:
         return round(units * self.kg_per_unit, 2)

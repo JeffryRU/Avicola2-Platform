@@ -11,6 +11,7 @@ export const productSchema = z.object({
   name: z.string(),
   kg_per_unit: z.number().positive(),
   sort_order: z.number().int(),
+  subcategory: z.string().nullish(),
 })
 export type Product = z.infer<typeof productSchema>
 

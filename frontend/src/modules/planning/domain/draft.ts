@@ -12,6 +12,9 @@ export const draftSchema = z.object({
   start: isoDateSchema,
   days: z.number().int().min(1).max(MAX_DAYS),
   category: z.string().min(1),
+  // Filtra los productos que se ven (Brasa chica...); null = todos. Lo enviado sigue siendo el día
+  // completo de la categoría: lo oculto conserva lo ya confirmado.
+  subcategory: z.string().nullable().default(null),
   units: z.record(isoDateSchema, z.record(z.string(), z.number().int().min(0).max(MAX_UNITS))),
   tried: z.boolean().default(false),
 })
@@ -22,6 +25,7 @@ export const newDraft = (start: IsoDate = today(), category = ''): Draft => ({
   start,
   days: 3,
   category,
+  subcategory: null,
   units: {},
   tried: false,
 })

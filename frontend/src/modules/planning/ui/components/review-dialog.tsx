@@ -4,7 +4,9 @@ import { dFull, dShort, type IsoDate } from '@/core/domain/dates'
 import { nf0, nf1 } from '@/core/domain/format'
 import type { Catalog } from '@/modules/planning/domain/catalog'
 import { sumUnits } from '@/modules/planning/domain/catalog'
+import type { Units } from '@/modules/planning/domain/schemas'
 import type { Draft } from '@/modules/planning/domain/draft'
+import type { Product } from '@/modules/planning/domain/schemas'
 import { tableCls } from '@/ui/components/layout'
 import { Button } from '@/ui/components/shadcn/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/ui/components/shadcn/dialog'
@@ -28,14 +30,22 @@ interface Props {
   draft: Draft
   dates: IsoDate[]
   catalog: Catalog
+  /** Productos a la vista (un tamaño o todos); los totales son de ellos. */
+  products: Product[]
   onClose: () => void
   onConfirm: () => void
 }
 
 /** Resumen antes de enviar: hoja inferior en celular, diálogo en escritorio. */
-export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onConfirm }: Props) {
-  const units = dates.reduce((s, d) => s + sumUnits(draft.units[d]), 0)
-  const kg = dates.reduce((s, d) => s + catalog.kg(draft.units[d] ?? {}), 0)
+export function ReviewDialog({ open, mobile, draft, dates, catalog, products, onClose, onConfirm }: Props) {
+  const ids = new Set(products.map((p) => p.id))
+  const pick = (all: Units | undefined, keep: boolean) =>
+    Object.fromEntries(Object.entries(all ?? {}).filter(([id]) => ids.has(id) === keep))
+  const dayUnits = (d: IsoDate) => pick(draft.units[d], true)
+  const units = dates.reduce((s, d) => s + sumUnits(dayUnits(d)), 0)
+  const kg = dates.reduce((s, d) => s + catalog.kg(dayUnits(d)), 0)
+  // Unidades ya registradas de otros tamaños: se reenvían tal cual con el día.
+  const kept = dates.reduce((s, d) => s + sumUnits(pick(draft.units[d], false)), 0)
   const body = (
     <>
       <div className="grid">
@@ -46,7 +56,7 @@ export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onC
           {draft.days} {draft.days === 1 ? 'día' : 'días'}
         </SummaryRow>
         <SummaryRow icon={<Tag />} label="Categoría">
-          {draft.category}
+          {catalog.detailedLabel(draft.category, draft.subcategory)}
         </SummaryRow>
         <SummaryRow icon={<BarChart3 />} label="Total proyectado">
           {nf0(units)} unidades<small>{nf1(kg)} kg (aprox.)</small>
@@ -66,12 +76,17 @@ export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onC
           {dates.map((d) => (
             <tr key={d}>
               <td className={tableCls.td}>{dShort(d)}</td>
-              <td className={tableCls.td}>{nf0(sumUnits(draft.units[d]))} unid.</td>
-              <td className={tableCls.td}>{nf1(catalog.kg(draft.units[d] ?? {}))} kg</td>
+              <td className={tableCls.td}>{nf0(sumUnits(dayUnits(d)))} unid.</td>
+              <td className={tableCls.td}>{nf1(catalog.kg(dayUnits(d)))} kg</td>
             </tr>
           ))}
         </tbody>
       </table>
+      {kept > 0 && (
+        <p className="-mt-2 mb-[18px] text-[13px] text-muted-foreground">
+          Se mantienen {nf0(kept)} unidades que ya registraste de otros tamaños.
+        </p>
+      )}
       <div className="grid gap-2.5">
         <Button autoFocus className="h-[54px] rounded-[14px] text-[16.5px] font-bold" onClick={onConfirm}>
           <Send /> Confirmar y enviar

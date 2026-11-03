@@ -25,7 +25,14 @@ class SqlProductRepository:
             select(products).where(products.c.is_active.is_(True))
         ).mappings()
         return [
-            Product(r["id"], r["category"], r["name"], float(r["kg_per_unit"]), r["sort_order"])
+            Product(
+                r["id"],
+                r["category"],
+                r["name"],
+                float(r["kg_per_unit"]),
+                r["sort_order"],
+                r["subcategory"],
+            )
             for r in rows
         ]
 

@@ -10,6 +10,7 @@ import { useRequiredSession } from '@/modules/auth/ui/use-session'
 import type { SubmitOutcome } from '@/modules/planning/application/planning-service'
 import { sumUnits } from '@/modules/planning/domain/catalog'
 import type { Draft } from '@/modules/planning/domain/draft'
+import type { Units } from '@/modules/planning/domain/schemas'
 import { useCatalog, useQueue } from '@/modules/planning/ui/hooks'
 import { SummaryRow } from '@/modules/planning/ui/components/review-dialog'
 import { CountUp } from '@/ui/components/charts'
@@ -31,10 +32,13 @@ export function SuccessPage() {
     state?.outcome.sync === 'pending' && queue.some((q) => q.submission_id === state.outcome.submission.submission_id)
   if (!state || !catalog) return <Navigate to={paths.home} replace />
 
-  const { outcome } = state
+  const { outcome, draft } = state
   const days = outcome.submission.days
-  const units = days.reduce((s, d) => s + sumUnits(d.units), 0)
-  const kg = days.reduce((s, d) => s + catalog.kg(d.units), 0)
+  // Con un tamaño elegido (Brasa chica...), los totales son solo de sus productos.
+  const ids = new Set(catalog.of(outcome.submission.category, draft.subcategory ?? null).map((p) => p.id))
+  const shown = (u: Units) => Object.fromEntries(Object.entries(u).filter(([id]) => ids.has(id)))
+  const units = days.reduce((s, d) => s + sumUnits(shown(d.units)), 0)
+  const kg = days.reduce((s, d) => s + catalog.kg(shown(d.units)), 0)
 
   async function retry() {
     const r = await planning.flush(seller.username)
@@ -95,7 +99,7 @@ export function SuccessPage() {
                 {days.length} {days.length === 1 ? 'día' : 'días'}
               </SummaryRow>
               <SummaryRow icon={<Tag />} label="Categoría">
-                {outcome.submission.category}
+                {catalog.detailedLabel(outcome.submission.category, draft.subcategory ?? null)}
               </SummaryRow>
               <SummaryRow icon={<BarChart3 />} label="Total proyectado">
                 <CountUp value={units} /> unidades<small>{nf1(kg)} kg (aprox.)</small>
@@ -129,8 +133,8 @@ export function SuccessPage() {
                       onClick={() => navigate(paths.day(d.date))}
                     >
                       <td className={tableCls.td}>{dShort(d.date)}</td>
-                      <td className={tableCls.td}>{nf0(sumUnits(d.units))} unid.</td>
-                      <td className={tableCls.td}>{nf1(catalog.kg(d.units))} kg</td>
+                      <td className={tableCls.td}>{nf0(sumUnits(shown(d.units)))} unid.</td>
+                      <td className={tableCls.td}>{nf1(catalog.kg(shown(d.units)))} kg</td>
                     </tr>
                   ))}
                 </tbody>

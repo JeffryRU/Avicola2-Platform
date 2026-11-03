@@ -37,8 +37,9 @@ function withExisting(draft: Draft, days: Map<IsoDate, MyDay>): Draft {
 function normalize(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): Draft {
   let d = draft
   if (!catalog.categories.includes(d.category)) {
-    d = { ...d, category: days.get(d.start)?.category ?? catalog.categories[0], units: {} }
+    d = { ...d, category: days.get(d.start)?.category ?? catalog.categories[0], subcategory: null, units: {} }
   }
+  if (d.subcategory && !catalog.subcategories(d.category).includes(d.subcategory)) d = { ...d, subcategory: null }
   return d.step === 1 ? withExisting(d, days) : d
 }
 
@@ -71,7 +72,10 @@ export function NewProjectionPage() {
   const dates = useMemo(() => draftDates(draft), [draft])
   if (!catalog) return <PageHeader title="Nueva proyección" />
 
-  const products = catalog.of(draft.category)
+  const products = catalog.of(draft.category, draft.subcategory)
+  const choiceLabel = catalog.label(draft.category, draft.subcategory)
+  const choices = catalog.choices
+  const choiceIndex = choices.findIndex((c) => c.category === draft.category && c.subcategory === draft.subcategory)
   const invalid = draft.tried ? emptyDays(draft) : []
   const alreadyConfirmed = dates.filter((d) => days.has(d))
 
@@ -129,7 +133,15 @@ export function NewProjectionPage() {
                   <label id="np-cat-label" className="mb-2.5 block text-base font-bold">
                     Categoría
                   </label>
-                  <Select value={draft.category} onValueChange={(c) => setDraft({ ...draft, category: c, units: {} })}>
+                  <Select
+                    value={String(choiceIndex)}
+                    onValueChange={(i) => {
+                      const c = choices[Number(i)]
+                      // Cambiar solo el tamaño conserva lo escrito; cambiar de categoría lo borra.
+                      const units = c.category === draft.category ? draft.units : {}
+                      setDraft({ ...draft, category: c.category, subcategory: c.subcategory, units })
+                    }}
+                  >
                     <SelectTrigger
                       aria-labelledby="np-cat-label"
                       className="!h-[54px] w-full rounded-[14px] border-[1.5px] bg-white text-[17px] font-semibold"
@@ -137,9 +149,9 @@ export function NewProjectionPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {catalog.categories.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
+                      {choices.map((c, i) => (
+                        <SelectItem key={`${c.category}|${c.subcategory ?? ''}`} value={String(i)}>
+                          {c.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -148,7 +160,7 @@ export function NewProjectionPage() {
               </div>
             </Section>
             <Section
-              title={`Productos de ${draft.category}`}
+              title={`Productos: ${choiceLabel}`}
               aside={<span className="text-muted-foreground">{products.length}</span>}
               className="hidden dsk:block"
             >
@@ -209,7 +221,12 @@ export function NewProjectionPage() {
       const filled = s.days.filter((d) => Object.keys(d.units).length)
       if (!filled.length) return void toast('Aún no hay historial suficiente para sugerir.')
       const units = { ...draft.units }
-      for (const d of filled) units[d.date] = { ...d.units }
+      // Con un tamaño elegido, solo se sugieren sus productos; el resto queda como estaba.
+      const visible = new Set(products.map((p) => p.id))
+      for (const d of filled) {
+        const picked = Object.entries(d.units).filter(([id]) => visible.has(id))
+        units[d.date] = { ...units[d.date], ...Object.fromEntries(picked) }
+      }
       setDraft({ ...draft, units })
       toast.success(`Sugerencia cargada (${filled.length} de ${draft.days} días). Revísala antes de enviar.`)
     } catch (e) {
@@ -253,7 +270,7 @@ export function NewProjectionPage() {
     <div>
       <PageHeader
         title="Nueva proyección"
-        subtitle={`Proyección por producto, ${draft.category}`}
+        subtitle={`Proyección por producto, ${choiceLabel}`}
         mobileActions={<StepPill n={2} />}
         actions={suggestBtn}
       />
@@ -262,7 +279,7 @@ export function NewProjectionPage() {
           <div className="flex flex-wrap items-end gap-x-7 gap-y-3 px-4 py-3 dsk:px-[18px] dsk:py-3.5">
             <Summary label="Fecha de inicio" value={dFull(draft.start)} />
             <Summary label="Días de proyección" value={`${draft.days} ${draft.days === 1 ? 'día' : 'días'}`} />
-            <Summary label="Categoría" value={draft.category} />
+            <Summary label="Categoría" value={choiceLabel} />
             <button type="button" className="ml-auto text-sm font-bold text-primary hover:underline" onClick={back}>
               Cambiar
             </button>
@@ -282,7 +299,6 @@ export function NewProjectionPage() {
           draft={draft}
           dates={dates}
           products={products}
-          catalog={catalog}
           invalid={invalid}
           mobile={mobile}
           onChange={setCell}
@@ -310,6 +326,7 @@ export function NewProjectionPage() {
         draft={draft}
         dates={dates}
         catalog={catalog}
+        products={products}
         onClose={() => setReviewing(false)}
         onConfirm={send}
       />

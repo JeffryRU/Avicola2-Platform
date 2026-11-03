@@ -97,7 +97,12 @@ export function ProductsPage() {
                 <tbody>
                   {products.map((p) => (
                     <tr key={p.id} className={tableCls.row}>
-                      <td className={tableCls.td}>{p.name}</td>
+                      <td className={tableCls.td}>
+                        {p.name}
+                        {p.subcategory && (
+                          <small className="block text-[11.5px] text-muted-foreground">{p.subcategory}</small>
+                        )}
+                      </td>
                       <td className={tableCls.td}>{p.kg_per_unit.toFixed(2)}</td>
                       <td className={tableCls.td}>{nf1(p.kg_per_unit * 10)} kg</td>
                     </tr>
