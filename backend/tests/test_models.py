@@ -21,4 +21,5 @@ def test_expected_tables() -> None:
         "np_products",
         "np_projections",
         "np_projection_lines",
+        "np_notifications",
     }

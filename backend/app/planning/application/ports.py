@@ -8,6 +8,7 @@ from datetime import date, datetime
 from typing import Any, Protocol
 
 from app.planning.domain.models import DailyUnits, Product, Projection, Seller, SellerAccount
+from app.planning.domain.notifications import Event, Notification
 
 
 class ProductRepository(Protocol):
@@ -88,3 +89,23 @@ class Clock(Protocol):
 
 class StatusProbe(Protocol):
     def status(self) -> dict[str, Any]: ...
+
+
+class NotificationRepository(Protocol):
+    def add(self, notification: Notification) -> Notification | None:
+        """Guarda y devuelve con id; None si ya existía una con el mismo `dedupe_key`."""
+        ...
+
+    def list_for(self, username: str, limit: int) -> list[Notification]: ...
+    def unread_count(self, username: str) -> int: ...
+
+    def mark_read(self, username: str, ids: list[int] | None, now: datetime) -> int:
+        """Marca como leídas las indicadas (o todas si `ids` es None). Devuelve cuántas."""
+        ...
+
+
+class EventPublisher(Protocol):
+    """Canal en tiempo real hacia los navegadores conectados (hoy en memoria; luego Redis,
+    Postgres LISTEN/NOTIFY o RabbitMQ, con otro adaptador)."""
+
+    def publish(self, event: Event) -> None: ...

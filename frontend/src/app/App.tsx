@@ -10,6 +10,7 @@ import { paths } from '@/app/routes'
 import { isSupervisor } from '@/modules/auth/domain/session'
 import { ForcedPasswordChange } from '@/modules/auth/ui/ChangePasswordPage'
 import { LoginPage } from '@/modules/auth/ui/LoginPage'
+import { useRealtime } from '@/modules/notifications/ui/hooks'
 import { useSession } from '@/modules/auth/ui/use-session'
 import { BrandProvider, type BrandId } from '@/ui/components/brand'
 import { ErrorBoundary } from '@/ui/components/error-boundary'
@@ -44,7 +45,7 @@ const NewProjectionPage = lazy(() =>
   import('@/modules/planning/ui/pages/NewProjectionPage').then((m) => ({ default: m.NewProjectionPage })),
 )
 const NotificationsPage = lazy(() =>
-  import('@/modules/planning/ui/pages/NotificationsPage').then((m) => ({ default: m.NotificationsPage })),
+  import('@/modules/notifications/ui/NotificationsPage').then((m) => ({ default: m.NotificationsPage })),
 )
 const ProductsPage = lazy(() =>
   import('@/modules/planning/ui/pages/ProductsPage').then((m) => ({ default: m.ProductsPage })),
@@ -103,6 +104,7 @@ function Routed() {
   const [splash, setSplash] = useState(true)
   useSessionLifecycle()
   useOutboxSync()
+  useRealtime()
   useEffect(() => {
     const t = setTimeout(() => setSplash(false), 2350)
     return () => clearTimeout(t)
@@ -128,6 +130,7 @@ function Routed() {
               <Route path={paths.dashVersus} element={<DashboardVersusPage />} />
               <Route path={paths.dashStatus} element={<DashboardStatusPage />} />
               <Route path={paths.products} element={<ProductsPage />} />
+              <Route path={paths.notifications} element={<NotificationsPage />} />
               <Route path={paths.profile} element={<ProfilePage onBrandChange={showSplash} />} />
               <Route path={paths.password} element={<ChangePasswordPage />} />
               <Route path={paths.connection} element={<ConnectionPage />} />

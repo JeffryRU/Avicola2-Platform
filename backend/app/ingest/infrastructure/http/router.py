@@ -4,11 +4,10 @@ Adaptador de entrada de FastAPI; los errores de dominio los traduce
 shared/infrastructure/http/errors.py.
 """
 
-import secrets
 from dataclasses import asdict
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -16,18 +15,9 @@ from app.ingest.bootstrap import IngestUseCases, build_use_cases
 from app.ingest.domain.models import LogRecord, MappingRecord
 from app.ingest.infrastructure.http.schemas import LogOut, MappingBody, MappingOut, TransformRequest
 from app.shared.infrastructure.database.session import get_session
+from app.shared.infrastructure.http.service_token import require_service_token
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
-
-
-def require_service_token(x_api_token: Annotated[str | None, Header()] = None) -> None:
-    """Si INGEST_API_TOKEN está configurado, exige el header X-Api-Token (lo usa n8n).
-
-    Provisional hasta el login con JWT (paso 5 del MVP).
-    """
-    expected = get_settings().ingest_api_token
-    if expected and not (x_api_token and secrets.compare_digest(x_api_token, expected)):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "token de servicio inválido")
 
 
 router = APIRouter(prefix="/ingest", tags=["ingest"], dependencies=[Depends(require_service_token)])

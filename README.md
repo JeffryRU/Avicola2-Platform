@@ -80,6 +80,10 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
   - El **supervisor** crea las cuentas y restablece las contraseñas olvidadas desde la pantalla **Usuarios**: entrega una contraseña temporal que el vendedor cambia al entrar.
   - Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.
   - Cada vendedor ve solo sus datos.
+- **Notificaciones en tiempo real** ([ADR 0006](docs/adr/0006-notificaciones-y-tiempo-real.md)):
+  - Llegan al instante por SSE (`/api/events`) y se guardan en la base, con "leído" sincronizado entre dispositivos.
+  - El supervisor recibe cada proyección enviada; los vendedores, el recordatorio diario de n8n.
+  - n8n puede enviar avisos con `POST /api/internal/notifications`.
 - **En producción** (`APP_ENV` distinto de `local`):
   - La API no arranca sin un `AUTH_SECRET` de al menos 32 caracteres, sin `INGEST_API_TOKEN` o sin HTTPS para la cookie.
   - El primer supervisor se crea con `cli supervisor`.

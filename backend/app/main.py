@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from app.core.config import get_settings
 from app.ingest.infrastructure.http import router as ingest
+from app.planning.infrastructure.http import events as planning_events
 from app.planning.infrastructure.http import router as planning
 from app.shared.infrastructure.http import health
 from app.shared.infrastructure.http.errors import register_error_handlers
@@ -36,6 +37,8 @@ app.include_router(ingest.router)
 app.include_router(planning.public)
 app.include_router(planning.router)
 app.include_router(planning.admin)
+app.include_router(planning.internal)
+app.include_router(planning_events.router)
 app.include_router(client_logs.router)
 # Al final: captura las rutas que no son de la API y sirve la app de React.
 mount_spa(app, settings.frontend_dist_dir)

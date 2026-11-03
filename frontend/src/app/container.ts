@@ -8,23 +8,16 @@ import { HttpLogSink } from '@/core/infrastructure/http-log-sink'
 import type { AccountsGateway } from '@/modules/accounts/application/ports'
 import { HttpAccountsGateway } from '@/modules/accounts/infrastructure/http-accounts-gateway'
 import { AuthService } from '@/modules/auth/application/auth-service'
+import type { EventStream, NotificationsGateway } from '@/modules/notifications/application/ports'
+import { HttpNotificationsGateway } from '@/modules/notifications/infrastructure/http-notifications-gateway'
+import { SseEventStream } from '@/modules/notifications/infrastructure/sse-event-stream'
 import { HttpAuthGateway } from '@/modules/auth/infrastructure/http-auth-gateway'
 import { StoredSessionRepository } from '@/modules/auth/infrastructure/stored-session-repository'
-import type {
-  DraftRepository,
-  FileSaver,
-  PlanningGateway,
-  ReadNotificationsRepository,
-  SubmissionQueue,
-} from '@/modules/planning/application/ports'
+import type { DraftRepository, FileSaver, PlanningGateway, SubmissionQueue } from '@/modules/planning/application/ports'
 import { PlanningService } from '@/modules/planning/application/planning-service'
 import { BrowserFileSaver } from '@/modules/planning/infrastructure/file-download'
 import { HttpPlanningGateway } from '@/modules/planning/infrastructure/http-planning-gateway'
-import {
-  StoredDraftRepository,
-  StoredReadNotifications,
-  StoredSubmissionQueue,
-} from '@/modules/planning/infrastructure/stored-repositories'
+import { StoredDraftRepository, StoredSubmissionQueue } from '@/modules/planning/infrastructure/stored-repositories'
 
 /** Lo que la interfaz puede usar: solo casos de uso y puertos, nunca adaptadores concretos. */
 export interface Container {
@@ -33,7 +26,8 @@ export interface Container {
   gateway: PlanningGateway
   queue: SubmissionQueue
   drafts: DraftRepository
-  readNotifications: ReadNotificationsRepository
+  notifications: NotificationsGateway
+  events: EventStream
   files: FileSaver
   preferences: KeyValueStore
   errors: ErrorReporter
@@ -73,7 +67,8 @@ export function createContainer(): Container {
     queue,
     planning: new PlanningService(gateway, queue, () => crypto.randomUUID()),
     drafts,
-    readNotifications: new StoredReadNotifications(local),
+    notifications: new HttpNotificationsGateway(http),
+    events: new SseEventStream(`${baseUrl}/events`),
     files: new BrowserFileSaver(),
     preferences: local,
     errors,

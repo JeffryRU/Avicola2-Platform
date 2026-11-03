@@ -1,16 +1,11 @@
 import { z } from 'zod'
 import type { KeyValueStore } from '@/core/application/ports'
-import type {
-  DraftRepository,
-  ReadNotificationsRepository,
-  SubmissionQueue,
-} from '@/modules/planning/application/ports'
+import type { DraftRepository, SubmissionQueue } from '@/modules/planning/application/ports'
 import { draftSchema, type Draft } from '@/modules/planning/domain/draft'
 import { submissionSchema, type Submission } from '@/modules/planning/domain/schemas'
 
 const QUEUE_KEY = 'nv_queue'
 const DRAFT_KEY = 'nv_draft'
-const READ_KEY = 'nv_notif_read'
 
 /** Cola en el dispositivo. `list()` devuelve la misma referencia mientras no cambie (React). */
 export class StoredSubmissionQueue implements SubmissionQueue {
@@ -53,14 +48,4 @@ export class StoredDraftRepository implements DraftRepository {
   load = (): Draft | null => this.store.get(DRAFT_KEY, draftSchema)
   save = (draft: Draft) => this.store.set(DRAFT_KEY, draft)
   clear = () => this.store.remove(DRAFT_KEY)
-}
-
-export class StoredReadNotifications implements ReadNotificationsRepository {
-  private readonly store: KeyValueStore
-  constructor(store: KeyValueStore) {
-    this.store = store
-  }
-
-  load = () => this.store.get(READ_KEY, z.array(z.string())) ?? []
-  save = (ids: string[]) => this.store.set(READ_KEY, ids)
 }

@@ -19,6 +19,7 @@ from app.planning.domain.models import Projection, Seller, SellerAccount
 from app.planning.infrastructure.http import schemas as s
 from app.shared.domain.errors import AuthenticationError, ForbiddenError
 from app.shared.infrastructure.database.session import get_session
+from app.shared.infrastructure.http.service_token import require_service_token
 
 SESSION_COOKIE = "nv_session"
 COOKIE_PATH = "/api"
@@ -252,3 +253,52 @@ def set_active(
     use_cases: UseCases, actor: ActiveAccount, username: str, body: s.SetActiveIn
 ) -> s.AdminAccountOut:
     return _admin_out(use_cases.set_account_active(actor, username, body.active))
+
+
+# --- Notificaciones --------------------------------------------------------------------
+
+
+def _notification_out(n) -> s.NotificationOut:
+    return s.NotificationOut(
+        id=n.id,
+        kind=n.kind,
+        title=n.title,
+        body=n.body,
+        link=n.link,
+        created_at=n.created_at,
+        read_at=n.read_at,
+    )
+
+
+@router.get("/notifications")
+def list_notifications(
+    use_cases: UseCases, account: ActiveAccount, limit: Annotated[int, Query(ge=1, le=100)] = 50
+) -> s.NotificationsOut:
+    page = use_cases.list_notifications(account, limit)
+    return s.NotificationsOut(items=[_notification_out(n) for n in page.items], unread=page.unread)
+
+
+@router.post("/notifications/read")
+def mark_notifications_read(
+    use_cases: UseCases, account: ActiveAccount, body: s.MarkReadIn
+) -> s.MarkReadOut:
+    return s.MarkReadOut(updated=use_cases.mark_notifications_read(account, body.ids))
+
+
+# --- Llamadas de n8n (token de servicio) -----------------------------------------------
+
+internal = APIRouter(
+    prefix="/api/internal", tags=["internal"], dependencies=[Depends(require_service_token)]
+)
+
+
+@internal.post("/notifications")
+def announce(use_cases: UseCases, body: s.AnnouncementIn) -> s.CreatedOut:
+    """Aviso general desde n8n (ventas actualizadas, cambios de catálogo, etc.)."""
+    return s.CreatedOut(created=use_cases.announce(body.audience, body.title, body.body, body.link))
+
+
+@internal.post("/notifications/projection-reminders")
+def projection_reminders(use_cases: UseCases) -> s.CreatedOut:
+    """Recordatorio diario (cron de n8n): a cada vendedor sin proyección para hoy."""
+    return s.CreatedOut(created=use_cases.send_projection_reminders())

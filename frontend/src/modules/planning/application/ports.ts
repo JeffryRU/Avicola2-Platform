@@ -41,11 +41,6 @@ export interface DraftRepository {
   clear(): void
 }
 
-export interface ReadNotificationsRepository {
-  load(): string[]
-  save(ids: string[]): void
-}
-
 /** Guarda un archivo generado por la app (p. ej. el CSV de proyecciones). */
 export interface FileSaver {
   save(fileName: string, content: string): void

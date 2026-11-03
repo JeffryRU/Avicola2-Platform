@@ -4,6 +4,7 @@ Cada clase hace una sola cosa y recibe sus dependencias como puertos.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from uuid import UUID, uuid4
@@ -81,9 +82,12 @@ class SubmitProjection:
         projections: ProjectionRepository,
         clock: Clock,
         max_days: int,
+        on_submitted: Callable[[Seller, list[Projection]], None] | None = None,
     ):
         self.products, self.projections, self.clock = products, projections, clock
         self.max_days = max_days
+        # Se llama tras guardar (avisos al supervisor); la carga de ejemplos no lo usa.
+        self.on_submitted = on_submitted
 
     def __call__(
         self, seller: Seller, category: str, days: list[DayUnits], submission_id: UUID | None
@@ -120,6 +124,8 @@ class SubmitProjection:
             len(result),
             sum(p.total_units for p in result),
         )
+        if self.on_submitted:
+            self.on_submitted(seller, result)
         return result
 
 

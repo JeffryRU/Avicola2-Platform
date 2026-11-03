@@ -10,6 +10,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -83,4 +84,22 @@ projection_lines = Table(
     Column("units", Integer, nullable=False),
     Column("kg", Numeric(10, 2, asdecimal=False), nullable=False),
     CheckConstraint("units >= 0", name="units_non_negative"),
+)
+
+notifications = Table(
+    TABLES["notifications"],
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("seller_id", Integer, ForeignKey(TABLES.fk("sellers")), nullable=False),
+    # varchar validado por la app (domain/notifications.KINDS), no ENUM.
+    Column("kind", String(30), nullable=False),
+    Column("title", String(120), nullable=False),
+    Column("body", String(500), nullable=False),
+    Column("link", String(200)),
+    # Sin restricción UNIQUE: SQL Server solo admite un NULL por columna única. El repositorio
+    # comprueba el duplicado antes de insertar.
+    Column("dedupe_key", String(100)),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("read_at", DateTime(timezone=True)),
+    Index(None, "seller_id", "created_at"),
 )

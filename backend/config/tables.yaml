@@ -20,3 +20,4 @@ tables:
   products: np_products
   projections: np_projections
   projection_lines: np_projection_lines
+  notifications: np_notifications

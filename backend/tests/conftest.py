@@ -5,6 +5,9 @@ os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["AUTH_SECRET"] = "secreto-de-tests-con-largo-suficiente"
 # Los tests no escriben en logs/: solo consola (pytest la captura).
 os.environ["LOG_TO_FILES"] = "false"
+# Sin token de servicio por defecto (el .env del desarrollador puede tener uno); los tests que
+# lo prueban lo configuran explícitamente.
+os.environ["INGEST_API_TOKEN"] = ""
 
 from datetime import date
 from pathlib import Path

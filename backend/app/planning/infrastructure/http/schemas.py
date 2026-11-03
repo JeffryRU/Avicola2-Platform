@@ -115,3 +115,41 @@ class SuggestionOut(BaseModel):
 
 
 StatusOut = dict[str, Any]
+
+
+class NotificationOut(BaseModel):
+    id: int
+    kind: str
+    title: str
+    body: str
+    link: str | None
+    created_at: datetime
+    read_at: datetime | None
+
+
+class NotificationsOut(BaseModel):
+    items: list[NotificationOut]
+    unread: int
+
+
+class MarkReadIn(BaseModel):
+    """Sin `ids` se marcan todas como leídas."""
+
+    ids: list[int] | None = Field(None, max_length=200)
+
+
+class MarkReadOut(BaseModel):
+    updated: int
+
+
+class AnnouncementIn(BaseModel):
+    """Aviso de n8n. `audience`: all | sellers | supervisors | un usuario."""
+
+    audience: str = Field("all", min_length=1, max_length=50)
+    title: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=500)
+    link: str | None = Field(None, max_length=200, pattern=r"^/[^\s]*$")
+
+
+class CreatedOut(BaseModel):
+    created: int

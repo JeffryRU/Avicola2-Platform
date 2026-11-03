@@ -1,0 +1,77 @@
+{
+  "name": "02_recordatorio_proyeccion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-6"
+            }
+          ]
+        }
+      },
+      "id": "c1a2b3c4-0201-4d5e-8f00-000000000001",
+      "name": "Todos los días 9:00 (lun-sáb)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/notifications/projection-reminders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "c1a2b3c4-0202-4d5e-8f00-000000000002",
+      "name": "Recordar a vendedores sin proyección",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "Todos los días 9:00 (lun-sáb)": {
+      "main": [
+        [
+          {
+            "node": "Recordar a vendedores sin proyección",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  },
+  "pinData": {},
+  "id": "avicola2Recordatorio02",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

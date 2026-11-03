@@ -6,7 +6,10 @@
       "parameters": {
         "triggerOn": "folder",
         "path": "/data/inbox",
-        "events": ["add", "change"],
+        "events": [
+          "add",
+          "change"
+        ],
         "options": {
           "awaitWriteFinish": true,
           "usePolling": true,
@@ -17,19 +20,30 @@
       "name": "Archivo nuevo en inbox",
       "type": "n8n-nodes-base.localFileTrigger",
       "typeVersion": 1,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "notes": "Polling: en Windows + Docker los eventos del sistema de archivos no llegan al contenedor."
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
           "conditions": [
             {
               "id": "a6f1c1d2-0001-4c0e-9f00-00000000000a",
               "leftValue": "={{ $json.path }}",
               "rightValue": "\\.(xlsx|xls|csv)$",
-              "operator": { "type": "string", "operation": "regex" }
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
             }
           ],
           "combinator": "and"
@@ -40,7 +54,10 @@
       "name": "¿Es Excel o CSV?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -52,7 +69,10 @@
       "name": "Leer archivo",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [440, -100]
+      "position": [
+        440,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -60,18 +80,34 @@
         "url": "={{ $env.BACKEND_URL }}/ingest/upload",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [{ "name": "X-Api-Token", "value": "={{ $env.INGEST_API_TOKEN }}" }]
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
         },
         "sendBody": true,
         "contentType": "multipart-form-data",
         "bodyParameters": {
           "parameters": [
-            { "parameterType": "formBinaryData", "name": "file", "inputDataFieldName": "data" },
-            { "name": "source", "value": "inbox" }
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "source",
+              "value": "inbox"
+            }
           ]
         },
         "options": {
-          "response": { "response": { "neverError": true } },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
           "timeout": 300000
         }
       },
@@ -79,19 +115,30 @@
       "name": "Cargar en el backend",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, -100],
+      "position": [
+        660,
+        -100
+      ],
       "notes": "El backend guarda el crudo en bronze, valida, escribe silver/gold y registra en ingestion_log."
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
           "conditions": [
             {
               "id": "a6f1c1d2-0002-4c0e-9f00-00000000000b",
               "leftValue": "={{ $json.status }}",
               "rightValue": "ok",
-              "operator": { "type": "string", "operation": "notEquals" }
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
             }
           ],
           "combinator": "and"
@@ -102,7 +149,10 @@
       "name": "¿Hubo problemas?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [880, -100]
+      "position": [
+        880,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -128,7 +178,10 @@
       "name": "Preparar aviso",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [1100, -200],
+      "position": [
+        1100,
+        -200
+      ],
       "notes": "Paso 6 del MVP: enviar este aviso por Telegram. Mientras tanto queda en la ejecución y en ingestion_log."
     },
     {
@@ -137,7 +190,10 @@
       "name": "Carga correcta",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1100, 0]
+      "position": [
+        1100,
+        0
+      ]
     },
     {
       "parameters": {},
@@ -145,28 +201,128 @@
       "name": "Ignorar (no es Excel/CSV)",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [440, 100]
+      "position": [
+        440,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/notifications",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ audience: 'supervisors', title: 'Carga de Excel con problemas', body: $json.aviso.slice(0, 500) }) }}",
+        "options": {}
+      },
+      "id": "c1a2b3c4-0101-4d5e-8f00-000000000010",
+      "name": "Avisar a los supervisores",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        -200
+      ]
     }
   ],
   "connections": {
-    "Archivo nuevo en inbox": { "main": [[{ "node": "¿Es Excel o CSV?", "type": "main", "index": 0 }]] },
-    "¿Es Excel o CSV?": {
+    "Archivo nuevo en inbox": {
       "main": [
-        [{ "node": "Leer archivo", "type": "main", "index": 0 }],
-        [{ "node": "Ignorar (no es Excel/CSV)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "¿Es Excel o CSV?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Leer archivo": { "main": [[{ "node": "Cargar en el backend", "type": "main", "index": 0 }]] },
-    "Cargar en el backend": { "main": [[{ "node": "¿Hubo problemas?", "type": "main", "index": 0 }]] },
+    "¿Es Excel o CSV?": {
+      "main": [
+        [
+          {
+            "node": "Leer archivo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignorar (no es Excel/CSV)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer archivo": {
+      "main": [
+        [
+          {
+            "node": "Cargar en el backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cargar en el backend": {
+      "main": [
+        [
+          {
+            "node": "¿Hubo problemas?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "¿Hubo problemas?": {
       "main": [
-        [{ "node": "Preparar aviso", "type": "main", "index": 0 }],
-        [{ "node": "Carga correcta", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Preparar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Carga correcta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar aviso": {
+      "main": [
+        [
+          {
+            "node": "Avisar a los supervisores",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
-  "settings": { "executionOrder": "v1", "timezone": "America/Lima" },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  },
   "active": false,
   "pinData": {},
-  "meta": { "templateCredsSetupCompleted": true }
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
 }

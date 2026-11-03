@@ -62,7 +62,8 @@ export function DashboardFilters() {
           <div className={cn(triggerCls, 'flex items-center gap-2.5 border px-3')}>
             <Users className="size-[18px] flex-none text-ink-2" />
             <span className="min-w-0 truncate">
-              {me.name} <small className="hidden font-normal text-muted-foreground dsk:inline">· solo tus proyecciones</small>
+              {me.name}{' '}
+              <small className="hidden font-normal text-muted-foreground dsk:inline">· solo tus proyecciones</small>
             </span>
           </div>
         </div>

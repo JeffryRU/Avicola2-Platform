@@ -18,7 +18,7 @@ import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
 import { initials } from '@/core/domain/format'
 import { isSupervisor, roleLabel } from '@/modules/auth/domain/session'
 import { useRequiredSession } from '@/modules/auth/ui/use-session'
-import { useUnreadCount } from '@/modules/planning/ui/notifications'
+import { useUnreadCount } from '@/modules/notifications/ui/hooks'
 import { Logo } from '@/ui/components/brand'
 import { cn } from '@/ui/lib/utils'
 
@@ -104,20 +104,18 @@ function Sidebar() {
           <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
         )}
         <SideItem to={paths.products} icon={<Box />} label="Productos" />
-        {!supervisor && (
-          <SideItem
-            to={paths.notifications}
-            icon={<Bell />}
-            label="Notificaciones"
-            extra={
-              unread > 0 && (
-                <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1.5 text-[11px] font-extrabold text-white not-italic">
-                  {unread}
-                </em>
-              )
-            }
-          />
-        )}
+        <SideItem
+          to={paths.notifications}
+          icon={<Bell />}
+          label="Notificaciones"
+          extra={
+            unread > 0 && (
+              <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1.5 text-[11px] font-extrabold text-white not-italic">
+                {unread}
+              </em>
+            )
+          }
+        />
       </nav>
       <div className="mt-auto grid gap-0.5 pt-4">
         <div className="mb-2 flex items-center gap-3 px-3 py-2.5">
@@ -148,12 +146,13 @@ const BOTTOM = [
 const BOTTOM_SUPERVISOR = [
   { to: paths.dashSummary, icon: BarChart3, label: 'Dashboards', end: false },
   { to: paths.accounts, icon: Users, label: 'Usuarios', end: false },
-  { to: paths.products, icon: Box, label: 'Productos', end: false },
+  { to: paths.notifications, icon: Bell, label: 'Avisos', end: false },
   { to: paths.profile, icon: User, label: 'Perfil', end: false },
 ]
 
 function BottomNav() {
   const items = isSupervisor(useRequiredSession().seller) ? BOTTOM_SUPERVISOR : BOTTOM
+  const unread = useUnreadCount()
   return (
     <nav
       aria-label="Navegación"
@@ -171,7 +170,12 @@ function BottomNav() {
             )
           }
         >
-          <Icon className="size-[22px]" />
+          <span className="relative">
+            <Icon className="size-[22px]" />
+            {to === paths.notifications && unread > 0 && (
+              <i className="absolute -top-0.5 -right-1 size-[9px] rounded-full border-2 border-white bg-destructive" />
+            )}
+          </span>
           {label}
         </NavLink>
       ))}

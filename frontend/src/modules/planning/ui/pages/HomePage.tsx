@@ -6,7 +6,7 @@ import { sumUnits } from '@/modules/planning/domain/catalog'
 import { roleLabel } from '@/modules/auth/domain/session'
 import { useRequiredSession } from '@/modules/auth/ui/use-session'
 import { useCatalog, useMyDays } from '@/modules/planning/ui/hooks'
-import { useNotifications } from '@/modules/planning/ui/notifications'
+import { useUnreadCount } from '@/modules/notifications/ui/hooks'
 import { BRANDS, BrandMark, useBrand } from '@/ui/components/brand'
 import { CountUp } from '@/ui/components/charts'
 import { Note } from '@/ui/components/feedback'
@@ -23,7 +23,7 @@ export function HomePage() {
   const navigate = useNavigate()
   const { days } = useMyDays()
   const { catalog } = useCatalog()
-  const { unread } = useNotifications()
+  const unread = useUnreadCount()
   const now = today()
   const week = weekDates(weekStart(now))
   const confirmed = week.filter((d) => days.has(d)).length
@@ -46,7 +46,7 @@ export function HomePage() {
       icon: Bell,
       color: 'bg-t-red',
       title: 'Notificaciones',
-      sub: unread.length ? `${unread.length} sin leer` : 'Alertas y mensajes',
+      sub: unread ? `${unread} sin leer` : 'Alertas y mensajes',
     },
   ]
 
@@ -62,8 +62,8 @@ export function HomePage() {
             aria-label="Notificaciones"
             className="relative ml-auto grid size-[42px] place-items-center rounded-xl"
           >
-            <Bell className={cn('size-[26px]', unread.length && 'animate-ring')} />
-            {unread.length > 0 && (
+            <Bell className={cn('size-[26px]', unread && 'animate-ring')} />
+            {unread > 0 && (
               <span className="absolute top-2 right-[9px] size-[9px] rounded-full border-2 border-head bg-destructive" />
             )}
           </Link>

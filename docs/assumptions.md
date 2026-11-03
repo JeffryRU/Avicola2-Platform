@@ -25,6 +25,7 @@ Mientras un punto no se confirme con el equipo o con Avícola 2, se elige la opc
 - **Integración con ARIS:** la app será un módulo de ARIS (registra clientes y ventas). Hoy las cuentas se administran aquí (supervisor); cuando se integre, un adaptador de ARIS implementará `SellerRepository` / `AccountsGateway`, y probablemente `SalesSource` para la venta real ([ADR 0005](adr/0005-seguridad-de-sesion-y-cuentas.md)).
 - **Recuperación de contraseña:** por ahora la restablece el supervisor (contraseña temporal). Recuperación por correo o Telegram vía n8n, solo si se pide más adelante.
 - **Visibilidad:** cada vendedor ve solo sus proyecciones y ventas; el supervisor ve a todos y no registra proyecciones.
+- **Recordatorio de proyección:** lun–sáb a las 9:00 (workflow `02_recordatorio_proyeccion` de n8n). La hora límite real del negocio está por confirmar ([ADR 0006](adr/0006-notificaciones-y-tiempo-real.md)).
 
 ## Proceso
 - **El flujo As-Is** ([architecture.md §1](architecture.md)) y el flujo de datos (quién registra qué y cada cuánto) son preliminares.

@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 
 from app.planning.application.ports import (
     Clock,
+    EventPublisher,
     PasswordHasher,
     SellerRepository,
     TemporaryPasswords,
@@ -12,6 +13,7 @@ from app.planning.application.ports import (
 )
 from app.planning.domain.accounts import LockoutPolicy, check_new_password, check_username
 from app.planning.domain.models import ROLES, SELLER, Seller, SellerAccount
+from app.planning.domain.notifications import SESSION_REVOKED, Audience, Event
 from app.shared.domain.errors import (
     AuthenticationError,
     ConflictError,
@@ -170,8 +172,12 @@ class CreateAccount:
 
 
 class _ManageAccount:
-    def __init__(self, sellers: SellerRepository):
-        self.sellers = sellers
+    def __init__(self, sellers: SellerRepository, events: EventPublisher):
+        self.sellers, self.events = sellers, events
+
+    def _revoke_sessions(self, username: str, reason: str) -> None:
+        """Los navegadores abiertos de esa cuenta cierran la sesión al instante."""
+        self.events.publish(Event(SESSION_REVOKED, Audience.users(username), {"reason": reason}))
 
     def _target(self, actor: SellerAccount, username: str) -> SellerAccount:
         require_supervisor(actor)
@@ -187,9 +193,13 @@ class ResetPassword(_ManageAccount):
     """Recuperación de contraseña: el supervisor entrega una temporal y desbloquea la cuenta."""
 
     def __init__(
-        self, sellers: SellerRepository, hasher: PasswordHasher, passwords: TemporaryPasswords
+        self,
+        sellers: SellerRepository,
+        hasher: PasswordHasher,
+        passwords: TemporaryPasswords,
+        events: EventPublisher,
     ):
-        super().__init__(sellers)
+        super().__init__(sellers, events)
         self.hasher, self.passwords = hasher, passwords
 
     def __call__(self, actor: SellerAccount, username: str) -> NewCredentials:
@@ -204,6 +214,7 @@ class ResetPassword(_ManageAccount):
             token_version=target.token_version + 1,
         )
         self.sellers.save_security(updated)
+        self._revoke_sessions(username, "Tu supervisor restableció tu contraseña.")
         logger.info("%s restableció la contraseña de %s", actor.seller.username, username)
         return NewCredentials(updated, temporary)
 
@@ -217,6 +228,8 @@ class SetAccountActive(_ManageAccount):
             token_version=target.token_version + (0 if active else 1),
         )
         self.sellers.save_security(updated)
+        if not active:
+            self._revoke_sessions(username, "Tu cuenta fue desactivada.")
         logger.info(
             "%s %s la cuenta %s",
             actor.seller.username,

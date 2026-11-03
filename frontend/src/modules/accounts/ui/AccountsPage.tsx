@@ -12,6 +12,7 @@ import {
   type NewCredentials,
 } from '@/modules/accounts/domain/accounts'
 import { useRequiredSession } from '@/modules/auth/ui/use-session'
+import { ConfirmDialog } from '@/ui/components/confirm-dialog'
 import { EmptyState } from '@/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/ui/components/layout'
 import { Button } from '@/ui/components/shadcn/button'
@@ -174,7 +175,6 @@ function AccountRow({ account, onCredentials }: { account: AdminAccount; onCrede
   const own = account.username === useRequiredSession().seller.username
 
   const doReset = async () => {
-    if (!confirm(`¿Restablecer la contraseña de ${account.name}? Se cerrarán sus sesiones abiertas.`)) return
     try {
       onCredentials(await reset.mutateAsync())
       refresh()
@@ -183,7 +183,6 @@ function AccountRow({ account, onCredentials }: { account: AdminAccount; onCrede
     }
   }
   const doToggle = async () => {
-    if (account.is_active && !confirm(`¿Desactivar a ${account.name}? No podrá entrar hasta que lo reactives.`)) return
     try {
       await toggle.mutateAsync()
       toast.success(account.is_active ? 'Cuenta desactivada.' : 'Cuenta activada.')
@@ -209,12 +208,35 @@ function AccountRow({ account, onCredentials }: { account: AdminAccount; onCrede
         <small className="font-semibold text-muted-foreground">Tu cuenta</small>
       ) : (
         <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={doReset} disabled={reset.isPending}>
-            {state === 'locked' ? <Lock /> : <KeyRound />} Restablecer
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={doToggle} disabled={toggle.isPending}>
-            <Power /> {account.is_active ? 'Desactivar' : 'Activar'}
-          </Button>
+          <ConfirmDialog
+            title={`¿Restablecer la contraseña de ${account.name}?`}
+            description="Se genera una contraseña temporal para entregarle y se cierran sus sesiones abiertas. Si la cuenta estaba bloqueada, se desbloquea."
+            confirmLabel="Restablecer"
+            onConfirm={doReset}
+            trigger={(open) => (
+              <Button type="button" variant="outline" size="sm" onClick={open}>
+                {state === 'locked' ? <Lock /> : <KeyRound />} Restablecer
+              </Button>
+            )}
+          />
+          {account.is_active ? (
+            <ConfirmDialog
+              title={`¿Desactivar a ${account.name}?`}
+              description="No podrá entrar hasta que reactives su cuenta, y se cierran sus sesiones abiertas."
+              confirmLabel="Desactivar"
+              destructive
+              onConfirm={doToggle}
+              trigger={(open) => (
+                <Button type="button" variant="outline" size="sm" onClick={open}>
+                  <Power /> Desactivar
+                </Button>
+              )}
+            />
+          ) : (
+            <Button type="button" variant="outline" size="sm" onClick={doToggle} disabled={toggle.isPending}>
+              <Power /> Activar
+            </Button>
+          )}
         </div>
       )}
     </li>
