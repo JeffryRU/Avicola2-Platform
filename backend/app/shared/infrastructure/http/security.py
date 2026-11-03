@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Awaitable, Callable
+from fnmatch import fnmatchcase
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request, Response
@@ -41,21 +42,31 @@ NO_STORE_PREFIXES = ("/api/", "/ingest/")
 DOCS_PREFIXES = ("/docs", "/redoc")
 
 
-def _cross_site(request: Request) -> bool:
-    """Una página de otro dominio intentando usar la sesión del usuario (CSRF)."""
+def _cross_site(request: Request, trusted_origins: tuple[str, ...]) -> bool:
+    """Una página de otro dominio intentando usar la sesión del usuario (CSRF).
+
+    `trusted_origins`: orígenes del frontend cuando no es el mismo host que la API, p. ej. la
+    app en Vercel que reenvía /api a este backend. Admiten comodín: https://avicola2-*.vercel.app
+    """
     if request.headers.get("sec-fetch-site") == "cross-site":
         return True
     origin = request.headers.get("origin")
-    return bool(origin) and urlsplit(origin).netloc != request.headers.get("host")
+    if not origin or urlsplit(origin).netloc == request.headers.get("host"):
+        return False
+    return not any(fnmatchcase(origin, pattern) for pattern in trusted_origins)
 
 
-def install_security(app: FastAPI, https: bool) -> None:
+def install_security(app: FastAPI, https: bool, trusted_origins: tuple[str, ...] = ()) -> None:
     @app.middleware("http")
     async def secure(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         path = request.url.path
-        if request.method in UNSAFE_METHODS and path.startswith("/api/") and _cross_site(request):
+        if (
+            request.method in UNSAFE_METHODS
+            and path.startswith("/api/")
+            and _cross_site(request, trusted_origins)
+        ):
             logger.warning(
                 "Bloqueada petición de otro sitio a %s (origin=%s)",
                 path,

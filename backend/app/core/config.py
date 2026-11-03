@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     auth_token_ttl_hours: int = Field(12, gt=0)
     # Cookie de sesión solo por HTTPS. Vacío = sí, salvo en APP_ENV=local (http://127.0.0.1).
     auth_cookie_secure: bool | None = None
+    # Orígenes del frontend si se sirve aparte (p. ej. Vercel reenviando /api a este backend),
+    # separados por coma. Admiten comodín: https://avicola2.vercel.app,https://avicola2-*.vercel.app
+    trusted_origins: str = ""
     # Bloqueo por intentos fallidos de login.
     login_max_attempts: int = Field(5, ge=1)
     login_lock_minutes: int = Field(15, ge=1)
@@ -79,6 +82,10 @@ class Settings(BaseSettings):
     @property
     def is_local(self) -> bool:
         return self.app_env == "local"
+
+    @property
+    def trusted_origin_list(self) -> tuple[str, ...]:
+        return tuple(o.strip().rstrip("/") for o in self.trusted_origins.split(",") if o.strip())
 
     @property
     def cookie_secure(self) -> bool:

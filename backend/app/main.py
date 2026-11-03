@@ -30,7 +30,7 @@ for problem in problems:
 docs = {} if settings.is_local else {"docs_url": None, "redoc_url": None, "openapi_url": None}
 app = FastAPI(title="Avícola 2 — Planificación de saca", version="0.1.0", **docs)
 register_error_handlers(app)
-install_security(app, https=settings.cookie_secure)
+install_security(app, https=settings.cookie_secure, trusted_origins=settings.trusted_origin_list)
 install_request_logging(app)
 app.include_router(health.router)
 app.include_router(ingest.router)

@@ -60,8 +60,14 @@ export function useRealtime() {
             break
         }
       },
-      // Si el canal se cae del todo, puede ser que la sesión ya no valga: se confirma.
-      () => void auth.verify(),
+      {
+        // Si el canal se cae del todo, puede ser que la sesión ya no valga: se confirma.
+        onLost: () => void auth.verify(),
+        onReconnect: () => {
+          client.invalidateQueries({ queryKey: notificationKeys.all })
+          client.invalidateQueries({ queryKey: ['window'] })
+        },
+      },
     )
   }, [user, events, auth, client])
 }

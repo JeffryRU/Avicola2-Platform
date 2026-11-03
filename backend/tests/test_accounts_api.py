@@ -255,3 +255,38 @@ def test_empty_cookie_secure_means_automatic(monkeypatch):
     monkeypatch.setenv("AUTH_COOKIE_SECURE", "")
     assert Settings(app_env="local").cookie_secure is False
     assert Settings(app_env="production").cookie_secure is True
+
+
+def _app_with_trusted(*origins: str) -> TestClient:
+    from fastapi import FastAPI
+
+    from app.shared.infrastructure.http.security import install_security
+
+    mini = FastAPI()
+    install_security(mini, https=True, trusted_origins=origins)
+
+    @mini.post("/api/x")
+    def x() -> dict[str, bool]:
+        return {"ok": True}
+
+    return TestClient(mini)
+
+
+def test_trusted_frontend_origin_is_allowed_behind_a_proxy():
+    """Vercel reenvía /api: el Origin es el de Vercel y el Host, el del backend."""
+    c = _app_with_trusted("https://avicola2.vercel.app", "https://avicola2-*.vercel.app")
+    same = {"Sec-Fetch-Site": "same-origin"}
+    assert (
+        c.post("/api/x", headers={**same, "Origin": "https://avicola2.vercel.app"}).status_code
+        == 200
+    )
+    preview = {**same, "Origin": "https://avicola2-git-develop-jeff.vercel.app"}
+    assert c.post("/api/x", headers=preview).status_code == 200
+    evil = {**same, "Origin": "https://avicola2.vercel.app.evil.example"}
+    assert c.post("/api/x", headers=evil).status_code == 403
+    assert c.post("/api/x", headers={"Origin": "https://otro.vercel.app"}).status_code == 403
+
+
+def test_trusted_origins_setting_parses_a_comma_list():
+    s = Settings(trusted_origins=" https://a.vercel.app/ , https://b-*.vercel.app ,")
+    assert s.trusted_origin_list == ("https://a.vercel.app", "https://b-*.vercel.app")

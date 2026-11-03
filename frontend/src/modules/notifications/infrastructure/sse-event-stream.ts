@@ -1,4 +1,4 @@
-import type { EventStream } from '@/modules/notifications/application/ports'
+import type { EventStream, StreamHandlers } from '@/modules/notifications/application/ports'
 import { REALTIME_EVENT_TYPES, realtimeEventSchema, type RealtimeEvent } from '@/modules/notifications/domain/events'
 
 /** Reintento si la conexión se cierra del todo (servidor caído o sesión rechazada). */
@@ -15,13 +15,20 @@ export class SseEventStream implements EventStream {
     this.url = url
   }
 
-  connect(onEvent: (event: RealtimeEvent) => void, onLost?: () => void) {
+  connect(onEvent: (event: RealtimeEvent) => void, { onLost, onReconnect }: StreamHandlers = {}) {
     let source: EventSource | null = null
     let retry: ReturnType<typeof setTimeout> | undefined
     let closed = false
+    // Detrás de un proxy (p. ej. Vercel corta a los 2 min) la conexión se renueva seguido:
+    // cada reapertura avisa para recuperar lo que llegó mientras tanto.
+    let openedBefore = false
 
     const open = () => {
       source = new EventSource(this.url, { withCredentials: true })
+      source.onopen = () => {
+        if (openedBefore) onReconnect?.()
+        openedBefore = true
+      }
       for (const type of REALTIME_EVENT_TYPES) {
         source.addEventListener(type, (message) => {
           let data: unknown

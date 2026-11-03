@@ -33,6 +33,8 @@ services:
       INGEST_API_TOKEN: ${INGEST_API_TOKEN:?Falta INGEST_API_TOKEN (openssl rand -hex 24)}
       AUTH_TOKEN_TTL_HOURS: ${AUTH_TOKEN_TTL_HOURS:-12}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-}
+      # Frontend servido aparte (Vercel reenviando /api aquí): su dominio, para no bloquearlo.
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-}
       LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-5}
       LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
       TZ: ${TZ:-America/Lima}

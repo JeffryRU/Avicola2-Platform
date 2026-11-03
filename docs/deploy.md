@@ -86,6 +86,18 @@ La carpeta [`deploy/`](../deploy) sirve igual para tres caminos. Elige uno:
    ```
 4. **Actualizar:** `git pull` y el mismo comando. Caddy deja pasar a n8n solo los webhooks (`/webhook/*`, `/form/*`); el editor queda cerrado desde internet.
 
+## Frontend en Vercel (opcional)
+
+Si la PWA se publica en Vercel y el backend queda en el VPS ([ADR 0007](adr/0007-frontend-en-vercel-con-proxy-api.md)), Vercel reenvía `/api/*` al backend. Así la cookie de sesión sigue siendo del mismo sitio y no hace falta CORS.
+
+1. **`frontend/vercel.json`:** reemplaza `REEMPLAZAR-IP` por la IP del VPS con guiones (p. ej. `api.203-0-113-10.sslip.io`), o por tu dominio. Haz commit y push.
+2. **En Vercel → Add New Project:** el repositorio, con **Root Directory** `frontend`. Vercel toma de `vercel.json` el comando `pnpm build` y la salida `dist`.
+3. **Variable del proyecto en Vercel:** `ENABLE_EXPERIMENTAL_COREPACK=1`, para que use la versión de pnpm de `package.json`.
+4. **En el backend (Coolify):** `TRUSTED_ORIGINS=https://<tu-proyecto>.vercel.app,https://<tu-proyecto>-*.vercel.app`, y redespliega. Sin esto, el backend rechaza el login reenviado por Vercel ("Origen no permitido").
+5. **Comprobar:** `https://<tu-proyecto>.vercel.app/api/health` responde `{"status":"ok",...}` a través del proxy, y el login funciona.
+
+Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en vivo se reconecta solo y, al reconectarse, la app vuelve a pedir lo pendiente.
+
 ## Después del primer despliegue (común)
 
 1. **Comprobar:** `https://APP_DOMAIN/health` responde `{"status":"ok","database":"ok"}`.

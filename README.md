@@ -126,6 +126,7 @@ uv run --project backend python scripts/load_synthetic.py               # carga 
 Ver [docs/deploy.md](docs/deploy.md). La carpeta `deploy/` sirve para tres caminos:
 - **Dokploy** (recomendado en un VPS) o **Coolify**: despliegan `deploy/compose.prod.yml` desde GitHub y se actualizan solos en cada `git push`.
 - **Sin panel** (VPS o VM de GCP): `deploy/bootstrap-vps.sh` prepara el servidor y Caddy pone el HTTPS.
+- **Frontend en Vercel** (opcional): `frontend/vercel.json` reenvía `/api` al backend del VPS; en el backend se configura `TRUSTED_ORIGINS` con el dominio de Vercel ([ADR 0007](docs/adr/0007-frontend-en-vercel-con-proxy-api.md)).
 
 Sin dominio propio sirve sslip.io (`app.<ip>.sslip.io`). Incluye un respaldo diario de la base.
 
