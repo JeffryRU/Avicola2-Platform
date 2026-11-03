@@ -70,7 +70,7 @@ export function Confetti() {
   const [pieces] = useState(() =>
     matchMedia('(prefers-reduced-motion: reduce)').matches
       ? []
-      : [...Array(46)].map(() => ({
+      : Array.from({ length: 46 }, () => ({
           left: Math.random() * 100,
           x: (Math.random() - 0.5) * 160,
           r: Math.random() * 720 - 360,

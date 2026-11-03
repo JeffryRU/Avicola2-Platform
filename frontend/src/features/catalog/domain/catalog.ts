@@ -96,7 +96,7 @@ export function bySubcategory(products: Product[]): { name: string | null; produ
   for (const p of products) {
     const name = p.subcategory ?? null
     const last = groups.at(-1)
-    if (last && last.name === name) last.products.push(p)
+    if (last?.name === name) last.products.push(p)
     else groups.push({ name, products: [p] })
   }
   return groups

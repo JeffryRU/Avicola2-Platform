@@ -31,7 +31,7 @@ function withExisting(draft: Draft, days: Map<IsoDate, MyDay>): Draft {
   for (const d of draftDates(draft)) {
     if (!units[d]) {
       const mine = days.get(d)
-      units[d] = mine && mine.category === draft.category ? { ...mine.units } : {}
+      units[d] = mine?.category === draft.category ? { ...mine.units } : {}
     }
   }
   return { ...draft, units }
@@ -74,6 +74,7 @@ export function NewProjectionPage() {
 
   const dates = useMemo(() => draftDates(draft), [draft])
   if (!catalog) return <PageHeader title="Nueva proyección" />
+  const loaded = catalog
 
   const products = catalog.selected(draft)
   const choiceLabel = catalog.label(draft)
@@ -115,10 +116,7 @@ export function NewProjectionPage() {
                   <DaysSlider value={draft.days} onChange={(n) => setDraft({ ...draft, days: n, units: {} })} />
                   <Note icon={<Calendar />} className="mt-[18px]">
                     <div>
-                      Se proyectarán{' '}
-                      <b>
-                        {daysCount(draft.days)}:
-                      </b>
+                      Se proyectarán <b>{daysCount(draft.days)}:</b>
                       <br />
                       {daysText(dates)}
                     </div>
@@ -211,8 +209,8 @@ export function NewProjectionPage() {
 
   const back = () => setDraft({ ...draft, step: 0 })
   const setCell = (date: IsoDate, productId: string, units: number | null) => {
-    const day = { ...(draft.units[date] ?? {}) }
-    if (units === null) delete day[productId]
+    let day = { ...(draft.units[date] ?? {}) }
+    if (units === null) day = Object.fromEntries(Object.entries(day).filter(([id]) => id !== productId))
     else day[productId] = units
     setDraft({ ...draft, units: { ...draft.units, [date]: day } })
   }
@@ -251,11 +249,11 @@ export function NewProjectionPage() {
     setSending(true)
     const started = Date.now()
     try {
-      const outcome = await planning.submit(draft, catalog!, seller.username)
+      const outcome = await planning.submit(draft, loaded, seller.username)
       await new Promise((r) => setTimeout(r, Math.max(0, 1200 - (Date.now() - started))))
       drafts.clear()
       await client.invalidateQueries({ queryKey: ['window'] })
-      navigate(paths.registered, { state: { outcome, draft } })
+      void navigate(paths.registered, { state: { outcome, draft } })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo enviar la proyección.')
     } finally {

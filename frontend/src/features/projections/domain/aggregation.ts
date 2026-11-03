@@ -50,7 +50,7 @@ export interface DayAgg {
 /** Total de un día para "todos" los vendedores o uno solo. */
 export function dayAgg(
   date: IsoDate,
-  seller: string | 'all',
+  seller: string, // un usuario o 'all'
   projections: Projection[],
   sales: DailyUnits[],
   catalog: Catalog,
@@ -65,7 +65,7 @@ export function dayAgg(
 
 export const weekAgg = (
   ws: IsoDate,
-  seller: string | 'all',
+  seller: string, // un usuario o 'all'
   projections: Projection[],
   sales: DailyUnits[],
   catalog: Catalog,
@@ -73,10 +73,10 @@ export const weekAgg = (
 
 /** Proyección vs venta real (kg) en los días que ya tienen venta. */
 export function versusReal(days: DayAgg[], catalog: Catalog) {
-  const withReal = days.filter((d) => d.real)
+  const withReal = days.flatMap((d) => (d.real ? [{ ...d, real: d.real }] : []))
   const projected = withReal.reduce((s, d) => s + d.kg, 0)
-  const real = withReal.reduce((s, d) => s + catalog.kg(d.real!), 0)
-  const absError = withReal.reduce((s, d) => s + Math.abs(catalog.kg(d.real!) - d.kg), 0)
+  const real = withReal.reduce((s, d) => s + catalog.kg(d.real), 0)
+  const absError = withReal.reduce((s, d) => s + Math.abs(catalog.kg(d.real) - d.kg), 0)
   return {
     daysWithReal: withReal.length,
     projected,

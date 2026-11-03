@@ -2,7 +2,13 @@ import { z } from 'zod'
 import type { HttpClient } from '@/shared/application/ports'
 import type { IsoDate } from '@/shared/domain/dates'
 import type { DateRange, ProjectionsGateway } from '@/features/projections/application/ports'
-import { dailyUnitsSchema, projectionSchema, submissionResultSchema, suggestionSchema, type Submission } from '@/features/projections/domain/schemas'
+import {
+  dailyUnitsSchema,
+  projectionSchema,
+  submissionResultSchema,
+  suggestionSchema,
+  type Submission,
+} from '@/features/projections/domain/schemas'
 
 const rangeQuery = (r: DateRange) => ({ date_from: r.from, date_to: r.to, seller: r.seller })
 

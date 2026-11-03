@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SyntheticEvent } from 'react'
 import { Eye, EyeOff, Loader2, Lock, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -24,7 +24,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [busy, setBusy] = useState(false)
   const [shakeKey, setShakeKey] = useState(0)
 
-  async function submit(e: FormEvent<HTMLFormElement>) {
+  async function submit(e: SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
     const parsed = credentialsSchema.safeParse({

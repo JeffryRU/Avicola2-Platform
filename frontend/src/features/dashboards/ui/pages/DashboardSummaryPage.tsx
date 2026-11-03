@@ -5,7 +5,12 @@ import { paths } from '@/app/routes'
 import { addDays, dDM, dDow, dShort } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
 import { weekAgg } from '@/features/projections/domain/aggregation'
-import { DashboardFilters, DashboardTabs, Delta, useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
+import {
+  DashboardFilters,
+  DashboardTabs,
+  Delta,
+  useDashboardFilters,
+} from '@/features/dashboards/ui/components/dashboard'
 import { Segmented } from '@/shared/ui/components/segmented'
 import { useCatalog } from '@/features/catalog/ui/hooks'
 import { useWindowData } from '@/features/projections/ui/hooks'

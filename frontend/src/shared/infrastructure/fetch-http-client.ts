@@ -67,6 +67,8 @@ export class FetchHttpClient implements HttpClient {
 function errorMessage(data: unknown): string | null {
   const detail = (data as { detail?: unknown } | null)?.detail
   if (typeof detail === 'string') return detail
-  if (Array.isArray(detail) && detail[0]?.msg) return `Datos inválidos: ${detail[0].msg}`
+  const first: unknown = Array.isArray(detail) ? detail[0] : null
+  const msg = (first as { msg?: unknown } | null)?.msg
+  if (typeof msg === 'string') return `Datos inválidos: ${msg}`
   return null
 }

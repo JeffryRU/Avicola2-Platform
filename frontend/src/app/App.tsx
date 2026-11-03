@@ -18,7 +18,9 @@ import { Splash } from '@/shared/ui/components/feedback'
 import { Toaster } from '@/shared/ui/components/shadcn/sonner'
 
 /** Pantallas cargadas a demanda: el celular descarga solo lo que abre. */
-const AccountsPage = lazy(() => import('@/features/accounts/ui/AccountsPage').then((m) => ({ default: m.AccountsPage })))
+const AccountsPage = lazy(() =>
+  import('@/features/accounts/ui/AccountsPage').then((m) => ({ default: m.AccountsPage })),
+)
 const ChangePasswordPage = lazy(() =>
   import('@/features/auth/ui/ChangePasswordPage').then((m) => ({ default: m.ChangePasswordPage })),
 )
@@ -71,12 +73,12 @@ function useOutboxSync() {
     const seller = session.seller.username
     const flush = async (silent: boolean) => {
       const r = await planning.flush(seller)
-      if (r.sent) client.invalidateQueries({ queryKey: ['window'] })
+      if (r.sent) void client.invalidateQueries({ queryKey: ['window'] })
       r.rejected.forEach((m) => toast.error(`Un envío fue rechazado: ${m}`))
       if (!silent && r.sent) toast.success(`${r.sent} ${r.sent === 1 ? 'envío sincronizado' : 'envíos sincronizados'}`)
     }
-    const t = setTimeout(() => flush(true), 2500)
-    const online = () => flush(false)
+    const t = setTimeout(() => void flush(true), 2500)
+    const online = () => void flush(false)
     addEventListener('online', online)
     return () => {
       clearTimeout(t)

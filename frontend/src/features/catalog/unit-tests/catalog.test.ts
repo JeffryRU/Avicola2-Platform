@@ -56,7 +56,14 @@ describe('catálogo', () => {
   })
 
   it('nombra un día según los tamaños con unidades y separa lo elegido de lo demás', () => {
-    const p = (id: string, subcategory: string) => ({ id, category: 'BRASA', name: id, kg_per_unit: 1, sort_order: 0, subcategory })
+    const p = (id: string, subcategory: string) => ({
+      id,
+      category: 'BRASA',
+      name: id,
+      kg_per_unit: 1,
+      sort_order: 0,
+      subcategory,
+    })
     const c = new Catalog([p('P1', 'Brasa chica'), p('P5', 'Brasa mediana'), p('P7', 'Brasa grande')])
     expect(c.dayLabel('BRASA', { P1: 3 })).toBe('Brasa chica')
     expect(c.dayLabel('BRASA', { P1: 3, P5: 1 })).toBe('Brasa chica y mediana')

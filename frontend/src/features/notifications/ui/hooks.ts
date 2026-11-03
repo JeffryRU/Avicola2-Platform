@@ -14,7 +14,7 @@ export function useNotifications() {
   const session = useSession()
   const query = useQuery({
     queryKey: notificationKeys.all,
-    queryFn: notifications.list,
+    queryFn: () => notifications.list(),
     enabled: !!session && !session.must_change_password,
     staleTime: 60_000,
   })
@@ -28,7 +28,7 @@ export function useMarkRead() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (ids?: number[]) => notifications.markRead(ids),
-    onSuccess: () => client.invalidateQueries({ queryKey: notificationKeys.all }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: notificationKeys.all }),
   })
 }
 
@@ -48,11 +48,11 @@ export function useRealtime() {
       (event) => {
         switch (event.type) {
           case 'notification':
-            client.invalidateQueries({ queryKey: notificationKeys.all })
+            void client.invalidateQueries({ queryKey: notificationKeys.all })
             toast(event.data.title, { description: event.data.body })
             break
           case 'projections.changed':
-            client.invalidateQueries({ queryKey: ['window'] })
+            void client.invalidateQueries({ queryKey: ['window'] })
             break
           case 'session.revoked':
             toast.error(event.data.reason, { description: 'Vuelve a iniciar sesión.' })
@@ -64,8 +64,8 @@ export function useRealtime() {
         // Si el canal se cae del todo, puede ser que la sesión ya no valga: se confirma.
         onLost: () => void auth.verify(),
         onReconnect: () => {
-          client.invalidateQueries({ queryKey: notificationKeys.all })
-          client.invalidateQueries({ queryKey: ['window'] })
+          void client.invalidateQueries({ queryKey: notificationKeys.all })
+          void client.invalidateQueries({ queryKey: ['window'] })
         },
       },
     )

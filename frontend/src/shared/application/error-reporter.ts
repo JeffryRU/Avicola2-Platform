@@ -1,5 +1,10 @@
 import type { LogSink } from '@/shared/application/ports'
-import { clientLogEntrySchema, describeError, type ClientLogEntry, type ClientLogLevel } from '@/shared/domain/client-log'
+import {
+  clientLogEntrySchema,
+  describeError,
+  type ClientLogEntry,
+  type ClientLogLevel,
+} from '@/shared/domain/client-log'
 
 interface Options {
   /** Pantalla actual y vendedor con sesión (si hay), leídos en el momento del error. */

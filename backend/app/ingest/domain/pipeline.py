@@ -5,6 +5,7 @@ ejemplo. Orden de mapeo: alias del YAML → mapeo confirmado (column_mappings) �
 el LLM.
 """
 
+import math
 from pathlib import PurePath
 from typing import Any
 
@@ -117,7 +118,7 @@ def _sum(values: list[Any]) -> Any:
         y = value - compensation
         t = total + y
         compensation = t - total - y
-        if compensation != compensation:  # NaN (con infinitos)
+        if math.isnan(compensation):  # con infinitos
             compensation = 0
         total = t
     return total
@@ -149,7 +150,7 @@ def _aggregate(rows: list[Row], spec: TableSpec) -> list[Row]:
     return merged
 
 
-def parse(
+def parse(  # noqa: PLR0912, PLR0915 (recorrido único de la tabla; se lee de arriba abajo)
     raw: RawTable,
     filename: str,
     schema: IngestSchema,

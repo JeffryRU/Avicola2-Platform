@@ -215,7 +215,7 @@ export function DashboardVersusPage() {
                     {catalog.products
                       .map((p) => {
                         const pk = withReal.reduce((s, d) => s + (d.units[p.id] ?? 0) * p.kg_per_unit, 0)
-                        const rk = withReal.reduce((s, d) => s + (d.real![p.id] ?? 0) * p.kg_per_unit, 0)
+                        const rk = withReal.reduce((s, d) => s + (d.real?.[p.id] ?? 0) * p.kg_per_unit, 0)
                         return { p, pk, rk }
                       })
                       .filter((r) => r.pk || r.rk)

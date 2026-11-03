@@ -1,6 +1,12 @@
 import type { IsoDate } from '@/shared/domain/dates'
 import type { Draft } from '@/features/projections/domain/draft'
-import type { DailyUnits, Projection, Submission, SubmissionResult, Suggestion } from '@/features/projections/domain/schemas'
+import type {
+  DailyUnits,
+  Projection,
+  Submission,
+  SubmissionResult,
+  Suggestion,
+} from '@/features/projections/domain/schemas'
 
 export interface DateRange {
   from: IsoDate

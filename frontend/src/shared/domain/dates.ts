@@ -46,7 +46,8 @@ export function weekStart(s: IsoDate): IsoDate {
 }
 
 export const weekDates = (ws: IsoDate): IsoDate[] => [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(ws, i))
-export const rangeDates = (start: IsoDate, days: number): IsoDate[] => [...Array(days)].map((_, i) => addDays(start, i))
+export const rangeDates = (start: IsoDate, days: number): IsoDate[] =>
+  Array.from({ length: days }, (_, i) => addDays(start, i))
 /** Índice lunes=0 … domingo=6. */
 export const weekdayIndex = (s: IsoDate) => (fromIso(s).getDay() + 6) % 7
 
@@ -81,11 +82,12 @@ export function relativeDay(s: IsoDate, ref: IsoDate = today()): string | null {
 /** "Hoy, mañana y pasado mañana." o "Del Lun 03/11 al Vie 07/11." */
 export function daysText(dates: IsoDate[], ref: IsoDate = today()): string {
   const rel = dates.map((d) => relativeDay(d, ref))
-  if (rel.every(Boolean)) {
-    const words = rel.map((r, i) => (i ? r!.toLowerCase() : r!))
-    return (words.length > 1 ? `${words.slice(0, -1).join(', ')} y ${words.at(-1)}` : words[0]) + '.'
+  const known = rel.filter((r): r is string => r !== null)
+  if (known.length === rel.length) {
+    const words = known.map((r, i) => (i ? r.toLowerCase() : r))
+    return `${words.length > 1 ? `${words.slice(0, -1).join(', ')} y ${words.at(-1)}` : words[0]}.`
   }
-  return `Del ${dShort(dates[0])} al ${dShort(dates.at(-1)!)}.`
+  return `Del ${dShort(dates[0])} al ${dShort(dates[dates.length - 1])}.`
 }
 
 /** "08:05" → "08:05 a. m." */

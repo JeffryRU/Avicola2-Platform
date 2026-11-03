@@ -57,7 +57,10 @@ const ISO_PATHS = (() => {
   const C = { x: 50, y: 52 }
   const R = 46
   const rad = (d: number) => (d * Math.PI) / 180
-  type P = { x: number; y: number }
+  interface P {
+    x: number
+    y: number
+  }
   const V: P[] = [0, 1, 2].map((i) => ({
     x: C.x + R * Math.cos(rad(-90 + 120 * i)),
     y: C.y + R * Math.sin(rad(-90 + 120 * i)),

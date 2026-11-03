@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Calendar, Users } from 'lucide-react'
 import { NavLink, useSearchParams } from 'react-router'
-import { weekLabel, type IsoDate } from '@/shared/domain/dates'
+import { weekLabel } from '@/shared/domain/dates'
 import { pct1 } from '@/shared/domain/format'
 import { DASHBOARDS } from '@/app/routes'
 import { isSupervisor } from '@/features/auth/domain/session'
@@ -10,13 +10,13 @@ import { weekOptions } from '@/features/dashboards/domain/weeks'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { cn } from '@/shared/ui/lib/utils'
 
-
 /** Semana y vendedor elegidos, guardados en la URL (?semana=&vendedor=) para poder compartirla. */
 export function useDashboardFilters() {
   const [params, setParams] = useSearchParams()
   const weeks = weekOptions()
-  const week = weeks.includes(params.get('semana') ?? '') ? (params.get('semana') as IsoDate) : weeks[0]
-  const seller = params.get('vendedor') || 'all'
+  const asked = params.get('semana') ?? ''
+  const week = weeks.includes(asked) ? asked : weeks[0]
+  const seller = params.get('vendedor') ?? 'all'
   const set = (key: 'semana' | 'vendedor', value: string) => {
     const next = new URLSearchParams(params)
     next.set(key, value)

@@ -11,7 +11,7 @@ Status = Literal["ok", "partial", "failed", "needs_mapping"]
 Row = dict[str, Any]
 
 
-class UnreadableFile(DomainError):
+class UnreadableFileError(DomainError):
     """El archivo no se puede leer como Excel o CSV."""
 
 
@@ -33,7 +33,7 @@ class RawTable:
     def signature(self) -> str:
         """Firma del conjunto de columnas, para reutilizar mapeos confirmados."""
         key = "|".join(sorted(self.columns))
-        return hashlib.sha1(key.encode()).hexdigest()[:16]
+        return hashlib.sha1(key.encode(), usedforsecurity=False).hexdigest()[:16]
 
     def excel_row(self, index: int) -> int:
         """Número de fila (1-based, como lo ve el usuario en Excel) de la fila `index`."""

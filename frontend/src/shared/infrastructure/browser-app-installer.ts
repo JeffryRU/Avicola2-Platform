@@ -7,7 +7,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 const isIos = (nav: Navigator) =>
-  /iPhone|iPad|iPod/.test(nav.userAgent) || (/Macintosh/.test(nav.userAgent) && nav.maxTouchPoints > 1)
+  /iPhone|iPad|iPod/.test(nav.userAgent) || (nav.userAgent.includes('Macintosh') && nav.maxTouchPoints > 1)
 
 /**
  * Escucha `beforeinstallprompt` desde que abre la app (puede llegar antes del login) y lo guarda

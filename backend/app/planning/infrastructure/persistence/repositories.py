@@ -213,7 +213,7 @@ class SqlProjectionRepository:
         rows = self.session.execute(
             select(sellers.c.username, sellers.c.id).where(sellers.c.username.in_(usernames))
         ).all()
-        found = {u: i for u, i in rows}
+        found = dict(rows)
         if missing := usernames - set(found):
             raise DomainError(f"El vendedor no existe: {', '.join(sorted(missing))}.")
         return found

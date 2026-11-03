@@ -20,7 +20,10 @@ const SNOOZE_DAYS = 14
 
 function useInstallState(): InstallState {
   const { installer } = useContainer()
-  return useSyncExternalStore(installer.subscribe, installer.state)
+  return useSyncExternalStore(
+    (cb) => installer.subscribe(cb),
+    () => installer.state(),
+  )
 }
 
 /** "Instalar": diálogo del navegador (Android/Chrome) o instrucciones (iPhone). */
@@ -29,7 +32,10 @@ function useInstallAction() {
   const state = useInstallState()
   const [iosHelp, setIosHelp] = useState(false)
   const install = async () => {
-    if (state === 'ios') return setIosHelp(true)
+    if (state === 'ios') {
+      setIosHelp(true)
+      return
+    }
     if (await installer.install()) toast.success('¡Listo! La app quedó instalada en tu dispositivo.')
   }
   const dialog = <IosInstallDialog open={iosHelp} onOpenChange={setIosHelp} />

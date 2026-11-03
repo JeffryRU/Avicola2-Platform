@@ -30,7 +30,10 @@ export function useWindowData() {
 
 export function useQueue() {
   const { queue } = useContainer()
-  return useSyncExternalStore(queue.subscribe, queue.list)
+  return useSyncExternalStore(
+    (cb) => queue.subscribe(cb),
+    () => queue.list(),
+  )
 }
 
 /** Proyecciones propias por fecha (servidor + cola offline). */

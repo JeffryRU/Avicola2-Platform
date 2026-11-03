@@ -24,5 +24,5 @@ export interface ExportTable {
 /** CSV con BOM (Excel reconoce las tildes) y comillas en todos los campos. */
 export function tableToCsv(table: ExportTable): string {
   const lines = [table.columns.map((c) => c.label), ...table.rows]
-  return '﻿' + lines.map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n')
+  return `\uFEFF${lines.map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n')}`
 }

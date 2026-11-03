@@ -25,7 +25,7 @@ export function ConnectionPage() {
   const pending = useQueue().filter((q) => q.seller === seller.username).length
   const client = useQueryClient()
   const s = status.data
-  const ok = !!s?.database && !!s.tables
+  const ok = Boolean(s?.database) && s?.tables === true
 
   const test = async () => {
     const r = await status.refetch()

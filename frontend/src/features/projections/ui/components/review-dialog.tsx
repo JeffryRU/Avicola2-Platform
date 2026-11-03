@@ -7,7 +7,13 @@ import { sumUnits } from '@/features/catalog/domain/catalog'
 import type { Draft } from '@/features/projections/domain/draft'
 import { tableCls } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/ui/components/shadcn/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/ui/components/shadcn/dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/shared/ui/components/shadcn/sheet'
 import { daysCount, kgAmount, unitsCount } from '@/shared/types/labels'
 

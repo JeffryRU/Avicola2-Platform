@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { type z } from 'zod'
 import { ApiError, type KeyValueStore } from '@/shared/application/ports'
 import { AuthService } from '@/features/auth/application/auth-service'
 import type { AuthGateway } from '@/features/auth/application/ports'
@@ -48,7 +48,9 @@ function setup() {
   const tab = new MemoryStore()
   const gateway = new FakeGateway()
   let cleaned = 0
-  const auth = new AuthService(gateway, new StoredSessionRepository(local, tab), () => void cleaned++)
+  const auth = new AuthService(gateway, new StoredSessionRepository(local, tab), () => {
+    cleaned++
+  })
   return { auth, gateway, local, tab, cleaned: () => cleaned }
 }
 

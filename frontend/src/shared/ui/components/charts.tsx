@@ -144,7 +144,7 @@ export function LineChart({ points, label }: { points: LinePoint[]; label: strin
   const p2 = points.flatMap((p, i) => (p.b == null ? [] : [[x(i), y(p.b)] as const]))
   const path = (pts: readonly (readonly [number, number])[]) =>
     pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
-  const area = `${path(p1)} L${p1.at(-1)![0]} ${T + ih} L${p1[0][0]} ${T + ih} Z`
+  const area = `${path(p1)} L${p1[p1.length - 1][0]} ${T + ih} L${p1[0][0]} ${T + ih} Z`
   return (
     <div className="chart relative">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>

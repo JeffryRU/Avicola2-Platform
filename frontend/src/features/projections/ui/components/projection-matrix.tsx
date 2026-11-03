@@ -121,9 +121,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
                     <tr key={p.id}>
                       <td className={cn(stk, 'border-b border-muted py-[7px]')}>
                         <b className="block text-[13.5px]">{p.name}</b>
-                        <small className="text-[10.5px] text-muted-foreground">
-                          {kgPerUnitLabel(p.kg_per_unit)}
-                        </small>
+                        <small className="text-[10.5px] text-muted-foreground">{kgPerUnitLabel(p.kg_per_unit)}</small>
                       </td>
                       {dates.map((d) => (
                         <td key={d} className="min-w-16 border-b border-muted px-1 py-[7px] text-center">

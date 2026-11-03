@@ -4,7 +4,10 @@ import { App } from '@/app/App'
 import { createContainer } from '@/app/container'
 import '@/shared/ui/styles/globals.css'
 
-createRoot(document.getElementById('root')!).render(
+const root = document.getElementById('root')
+if (!root) throw new Error('Falta el elemento #root en index.html.')
+
+createRoot(root).render(
   <StrictMode>
     <App container={createContainer()} />
   </StrictMode>,

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SyntheticEvent } from 'react'
 import { Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -28,11 +28,11 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false)
   const [show, setShow] = useState(false)
 
-  async function submit(e: FormEvent<HTMLFormElement>) {
+  async function submit(e: SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
     const parsed = newPasswordSchema(seller.username).safeParse(
-      Object.fromEntries(FIELDS.map((f) => [f.name, String(form.get(f.name) ?? '')])),
+      Object.fromEntries(FIELDS.map((f) => [f.name, (form.get(f.name) as string | null) ?? ''])),
     )
     if (!parsed.success) {
       const flat = z.flattenError(parsed.error).fieldErrors

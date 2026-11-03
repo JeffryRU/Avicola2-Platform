@@ -23,7 +23,11 @@ export const isSupervisor = (seller: Seller) => seller.role === 'supervisor'
 
 /** "Supervisor" o "Vendedor, Trujillo" (debajo del nombre). */
 export const roleLabel = (seller: Seller) =>
-  isSupervisor(seller) ? ROLE_LABEL.supervisor : seller.zone ? `${ROLE_LABEL.seller}, ${seller.zone}` : ROLE_LABEL.seller
+  isSupervisor(seller)
+    ? ROLE_LABEL.supervisor
+    : seller.zone
+      ? `${ROLE_LABEL.seller}, ${seller.zone}`
+      : ROLE_LABEL.seller
 
 /** Formulario de inicio de sesión. */
 export const credentialsSchema = z.object({

@@ -28,7 +28,7 @@ export function NotificationsPage() {
   const open = (n: AppNotification) => {
     if (!n.read_at) markRead.mutate([n.id])
     const link = safeLink(n.link)
-    if (link) navigate(link)
+    if (link) void navigate(link)
   }
   const readAll = () =>
     markRead.mutate(undefined, { onSuccess: () => toast.success('Notificaciones marcadas como leídas') })

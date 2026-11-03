@@ -8,7 +8,7 @@ from logging.config import fileConfig
 
 from alembic import context
 
-import app.db.models  # noqa: F401  (registra las tablas ORM en la metadata)
+import app.db.models  # registra las tablas ORM en la metadata
 import app.planning.infrastructure.persistence.tables  # noqa: F401  (tablas de planificación)
 from app.core.config import get_settings
 from app.shared.infrastructure.database.engine import build_engine, ensure_schema, physical_schema
@@ -25,7 +25,7 @@ if config.config_file_name is not None:
 target_metadata = metadata
 
 
-def _only_app_schema(name, type_, parent_names) -> bool:
+def _only_app_schema(name, type_, _parent_names) -> bool:
     """Autogenerate solo mira el esquema de la app (ignora n8n, auth, storage de Supabase...)."""
     if type_ == "schema":
         return name == SCHEMA

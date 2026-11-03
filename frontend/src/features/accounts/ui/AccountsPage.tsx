@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SyntheticEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Copy, KeyRound, Loader2, Lock, Power, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -100,9 +100,9 @@ function NewAccountDialog({
 }) {
   const { accounts } = useContainer()
   const [errors, setErrors] = useState<FormErrors>({})
-  const create = useMutation({ mutationFn: accounts.create })
+  const create = useMutation({ mutationFn: (a: Parameters<typeof accounts.create>[0]) => accounts.create(a) })
 
-  async function submit(e: FormEvent<HTMLFormElement>) {
+  async function submit(e: SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
     const parsed = newAccountSchema.safeParse({
@@ -170,7 +170,7 @@ function NewAccountDialog({
 function AccountRow({ account, onCredentials }: { account: AdminAccount; onCredentials: (c: NewCredentials) => void }) {
   const { accounts } = useContainer()
   const client = useQueryClient()
-  const refresh = () => client.invalidateQueries({ queryKey: KEY })
+  const refresh = () => void client.invalidateQueries({ queryKey: KEY })
   const reset = useMutation({ mutationFn: () => accounts.resetPassword(account.username) })
   const toggle = useMutation({ mutationFn: () => accounts.setActive(account.username, !account.is_active) })
   const state = accountState(account, new Date())
@@ -199,7 +199,8 @@ function AccountRow({ account, onCredentials }: { account: AdminAccount; onCrede
     <li className="flex flex-wrap items-center gap-3 border-b border-muted px-4 py-3.5 last:border-0 dsk:px-5">
       <div className="min-w-0 flex-[1_1_200px]">
         <b className="block">
-          {account.name} {account.role === 'supervisor' && <small className="text-primary">· {ROLE_LABEL.supervisor}</small>}
+          {account.name}{' '}
+          {account.role === 'supervisor' && <small className="text-primary">· {ROLE_LABEL.supervisor}</small>}
         </b>
         <small className="text-muted-foreground">
           {account.username}
@@ -250,7 +251,7 @@ function AccountRow({ account, onCredentials }: { account: AdminAccount; onCrede
 export function AccountsPage() {
   const { accounts } = useContainer()
   const client = useQueryClient()
-  const list = useQuery({ queryKey: KEY, queryFn: accounts.list })
+  const list = useQuery({ queryKey: KEY, queryFn: () => accounts.list() })
   const [creating, setCreating] = useState(false)
   const [credentials, setCredentials] = useState<NewCredentials | null>(null)
 
@@ -294,7 +295,7 @@ export function AccountsPage() {
         onCreated={(c) => {
           setCreating(false)
           setCredentials(c)
-          client.invalidateQueries({ queryKey: KEY })
+          void client.invalidateQueries({ queryKey: KEY })
         }}
       />
       <CredentialsDialog credentials={credentials} onClose={() => setCredentials(null)} />

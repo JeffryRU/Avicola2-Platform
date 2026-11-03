@@ -38,7 +38,7 @@ export function ExportMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild disabled={disabled || busy !== null}>
+      <DropdownMenuTrigger asChild disabled={(disabled ?? false) || busy !== null}>
         {compact ? (
           <Button variant="ghost" size="icon" aria-label="Exportar" className={className}>
             {busy ? <Loader2 className="animate-spin" /> : <Download />}
