@@ -90,11 +90,17 @@ La carpeta [`deploy/`](../deploy) sirve igual para tres caminos. Elige uno:
 
 Si la PWA se publica en Vercel y el backend queda en el VPS ([ADR 0007](adr/0007-frontend-en-vercel-con-proxy-api.md)), Vercel reenvía `/api/*` al backend. Así la cookie de sesión sigue siendo del mismo sitio y no hace falta CORS.
 
-1. **`frontend/vercel.json`:** reemplaza `REEMPLAZAR-IP` por la IP del VPS con guiones (p. ej. `api.203-0-113-10.sslip.io`), o por tu dominio. Haz commit y push.
-2. **En Vercel → Add New Project:** el repositorio, con **Root Directory** `frontend`. Vercel toma de `vercel.json` el comando `pnpm build` y la salida `dist`.
-3. **Variable del proyecto en Vercel:** `ENABLE_EXPERIMENTAL_COREPACK=1`, para que use la versión de pnpm de `package.json`.
-4. **En el backend (Coolify):** `TRUSTED_ORIGINS=https://<tu-proyecto>.vercel.app,https://<tu-proyecto>-*.vercel.app`, y redespliega. Sin esto, el backend rechaza el login reenviado por Vercel ("Origen no permitido").
-5. **Comprobar:** `https://<tu-proyecto>.vercel.app/api/health` responde `{"status":"ok",...}` a través del proxy, y el login funciona.
+1. **`frontend/vercel.json`** tiene dos reenvíos de `/api/*`, elegidos por el host de Vercel:
+   - Los dominios de producción (`avicola2-platform.vercel.app` y los alias de la rama `main`) van al backend de producción: `https://avicola.13-140-234-184.sslip.io`.
+   - Cualquier otro host (rama `develop` y vistas previas) va al backend de develop: `https://avicola-dev.13-140-234-184.sslip.io`.
+
+   Si cambia la IP, el dominio o el nombre del proyecto en Vercel, edita la expresión regular de `missing` y los dos destinos.
+2. **En Vercel → Add New Project:** el repositorio, con **Root Directory** `frontend`. Vercel toma de `vercel.json` el comando `pnpm build` y la salida `dist`. Producción sigue la rama `main`; la rama `develop` se publica como vista previa en `avicola2-platform-git-develop-<equipo>.vercel.app`.
+3. **Variable del proyecto en Vercel:** `ENABLE_EXPERIMENTAL_COREPACK=1` (en Production y Preview), para que use la versión de pnpm de `package.json`.
+4. **`TRUSTED_ORIGINS` en cada backend (Coolify)**, y redespliega. Sin esto, el backend rechaza el login reenviado por Vercel ("Origen no permitido").
+   - Producción: los dominios exactos de producción, separados por coma.
+   - Develop: `https://avicola2-platform-*-<equipo>.vercel.app` (comodín para `develop` y las vistas previas).
+5. **Comprobar:** `https://<tu-proyecto>.vercel.app/api/health` responde `{"status":"ok",...}` a través del proxy, y el login funciona. Lo mismo en el dominio de la rama `develop`.
 
 Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en vivo se reconecta solo y, al reconectarse, la app vuelve a pedir lo pendiente.
 

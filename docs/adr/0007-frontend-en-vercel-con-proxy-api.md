@@ -5,7 +5,7 @@
 
 ## Contexto
 
-- El backend (API, n8n y respaldo) se despliega en un VPS con Coolify, con el dominio `api.<ip>.sslip.io`.
+- El backend (API, n8n y respaldo) se despliega en un VPS con Coolify, con un entorno por rama: `avicola.<ip>.sslip.io` (`main`) y `avicola-dev.<ip>.sslip.io` (`develop`).
 - El frontend (PWA) se publica en Vercel.
 - La sesión vive en una cookie `HttpOnly; SameSite=Strict` ([ADR 0005](0005-seguridad-de-sesion-y-cuentas.md)). Si la PWA en `*.vercel.app` llamara directamente a `*.sslip.io`, esa cookie sería de terceros:
   - Safari la bloquea siempre y Chrome en varios casos, así que el login no funcionaría.
@@ -28,10 +28,10 @@
 
 - **Llamar a la API directo desde Vercel (CORS + `SameSite=None`):** la cookie sería de terceros, y Safari y otros navegadores la bloquean.
 - **Dominio propio (`app.midominio.com` en Vercel + `api.midominio.com` en el VPS):** mismo sitio, sin proxy y sin el corte de 120 s. Requiere comprar un dominio, y con sslip.io no es posible. Es el siguiente paso si se compra uno.
-- **Middleware de Vercel que lea `BACKEND_URL` de las variables del proyecto:** evita escribir la URL en `vercel.json`, pero agrega una función edge. Por ahora la URL va en el archivo; hoy es el marcador `REEMPLAZAR-IP`, que hay que reemplazar por la IP del VPS.
+- **Middleware de Vercel que lea `BACKEND_URL` de las variables del proyecto:** evita escribir la URL en `vercel.json`, pero agrega una función edge. Por ahora las URLs van en el archivo: una regla `missing` por host manda a develop todo lo que no sea un dominio de producción (ver `docs/deploy.md`).
 
 ## Consecuencias
 
 - **Cambiar la IP o el dominio del backend exige editar `frontend/vercel.json`** y redesplegar en Vercel.
-- **El backend sigue accesible directamente en `api.<ip>.sslip.io`,** que también sirve la PWA. Si se quiere que solo responda a Vercel, se puede agregar un secreto que Vercel envíe en cada reenvío; Vercel lo permite con `routes` y `transforms`.
+- **El backend sigue accesible directamente en su dominio `sslip.io`,** que también sirve la PWA. Si se quiere que solo responda a Vercel, se puede agregar un secreto que Vercel envíe en cada reenvío; Vercel lo permite con `routes` y `transforms`.
 - **El canal en vivo se renueva cada ~2 minutos** cuando pasa por Vercel. Es invisible para el usuario.
