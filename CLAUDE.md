@@ -84,6 +84,12 @@ Plataforma de **planificación de saca** para **Avícola 2** (taller universitar
 - **Cambiar o restablecer la contraseña, o desactivar la cuenta, sube `token_version`.**
 - **Cuentas detrás de puertos** (`SellerRepository`, `AccountsGateway`): la app será un módulo de ARIS.
 
+**Notificaciones y tiempo real** ([ADR 0006](docs/adr/0006-notificaciones-y-tiempo-real.md))
+- **Notificaciones reales, guardadas en `np_notifications`;** nada de avisos fijos del mockup.
+- **Tiempo real por SSE (`/api/events`), solo para avisar que algo cambió;** los datos siempre por la API REST.
+- **Se publica por el puerto `EventPublisher`.** El bus en memoria vale para 1 proceso; con varios, cambiar el adaptador (Redis o Postgres LISTEN/NOTIFY).
+- **No usar `window.confirm()`/`alert()`:** algunos navegadores embebidos los bloquean. Usar `ConfirmDialog`.
+
 **Proceso**
 - **El flujo As-Is no está confirmado.** No acoplar la lógica a un orden de pasos. Ante una duda, elegir la opción más simple, dejarla configurable y registrarla en `docs/assumptions.md` o en un ADR.
 - **Mantener independientes ingesta, ML y app**, de modo que se pueda rehacer una sin tocar las otras.

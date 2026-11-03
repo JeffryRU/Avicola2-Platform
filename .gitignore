@@ -37,8 +37,9 @@ backend/models/*
 .DS_Store
 Thumbs.db
 
-# Claude Code (configuración local)
-.claude/settings.local.json
+# Claude Code: configuración e instrucciones solo locales (no se versionan)
+.claude/
+CLAUDE.md
 
 # Frontend (PWA)
 frontend/dev-dist/
