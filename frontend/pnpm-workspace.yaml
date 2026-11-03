@@ -1,0 +1,3 @@
+allowBuilds:
+  # El postinstall de core-js (dependencia de jspdf) solo imprime un mensaje: no hace falta.
+  core-js: false

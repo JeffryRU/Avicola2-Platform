@@ -14,10 +14,15 @@ import { HttpNotificationsGateway } from '@/modules/notifications/infrastructure
 import { SseEventStream } from '@/modules/notifications/infrastructure/sse-event-stream'
 import { HttpAuthGateway } from '@/modules/auth/infrastructure/http-auth-gateway'
 import { StoredSessionRepository } from '@/modules/auth/infrastructure/stored-session-repository'
-import type { DraftRepository, FileSaver, PlanningGateway, SubmissionQueue } from '@/modules/planning/application/ports'
+import type {
+  DraftRepository,
+  PlanningGateway,
+  SubmissionQueue,
+  TableExporter,
+} from '@/modules/planning/application/ports'
 import { PlanningService } from '@/modules/planning/application/planning-service'
-import { BrowserFileSaver } from '@/modules/planning/infrastructure/file-download'
 import { HttpPlanningGateway } from '@/modules/planning/infrastructure/http-planning-gateway'
+import { BrowserTableExporter } from '@/modules/planning/infrastructure/table-exporter'
 import { StoredDraftRepository, StoredSubmissionQueue } from '@/modules/planning/infrastructure/stored-repositories'
 
 /** Lo que la interfaz puede usar: solo casos de uso y puertos, nunca adaptadores concretos. */
@@ -29,7 +34,7 @@ export interface Container {
   drafts: DraftRepository
   notifications: NotificationsGateway
   events: EventStream
-  files: FileSaver
+  exporter: TableExporter
   preferences: KeyValueStore
   errors: ErrorReporter
   accounts: AccountsGateway
@@ -71,7 +76,7 @@ export function createContainer(): Container {
     drafts,
     notifications: new HttpNotificationsGateway(http),
     events: new SseEventStream(`${baseUrl}/events`),
-    files: new BrowserFileSaver(),
+    exporter: new BrowserTableExporter(),
     preferences: local,
     errors,
     accounts: new HttpAccountsGateway(http),

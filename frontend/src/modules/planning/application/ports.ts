@@ -10,6 +10,7 @@ import type {
   Suggestion,
 } from '@/modules/planning/domain/schemas'
 import type { Seller } from '@/modules/auth/domain/session'
+import type { ExportFormat, ExportTable } from '@/modules/planning/domain/export'
 
 export interface DateRange {
   from: IsoDate
@@ -41,7 +42,7 @@ export interface DraftRepository {
   clear(): void
 }
 
-/** Guarda un archivo generado por la app (p. ej. el CSV de proyecciones). */
-export interface FileSaver {
-  save(fileName: string, content: string): void
+/** Exporta una tabla a un archivo (CSV, Excel o PDF) y lo descarga. */
+export interface TableExporter {
+  export(table: ExportTable, format: ExportFormat, fileBase: string): Promise<void>
 }

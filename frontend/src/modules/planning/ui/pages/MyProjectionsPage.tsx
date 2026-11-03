@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, Clock, Download, Package, Plus, Scale, Send } from 'lucide-react'
+import { ChevronRight, Clock, Package, Plus, Scale } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
@@ -20,8 +20,9 @@ import { nf0, nf1 } from '@/core/domain/format'
 import { useRequiredSession } from '@/modules/auth/ui/use-session'
 import { versusReal, weekAgg, type MyDay } from '@/modules/planning/domain/aggregation'
 import { sumUnits, type Catalog } from '@/modules/planning/domain/catalog'
-import { projectionsCsv } from '@/modules/planning/domain/csv'
+import { projectionsTable, type ExportFormat } from '@/modules/planning/domain/export'
 import { Segmented } from '@/modules/planning/ui/components/dashboard'
+import { ExportMenu } from '@/modules/planning/ui/components/export-menu'
 import { useCatalog, useMyDays, useQueue, useWindowData } from '@/modules/planning/ui/hooks'
 import { StatusBadge } from '@/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/ui/components/layout'
@@ -95,7 +96,7 @@ export function MyProjectionsPage() {
   const { seller } = useRequiredSession()
   const data = useWindowData()
   const queue = useQueue().filter((q) => q.seller === seller.username)
-  const { planning, files } = useContainer()
+  const { planning, exporter } = useContainer()
   const client = useQueryClient()
   const mobile = useIsMobile()
   const navigate = useNavigate()
@@ -111,12 +112,17 @@ export function MyProjectionsPage() {
     )
   }
 
-  function exportCsv() {
+  async function exportAs(format: ExportFormat) {
     if (!catalog) return
-    const list = [...days.values()]
-    files.save(`proyecciones_${today()}.csv`, projectionsCsv(list, catalog))
-    toast.success(`CSV descargado (${list.reduce((s, d) => s + catalog.of(d.category).length, 0)} filas)`)
+    const table = projectionsTable([...days.values()], catalog, seller.name, new Date())
+    try {
+      await exporter.export(table, format, `proyecciones_${seller.username}_${today()}`)
+      toast.success(`Archivo descargado (${table.rows.length} filas)`)
+    } catch {
+      toast.error('No se pudo generar el archivo. Inténtalo de nuevo.')
+    }
   }
+  const nothing = days.size === 0
 
   return (
     <div>
@@ -124,37 +130,29 @@ export function MyProjectionsPage() {
         title="Mis proyecciones"
         subtitle={mobile ? undefined : 'Tus proyecciones confirmadas y pendientes por día.'}
         actions={
-          <Button asChild className="h-[46px] rounded-xl font-bold">
-            <Link to={paths.register}>
-              <Plus /> Nueva proyección
-            </Link>
-          </Button>
+          <div className="flex gap-2.5">
+            <ExportMenu onExport={exportAs} disabled={!catalog || nothing} />
+            <Button asChild className="h-[46px] rounded-xl font-bold">
+              <Link to={paths.register}>
+                <Plus /> Nueva proyección
+              </Link>
+            </Button>
+          </div>
         }
+        mobileActions={<ExportMenu compact onExport={exportAs} disabled={!catalog || nothing} />}
       />
       <PageBody>
-        <div className="mb-3.5 flex flex-wrap items-center gap-3.5 rounded-[14px] bg-card px-3.5 py-2.5 text-[13.5px] text-ink-2 shadow-card">
-          <span className="flex flex-1 flex-wrap items-center gap-1.5">
-            <Send className="size-4" /> Destino: <b>Base de datos</b>
-            {queue.length > 0 && (
-              <>
-                {' '}
-                · <b className="text-warn">{queue.length} por sincronizar</b>
-              </>
-            )}
-          </span>
-          {queue.length > 0 && (
-            <button type="button" className="font-bold text-primary hover:underline" onClick={retry}>
+        {queue.length > 0 && (
+          <div className="mb-3.5 flex flex-wrap items-center gap-3 rounded-[14px] bg-warn-soft px-3.5 py-2.5 text-[13.5px] text-warn">
+            <b className="flex-1">
+              {queue.length} {queue.length === 1 ? 'envío por sincronizar' : 'envíos por sincronizar'} en este
+              dispositivo
+            </b>
+            <button type="button" className="font-bold hover:underline" onClick={retry}>
               Reintentar
             </button>
-          )}
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 font-bold text-primary hover:underline"
-            onClick={exportCsv}
-          >
-            <Download className="size-[15px]" /> Exportar CSV
-          </button>
-        </div>
+          </div>
+        )}
         <Segmented
           full
           className="mb-3.5 max-w-[420px]"

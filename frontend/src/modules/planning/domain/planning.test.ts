@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { addDays, daysText, weekStart } from '@/core/domain/dates'
-import { myDays, versusReal, weekAgg } from '@/modules/planning/domain/aggregation'
+import { myDays, versusReal, weekAgg, type MyDay } from '@/modules/planning/domain/aggregation'
 import { Catalog } from '@/modules/planning/domain/catalog'
 import { emptyDays, newDraft, parseCell, submittableDraft } from '@/modules/planning/domain/draft'
+import { projectionsTable, tableToCsv } from '@/modules/planning/domain/export'
 import type { Projection, Submission } from '@/modules/planning/domain/schemas'
 
 const catalog = new Catalog([
@@ -92,5 +93,49 @@ describe('agregados', () => {
     ]
     const mine = myDays(projections, queue, 'ana').get(ws)
     expect(mine).toMatchObject({ sync: 'pending', units: { B2: 1 } })
+  })
+})
+
+describe('exportación', () => {
+  const days: MyDay[] = [
+    {
+      date: '2026-11-04',
+      category: 'BRASA',
+      units: { B1: 10 },
+      submittedAt: '2026-11-03T08:30:00Z',
+      sync: 'ok' as const,
+    },
+    { date: '2026-11-03', category: 'BRASA', units: { B2: 2 }, submittedAt: '', sync: 'pending' as const },
+  ]
+
+  it('arma una fila por día y producto, ordenada por fecha, con kg y estado', () => {
+    const table = projectionsTable(days, catalog, 'Juan Pérez', new Date('2026-11-03T12:00:00'))
+    expect(table.columns.map((c) => c.label)).toContain('Kg por unidad')
+    expect(table.rows).toHaveLength(4) // 2 días × 2 productos BRASA
+    expect(table.rows[0]).toEqual(['2026-11-03', 'Mar', 'BRASA', 'B1', 'Brasa 1', 1.2, 0, 0, 'Por sincronizar', ''])
+    expect(table.rows[3]).toEqual([
+      '2026-11-04',
+      'Mié',
+      'BRASA',
+      'B2',
+      'Brasa 2',
+      1.5,
+      0,
+      0,
+      'Sincronizada',
+      '2026-11-03 08:30',
+    ])
+    expect(table.rows[2][7]).toBe(12) // 10 unidades × 1,2 kg
+  })
+
+  it('el CSV lleva BOM y escapa comillas', () => {
+    const csv = tableToCsv({
+      title: '',
+      subtitle: '',
+      columns: [{ label: 'Producto', width: 5 }],
+      rows: [['Pollo "entero"']],
+    })
+    expect(csv.startsWith('\uFEFF"Producto"')).toBe(true)
+    expect(csv).toContain('"Pollo ""entero"""')
   })
 })
