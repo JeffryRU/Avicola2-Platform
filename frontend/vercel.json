@@ -7,7 +7,17 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://api.REEMPLAZAR-IP.sslip.io/api/:path*"
+      "missing": [
+        {
+          "type": "host",
+          "value": "avicola2-platform(-git-main)?(-jeffry25ru-gmailcoms-projects)?\\.vercel\\.app"
+        }
+      ],
+      "destination": "https://avicola-dev.13-140-234-184.sslip.io/api/:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://avicola.13-140-234-184.sslip.io/api/:path*"
     },
     {
       "source": "/((?!api/|assets/).*)",
