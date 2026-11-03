@@ -4,14 +4,17 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
-/** Arquitectura hexagonal: cada capa solo importa hacia adentro (ver docs/adr/0004). */
+/**
+ * Features (screaming) con capas hexagonales dentro: cada capa solo importa hacia adentro.
+ * Ver docs/adr/0004 y docs/adr/0007.
+ */
 const layer = (files, patterns, message) => ({
   files,
   rules: { 'no-restricted-imports': ['error', { patterns: [{ group: patterns, message }] }] },
 })
 
 export default tseslint.config(
-  { ignores: ['dist', 'dev-dist', 'src/ui/components/shadcn'] },
+  { ignores: ['dist', 'dev-dist', 'src/shared/ui/components/shadcn'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
@@ -22,6 +25,11 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
+  layer(
+    ['src/**/types/**'],
+    ['react', 'react-*', '@tanstack/*', '**/application/**', '**/infrastructure/**', '**/ui/**', '@/app/*'],
+    'types/ es vocabulario puro (tipos, nombres y textos): no importa React ni otras capas.',
+  ),
   layer(
     ['src/**/domain/**'],
     ['react', 'react-*', '@tanstack/*', '**/application/**', '**/infrastructure/**', '**/ui/**', '@/app/*'],
@@ -38,7 +46,7 @@ export default tseslint.config(
     'Los adaptadores no conocen la interfaz.',
   ),
   layer(
-    ['src/ui/**', 'src/modules/*/ui/**'],
+    ['src/shared/ui/**', 'src/features/*/ui/**'],
     ['**/infrastructure/**'],
     'La interfaz usa casos de uso y puertos (vía useContainer), nunca adaptadores concretos.',
   ),

@@ -16,12 +16,12 @@ import { NavLink, Outlet, useLocation } from 'react-router'
 import { useContainer } from '@/app/di'
 import { InstallBanner } from '@/app/install'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
-import { initials } from '@/core/domain/format'
-import { isSupervisor, roleLabel } from '@/modules/auth/domain/session'
-import { useRequiredSession } from '@/modules/auth/ui/use-session'
-import { useUnreadCount } from '@/modules/notifications/ui/hooks'
-import { Logo } from '@/ui/components/brand'
-import { cn } from '@/ui/lib/utils'
+import { initials } from '@/shared/domain/format'
+import { isSupervisor, roleLabel } from '@/features/auth/domain/session'
+import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { useUnreadCount } from '@/features/notifications/ui/hooks'
+import { Logo } from '@/shared/ui/components/brand'
+import { cn } from '@/shared/ui/lib/utils'
 
 const itemCls = (active: boolean) =>
   cn(

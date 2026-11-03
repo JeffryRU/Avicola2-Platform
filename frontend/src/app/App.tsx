@@ -7,54 +7,54 @@ import { AppShell } from '@/app/AppShell'
 import type { Container } from '@/app/container'
 import { ContainerProvider, useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
-import { isSupervisor } from '@/modules/auth/domain/session'
-import { ForcedPasswordChange } from '@/modules/auth/ui/ChangePasswordPage'
-import { LoginPage } from '@/modules/auth/ui/LoginPage'
-import { useRealtime } from '@/modules/notifications/ui/hooks'
-import { useSession } from '@/modules/auth/ui/use-session'
-import { BrandProvider, type BrandId } from '@/ui/components/brand'
-import { ErrorBoundary } from '@/ui/components/error-boundary'
-import { Splash } from '@/ui/components/feedback'
-import { Toaster } from '@/ui/components/shadcn/sonner'
+import { isSupervisor } from '@/features/auth/domain/session'
+import { ForcedPasswordChange } from '@/features/auth/ui/ChangePasswordPage'
+import { LoginPage } from '@/features/auth/ui/LoginPage'
+import { useRealtime } from '@/features/notifications/ui/hooks'
+import { useSession } from '@/features/auth/ui/use-session'
+import { BrandProvider, type BrandId } from '@/shared/ui/components/brand'
+import { ErrorBoundary } from '@/shared/ui/components/error-boundary'
+import { Splash } from '@/shared/ui/components/feedback'
+import { Toaster } from '@/shared/ui/components/shadcn/sonner'
 
 /** Pantallas cargadas a demanda: el celular descarga solo lo que abre. */
-const AccountsPage = lazy(() => import('@/modules/accounts/ui/AccountsPage').then((m) => ({ default: m.AccountsPage })))
+const AccountsPage = lazy(() => import('@/features/accounts/ui/AccountsPage').then((m) => ({ default: m.AccountsPage })))
 const ChangePasswordPage = lazy(() =>
-  import('@/modules/auth/ui/ChangePasswordPage').then((m) => ({ default: m.ChangePasswordPage })),
+  import('@/features/auth/ui/ChangePasswordPage').then((m) => ({ default: m.ChangePasswordPage })),
 )
 const ConnectionPage = lazy(() =>
-  import('@/modules/planning/ui/pages/ConnectionPage').then((m) => ({ default: m.ConnectionPage })),
+  import('@/features/connection/ui/pages/ConnectionPage').then((m) => ({ default: m.ConnectionPage })),
 )
 const DashboardStatusPage = lazy(() =>
-  import('@/modules/planning/ui/pages/DashboardStatusPage').then((m) => ({ default: m.DashboardStatusPage })),
+  import('@/features/dashboards/ui/pages/DashboardStatusPage').then((m) => ({ default: m.DashboardStatusPage })),
 )
 const DashboardSummaryPage = lazy(() =>
-  import('@/modules/planning/ui/pages/DashboardSummaryPage').then((m) => ({ default: m.DashboardSummaryPage })),
+  import('@/features/dashboards/ui/pages/DashboardSummaryPage').then((m) => ({ default: m.DashboardSummaryPage })),
 )
 const DashboardVersusPage = lazy(() =>
-  import('@/modules/planning/ui/pages/DashboardVersusPage').then((m) => ({ default: m.DashboardVersusPage })),
+  import('@/features/dashboards/ui/pages/DashboardVersusPage').then((m) => ({ default: m.DashboardVersusPage })),
 )
 const DayDetailPage = lazy(() =>
-  import('@/modules/planning/ui/pages/DayDetailPage').then((m) => ({ default: m.DayDetailPage })),
+  import('@/features/projections/ui/pages/DayDetailPage').then((m) => ({ default: m.DayDetailPage })),
 )
-const HomePage = lazy(() => import('@/modules/planning/ui/pages/HomePage').then((m) => ({ default: m.HomePage })))
+const HomePage = lazy(() => import('@/features/home/ui/pages/HomePage').then((m) => ({ default: m.HomePage })))
 const MyProjectionsPage = lazy(() =>
-  import('@/modules/planning/ui/pages/MyProjectionsPage').then((m) => ({ default: m.MyProjectionsPage })),
+  import('@/features/projections/ui/pages/MyProjectionsPage').then((m) => ({ default: m.MyProjectionsPage })),
 )
 const NewProjectionPage = lazy(() =>
-  import('@/modules/planning/ui/pages/NewProjectionPage').then((m) => ({ default: m.NewProjectionPage })),
+  import('@/features/projections/ui/pages/NewProjectionPage').then((m) => ({ default: m.NewProjectionPage })),
 )
 const NotificationsPage = lazy(() =>
-  import('@/modules/notifications/ui/NotificationsPage').then((m) => ({ default: m.NotificationsPage })),
+  import('@/features/notifications/ui/NotificationsPage').then((m) => ({ default: m.NotificationsPage })),
 )
 const ProductsPage = lazy(() =>
-  import('@/modules/planning/ui/pages/ProductsPage').then((m) => ({ default: m.ProductsPage })),
+  import('@/features/catalog/ui/pages/ProductsPage').then((m) => ({ default: m.ProductsPage })),
 )
 const ProfilePage = lazy(() =>
-  import('@/modules/planning/ui/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
+  import('@/features/profile/ui/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
 )
 const SuccessPage = lazy(() =>
-  import('@/modules/planning/ui/pages/SuccessPage').then((m) => ({ default: m.SuccessPage })),
+  import('@/features/projections/ui/pages/SuccessPage').then((m) => ({ default: m.SuccessPage })),
 )
 
 const queryClient = new QueryClient({

@@ -3,9 +3,9 @@ import { Download, PlusSquare, Share, Smartphone, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
-import type { InstallState } from '@/core/application/ports'
-import { BRANDS, BrandMark, useBrand } from '@/ui/components/brand'
-import { Button } from '@/ui/components/shadcn/button'
+import type { InstallState } from '@/shared/application/ports'
+import { BRANDS, BrandMark, useBrand } from '@/shared/ui/components/brand'
+import { Button } from '@/shared/ui/components/shadcn/button'
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/ui/components/shadcn/dialog'
+} from '@/shared/ui/components/shadcn/dialog'
 
 const SNOOZE_KEY = 'nv_install_snooze_until'
 const SNOOZE_DAYS = 14

@@ -1,35 +1,40 @@
-import { ErrorReporter } from '@/core/application/error-reporter'
-import type { AppInstaller, KeyValueStore } from '@/core/application/ports'
-import { BrowserAppInstaller } from '@/core/infrastructure/browser-app-installer'
-import { BrowserStore } from '@/core/infrastructure/browser-store'
-import { clearCachedApiData } from '@/core/infrastructure/cached-data'
-import { FetchHttpClient } from '@/core/infrastructure/fetch-http-client'
-import { installGlobalErrorCapture } from '@/core/infrastructure/global-error-capture'
-import { HttpLogSink } from '@/core/infrastructure/http-log-sink'
-import type { AccountsGateway } from '@/modules/accounts/application/ports'
-import { HttpAccountsGateway } from '@/modules/accounts/infrastructure/http-accounts-gateway'
-import { AuthService } from '@/modules/auth/application/auth-service'
-import type { EventStream, NotificationsGateway } from '@/modules/notifications/application/ports'
-import { HttpNotificationsGateway } from '@/modules/notifications/infrastructure/http-notifications-gateway'
-import { SseEventStream } from '@/modules/notifications/infrastructure/sse-event-stream'
-import { HttpAuthGateway } from '@/modules/auth/infrastructure/http-auth-gateway'
-import { StoredSessionRepository } from '@/modules/auth/infrastructure/stored-session-repository'
-import type {
-  DraftRepository,
-  PlanningGateway,
-  SubmissionQueue,
-  TableExporter,
-} from '@/modules/planning/application/ports'
-import { PlanningService } from '@/modules/planning/application/planning-service'
-import { HttpPlanningGateway } from '@/modules/planning/infrastructure/http-planning-gateway'
-import { BrowserTableExporter } from '@/modules/planning/infrastructure/table-exporter'
-import { StoredDraftRepository, StoredSubmissionQueue } from '@/modules/planning/infrastructure/stored-repositories'
+import { ErrorReporter } from '@/shared/application/error-reporter'
+import type { AppInstaller, KeyValueStore } from '@/shared/application/ports'
+import { BrowserAppInstaller } from '@/shared/infrastructure/browser-app-installer'
+import { BrowserStore } from '@/shared/infrastructure/browser-store'
+import { clearCachedApiData } from '@/shared/infrastructure/cached-data'
+import { FetchHttpClient } from '@/shared/infrastructure/fetch-http-client'
+import { installGlobalErrorCapture } from '@/shared/infrastructure/global-error-capture'
+import { HttpLogSink } from '@/shared/infrastructure/http-log-sink'
+import type { AccountsGateway } from '@/features/accounts/application/ports'
+import { HttpAccountsGateway } from '@/features/accounts/infrastructure/http-accounts-gateway'
+import { AuthService } from '@/features/auth/application/auth-service'
+import type { EventStream, NotificationsGateway } from '@/features/notifications/application/ports'
+import { HttpNotificationsGateway } from '@/features/notifications/infrastructure/http-notifications-gateway'
+import { SseEventStream } from '@/features/notifications/infrastructure/sse-event-stream'
+import { HttpAuthGateway } from '@/features/auth/infrastructure/http-auth-gateway'
+import { StoredSessionRepository } from '@/features/auth/infrastructure/stored-session-repository'
+import type { DraftRepository, ProjectionsGateway, SubmissionQueue } from '@/features/projections/application/ports'
+import type { TableExporter } from '@/shared/application/ports'
+import { PlanningService } from '@/features/projections/application/planning-service'
+import { HttpProjectionsGateway } from '@/features/projections/infrastructure/http-projections-gateway'
+import type { CatalogGateway } from '@/features/catalog/application/ports'
+import { HttpCatalogGateway } from '@/features/catalog/infrastructure/http-catalog-gateway'
+import type { StatusGateway } from '@/features/connection/application/ports'
+import { HttpStatusGateway } from '@/features/connection/infrastructure/http-status-gateway'
+import type { SellersGateway } from '@/features/dashboards/application/ports'
+import { HttpSellersGateway } from '@/features/dashboards/infrastructure/http-sellers-gateway'
+import { BrowserTableExporter } from '@/shared/infrastructure/table-exporter'
+import { StoredDraftRepository, StoredSubmissionQueue } from '@/features/projections/infrastructure/stored-repositories'
 
 /** Lo que la interfaz puede usar: solo casos de uso y puertos, nunca adaptadores concretos. */
 export interface Container {
   auth: AuthService
   planning: PlanningService
-  gateway: PlanningGateway
+  catalog: CatalogGateway
+  projections: ProjectionsGateway
+  sellers: SellersGateway
+  status: StatusGateway
   queue: SubmissionQueue
   drafts: DraftRepository
   notifications: NotificationsGateway
@@ -66,13 +71,16 @@ export function createContainer(): Container {
     return clearCachedApiData()
   }
   auth = new AuthService(new HttpAuthGateway(http), new StoredSessionRepository(local, tab), cleanup)
-  const gateway = new HttpPlanningGateway(http)
+  const projections = new HttpProjectionsGateway(http)
   const queue = new StoredSubmissionQueue(local)
   return {
     auth,
-    gateway,
+    catalog: new HttpCatalogGateway(http),
+    projections,
+    sellers: new HttpSellersGateway(http),
+    status: new HttpStatusGateway(http),
     queue,
-    planning: new PlanningService(gateway, queue, () => crypto.randomUUID()),
+    planning: new PlanningService(projections, queue, () => crypto.randomUUID()),
     drafts,
     notifications: new HttpNotificationsGateway(http),
     events: new SseEventStream(`${baseUrl}/events`),
