@@ -96,7 +96,7 @@ Si la PWA se publica en Vercel y el backend queda en el VPS ([ADR 0007](adr/0007
 
    Si cambia la IP, el dominio o el nombre del proyecto en Vercel, edita la expresión regular de `missing` y los dos destinos.
 2. **En Vercel → Add New Project:** el repositorio, con **Root Directory** `frontend`. Vercel toma de `vercel.json` el comando `pnpm build` y la salida `dist`. Producción sigue la rama `main`; la rama `develop` se publica como vista previa en `avicola2-platform-git-develop-<equipo>.vercel.app`.
-3. **Variable del proyecto en Vercel:** `ENABLE_EXPERIMENTAL_COREPACK=1` (en Production y Preview), para que use la versión de pnpm de `package.json`.
+3. **Versión de pnpm:** `vercel.json` instala y compila con la versión exacta de `packageManager` (`npx pnpm@<versión>`), porque el pnpm por defecto de Vercel no lee el lockfile de pnpm 12 (`ERR_PNPM_BROKEN_LOCKFILE`) y corepack no siempre detecta `packageManager`. No hace falta `ENABLE_EXPERIMENTAL_COREPACK`.
 4. **`TRUSTED_ORIGINS` en cada backend (Coolify)**, y redespliega. Sin esto, el backend rechaza el login reenviado por Vercel ("Origen no permitido").
    - Producción: los dominios exactos de producción, separados por coma.
    - Develop: `https://avicola2-platform-*-<equipo>.vercel.app` (comodín para `develop` y las vistas previas).
