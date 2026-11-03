@@ -1,5 +1,6 @@
 import { ErrorReporter } from '@/core/application/error-reporter'
-import type { KeyValueStore } from '@/core/application/ports'
+import type { AppInstaller, KeyValueStore } from '@/core/application/ports'
+import { BrowserAppInstaller } from '@/core/infrastructure/browser-app-installer'
 import { BrowserStore } from '@/core/infrastructure/browser-store'
 import { clearCachedApiData } from '@/core/infrastructure/cached-data'
 import { FetchHttpClient } from '@/core/infrastructure/fetch-http-client'
@@ -32,6 +33,7 @@ export interface Container {
   preferences: KeyValueStore
   errors: ErrorReporter
   accounts: AccountsGateway
+  installer: AppInstaller
 }
 
 /** Raíz de composición del frontend: el único lugar que conoce los adaptadores. */
@@ -73,5 +75,6 @@ export function createContainer(): Container {
     preferences: local,
     errors,
     accounts: new HttpAccountsGateway(http),
+    installer: new BrowserAppInstaller(),
   }
 }

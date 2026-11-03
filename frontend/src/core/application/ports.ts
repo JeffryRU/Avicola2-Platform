@@ -35,3 +35,19 @@ export interface LogSink {
   /** Envío de último momento al cerrar la página (sin esperar respuesta). */
   sendOnExit(entries: ClientLogEntry[]): boolean
 }
+
+/**
+ * Instalación de la PWA en el dispositivo.
+ * - `available`: el navegador ofrece instalarla (Android, Chrome, Edge).
+ * - `ios`: iPhone/iPad, se instala a mano (Compartir → Agregar a inicio).
+ * - `installed`: ya se abre como app.
+ * - `unavailable`: el navegador no lo permite.
+ */
+export type InstallState = 'available' | 'ios' | 'installed' | 'unavailable'
+
+export interface AppInstaller {
+  state(): InstallState
+  subscribe(listener: () => void): () => void
+  /** Muestra el diálogo del navegador; true si la persona aceptó. */
+  install(): Promise<boolean>
+}

@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
 import { credentialsSchema } from '@/modules/auth/domain/session'
+import { LoginShowcase } from '@/modules/auth/ui/LoginShowcase'
 import { BRANDS, BrandMark, useBrand } from '@/ui/components/brand'
 import { Button } from '@/ui/components/shadcn/button'
 import { Input } from '@/ui/components/shadcn/input'
@@ -58,14 +59,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
 
   return (
     <div className="grid min-h-dvh bg-background dsk:grid-cols-[1.1fr_1fr]">
-      <div className="relative hidden overflow-hidden bg-head dsk:block">
-        <div className="absolute right-12 bottom-12 left-12 z-10 text-white">
-          <h2 className="max-w-[14ch] text-[34px] font-extrabold">Planifica la demanda de cada día</h2>
-          <p className="mt-2 max-w-[42ch] opacity-90">
-            Registra tu proyección por producto y compárala con la venta real de la semana.
-          </p>
-        </div>
-      </div>
+      <LoginShowcase />
       <div className="flex items-start justify-center px-5 pt-24 pb-8 dsk:items-center dsk:pt-8">
         <form
           key={shakeKey}

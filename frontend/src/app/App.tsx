@@ -188,7 +188,14 @@ Componentes:${componentStack}`
             <BrowserRouter>
               <Routed />
             </BrowserRouter>
-            <Toaster position="bottom-center" offset={96} mobileOffset={{ bottom: 96 }} />
+            {/* Avisos arriba a la derecha; en el celular, arriba (respetando la muesca). */}
+            <Toaster
+              position="top-right"
+              offset={{ top: 20, right: 20 }}
+              mobileOffset={{ top: 'calc(10px + env(safe-area-inset-top))', left: 12, right: 12 }}
+              closeButton
+              visibleToasts={4}
+            />
           </BrandProvider>
         </QueryClientProvider>
       </ContainerProvider>

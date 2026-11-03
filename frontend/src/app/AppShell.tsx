@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { useContainer } from '@/app/di'
+import { InstallBanner } from '@/app/install'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
 import { initials } from '@/core/domain/format'
 import { isSupervisor, roleLabel } from '@/modules/auth/domain/session'
@@ -206,6 +207,8 @@ export function AppShell() {
         </div>
       </main>
       {!flow && <BottomNav />}
+      {/* Aviso de instalación solo en la pantalla de entrada de cada rol. */}
+      {(pathname === paths.home || pathname === paths.dashSummary) && <InstallBanner />}
     </div>
   )
 }

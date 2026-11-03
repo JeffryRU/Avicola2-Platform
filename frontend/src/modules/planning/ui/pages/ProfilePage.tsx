@@ -1,6 +1,7 @@
 import { ChevronRight, KeyRound, Layers, LogOut, Send } from 'lucide-react'
 import { Link } from 'react-router'
 import { useContainer } from '@/app/di'
+import { InstallOption } from '@/app/install'
 import { paths } from '@/app/routes'
 import { initials } from '@/core/domain/format'
 import { roleLabel } from '@/modules/auth/domain/session'
@@ -69,6 +70,7 @@ export function ProfilePage({ onBrandChange }: { onBrandChange: () => void }) {
               ))}
             </div>
           </div>
+          <InstallOption className={optCls} />
           <Link to={paths.password} className={optCls}>
             <span className={cn(tileCls, 'bg-warn-soft text-warn')}>
               <KeyRound />

@@ -15,7 +15,6 @@ import { Button } from '@/ui/components/shadcn/button'
 import { cn } from '@/ui/lib/utils'
 
 /** Hora límite para confirmar la proyección del día (mensaje informativo del mockup). */
-const DEADLINE = '10:00 a. m.'
 
 export function HomePage() {
   const { seller } = useRequiredSession()
@@ -82,7 +81,7 @@ export function HomePage() {
             <div className="min-w-0 flex-1">
               <b>Tu proyección de hoy está pendiente.</b>
               <br />
-              Confírmala antes de las {DEADLINE} para que entre a producción.
+              Confírmala para que entre a la planificación de producción.
             </div>
             <Button
               className="h-10 w-full font-bold dsk:w-auto"
