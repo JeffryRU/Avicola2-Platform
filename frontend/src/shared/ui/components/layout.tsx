@@ -85,34 +85,40 @@ export function Kpi({
   extra?: ReactNode
   index?: number
 }) {
+  // Angosta (celular, 4 por fila): todo centrado y apilado. Ancha: ícono a la izquierda y texto al lado.
+  // El gráfico (extra) ocupa el lugar del ícono, así todas las tarjetas siguen el mismo orden.
+  const badge =
+    extra ??
+    (icon && (
+      <div
+        className={cn(
+          'grid size-12 place-items-center rounded-2xl @[16rem]:size-[58px] [&>svg]:size-6 @[16rem]:[&>svg]:size-7',
+          tone,
+        )}
+      >
+        {icon}
+      </div>
+    ))
   return (
     <div
-      className="@container relative animate-rise rounded-[18px] bg-card shadow-card dsk:min-h-[118px]"
+      className="@container animate-rise rounded-[18px] bg-card shadow-card dsk:min-h-[118px]"
       style={{ animationDelay: `${index * 0.06}s` }}
     >
-      <div className="flex h-full flex-col items-start gap-2.5 p-3.5 dsk:p-5 @[16rem]:flex-row @[16rem]:items-center @[16rem]:gap-4">
-        {!extra && icon && (
-          <div
-            className={cn(
-              'grid size-10 flex-none place-items-center rounded-xl @[16rem]:size-[58px] @[16rem]:rounded-2xl [&>svg]:size-5 @[16rem]:[&>svg]:size-7',
-              tone,
-            )}
-          >
-            {icon}
-          </div>
-        )}
-        <div className={cn('w-full min-w-0 flex-1', extra && 'pr-[58px] @[16rem]:pr-0')}>
-          <span className="block text-[14.5px] leading-snug font-semibold text-ink-2">{label}</span>
-          <b className="mt-0.5 block text-[21px] font-extrabold tracking-[-0.03em] whitespace-nowrap @[16rem]:text-[25px] @[20rem]:text-[28px]">
+      <div className="flex h-full flex-col items-center justify-center gap-2.5 p-4 text-center dsk:p-5 @[16rem]:flex-row @[16rem]:justify-start @[16rem]:gap-4 @[16rem]:text-left">
+        {badge && <div className="flex-none">{badge}</div>}
+        <div className="w-full min-w-0 @[16rem]:flex-1">
+          <span className="block text-[14px] leading-snug font-semibold text-ink-2 @[16rem]:text-[14.5px]">
+            {label}
+          </span>
+          <b className="mt-1 block text-[22px] leading-tight font-extrabold tracking-[-0.03em] whitespace-nowrap @[16rem]:text-[25px] @[20rem]:text-[28px]">
             {value}
           </b>
           {foot && (
-            <small className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground">
+            <small className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground @[16rem]:justify-start">
               {foot}
             </small>
           )}
         </div>
-        {extra && <div className="absolute top-2.5 right-2.5 @[16rem]:static @[16rem]:ml-auto">{extra}</div>}
       </div>
     </div>
   )

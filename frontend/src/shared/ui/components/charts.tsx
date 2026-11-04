@@ -205,7 +205,7 @@ export function LineChart({ points, label }: { points: LinePoint[]; label: strin
 
 export function Donut({ pct }: { pct: number }) {
   return (
-    <div className="relative size-[60px] flex-none dsk:size-[72px]">
+    <div className="relative size-[60px] flex-none dsk:size-[68px]">
       <svg viewBox="0 0 84 84" className="size-full -rotate-90">
         <circle cx="42" cy="42" r="34" fill="none" stroke="var(--border)" strokeWidth="9" />
         <circle
