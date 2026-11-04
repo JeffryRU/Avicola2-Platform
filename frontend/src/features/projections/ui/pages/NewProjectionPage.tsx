@@ -88,7 +88,7 @@ export function NewProjectionPage() {
       <div>
         <PageHeader title="Nueva proyección" mobileActions={<StepPill n={1} />} actions={<StepPill n={1} />} />
         <PageBody>
-          <div className="grid gap-4 dsk:grid-cols-2">
+          <div className="grid gap-4 @3xl/main:grid-cols-2">
             <Section>
               <div className="px-4 pt-[22px] pb-4 dsk:px-5 dsk:pb-5">
                 <div className="mb-[22px]">
@@ -163,9 +163,9 @@ export function NewProjectionPage() {
             <Section
               title={`Productos: ${choiceLabel}`}
               aside={<span className="text-muted-foreground">{products.length}</span>}
-              className="hidden dsk:block"
+              className="hidden @3xl/main:block"
             >
-              <div className="px-5 pb-5">
+              <div className="overflow-x-auto px-5 pb-5">
                 <table className={tableCls.table}>
                   <thead>
                     <tr>

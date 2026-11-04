@@ -26,14 +26,14 @@ export function PageHeader({
       >
         <ChevronLeft className="size-6" strokeWidth={2.4} />
       </Link>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 dsk:flex-[1_1_auto]">
         <h1 className="text-[22px] font-extrabold tracking-[-0.02em] dsk:text-[34px] dsk:tracking-[-0.035em]">
           {title}
         </h1>
         {subtitle && <p className="mt-0.5 text-[13px] text-ink-2 dsk:mt-1.5 dsk:text-base">{subtitle}</p>}
       </div>
       {mobileActions && <div className="dsk:hidden">{mobileActions}</div>}
-      {actions && <div className="hidden dsk:block">{actions}</div>}
+      {actions && <div className="hidden max-w-full dsk:block">{actions}</div>}
     </header>
   )
 }
@@ -87,29 +87,33 @@ export function Kpi({
 }) {
   return (
     <div
-      className="relative flex animate-rise flex-wrap items-start gap-2.5 rounded-[18px] bg-card p-3.5 shadow-card dsk:min-h-[118px] dsk:flex-nowrap dsk:items-center dsk:gap-4 dsk:p-5"
+      className="@container relative animate-rise rounded-[18px] bg-card shadow-card dsk:min-h-[118px]"
       style={{ animationDelay: `${index * 0.06}s` }}
     >
-      {!extra && icon && (
-        <div
-          className={cn(
-            'grid size-10 flex-none place-items-center rounded-xl dsk:size-[58px] dsk:rounded-2xl [&>svg]:size-5 dsk:[&>svg]:size-7',
-            tone,
-          )}
-        >
-          {icon}
-        </div>
-      )}
-      <div className={cn('min-w-0 flex-1', extra && 'pr-[58px] dsk:pr-0')}>
-        <span className="block text-[14.5px] font-semibold text-ink-2">{label}</span>
-        <b className="mt-0.5 block text-[21px] font-extrabold tracking-[-0.03em] whitespace-nowrap dsk:text-[28px]">
-          {value}
-        </b>
-        {foot && (
-          <small className="mt-1.5 flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">{foot}</small>
+      <div className="flex h-full flex-col items-start gap-2.5 p-3.5 dsk:p-5 @[16rem]:flex-row @[16rem]:items-center @[16rem]:gap-4">
+        {!extra && icon && (
+          <div
+            className={cn(
+              'grid size-10 flex-none place-items-center rounded-xl @[16rem]:size-[58px] @[16rem]:rounded-2xl [&>svg]:size-5 @[16rem]:[&>svg]:size-7',
+              tone,
+            )}
+          >
+            {icon}
+          </div>
         )}
+        <div className={cn('w-full min-w-0 flex-1', extra && 'pr-[58px] @[16rem]:pr-0')}>
+          <span className="block text-[14.5px] leading-snug font-semibold text-ink-2">{label}</span>
+          <b className="mt-0.5 block text-[21px] font-extrabold tracking-[-0.03em] whitespace-nowrap @[16rem]:text-[25px] @[20rem]:text-[28px]">
+            {value}
+          </b>
+          {foot && (
+            <small className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground">
+              {foot}
+            </small>
+          )}
+        </div>
+        {extra && <div className="absolute top-2.5 right-2.5 @[16rem]:static @[16rem]:ml-auto">{extra}</div>}
       </div>
-      {extra && <div className="absolute top-2.5 right-2.5 dsk:static dsk:ml-auto">{extra}</div>}
     </div>
   )
 }

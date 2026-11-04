@@ -46,7 +46,7 @@ export function DashboardSummaryPage() {
       {mobile && <DashboardFilters />}
       <DashboardTabs />
       <PageBody>
-        <div className="mb-3 grid grid-cols-2 gap-2.5 min-[1201px]:grid-cols-4 dsk:mb-4 dsk:gap-4">
+        <div className="mb-3 grid grid-cols-2 gap-2.5 dsk:mb-4 dsk:gap-4 @4xl/main:grid-cols-4">
           <Kpi
             icon={<Package />}
             tone="bg-secondary text-primary"

@@ -26,7 +26,8 @@ export function useDashboardFilters() {
 }
 
 const boxCls =
-  'min-w-0 flex-1 rounded-[14px] bg-card px-2.5 pt-2 pb-2.5 shadow-card dsk:min-w-[220px] dsk:flex-none dsk:px-3 dsk:pt-2.5 dsk:pb-3'
+  // Dos por fila si caben sin cortar el texto; si no, uno por fila.
+  'min-w-[11rem] flex-1 rounded-[14px] bg-card px-2.5 pt-2 pb-2.5 shadow-card dsk:min-w-[220px] dsk:flex-none dsk:px-3 dsk:pt-2.5 dsk:pb-3'
 const triggerCls =
   'h-11 w-full rounded-[10px] border-[1.5px] bg-white font-semibold [&>span]:flex [&>span]:items-center [&>span]:gap-2.5'
 

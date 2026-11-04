@@ -39,7 +39,7 @@ export function DashboardVersusPage() {
       {mobile && <DashboardFilters />}
       <DashboardTabs />
       <PageBody>
-        <div className="mb-3 grid grid-cols-2 gap-2.5 min-[1201px]:grid-cols-4 dsk:mb-4 dsk:gap-4">
+        <div className="mb-3 grid grid-cols-2 gap-2.5 dsk:mb-4 dsk:gap-4 @4xl/main:grid-cols-4">
           <Kpi
             icon={<BarChart3 />}
             tone="bg-secondary text-primary"
@@ -88,7 +88,7 @@ export function DashboardVersusPage() {
             index={3}
           />
         </div>
-        <div className="grid gap-4 dsk:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <div className="grid gap-4 @7xl/main:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
           <Section
             title="Evolución semanal (kg)"
             aside={

@@ -113,13 +113,8 @@ export function SuccessPage() {
           </Section>
           <h2 className="mt-5 mb-2.5 text-left text-[19px] font-extrabold">Total por día</h2>
           <Section>
-            <div className="p-2.5">
-              <table
-                className={cn(
-                  tableCls.table,
-                  '[&_td:not(:first-child)]:text-right [&_th:not(:first-child)]:text-right',
-                )}
-              >
+            <div className="overflow-x-auto p-2.5">
+              <table className={tableCls.table}>
                 <thead>
                   <tr>
                     <th className={tableCls.th}>Fecha</th>

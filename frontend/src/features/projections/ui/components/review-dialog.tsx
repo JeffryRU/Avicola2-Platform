@@ -62,9 +62,7 @@ export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onC
           {nf0(units)} unidades<small>{kgAmount(kg, true)}</small>
         </SummaryRow>
       </div>
-      <table
-        className={`${tableCls.table} mt-2.5 mb-[18px] [&_td:not(:first-child)]:text-right [&_th:not(:first-child)]:text-right`}
-      >
+      <table className={`${tableCls.table} mt-2.5 mb-[18px]`}>
         <thead>
           <tr>
             <th className={tableCls.th}>Fecha</th>

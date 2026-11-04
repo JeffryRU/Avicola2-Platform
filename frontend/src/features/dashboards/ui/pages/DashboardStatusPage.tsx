@@ -89,7 +89,7 @@ export function DashboardStatusPage() {
           ))}
         </div>
         {node}
-        <div className="grid gap-4 dsk:grid-cols-2">
+        <div className="grid gap-4 @6xl/main:grid-cols-2">
           <Section title="Total proyectado por día (unidades)">
             <div className="px-4 pt-1.5 pb-4 dsk:px-5 dsk:pb-5">
               <BarChart

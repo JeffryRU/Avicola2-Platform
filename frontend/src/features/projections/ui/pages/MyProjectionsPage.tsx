@@ -169,7 +169,7 @@ export function MyProjectionsPage() {
         {!catalog ? null : tab === 'week' ? (
           <>
             <p className="mb-3 font-semibold text-muted-foreground">{weekLabel(current, true)}</p>
-            <div className="grid gap-3 dsk:grid-cols-2">
+            <div className="grid gap-3 @5xl/main:grid-cols-2">
               {weekDates(current).map((d, i) => (
                 <ProjectionCard key={d} date={d} day={days.get(d)} catalog={catalog} index={i} />
               ))}

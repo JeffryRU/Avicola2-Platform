@@ -6,7 +6,6 @@ import { useCatalog } from '@/features/catalog/ui/hooks'
 import { PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
 import { Input } from '@/shared/ui/components/shadcn/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
-import { cn } from '@/shared/ui/lib/utils'
 import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
 
 export function ProductsPage() {
@@ -19,7 +18,6 @@ export function ProductsPage() {
   const cat = category ?? catalog.categories[0]
   const products = catalog.of(cat)
   const selected = products.find((p) => p.id === productId) ?? products[0]
-  const right = '[&_td:not(:first-child)]:text-right [&_th:not(:first-child)]:text-right'
 
   return (
     <div>
@@ -34,7 +32,7 @@ export function ProductsPage() {
           }}
           options={catalog.categories.map((c) => ({ value: c, label: c }))}
         />
-        <div className="grid items-start gap-4 dsk:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <div className="grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
           <Section title="Calculadora">
             <div className="px-4 pt-1.5 pb-4 dsk:px-5 dsk:pb-5">
               <div className="flex flex-wrap items-end gap-3">
@@ -86,8 +84,8 @@ export function ProductsPage() {
             title={`Catálogo ${cat}`}
             aside={<span className="text-muted-foreground">{products.length} productos</span>}
           >
-            <div className="px-3 pb-3.5">
-              <table className={cn(tableCls.table, right)}>
+            <div className="overflow-x-auto px-3 pb-3.5">
+              <table className={tableCls.table}>
                 <thead>
                   <tr>
                     <th className={tableCls.th}>Producto</th>

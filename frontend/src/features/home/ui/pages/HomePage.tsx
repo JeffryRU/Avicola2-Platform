@@ -93,7 +93,7 @@ export function HomePage() {
           </Note>
         )}
 
-        <div className="grid gap-3 dsk:grid-cols-3 dsk:gap-4">
+        <div className="grid gap-3 dsk:gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
           {menu.map((m, i) => (
             <Link
               key={m.to}
@@ -113,7 +113,7 @@ export function HomePage() {
           ))}
         </div>
 
-        <div className="mt-3 grid gap-3 dsk:mt-4 dsk:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] dsk:gap-4">
+        <div className="mt-3 grid gap-3 dsk:mt-4 dsk:gap-4 @4xl/main:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <Section
             title="Tu semana"
             aside={<span className="text-muted-foreground">{confirmed} de 7 días confirmados</span>}

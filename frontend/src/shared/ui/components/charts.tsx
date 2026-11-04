@@ -1,6 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import { useCountUp } from '@/shared/ui/hooks/use-count-up'
-import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
+import { useElementWidth } from '@/shared/ui/hooks/use-element-width'
+
+/** Por debajo de este ancho (px) el gráfico usa su versión compacta. */
+const COMPACT = 560
 
 /** Tooltip que sigue al mouse (gráficos y tarjetas del mockup). */
 export function useTooltip() {
@@ -51,9 +54,11 @@ export function BarChart({
   height?: number
   label: string
 }) {
-  const mob = useIsMobile()
+  // Se dibuja al ancho real de su tarjeta: textos y barras no se agrandan con la pantalla.
+  const [ref, measured] = useElementWidth<HTMLDivElement>()
   const { bind, node } = useTooltip()
-  const W = mob ? 360 : width
+  const W = measured || width
+  const mob = W < COMPACT
   const H = mob ? 230 : height
   const L = mob ? 30 : 44
   const R = 8
@@ -66,7 +71,7 @@ export function BarChart({
   const bw = Math.min(mob ? 30 : 92, step * 0.58)
   const y = (v: number) => T + ih - (v / max) * ih
   return (
-    <div className="chart relative">
+    <div ref={ref} className="chart relative">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
         {[0, 1, 2, 3, 4].map((i) => (
           <g key={i}>
@@ -126,9 +131,10 @@ export interface LinePoint {
 
 /** Dos series (proyección vs venta real) con área y puntos animados. */
 export function LineChart({ points, label }: { points: LinePoint[]; label: string }) {
-  const mob = useIsMobile()
+  const [ref, measured] = useElementWidth<HTMLDivElement>()
   const { bind, node } = useTooltip()
-  const W = mob ? 360 : 720
+  const W = measured || 720
+  const mob = W < COMPACT
   const H = mob ? 250 : 330
   const L = mob ? 40 : 56
   const R = 14
@@ -146,7 +152,7 @@ export function LineChart({ points, label }: { points: LinePoint[]; label: strin
     pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
   const area = `${path(p1)} L${p1[p1.length - 1][0]} ${T + ih} L${p1[0][0]} ${T + ih} Z`
   return (
-    <div className="chart relative">
+    <div ref={ref} className="chart relative">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
         {[0, 1, 2, 3, 4, 5].map((i) => (
           <g key={i}>

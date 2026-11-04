@@ -195,7 +195,7 @@ export function AppShell() {
   return (
     <div className="flex min-h-dvh">
       <Sidebar />
-      <main className="min-w-0 flex-1">
+      <main className="@container/main min-w-0 flex-1">
         <div
           key={pathname}
           className={cn(
