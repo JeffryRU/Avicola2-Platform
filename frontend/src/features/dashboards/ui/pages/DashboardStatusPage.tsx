@@ -14,6 +14,8 @@ import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
 import { STATUS_LABEL } from '@/shared/types/labels'
 import { kgAmount, unitsCount } from '@/shared/types/labels'
+import { isSupervisor } from '@/features/auth/domain/session'
+import { useRequiredSession } from '@/features/auth/ui/use-session'
 
 export function DashboardStatusPage() {
   const { week, seller } = useDashboardFilters()
@@ -21,6 +23,8 @@ export function DashboardStatusPage() {
   const data = useWindowData()
   const mobile = useIsMobile()
   const navigate = useNavigate()
+  // El detalle del día es la proyección propia del vendedor: el supervisor no tiene esa pantalla.
+  const canOpenDay = !isSupervisor(useRequiredSession().seller)
   const { bind, node } = useTooltip()
   const title = 'Estado de proyecciones'
   if (!catalog || !data.data) return <PageHeader title={title} subtitle={weekLabel(week, true)} />
@@ -57,7 +61,8 @@ export function DashboardStatusPage() {
             <button
               key={d.date}
               type="button"
-              onClick={() => navigate(paths.day(d.date))}
+              aria-disabled={!canOpenDay}
+              onClick={canOpenDay ? () => void navigate(paths.day(d.date)) : undefined}
               {...bind(
                 <>
                   <b>{dShort(d.date)}</b>
@@ -65,7 +70,10 @@ export function DashboardStatusPage() {
                   {d.confirmed ? `${unitsCount(d.u)}, ${kgAmount(d.kg)}` : STATUS_LABEL.pending}
                 </>,
               )}
-              className="grid justify-items-center gap-0.5 rounded-xl bg-card px-0.5 py-2.5 text-center shadow-card transition hover:-translate-y-[3px] dsk:rounded-2xl dsk:px-2 dsk:py-4"
+              className={cn(
+                'grid justify-items-center gap-0.5 rounded-xl bg-card px-0.5 py-2.5 text-center shadow-card transition dsk:rounded-2xl dsk:px-2 dsk:py-4',
+                canOpenDay ? 'hover:-translate-y-[3px]' : 'cursor-default',
+              )}
             >
               <b className="text-[13px] font-extrabold dsk:text-[19px]">{dDow(d.date)}</b>
               <span className="text-[11.5px] text-ink-2 dsk:text-base">{dDM(d.date)}</span>
@@ -96,7 +104,7 @@ export function DashboardStatusPage() {
                 label="Unidades proyectadas por día"
                 width={560}
                 height={330}
-                onSelect={(d) => navigate(paths.day(d))}
+                onSelect={canOpenDay ? (d) => void navigate(paths.day(d)) : undefined}
                 bars={days.map((d) => ({
                   key: d.date,
                   value: d.u,
@@ -128,8 +136,8 @@ export function DashboardStatusPage() {
                   {days.map((d) => (
                     <tr
                       key={d.date}
-                      className={cn(tableCls.row, 'cursor-pointer')}
-                      onClick={() => navigate(paths.day(d.date))}
+                      className={cn(tableCls.row, canOpenDay && 'cursor-pointer')}
+                      onClick={canOpenDay ? () => void navigate(paths.day(d.date)) : undefined}
                     >
                       <td className={tableCls.td}>
                         {dDow(d.date)} {dFull(d.date)}

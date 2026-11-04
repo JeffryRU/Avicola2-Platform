@@ -19,6 +19,8 @@ import { Kpi, PageBody, PageHeader, Section, tableCls } from '@/shared/ui/compon
 import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
 import { STATUS_LABEL } from '@/shared/types/labels'
+import { isSupervisor } from '@/features/auth/domain/session'
+import { useRequiredSession } from '@/features/auth/ui/use-session'
 
 export function DashboardSummaryPage() {
   const { week, seller } = useDashboardFilters()
@@ -26,6 +28,8 @@ export function DashboardSummaryPage() {
   const data = useWindowData()
   const mobile = useIsMobile()
   const navigate = useNavigate()
+  // El detalle del día es la proyección propia del vendedor: el supervisor no tiene esa pantalla.
+  const canOpenDay = !isSupervisor(useRequiredSession().seller)
   const [category, setCategory] = useState<string | null>(null)
   if (!catalog || !data.data) return <PageHeader title="Planificación de Demanda" subtitle="Resumen semanal" />
 
@@ -89,13 +93,17 @@ export function DashboardSummaryPage() {
         </div>
         <Section
           title="Proyección por día (unidades)"
-          aside={<span className="hidden text-muted-foreground dsk:inline">Toca una barra para ver el día</span>}
+          aside={
+            canOpenDay && (
+              <span className="hidden text-muted-foreground dsk:inline">Toca una barra para ver el día</span>
+            )
+          }
           className="mb-4"
         >
           <div className="px-4 pt-1.5 pb-4 dsk:px-5 dsk:pb-5">
             <BarChart
               label="Unidades proyectadas por día"
-              onSelect={(d) => navigate(paths.day(d))}
+              onSelect={canOpenDay ? (d) => void navigate(paths.day(d)) : undefined}
               bars={days.map((d) => ({
                 key: d.date,
                 value: d.u,
