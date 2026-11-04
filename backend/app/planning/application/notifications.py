@@ -104,18 +104,31 @@ class NotifyProjectionSubmitted:
     def __init__(self, sellers: SellerRepository, notifier: Notifier, events: EventPublisher):
         self.sellers, self.notifier, self.events = sellers, notifier, events
 
-    def __call__(self, seller: Seller, saved: list[Projection]) -> None:
+    def __call__(
+        self, seller: Seller, saved: list[Projection], author: Seller | None = None
+    ) -> None:
         dates = sorted(p.date for p in saved)
         units = sum(p.total_units for p in saved)
-        supervisors = [s for s in self.sellers.list_active() if s.role == SUPERVISOR]
         days = f"{len(saved)} día" if len(saved) == 1 else f"{len(saved)} días"
-        self.notifier.notify(
-            supervisors,
-            PROJECTION_SUBMITTED,
-            f"Proyección de {seller.name}",
-            f"Registró {days} de {saved[0].category} ({units} unid.) desde el {dates[0]:%d/%m}.",
-            link="/dashboards/estado",
-        )
+        what = f"{days} de {saved[0].category} ({units} unid.) desde el {dates[0]:%d/%m}."
+        if author and author.username != seller.username:
+            # Lo registró el supervisor: el aviso es para el vendedor.
+            self.notifier.notify(
+                [seller],
+                PROJECTION_SUBMITTED,
+                f"{author.name} actualizó tu proyección",
+                what[0].upper() + what[1:],
+                link="/historial",
+            )
+        else:
+            supervisors = [s for s in self.sellers.list_active() if s.role == SUPERVISOR]
+            self.notifier.notify(
+                supervisors,
+                PROJECTION_SUBMITTED,
+                f"Proyección de {seller.name}",
+                f"Registró {what}",
+                link="/dashboards/estado",
+            )
         # El propio vendedor también: sus otros dispositivos actualizan su historial.
         audience = Audience(usernames=frozenset({seller.username}), roles=frozenset({SUPERVISOR}))
         self.events.publish(

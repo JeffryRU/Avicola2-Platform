@@ -23,3 +23,4 @@ tables:
   notifications: np_notifications
   settings: np_settings
   edit_unlocks: np_edit_unlocks
+  projection_changes: np_projection_changes

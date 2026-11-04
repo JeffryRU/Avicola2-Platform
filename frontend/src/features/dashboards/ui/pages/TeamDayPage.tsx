@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Package, ShoppingBag, ShoppingCart, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Package, Pencil, ShoppingBag, ShoppingCart, Users } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router'
 import { paths } from '@/app/routes'
 import { addDays, dDowLong, dFull, formatTime, hhmm, today, type IsoDate } from '@/shared/domain/dates'
@@ -49,6 +49,8 @@ export function TeamDayView({
 
   const day = teamDay(date, sellers, data.data.projections, data.data.sales, catalog)
   const pending = day.rows.filter((r) => !r.confirmed)
+  // El supervisor edita cualquier día que aún no pasó (aunque haya cerrado).
+  const editable = date >= today()
   const { from, to } = dataWindow()
   const prev = addDays(date, -1)
   const next = addDays(date, 1)
@@ -125,6 +127,7 @@ export function TeamDayView({
                     <th className={tableCls.th}>Kg (aprox.)</th>
                     <th className={tableCls.th}>Venta real (kg)</th>
                     <th className={tableCls.th}>Enviado</th>
+                    {editable && <th className={tableCls.th} aria-label="Acciones" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -146,6 +149,15 @@ export function TeamDayView({
                       <td className={cn(tableCls.td, 'text-muted-foreground')}>
                         {r.submittedAt ? formatTime(hhmm(r.submittedAt)) : '-'}
                       </td>
+                      {editable && (
+                        <td className={tableCls.td}>
+                          <Button asChild variant="outline" size="sm" className="font-bold">
+                            <Link to={`${paths.register}?vendedor=${r.seller.username}&dia=${date}`}>
+                              <Pencil /> {r.confirmed ? 'Editar' : 'Registrar'}
+                            </Link>
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   <tr className={tableCls.total}>
@@ -158,6 +170,7 @@ export function TeamDayView({
                     <td className="text-center">{nf1(day.kg)}</td>
                     <td className="text-center">{day.realKg === null ? '-' : nf1(day.realKg)}</td>
                     <td />
+                    {editable && <td />}
                   </tr>
                 </tbody>
               </table>

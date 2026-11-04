@@ -15,6 +15,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Table,
+    Text,
     UniqueConstraint,
     Uuid,
     false,
@@ -127,4 +128,26 @@ edit_unlocks = Table(
     Column("decided_by", String(50)),
     Column("decided_at", DateTime(timezone=True)),
     Index(None, "seller_id", "date"),
+)
+
+projection_changes = Table(
+    TABLES["projection_changes"],
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("seller_id", Integer, ForeignKey(TABLES.fk("sellers")), nullable=False),
+    Column("date", Date, nullable=False),
+    Column("category", String(30), nullable=False),
+    Column("author", String(50), nullable=False),
+    # created | updated (domain/history.ACTIONS), no ENUM.
+    Column("action", String(10), nullable=False),
+    # Unidades por producto en JSON (texto: portable entre motores).
+    Column("before_units", Text),
+    Column("after_units", Text, nullable=False),
+    Column("before_total", Integer),
+    Column("after_total", Integer, nullable=False),
+    Column("after_cutoff", Boolean, nullable=False, default=False),
+    Column("changed_at", DateTime(timezone=True), nullable=False),
+    # Día del cambio en la zona del negocio (para filtrar sin depender del motor).
+    Column("changed_on", Date, nullable=False),
+    Index(None, "seller_id", "changed_on"),
 )

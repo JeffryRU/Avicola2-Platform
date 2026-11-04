@@ -42,13 +42,12 @@ export function useQueue() {
 }
 
 /** Proyecciones propias por fecha (servidor + cola offline). */
-export function useMyDays() {
+/** Días del vendedor con sesión, o de otro (el supervisor registrando por él). */
+export function useMyDays(username?: string) {
   const session = useRequiredSession()
   const data = useWindowData()
   const queue = useQueue()
-  const days = useMemo(
-    () => myDays(data.data?.projections ?? [], queue, session.seller.username),
-    [data.data, queue, session.seller.username],
-  )
+  const owner = username ?? session.seller.username
+  const days = useMemo(() => myDays(data.data?.projections ?? [], queue, owner), [data.data, queue, owner])
   return { days, isLoading: data.isLoading, error: data.error }
 }

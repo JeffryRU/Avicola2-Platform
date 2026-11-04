@@ -18,6 +18,9 @@ import { Splash } from '@/shared/ui/components/feedback'
 import { Toaster } from '@/shared/ui/components/shadcn/sonner'
 
 /** Pantallas cargadas a demanda: el celular descarga solo lo que abre. */
+const HistoryPage = lazy(() =>
+  import('@/features/history/ui/pages/HistoryPage').then((m) => ({ default: m.HistoryPage })),
+)
 const UnlocksPage = lazy(() =>
   import('@/features/editing/ui/pages/UnlocksPage').then((m) => ({ default: m.UnlocksPage })),
 )
@@ -141,6 +144,8 @@ function Routed() {
               <Route index element={<SupervisorHomePage />} />
               <Route path={paths.accounts} element={<AccountsPage />} />
               <Route path={paths.unlocks} element={<UnlocksPage />} />
+              <Route path={paths.register} element={<NewProjectionPage />} />
+              <Route path={paths.history} element={<HistoryPage />} />
               <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />
               <Route path={paths.dashVersus} element={<DashboardVersusPage />} />
               <Route path={paths.dashStatus} element={<DashboardStatusPage />} />
@@ -163,6 +168,7 @@ function Routed() {
               <Route path={paths.register} element={<NewProjectionPage />} />
               <Route path={paths.registered} element={<SuccessPage />} />
               <Route path={paths.mine} element={<MyProjectionsPage />} />
+              <Route path={paths.history} element={<HistoryPage />} />
               <Route path="/proyecciones/:date" element={<DayDetailPage />} />
               <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />
               <Route path={paths.dashVersus} element={<DashboardVersusPage />} />

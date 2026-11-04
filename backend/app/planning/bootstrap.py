@@ -21,6 +21,7 @@ from app.planning.infrastructure.persistence.editing import (
     SqlSettingsRepository,
     SqlUnlockRepository,
 )
+from app.planning.infrastructure.persistence.history import SqlChangeLog
 from app.planning.infrastructure.persistence.notifications import SqlNotificationRepository
 from app.planning.infrastructure.persistence.repositories import (
     SqlProductRepository,
@@ -53,6 +54,7 @@ class PlanningUseCases:
     list_projections: uc.ListProjections
     submit_projection: uc.SubmitProjection
     get_sales: uc.GetSales
+    list_changes: uc.ListChanges
     suggest_projection: uc.SuggestProjection
     status: SqlStatusProbe
     list_notifications: nt.ListNotifications
@@ -79,6 +81,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     forecaster = WeekdayAverageForecaster(projections, settings.planning_suggestion_weeks)
     schema = physical_schema(settings.database_url, APP_SCHEMA, settings.db_schema)
     unlocks = SqlUnlockRepository(session)
+    history = SqlChangeLog(session)
     editing = ed.EditingSettings(
         SqlSettingsRepository(session),
         settings.planning_cutoff_time,
@@ -104,8 +107,11 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             settings.planning_max_days,
             on_submitted=nt.NotifyProjectionSubmitted(sellers, notifier, event_bus),
             rules=ed.EditingRules(editing, unlocks),
+            sellers=sellers,
+            history=history,
         ),
         get_sales=uc.GetSales(SimulatedSalesSource(projections, clock)),
+        list_changes=uc.ListChanges(history),
         suggest_projection=uc.SuggestProjection(products, forecaster, settings.planning_max_days),
         status=SqlStatusProbe(session, schema),
         list_notifications=nt.ListNotifications(notifications),

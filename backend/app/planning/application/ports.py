@@ -8,6 +8,7 @@ from datetime import date, datetime
 from typing import Any, Protocol
 
 from app.planning.domain.editing import EditUnlock
+from app.planning.domain.history import ProjectionChange
 from app.planning.domain.models import DailyUnits, Product, Projection, Seller, SellerAccount
 from app.planning.domain.notifications import Event, Notification
 
@@ -142,4 +143,14 @@ class UnlockRepository(Protocol):
 
     def save(self, unlock: EditUnlock) -> None:
         """Guarda la decisión (estado, quién y cuándo)."""
+        ...
+
+
+class ChangeLog(Protocol):
+    """Historial de cambios de las proyecciones."""
+
+    def add(self, changes: list[ProjectionChange]) -> None: ...
+
+    def list(self, date_from: date, date_to: date, seller: str | None) -> list[ProjectionChange]:
+        """Cambios hechos entre esas fechas (de un vendedor o de todos), recientes primero."""
         ...

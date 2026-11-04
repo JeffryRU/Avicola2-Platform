@@ -20,13 +20,19 @@ export class HttpProjectionsGateway implements ProjectionsGateway {
 
   projections = (r: DateRange) => this.http.get('/projections', z.array(projectionSchema), rangeQuery(r))
   sales = (r: DateRange) => this.http.get('/sales', z.array(dailyUnitsSchema), rangeQuery(r))
-  suggestions = (category: string, start: IsoDate, days: number) =>
-    this.http.get('/suggestions', suggestionSchema, { category, start, days })
+  suggestions = (category: string, start: IsoDate, days: number, seller?: string) =>
+    this.http.get('/suggestions', suggestionSchema, { category, start, days, on_behalf: seller })
 
   submit = (s: Submission) =>
     this.http.post(
       '/projections',
-      { submission_id: s.submission_id, category: s.category, days: s.days },
+      {
+        submission_id: s.submission_id,
+        category: s.category,
+        days: s.days,
+        // El backend solo acepta otro vendedor si quien envía es supervisor.
+        ...(s.author && s.author !== s.seller ? { seller: s.seller } : {}),
+      },
       submissionResultSchema,
     )
 }

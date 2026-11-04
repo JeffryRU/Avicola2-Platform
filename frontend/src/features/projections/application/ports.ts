@@ -18,7 +18,8 @@ export interface DateRange {
 export interface ProjectionsGateway {
   projections(range: DateRange): Promise<Projection[]>
   sales(range: DateRange): Promise<DailyUnits[]>
-  suggestions(category: string, start: IsoDate, days: number): Promise<Suggestion>
+  /** `seller`: solo el supervisor, para la sugerencia de un vendedor. */
+  suggestions(category: string, start: IsoDate, days: number, seller?: string): Promise<Suggestion>
   submit(submission: Submission): Promise<SubmissionResult>
 }
 

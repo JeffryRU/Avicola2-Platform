@@ -36,6 +36,8 @@ export type SubmissionResult = z.infer<typeof submissionResultSchema>
 export const submissionSchema = z.object({
   submission_id: z.string(),
   seller: z.string(),
+  // Quien la envía, si no es el vendedor (el supervisor registrando por él).
+  author: z.string().optional(),
   category: z.string(),
   days: z.array(z.object({ date: isoDateSchema, units: unitsSchema })).min(1),
   created_at: z.string(),

@@ -99,6 +99,8 @@ class SubmissionIn(BaseModel):
     submission_id: UUID | None = None
     category: str = Field(min_length=1, max_length=30)
     days: list[DayIn] = Field(min_length=1)
+    # Solo el supervisor: el vendedor de la proyección. Para un vendedor sale de la sesión.
+    seller: str | None = Field(default=None, max_length=50)
 
 
 class SubmissionOut(BaseModel):
@@ -204,3 +206,18 @@ class UnlockDecisionIn(BaseModel):
 class CutoffIn(BaseModel):
     cutoff_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     days_before: int = Field(ge=0, le=7)
+
+
+class ChangeOut(BaseModel):
+    id: int
+    seller: str
+    date: date
+    category: str
+    author: str
+    action: str
+    before: dict[str, int] | None
+    after: dict[str, int]
+    before_total: int | None
+    after_total: int
+    after_cutoff: bool
+    changed_at: datetime

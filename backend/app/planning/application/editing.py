@@ -85,16 +85,19 @@ class EditingRules:
     def __init__(self, settings: EditingSettings, unlocks: UnlockRepository):
         self.settings, self.unlocks = settings, unlocks
 
-    def check(self, seller: Seller, day: date, today: date, now: datetime) -> None:
+    def check(self, seller: Seller, day: date, today: date, now: datetime) -> bool:
+        """Lanza un error si no se puede guardar; devuelve True si es pasada la hora de corte."""
         policy = self.settings.policy()
         last = policy.last_day(today)
         if day > last:
             raise DomainError(f"Solo puedes registrar hasta el {last:%d/%m/%Y}.")
-        if policy.is_open(day, now) or seller.is_supervisor:
-            return
+        if policy.is_open(day, now):
+            return False
+        if seller.is_supervisor:
+            return True
         unlock = self.unlocks.latest(seller.username, day)
         if unlock and unlock.is_open:
-            return
+            return True
         closes = policy.closes_at(day, now.tzinfo)
         raise ForbiddenError(
             f"La edición del {day:%d/%m/%Y} cerró el {closes:%d/%m} a las {closes:%H:%M}. "

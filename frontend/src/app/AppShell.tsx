@@ -5,6 +5,7 @@ import {
   Box,
   ChevronDown,
   ClipboardList,
+  History,
   Home,
   LockOpen,
   LogOut,
@@ -72,7 +73,7 @@ function Sidebar() {
       </div>
       <nav className="grid gap-0.5" aria-label="Principal">
         <SideItem to={paths.home} end icon={<Home />} label="Inicio" />
-        {!supervisor && <SideItem to={paths.register} icon={<Plus />} label="Registrar" />}
+        <SideItem to={paths.register} icon={<Plus />} label="Registrar" />
         <button
           type="button"
           aria-expanded={expanded}
@@ -120,6 +121,7 @@ function Sidebar() {
         ) : (
           <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
         )}
+        <SideItem to={paths.history} icon={<History />} label="Historial" />
         <SideItem to={paths.products} icon={<Box />} label="Productos" />
         <SideItem
           to={paths.notifications}

@@ -24,12 +24,14 @@ export class PlanningService {
     this.newId = newId
   }
 
-  async submit(draft: Draft, catalog: Catalog, seller: string): Promise<SubmitOutcome> {
+  /** `seller`: el vendedor de la proyección; `author`: quien la envía (el supervisor, por él). */
+  async submit(draft: Draft, catalog: Catalog, seller: string, author = seller): Promise<SubmitOutcome> {
     const valid = submittableDraft(today()).parse(draft)
     const products = catalog.of(valid.category)
     const submission: Submission = {
       submission_id: this.newId(),
       seller,
+      ...(author !== seller ? { author } : {}),
       category: valid.category,
       days: draftDates(valid).map((date) => ({
         date,
@@ -41,11 +43,12 @@ export class PlanningService {
     return this.send(submission)
   }
 
-  /** Reintenta lo pendiente del vendedor con sesión (el token identifica al vendedor). */
+  /** Reintenta lo pendiente de quien tiene la sesión (lo suyo y lo que envió por otros). */
   async flush(seller: string): Promise<{ sent: number; pending: number; rejected: string[] }> {
     let sent = 0
     const rejected: string[] = []
-    for (const s of this.queue.list().filter((q) => q.seller === seller)) {
+    const mine = (q: Submission) => (q.author ?? q.seller) === seller
+    for (const s of this.queue.list().filter(mine)) {
       try {
         const outcome = await this.send(s)
         if (outcome.sync === 'ok') sent++
@@ -53,7 +56,7 @@ export class PlanningService {
         rejected.push(e instanceof Error ? e.message : String(e))
       }
     }
-    return { sent, pending: this.queue.list().filter((q) => q.seller === seller).length, rejected }
+    return { sent, pending: this.queue.list().filter(mine).length, rejected }
   }
 
   private async send(submission: Submission): Promise<SubmitOutcome> {

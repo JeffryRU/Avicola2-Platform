@@ -193,7 +193,11 @@ def submit_projection(
 ) -> s.SubmissionOut:
     """El vendedor sale de la sesión, nunca del cuerpo de la petición."""
     saved = use_cases.submit_projection(
-        seller, body.category, [DayUnits(d.date, d.units) for d in body.days], body.submission_id
+        seller,
+        body.category,
+        [DayUnits(d.date, d.units) for d in body.days],
+        body.submission_id,
+        body.seller,
     )
     return s.SubmissionOut(
         submission_id=saved[0].submission_id,
@@ -201,6 +205,34 @@ def submit_projection(
         total_units=sum(p.total_units for p in saved),
         total_kg=round(sum(p.total_kg for p in saved), 2),
     )
+
+
+@router.get("/projections/history")
+def projection_history(
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    date_from: DateFrom,
+    date_to: DateTo,
+    seller: SellerFilter = None,
+) -> list[s.ChangeOut]:
+    """Quién cambió qué y cuándo: el vendedor, lo suyo; el supervisor, todo (o un vendedor)."""
+    return [
+        s.ChangeOut(
+            id=c.id or 0,
+            seller=c.seller,
+            date=c.date,
+            category=c.category,
+            author=c.author,
+            action=c.action,
+            before=c.before,
+            after=c.after,
+            before_total=c.before_total,
+            after_total=c.after_total,
+            after_cutoff=c.after_cutoff,
+            changed_at=c.changed_at,
+        )
+        for c in use_cases.list_changes(viewer, date_from, date_to, seller)
+    ]
 
 
 @router.get("/sales")
@@ -222,8 +254,9 @@ def suggestions(
     category: Annotated[str, Query(max_length=30)],
     start: Annotated[date, Query()],
     days: Annotated[int, Query(ge=1)] = 1,
+    on_behalf: SellerFilter = None,
 ) -> s.SuggestionOut:
-    result = use_cases.suggest_projection(seller, category, start, days)
+    result = use_cases.suggest_projection(seller, category, start, days, on_behalf)
     method = use_cases.suggest_projection.forecaster.name
     return s.SuggestionOut(method=method, days=[s.DailyUnitsOut(**asdict(d)) for d in result])
 

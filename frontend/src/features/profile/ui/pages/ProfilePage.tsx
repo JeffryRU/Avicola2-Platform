@@ -1,4 +1,4 @@
-import { ChevronRight, KeyRound, LockOpen, LogOut, UserCog } from 'lucide-react'
+import { ChevronRight, History, KeyRound, LockOpen, LogOut, UserCog } from 'lucide-react'
 import { Link } from 'react-router'
 import { useContainer } from '@/app/di'
 import { InstallOption } from '@/app/install'
@@ -52,6 +52,16 @@ export function ProfilePage() {
               <ChevronRight className="size-[18px]" />
             </Link>
           )}
+          <Link to={paths.history} className={optCls}>
+            <span className={cn(tileCls, 'bg-secondary text-primary')}>
+              <History />
+            </span>
+            <span className="min-w-0 flex-1">
+              <b className="block">Historial de cambios</b>
+              <small className="text-muted-foreground">Quién creó o modificó cada proyección</small>
+            </span>
+            <ChevronRight className="size-[18px]" />
+          </Link>
           <InstallOption className={optCls} />
           <Link to={paths.password} className={optCls}>
             <span className={cn(tileCls, 'bg-warn-soft text-warn')}>
