@@ -205,26 +205,25 @@ export function DetailFilterMenus({ dates, custom, catalog }: { dates: IsoDate[]
   const f = useDetailSelection(dates, catalog)
   return (
     <>
-      {supervisor && (
-        <FilterMenu
-          icon={<CalendarDays />}
-          label={
-            f.days.length === 0 ? whole : f.days.length > 2 ? daysCount(f.days.length) : f.days.map(dShort).join(', ')
-          }
-          title={DAY_FILTER_LABEL}
-          active={f.days.length > 0}
-        >
-          <CheckItem checked={f.days.length === 0} onToggle={() => f.setDays([])}>
-            {whole}
+      {/* Día: también para el vendedor (filtra las columnas de su vista por día). */}
+      <FilterMenu
+        icon={<CalendarDays />}
+        label={
+          f.days.length === 0 ? whole : f.days.length > 2 ? daysCount(f.days.length) : f.days.map(dShort).join(', ')
+        }
+        title={DAY_FILTER_LABEL}
+        active={f.days.length > 0}
+      >
+        <CheckItem checked={f.days.length === 0} onToggle={() => f.setDays([])}>
+          {whole}
+        </CheckItem>
+        <DropdownMenuSeparator />
+        {f.weekDays.map((d) => (
+          <CheckItem key={d} checked={f.days.includes(d)} onToggle={() => f.setDays(toggleIn(f.days, d))}>
+            {dShort(d)}
           </CheckItem>
-          <DropdownMenuSeparator />
-          {f.weekDays.map((d) => (
-            <CheckItem key={d} checked={f.days.includes(d)} onToggle={() => f.setDays(toggleIn(f.days, d))}>
-              {dShort(d)}
-            </CheckItem>
-          ))}
-        </FilterMenu>
-      )}
+        ))}
+      </FilterMenu>
       {supervisor && f.allZones.length > 1 && (
         <FilterMenu
           icon={<MapPin />}
