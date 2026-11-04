@@ -24,6 +24,8 @@ import type { StatusGateway } from '@/features/connection/application/ports'
 import { HttpStatusGateway } from '@/features/connection/infrastructure/http-status-gateway'
 import type { SellersGateway } from '@/features/dashboards/application/ports'
 import { HttpSellersGateway } from '@/features/dashboards/infrastructure/http-sellers-gateway'
+import type { EditingGateway } from '@/features/editing/application/ports'
+import { HttpEditingGateway } from '@/features/editing/infrastructure/http-editing-gateway'
 import { BrowserTableExporter } from '@/shared/infrastructure/table-exporter'
 import { StoredDraftRepository, StoredSubmissionQueue } from '@/features/projections/infrastructure/stored-repositories'
 
@@ -43,6 +45,7 @@ export interface Container {
   preferences: KeyValueStore
   errors: ErrorReporter
   accounts: AccountsGateway
+  editing: EditingGateway
   installer: AppInstaller
 }
 
@@ -88,6 +91,7 @@ export function createContainer(): Container {
     preferences: local,
     errors,
     accounts: new HttpAccountsGateway(http),
+    editing: new HttpEditingGateway(http),
     installer: new BrowserAppInstaller(),
   }
 }

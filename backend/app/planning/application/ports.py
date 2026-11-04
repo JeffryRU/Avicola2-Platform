@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Protocol
 
+from app.planning.domain.editing import EditUnlock
 from app.planning.domain.models import DailyUnits, Product, Projection, Seller, SellerAccount
 from app.planning.domain.notifications import Event, Notification
 
@@ -113,3 +114,32 @@ class EventPublisher(Protocol):
     Postgres LISTEN/NOTIFY o RabbitMQ, con otro adaptador)."""
 
     def publish(self, event: Event) -> None: ...
+
+
+class SettingsRepository(Protocol):
+    """Ajustes que cambia el supervisor desde la app (p. ej., la hora de corte)."""
+
+    def get(self, key: str) -> str | None: ...
+    def set(self, key: str, value: str, updated_by: str, updated_at: datetime) -> None: ...
+
+
+class UnlockRepository(Protocol):
+    """Solicitudes de habilitación de edición."""
+
+    def add(self, unlock: EditUnlock) -> EditUnlock:
+        """Guarda y devuelve con id."""
+        ...
+
+    def get(self, unlock_id: int) -> EditUnlock | None: ...
+
+    def latest(self, seller: str, day: date) -> EditUnlock | None:
+        """La última solicitud del vendedor para ese día (la que manda)."""
+        ...
+
+    def list_since(self, since: date, seller: str | None) -> list[EditUnlock]:
+        """Solicitudes para días desde `since` (de un vendedor o de todos), recientes primero."""
+        ...
+
+    def save(self, unlock: EditUnlock) -> None:
+        """Guarda la decisión (estado, quién y cuándo)."""
+        ...

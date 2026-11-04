@@ -7,6 +7,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from app.planning.application.ports import (
@@ -20,6 +21,9 @@ from app.planning.application.ports import (
 from app.planning.domain.catalog import Catalog
 from app.planning.domain.models import SELLER, DailyUnits, Product, Projection, Seller
 from app.shared.domain.errors import DomainError, ForbiddenError
+
+if TYPE_CHECKING:
+    from app.planning.application.editing import EditingRules
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +87,12 @@ class SubmitProjection:
         clock: Clock,
         max_days: int,
         on_submitted: Callable[[Seller, list[Projection]], None] | None = None,
+        rules: "EditingRules | None" = None,
     ):
         self.products, self.projections, self.clock = products, projections, clock
         self.max_days = max_days
+        # Ventana de registro y hora de corte; la carga de ejemplos (cli seed) no la usa.
+        self.rules = rules
         # Se llama tras guardar (avisos al supervisor); la carga de ejemplos no lo usa.
         self.on_submitted = on_submitted
 
@@ -108,6 +115,8 @@ class SubmitProjection:
         for day in sorted(days, key=lambda d: d.date):
             if day.date < today:
                 raise DomainError(f"El día {day.date:%d/%m/%Y} ya pasó.")
+            if self.rules:
+                self.rules.check(seller, day.date, today, now)
             lines = catalog.lines_for(category, day.units)
             projection = Projection(
                 uuid4(), submission, seller.username, day.date, category, lines, now

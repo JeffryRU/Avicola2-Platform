@@ -22,4 +22,6 @@ def test_expected_tables() -> None:
         "np_projections",
         "np_projection_lines",
         "np_notifications",
+        "np_settings",
+        "np_edit_unlocks",
     }

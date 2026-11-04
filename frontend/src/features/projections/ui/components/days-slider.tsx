@@ -2,15 +2,23 @@ import { MAX_DAYS } from '@/features/projections/domain/draft'
 import { cn } from '@/shared/ui/lib/utils'
 import { daysCount } from '@/shared/types/labels'
 
-/** Selector de 1 a 7 días con riel (como el del mockup). */
-export function DaysSlider({ value, onChange }: { value: number; onChange: (n: number) => void }) {
-  const steps = Array.from({ length: MAX_DAYS }, (_, i) => i + 1)
+/** Selector de 1 a `max` días con riel (como el del mockup). */
+export function DaysSlider({
+  value,
+  onChange,
+  max = MAX_DAYS,
+}: {
+  value: number
+  onChange: (n: number) => void
+  max?: number
+}) {
+  const steps = Array.from({ length: max }, (_, i) => i + 1)
   return (
     <div role="radiogroup" aria-label="Días de proyección" className="relative px-1.5 pt-2">
       <div className="absolute top-6 right-[18px] left-[18px] h-1 rounded bg-border" />
       <div
         className="absolute top-6 left-[18px] h-1 rounded bg-primary transition-[width] duration-300"
-        style={{ width: `calc((100% - 36px) * ${(value - 1) / (MAX_DAYS - 1)})` }}
+        style={{ width: `calc((100% - 36px) * ${max > 1 ? (value - 1) / (max - 1) : 1})` }}
       />
       <div className="relative flex justify-between">
         {steps.map((n) => {

@@ -54,6 +54,9 @@ export function useRealtime() {
           case 'projections.changed':
             void client.invalidateQueries({ queryKey: ['window'] })
             break
+          case 'editing.changed':
+            void client.invalidateQueries({ queryKey: ['editing'] })
+            break
           case 'session.revoked':
             toast.error(event.data.reason, { description: 'Vuelve a iniciar sesión.' })
             auth.expire()

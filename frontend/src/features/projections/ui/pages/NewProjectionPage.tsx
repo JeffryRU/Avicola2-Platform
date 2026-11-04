@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, ArrowRight, Calendar, ChevronLeft, Info, Loader2, Wand2 } from 'lucide-react'
+import { AlertCircle, ArrowRight, Calendar, ChevronLeft, Info, Loader2, Lock, Wand2 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
@@ -24,6 +24,10 @@ import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
 import { daysCount } from '@/shared/types/labels'
+import { closedDays, windowDates } from '@/features/editing/domain/editing'
+import { closedDaysNote } from '@/features/editing/types/editing'
+import { EditingDays } from '@/features/editing/ui/components/editing-days'
+import { useEditingWindow } from '@/features/editing/ui/hooks'
 
 /** Completa las unidades de cada fecha con lo ya confirmado (si es de la misma categoría). */
 function withExisting(draft: Draft, days: Map<IsoDate, MyDay>): Draft {
@@ -51,6 +55,9 @@ export function NewProjectionPage() {
   const { seller } = useRequiredSession()
   const { catalog } = useCatalog()
   const { days } = useMyDays()
+  const editing = useEditingWindow().data
+  // Días que se pueden registrar (hoy, mañana y pasado mañana); sin datos aún, sin tope.
+  const allowed = editing ? windowDates(editing) : null
   const mobile = useIsMobile()
   const navigate = useNavigate()
   const client = useQueryClient()
@@ -66,7 +73,16 @@ export function NewProjectionPage() {
   const [suggesting, setSuggesting] = useState(false)
 
   // Borrador efectivo: categoría válida y días ya confirmados precargados (derivado, sin efectos).
-  const draft = useMemo(() => (catalog ? normalize(stored, catalog, days) : stored), [stored, catalog, days])
+  const draft = useMemo(() => {
+    let d = catalog ? normalize(stored, catalog, days) : stored
+    if (allowed?.length) {
+      // El borrador guardado puede ser de otro día: se lleva a la ventana de registro.
+      if (!allowed.includes(d.start)) d = { ...d, start: allowed[0], units: {} }
+      const room = allowed.length - allowed.indexOf(d.start)
+      if (d.days > room) d = { ...d, days: room }
+    }
+    return d
+  }, [stored, catalog, days, allowed])
   const setDraft = (next: Draft) => {
     setStored(next)
     drafts.save(next)
@@ -82,6 +98,9 @@ export function NewProjectionPage() {
   const choiceIndex = choices.findIndex((c) => c.category === draft.category && c.subcategory === draft.subcategory)
   const invalid = draft.tried ? emptyDays(draft) : []
   const alreadyConfirmed = dates.filter((d) => days.has(d))
+  const closed = closedDays(editing, dates)
+  const lastAllowed = allowed?.at(-1)
+  const room = allowed ? allowed.length - Math.max(0, allowed.indexOf(draft.start)) : undefined
 
   if (draft.step === 0) {
     return (
@@ -101,10 +120,13 @@ export function NewProjectionPage() {
                       id="np-start"
                       type="date"
                       min={today()}
+                      max={lastAllowed}
                       value={draft.start}
                       onChange={(e) => {
                         if (!e.target.value || e.target.value < today())
                           return void toast('Elige hoy o una fecha futura')
+                        if (lastAllowed && e.target.value > lastAllowed)
+                          return void toast(`Solo puedes registrar hasta el ${dShort(lastAllowed)}`)
                         setDraft({ ...draft, start: e.target.value, units: {} })
                       }}
                       className="h-[54px] w-full rounded-[14px] border-[1.5px] bg-white pr-3 pl-12 text-[17px] font-semibold outline-none focus:border-primary focus:ring-4 focus:ring-primary-ring"
@@ -113,7 +135,11 @@ export function NewProjectionPage() {
                 </div>
                 <div className="mb-[22px]">
                   <span className="mb-2.5 block text-base font-bold">Días de proyección</span>
-                  <DaysSlider value={draft.days} onChange={(n) => setDraft({ ...draft, days: n, units: {} })} />
+                  <DaysSlider
+                    value={draft.days}
+                    max={room}
+                    onChange={(n) => setDraft({ ...draft, days: n, units: {} })}
+                  />
                   <Note icon={<Calendar />} className="mt-[18px]">
                     <div>
                       Se proyectarán <b>{daysCount(draft.days)}:</b>
@@ -121,6 +147,11 @@ export function NewProjectionPage() {
                       {daysText(dates)}
                     </div>
                   </Note>
+                  {closed.length > 0 && (
+                    <Note tone="bad" icon={<Lock />} className="mt-3">
+                      <div>{closedDaysNote(closed)}</div>
+                    </Note>
+                  )}
                   {alreadyConfirmed.length > 0 && (
                     <Note tone="warn" icon={<Info />} className="mt-3">
                       <div>
@@ -130,6 +161,7 @@ export function NewProjectionPage() {
                     </Note>
                   )}
                 </div>
+                <EditingDays className="mb-[22px]" />
                 <div className="mb-1.5">
                   <label id="np-cat-label" className="mb-2.5 block text-base font-bold">
                     Categoría
@@ -197,6 +229,7 @@ export function NewProjectionPage() {
             </Button>
             <Button
               className="h-[54px] flex-1 rounded-[14px] text-[16.5px] font-bold dsk:min-w-[220px] dsk:flex-none"
+              disabled={closed.length > 0}
               onClick={() => setDraft(withExisting({ ...draft, step: 1, tried: false }, days))}
             >
               Continuar <ArrowRight className="size-5" />
@@ -238,6 +271,7 @@ export function NewProjectionPage() {
   }
 
   function review() {
+    if (closed.length) return void toast.error(closedDaysNote(closed))
     const tried = { ...draft, tried: true }
     setDraft(tried)
     if (!submittableDraft().safeParse(tried).success) return

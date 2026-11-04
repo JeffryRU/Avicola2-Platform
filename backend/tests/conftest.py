@@ -8,6 +8,10 @@ os.environ["LOG_TO_FILES"] = "false"
 # Sin token de servicio por defecto (el .env del desarrollador puede tener uno); los tests que
 # lo prueban lo configuran explícitamente.
 os.environ["INGEST_API_TOKEN"] = ""
+# Las pruebas registran desde hoy hasta 7 días: corte al final del día y ventana amplia.
+# Las de la hora de corte la cambian por la API.
+os.environ["PLANNING_CUTOFF_TIME"] = "23:59"
+os.environ["PLANNING_MAX_DAYS"] = "7"
 
 from datetime import date
 from pathlib import Path

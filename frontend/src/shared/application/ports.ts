@@ -14,6 +14,7 @@ export interface HttpClient {
   get<T>(path: string, schema: z.ZodType<T>, query?: Record<string, string | number | undefined>): Promise<T>
   post<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
   patch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
+  put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
 }
 
 /** Error de la API con el código HTTP (0 = sin conexión o sin respuesta). */

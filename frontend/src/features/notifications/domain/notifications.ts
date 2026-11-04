@@ -17,7 +17,8 @@ export const notificationPageSchema = z.object({ items: z.array(notificationSche
 export type NotificationPage = z.infer<typeof notificationPageSchema>
 
 /** Tipos conocidos; uno nuevo del servidor se muestra igual, con el estilo genérico. */
-export type NotificationKind = 'projection_reminder' | 'projection_submitted' | 'announcement'
+export type NotificationKind =
+  'projection_reminder' | 'projection_submitted' | 'announcement' | 'edit_requested' | 'edit_decided'
 
 /** Solo se siguen enlaces internos de la app (nunca una URL externa recibida del servidor). */
 export const safeLink = (link: string | null) => (link && /^\/(?!\/)/.test(link) ? link : null)

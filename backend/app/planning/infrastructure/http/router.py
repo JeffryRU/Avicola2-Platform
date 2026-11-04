@@ -15,6 +15,7 @@ from app.core.config import get_settings
 from app.planning.application.accounts import Session as AuthSession
 from app.planning.application.use_cases import DayUnits
 from app.planning.bootstrap import PlanningUseCases, build_use_cases
+from app.planning.domain.editing import CutoffPolicy, EditUnlock
 from app.planning.domain.models import Projection, Seller, SellerAccount
 from app.planning.infrastructure.http import schemas as s
 from app.shared.domain.errors import AuthenticationError, ForbiddenError
@@ -308,3 +309,70 @@ def announce(use_cases: UseCases, body: s.AnnouncementIn) -> s.CreatedOut:
 def projection_reminders(use_cases: UseCases) -> s.CreatedOut:
     """Recordatorio diario (cron de n8n): a cada vendedor sin proyección para hoy."""
     return s.CreatedOut(created=use_cases.send_projection_reminders())
+
+
+# --- Hora de corte y habilitaciones de edición -----------------------------------------
+
+
+def _unlock_out(u: EditUnlock) -> s.UnlockOut:
+    return s.UnlockOut(
+        id=u.id or 0,  # siempre viene de la base, con id
+        seller=u.seller,
+        date=u.date,
+        reason=u.reason,
+        status=u.status,
+        requested_at=u.requested_at,
+        decided_by=u.decided_by,
+        decided_at=u.decided_at,
+    )
+
+
+def _cutoff_out(policy: CutoffPolicy) -> s.CutoffOut:
+    return s.CutoffOut(
+        cutoff_time=f"{policy.cutoff:%H:%M}",
+        days_before=policy.days_before,
+        open_days=policy.open_days,
+    )
+
+
+@router.get("/editing")
+def editing_window(use_cases: UseCases, viewer: CurrentSeller) -> s.EditingWindowOut:
+    """Días que se pueden registrar, hasta cuándo y si hay habilitación (pantalla Registrar)."""
+    window = use_cases.editing_window(viewer)
+    return s.EditingWindowOut(
+        policy=_cutoff_out(window.policy),
+        days=[
+            s.EditingDayOut(
+                date=d.date,
+                closes_at=d.closes_at,
+                open=d.open,
+                unlock=_unlock_out(d.unlock) if d.unlock else None,
+            )
+            for d in window.days
+        ],
+    )
+
+
+@router.get("/editing/unlocks")
+def list_unlocks(use_cases: UseCases, viewer: CurrentSeller) -> list[s.UnlockOut]:
+    return [_unlock_out(u) for u in use_cases.list_unlocks(viewer)]
+
+
+@router.post("/editing/unlocks", status_code=status.HTTP_201_CREATED)
+def request_unlock(
+    use_cases: UseCases, seller: CurrentSeller, body: s.UnlockRequestIn
+) -> s.UnlockOut:
+    """El vendedor pide editar un día ya cerrado (el vendedor sale de la sesión)."""
+    return _unlock_out(use_cases.request_unlock(seller, body.date, body.reason))
+
+
+@admin.post("/editing/unlocks/{unlock_id}")
+def decide_unlock(
+    use_cases: UseCases, actor: ActiveAccount, unlock_id: int, body: s.UnlockDecisionIn
+) -> s.UnlockOut:
+    return _unlock_out(use_cases.decide_unlock(actor.seller, unlock_id, body.action))
+
+
+@admin.put("/editing/cutoff")
+def update_cutoff(use_cases: UseCases, actor: ActiveAccount, body: s.CutoffIn) -> s.CutoffOut:
+    return _cutoff_out(use_cases.update_cutoff(actor.seller, body.cutoff_time, body.days_before))

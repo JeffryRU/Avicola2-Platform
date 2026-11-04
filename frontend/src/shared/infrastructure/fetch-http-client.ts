@@ -34,6 +34,10 @@ export class FetchHttpClient implements HttpClient {
     return this.request(path, { method: 'PATCH', body: JSON.stringify(body) }, schema)
   }
 
+  put<T>(path: string, body: unknown, schema: z.ZodType<T>) {
+    return this.request(path, { method: 'PUT', body: JSON.stringify(body) }, schema)
+  }
+
   private async request<T>(path: string, init: RequestInit, schema: z.ZodType<T>): Promise<T> {
     const { baseUrl, timeoutMs, onUnauthorized } = this.options
     const headers: Record<string, string> = { Accept: 'application/json' }

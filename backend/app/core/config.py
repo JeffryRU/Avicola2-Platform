@@ -41,8 +41,13 @@ class Settings(BaseSettings):
     login_max_attempts: int = Field(5, ge=1)
     login_lock_minutes: int = Field(15, ge=1)
 
-    # Proyecciones: máximo de días por envío y semanas de historia para la sugerencia.
-    planning_max_days: int = Field(7, ge=1)
+    # Proyecciones: días que se pueden registrar (hoy, mañana y pasado mañana = 3) y semanas de
+    # historia para la sugerencia.
+    planning_max_days: int = Field(3, ge=1)
+    # Hora de corte por defecto (el supervisor la cambia desde la app): la proyección de un día
+    # se edita hasta esa hora del mismo día menos PLANNING_CUTOFF_DAYS_BEFORE días.
+    planning_cutoff_time: str = "07:00"
+    planning_cutoff_days_before: int = Field(0, ge=0, le=7)
     planning_suggestion_weeks: int = Field(4, ge=1)
 
     # Build del frontend (React) que sirve FastAPI; si no existe, no se monta.

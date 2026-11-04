@@ -10,12 +10,17 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.planning.application import accounts as acc
+from app.planning.application import editing as ed
 from app.planning.application import notifications as nt
 from app.planning.application import use_cases as uc
 from app.planning.domain.accounts import LockoutPolicy
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.events import event_bus
 from app.planning.infrastructure.forecast import WeekdayAverageForecaster
+from app.planning.infrastructure.persistence.editing import (
+    SqlSettingsRepository,
+    SqlUnlockRepository,
+)
 from app.planning.infrastructure.persistence.notifications import SqlNotificationRepository
 from app.planning.infrastructure.persistence.repositories import (
     SqlProductRepository,
@@ -54,6 +59,11 @@ class PlanningUseCases:
     mark_notifications_read: nt.MarkNotificationsRead
     send_projection_reminders: nt.SendProjectionReminders
     announce: nt.Announce
+    editing_window: ed.GetEditingWindow
+    request_unlock: ed.RequestUnlock
+    list_unlocks: ed.ListUnlocks
+    decide_unlock: ed.DecideUnlock
+    update_cutoff: ed.UpdateCutoff
 
 
 def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
@@ -68,6 +78,13 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     notifier = nt.Notifier(notifications, event_bus, clock)
     forecaster = WeekdayAverageForecaster(projections, settings.planning_suggestion_weeks)
     schema = physical_schema(settings.database_url, APP_SCHEMA, settings.db_schema)
+    unlocks = SqlUnlockRepository(session)
+    editing = ed.EditingSettings(
+        SqlSettingsRepository(session),
+        settings.planning_cutoff_time,
+        settings.planning_cutoff_days_before,
+        settings.planning_max_days,
+    )
     return PlanningUseCases(
         authenticate=acc.Authenticate(sellers, hasher, tokens, clock, lockout),
         current_account=acc.CurrentAccount(sellers, tokens),
@@ -86,6 +103,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             clock,
             settings.planning_max_days,
             on_submitted=nt.NotifyProjectionSubmitted(sellers, notifier, event_bus),
+            rules=ed.EditingRules(editing, unlocks),
         ),
         get_sales=uc.GetSales(SimulatedSalesSource(projections, clock)),
         suggest_projection=uc.SuggestProjection(products, forecaster, settings.planning_max_days),
@@ -94,4 +112,9 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         mark_notifications_read=nt.MarkNotificationsRead(notifications, clock),
         send_projection_reminders=nt.SendProjectionReminders(sellers, projections, notifier, clock),
         announce=nt.Announce(sellers, notifier),
+        editing_window=ed.GetEditingWindow(editing, unlocks, clock),
+        request_unlock=ed.RequestUnlock(editing, unlocks, sellers, notifier, event_bus, clock),
+        list_unlocks=ed.ListUnlocks(unlocks, clock),
+        decide_unlock=ed.DecideUnlock(unlocks, sellers, notifier, event_bus, clock),
+        update_cutoff=ed.UpdateCutoff(editing, event_bus, clock),
     )

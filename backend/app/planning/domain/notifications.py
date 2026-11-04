@@ -10,11 +10,14 @@ from app.planning.domain.models import SELLER, SUPERVISOR
 PROJECTION_REMINDER = "projection_reminder"  # recordatorio: falta la proyección de hoy (n8n)
 PROJECTION_SUBMITTED = "projection_submitted"  # al supervisor: un vendedor envió su proyección
 ANNOUNCEMENT = "announcement"  # aviso general (n8n): ventas actualizadas, catálogo, etc.
-KINDS = (PROJECTION_REMINDER, PROJECTION_SUBMITTED, ANNOUNCEMENT)
+EDIT_REQUESTED = "edit_requested"  # al supervisor: un vendedor pide editar un día cerrado
+EDIT_DECIDED = "edit_decided"  # al vendedor: su solicitud se aprobó, rechazó o se volvió a cerrar
+KINDS = (PROJECTION_REMINDER, PROJECTION_SUBMITTED, ANNOUNCEMENT, EDIT_REQUESTED, EDIT_DECIDED)
 
 # Eventos del canal en tiempo real. Solo avisan que algo cambió: los datos se piden por la API.
 NOTIFICATION_CREATED = "notification"
 PROJECTIONS_CHANGED = "projections.changed"
+EDITING_CHANGED = "editing.changed"  # hora de corte o habilitaciones
 SESSION_REVOKED = "session.revoked"
 
 # A quién va un aviso general.

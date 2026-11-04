@@ -16,6 +16,7 @@ export const paths = {
   connection: '/perfil/conexion',
   password: '/perfil/contrasena',
   accounts: '/usuarios',
+  unlocks: '/habilitaciones',
 } as const
 
 export const DASHBOARDS = [

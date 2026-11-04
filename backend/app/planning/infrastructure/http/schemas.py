@@ -1,7 +1,7 @@
 """Contratos JSON de la API de planificación (adaptador de entrada)."""
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -158,3 +158,49 @@ class AnnouncementIn(BaseModel):
 
 class CreatedOut(BaseModel):
     created: int
+
+
+# --- Hora de corte y habilitaciones ----------------------------------------------------
+
+
+class UnlockOut(BaseModel):
+    id: int
+    seller: str
+    date: date
+    reason: str
+    status: str
+    requested_at: datetime
+    decided_by: str | None
+    decided_at: datetime | None
+
+
+class EditingDayOut(BaseModel):
+    date: date
+    closes_at: datetime
+    open: bool
+    unlock: UnlockOut | None
+
+
+class CutoffOut(BaseModel):
+    cutoff_time: str
+    days_before: int
+    open_days: int
+
+
+class EditingWindowOut(BaseModel):
+    policy: CutoffOut
+    days: list[EditingDayOut]
+
+
+class UnlockRequestIn(BaseModel):
+    date: date
+    reason: str = Field(min_length=1, max_length=300)
+
+
+class UnlockDecisionIn(BaseModel):
+    action: Literal["approve", "reject", "close"]
+
+
+class CutoffIn(BaseModel):
+    cutoff_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    days_before: int = Field(ge=0, le=7)

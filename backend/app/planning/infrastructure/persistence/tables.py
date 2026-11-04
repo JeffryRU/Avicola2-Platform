@@ -104,3 +104,27 @@ notifications = Table(
     Column("read_at", DateTime(timezone=True)),
     Index(None, "seller_id", "created_at"),
 )
+
+settings = Table(
+    TABLES["settings"],
+    metadata,
+    Column("key", String(50), primary_key=True),
+    Column("value", String(200), nullable=False),
+    Column("updated_by", String(50)),
+    Column("updated_at", DateTime(timezone=True)),
+)
+
+edit_unlocks = Table(
+    TABLES["edit_unlocks"],
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("seller_id", Integer, ForeignKey(TABLES.fk("sellers")), nullable=False),
+    Column("date", Date, nullable=False),
+    Column("reason", String(300), nullable=False),
+    # requested | approved | rejected | closed (domain/editing.UNLOCK_STATUSES), no ENUM.
+    Column("status", String(15), nullable=False),
+    Column("requested_at", DateTime(timezone=True), nullable=False),
+    Column("decided_by", String(50)),
+    Column("decided_at", DateTime(timezone=True)),
+    Index(None, "seller_id", "date"),
+)

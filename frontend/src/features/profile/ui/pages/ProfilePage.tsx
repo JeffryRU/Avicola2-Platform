@@ -1,10 +1,10 @@
-import { ChevronRight, KeyRound, LogOut, UserCog } from 'lucide-react'
+import { ChevronRight, KeyRound, LockOpen, LogOut, UserCog } from 'lucide-react'
 import { Link } from 'react-router'
 import { useContainer } from '@/app/di'
 import { InstallOption } from '@/app/install'
 import { paths } from '@/app/routes'
 import { initials } from '@/shared/domain/format'
-import { roleLabel } from '@/features/auth/domain/session'
+import { isSupervisor, roleLabel } from '@/features/auth/domain/session'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
@@ -40,6 +40,18 @@ export function ProfilePage() {
             </span>
             <ChevronRight className="size-[18px]" />
           </Link>
+          {isSupervisor(seller) && (
+            <Link to={paths.unlocks} className={optCls}>
+              <span className={cn(tileCls, 'bg-ok-soft text-ok')}>
+                <LockOpen />
+              </span>
+              <span className="min-w-0 flex-1">
+                <b className="block">Habilitaciones</b>
+                <small className="text-muted-foreground">Horario de corte y solicitudes de edición</small>
+              </span>
+              <ChevronRight className="size-[18px]" />
+            </Link>
+          )}
           <InstallOption className={optCls} />
           <Link to={paths.password} className={optCls}>
             <span className={cn(tileCls, 'bg-warn-soft text-warn')}>

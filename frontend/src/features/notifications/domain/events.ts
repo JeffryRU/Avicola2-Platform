@@ -12,6 +12,12 @@ export const realtimeEventSchema = z.discriminatedUnion('type', [
     data: z.object({ seller: z.string(), dates: z.array(z.string()) }),
   }),
   z.object({ type: z.literal('session.revoked'), data: z.object({ reason: z.string() }) }),
+  z.object({ type: z.literal('editing.changed'), data: z.looseObject({}) }),
 ])
 export type RealtimeEvent = z.infer<typeof realtimeEventSchema>
-export const REALTIME_EVENT_TYPES = ['notification', 'projections.changed', 'session.revoked'] as const
+export const REALTIME_EVENT_TYPES = [
+  'notification',
+  'projections.changed',
+  'session.revoked',
+  'editing.changed',
+] as const

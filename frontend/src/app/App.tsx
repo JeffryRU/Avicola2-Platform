@@ -18,6 +18,9 @@ import { Splash } from '@/shared/ui/components/feedback'
 import { Toaster } from '@/shared/ui/components/shadcn/sonner'
 
 /** Pantallas cargadas a demanda: el celular descarga solo lo que abre. */
+const UnlocksPage = lazy(() =>
+  import('@/features/editing/ui/pages/UnlocksPage').then((m) => ({ default: m.UnlocksPage })),
+)
 const AccountsPage = lazy(() =>
   import('@/features/accounts/ui/AccountsPage').then((m) => ({ default: m.AccountsPage })),
 )
@@ -137,6 +140,7 @@ function Routed() {
             <Route element={<AppShell />}>
               <Route index element={<SupervisorHomePage />} />
               <Route path={paths.accounts} element={<AccountsPage />} />
+              <Route path={paths.unlocks} element={<UnlocksPage />} />
               <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />
               <Route path={paths.dashVersus} element={<DashboardVersusPage />} />
               <Route path={paths.dashStatus} element={<DashboardStatusPage />} />
