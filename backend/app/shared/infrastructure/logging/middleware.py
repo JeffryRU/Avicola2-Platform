@@ -4,6 +4,7 @@ import logging
 import re
 import time
 from collections.abc import Awaitable, Callable
+from http import HTTPStatus
 from uuid import uuid4
 
 from fastapi import FastAPI, Request, Response
@@ -21,9 +22,9 @@ API_PREFIXES = ("/api/", "/ingest/")
 
 
 def _level(path: str, status: int) -> int:
-    if status >= 500:
+    if status >= HTTPStatus.INTERNAL_SERVER_ERROR:
         return logging.ERROR
-    if status >= 400:
+    if status >= HTTPStatus.BAD_REQUEST:
         return logging.WARNING
     return logging.INFO if path.startswith(API_PREFIXES) else logging.DEBUG
 

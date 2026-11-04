@@ -13,7 +13,7 @@ from app.planning.domain.models import CONFIRMED, DailyUnits
 
 
 def _fraction(key: str) -> float:
-    return int(hashlib.md5(key.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
+    return int(hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()[:8], 16) / 0xFFFFFFFF
 
 
 class SimulatedSalesSource:

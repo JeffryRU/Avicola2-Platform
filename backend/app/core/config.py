@@ -6,7 +6,7 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_AUTH_SECRET = "cambiar-en-produccion"
+DEFAULT_AUTH_SECRET = "cambiar-en-produccion"  # noqa: S105 (marcador: fuera de local se rechaza)
 MIN_SECRET_LENGTH = 32
 
 

@@ -28,14 +28,16 @@ STATUS_BY_ERROR: dict[type[DomainError], int] = {
 
 def register_error_handlers(app: FastAPI) -> None:
     async def handle(_: Request, exc: Exception) -> JSONResponse:
-        assert isinstance(exc, DomainError)
+        if not isinstance(exc, DomainError):
+            raise exc
         code = next(c for t, c in STATUS_BY_ERROR.items() if isinstance(exc, t))
         # Errores esperados (datos inválidos, login fallido): INFO, no ensucian errors.log.
         logger.info("Rechazado (%s): %s", type(exc).__name__, exc.message)
         return JSONResponse({"detail": exc.message}, status_code=code)
 
     async def handle_validation(request: Request, exc: Exception) -> JSONResponse:
-        assert isinstance(exc, RequestValidationError)
+        if not isinstance(exc, RequestValidationError):
+            raise exc
         # Solo campo y motivo: el valor recibido puede ser una contraseña o un token.
         fields = "; ".join(
             f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in exc.errors()

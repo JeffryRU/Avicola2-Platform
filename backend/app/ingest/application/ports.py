@@ -20,7 +20,7 @@ from app.ingest.domain.schema import TableSpec
 
 class FileReader(Protocol):
     def read(self, content: bytes, filename: str, known: set[str]) -> RawTable:
-        """Elige la hoja y la fila de encabezado más probables. Lanza UnreadableFile."""
+        """Elige la hoja y la fila de encabezado más probables. Lanza UnreadableFileError."""
         ...
 
 

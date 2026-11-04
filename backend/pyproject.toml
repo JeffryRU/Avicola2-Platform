@@ -38,8 +38,53 @@ package = false
 line-length = 100
 target-version = "py312"
 
+[tool.ruff.format]
+docstring-code-format = true
+
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM"]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "N",        # pep8-naming
+    "UP",       # pyupgrade
+    "B",        # bugbear: errores probables
+    "A",        # no tapar builtins
+    "C4",       # comprensiones
+    "SIM",      # simplificaciones
+    "RET",      # returns
+    "PIE",      # misc
+    "PERF",     # rendimiento
+    "PTH",      # pathlib en vez de os.path
+    "DTZ",      # datetimes con zona horaria
+    "S",        # bandit: seguridad
+    "BLE",      # except Exception ciego
+    "T20",      # sin print (usar logging)
+    "LOG", "G", # buen uso de logging
+    "ERA",      # código comentado
+    "ARG",      # argumentos sin usar
+    "ISC",      # concatenación implícita de strings
+    "TID",      # imports: sin relativos
+    "PT",       # pytest
+    "PL",       # pylint
+    "ASYNC",    # async
+    "FAST",     # FastAPI
+    "RUF",      # reglas propias de Ruff
+]
+ignore = [
+    "PLR0913", "PLR0917",  # los casos de uso reciben sus puertos por constructor
+    "RUF001", "RUF002", "RUF003",  # textos en español (×, «», tildes) no son ambiguos
+    "PT018",  # se permite `assert a and b` en las pruebas
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S107", "PLR2004", "PLC0415", "ARG001", "DTZ001"]
+# Comandos de consola: imprimen en pantalla y generan datos de ejemplo.
+"app/**/cli.py" = ["T201", "S311", "PLR2004"]
+"../scripts/**" = ["T201", "S311", "DTZ011"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

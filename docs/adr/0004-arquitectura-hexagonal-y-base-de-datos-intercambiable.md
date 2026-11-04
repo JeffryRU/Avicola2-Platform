@@ -55,6 +55,8 @@ backend/app/
 
 ### Frontend: PWA con la misma separación por capas
 
+> La estructura de carpetas de abajo fue reemplazada por la [0008](0008-frontend-por-features.md) (features + shared). Las reglas de capas siguen igual.
+
 ```
 frontend/src/
 ├── core/                 núcleo: fechas y formatos (domain), puertos y ApiError (application),

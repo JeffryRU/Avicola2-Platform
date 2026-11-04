@@ -1,32 +1,32 @@
-# Datos maestros iniciales de la app de planificación (los del mockup).
-# `python -m app.planning.infrastructure.cli init` los carga o actualiza.
-# SUPUESTO: catálogo y vendedores de ejemplo; el real está por validar (docs/assumptions.md).
+# Datos maestros de la app de planificación ("TABLAS MAESTRAS PARA APP.xlsx" de Avícola 2).
+# `python -m app.planning.infrastructure.cli init` los carga o actualiza; los productos que ya
+# no están aquí se desactivan (no se borran: las proyecciones antiguas los siguen citando).
+# `subcategory` agrupa la tabla de proyección (Brasa chica/mediana/grande); la proyección es por
+# categoría, como en el mockup. `kg_per_unit` es la columna «Peso» (kg por unidad, promedio).
 
 products:
   BRASA:
-    - {id: B1, name: Brasa 1, kg_per_unit: 1.20}
-    - {id: B2, name: Brasa 2, kg_per_unit: 1.50}
-    - {id: B3, name: Brasa 3, kg_per_unit: 1.80}
-    - {id: B4, name: Brasa 4, kg_per_unit: 2.00}
-    - {id: B5, name: Brasa 5, kg_per_unit: 1.50}
-    - {id: B6, name: Brasa 6, kg_per_unit: 1.80}
-    - {id: B7, name: Brasa 7, kg_per_unit: 2.20}
-    - {id: B8, name: Brasa 8, kg_per_unit: 2.50}
-    - {id: B9, name: Brasa 9, kg_per_unit: 2.80}
-    - {id: B10, name: Brasa 10, kg_per_unit: 3.00}
-  BROASTER:
-    - {id: R1, name: Broaster 1, kg_per_unit: 0.90}
-    - {id: R2, name: Broaster 2, kg_per_unit: 1.05}
-    - {id: R3, name: Broaster 3, kg_per_unit: 1.20}
-    - {id: R4, name: Broaster 4, kg_per_unit: 1.35}
-    - {id: R5, name: Broaster 5, kg_per_unit: 1.50}
-    - {id: R6, name: Broaster 6, kg_per_unit: 1.65}
+    - {id: P0001, name: Brasa 1, subcategory: Brasa chica, kg_per_unit: 1.0}
+    - {id: P0002, name: Brasa 2, subcategory: Brasa chica, kg_per_unit: 1.2}
+    - {id: P0003, name: Brasa 3, subcategory: Brasa chica, kg_per_unit: 1.3}
+    - {id: P0004, name: Brasa 4, subcategory: Brasa chica, kg_per_unit: 1.4}
+    - {id: P0005, name: Brasa 5, subcategory: Brasa mediana, kg_per_unit: 1.5}
+    - {id: P0006, name: Brasa 6, subcategory: Brasa mediana, kg_per_unit: 1.6}
+    - {id: P0007, name: Brasa 7, subcategory: Brasa grande, kg_per_unit: 1.7}
+    - {id: P0008, name: Brasa 8, subcategory: Brasa grande, kg_per_unit: 1.8}
+    - {id: P0009, name: Brasa 9, subcategory: Brasa grande, kg_per_unit: 1.9}
+    - {id: P0010, name: Brasa 10, subcategory: Brasa grande, kg_per_unit: 2.0}
 
-# Usuarios de prueba: solo se crean con APP_ENV=local. La contraseña sale de
-# PLANNING_DEMO_PASSWORD (por defecto demo1234). En producción, el primer supervisor se crea con
-# `cli supervisor` y él da de alta a los vendedores desde la app.
+# Vendedores (id_usuario U0001..U0007 de la tabla maestra). Solo se crean con APP_ENV=local, con la
+# contraseña de PLANNING_DEMO_PASSWORD (por defecto demo1234). En producción, el primer supervisor
+# se crea con `cli supervisor` y él da de alta a los vendedores desde la app.
+# SUPUESTO: el supervisor es de prueba; la tabla maestra no indica quién administra las cuentas.
 users:
-  - {username: supervisor, name: Ana Torres, role: supervisor}
-  - {username: jperez, name: Juan Pérez, zone: Zona Norte}
-  - {username: mrios, name: María Ríos, zone: Zona Sur}
-  - {username: cleon, name: Carlos León, zone: Zona Centro}
+  - {username: supervisor, name: Supervisor de prueba, role: supervisor}
+  - {username: rnavarro, name: Roberto Navarro, zone: Trujillo}       # U0001
+  - {username: hdias, name: Hebert Días, zone: Chiclayo}               # U0002
+  - {username: mcordova, name: Miguel Córdova, zone: Piura}            # U0003
+  - {username: gfernandez, name: Gary Fernández, zone: San Martín}     # U0004
+  - {username: jgonzales, name: Jhony Gonzales, zone: Chimbote}        # U0005
+  - {username: cvillalobos, name: César Villalobos, zone: Trujillo}    # U0006
+  - {username: eauleste, name: Estuardo Auleste, zone: Trujillo}       # U0007

@@ -11,3 +11,4 @@ Cada decisión de arquitectura relevante o supuesto de proceso se registra aquí
 | [0005](0005-seguridad-de-sesion-y-cuentas.md) | Seguridad de sesión y cuentas: cookie HttpOnly, supervisor y recuperación asistida | aceptado |
 | [0006](0006-notificaciones-y-tiempo-real.md) | Notificaciones reales y tiempo real con SSE | aceptado |
 | [0007](0007-frontend-en-vercel-con-proxy-api.md) | Frontend en Vercel con proxy de /api al backend | aceptado |
+| [0008](0008-frontend-por-features.md) | Frontend por features (screaming) y vocabulario en una sola fuente | aceptado |

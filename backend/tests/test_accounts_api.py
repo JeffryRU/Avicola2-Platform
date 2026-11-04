@@ -27,7 +27,7 @@ def client():
     return TestClient(app)
 
 
-def _login(client, username="jperez", password="demo1234", remember=False):
+def _login(client, username="rnavarro", password="demo1234", remember=False):
     return client.post(
         "/api/auth/login",
         json={"username": username, "password": password, "remember": remember},
@@ -42,9 +42,9 @@ def test_login_sets_httponly_cookie_and_never_returns_the_token(client):
     assert r.status_code == 200
     assert r.json() == {
         "seller": {
-            "username": "jperez",
-            "name": "Juan Pérez",
-            "zone": "Zona Norte",
+            "username": "rnavarro",
+            "name": "Roberto Navarro",
+            "zone": "Trujillo",
             "role": "seller",
         },
         "must_change_password": False,
@@ -80,7 +80,7 @@ def test_api_responses_are_not_cached(client):
 
 def test_unknown_user_and_wrong_password_look_the_same(client):
     a = _login(client, "noexiste", "loquesea1")
-    b = _login(client, "jperez", "mala-clave-1")
+    b = _login(client, "rnavarro", "mala-clave-1")
     assert a.status_code == b.status_code == 401
     assert a.json() == b.json() == {"detail": "Usuario o contraseña incorrectos."}
 
@@ -128,7 +128,7 @@ def test_change_password_rotates_the_session(client):
         ("demo1234", "demo1234", "distinta"),
         ("demo1234", "corta1", "entre 8"),
         ("demo1234", "solamenteletras", "letras y números"),
-        ("demo1234", "jperez2026", "fácil de adivinar"),
+        ("demo1234", "rnavarro2026", "fácil de adivinar"),
     ],
 )
 def test_change_password_rules(client, current, new, error):
@@ -149,7 +149,7 @@ def test_password_policy_rejects_common_passwords():
 def test_only_supervisor_manages_accounts(client):
     _login(client)
     assert client.get("/api/admin/accounts").status_code == 403
-    assert client.post("/api/admin/accounts/mrios/reset-password").status_code == 403
+    assert client.post("/api/admin/accounts/hdias/reset-password").status_code == 403
 
 
 def test_supervisor_creates_account_with_temporary_password(client):
@@ -185,18 +185,18 @@ def test_reset_password_unlocks_and_closes_sessions(client):
         _login(TestClient(app), password="mala-clave-1")
 
     _login(client, "supervisor")
-    r = client.post("/api/admin/accounts/jperez/reset-password")
+    r = client.post("/api/admin/accounts/rnavarro/reset-password")
     assert r.status_code == 200
     temporary = r.json()["temporary_password"]
     assert seller.get("/api/auth/me").status_code == 401  # sesión anterior cerrada
-    assert _login(TestClient(app), "jperez", temporary).json()["must_change_password"]
+    assert _login(TestClient(app), "rnavarro", temporary).json()["must_change_password"]
 
 
 def test_deactivated_account_cannot_log_in(client):
     seller = TestClient(app)
     _login(seller)
     _login(client, "supervisor")
-    r = client.patch("/api/admin/accounts/jperez", json={"active": False})
+    r = client.patch("/api/admin/accounts/rnavarro", json={"active": False})
     assert r.status_code == 200 and r.json()["is_active"] is False
     assert seller.get("/api/catalog").status_code == 401
     assert _login(TestClient(app)).status_code == 401
@@ -214,8 +214,8 @@ def test_temporary_passwords_are_random_and_mixed():
 
 def test_tokens_from_another_secret_or_without_version_are_rejected():
     tokens = JwtTokenService("a" * 40, 1)
-    assert tokens.decode(tokens.issue("jperez", 3)).version == 3
-    assert JwtTokenService("b" * 40, 1).decode(tokens.issue("jperez", 3)) is None
+    assert tokens.decode(tokens.issue("rnavarro", 3)).version == 3
+    assert JwtTokenService("b" * 40, 1).decode(tokens.issue("rnavarro", 3)) is None
     assert tokens.decode("no-es-un-jwt") is None
 
 
@@ -290,3 +290,52 @@ def test_trusted_frontend_origin_is_allowed_behind_a_proxy():
 def test_trusted_origins_setting_parses_a_comma_list():
     s = Settings(trusted_origins=" https://a.vercel.app/ , https://b-*.vercel.app ,")
     assert s.trusted_origin_list == ("https://a.vercel.app", "https://b-*.vercel.app")
+
+
+def test_update_own_profile_name(client):
+    _login(client)
+    r = client.patch("/api/auth/profile", json={"name": "  Roberto   Navarro Ruiz "})
+    assert r.status_code == 200, r.text
+    assert r.json()["seller"]["name"] == "Roberto Navarro Ruiz"
+    assert client.get("/api/auth/me").json()["seller"]["name"] == "Roberto Navarro Ruiz"
+    assert client.patch("/api/auth/profile", json={"name": "   "}).status_code == 422
+
+
+def test_update_profile_requires_session(client):
+    client.cookies.clear()
+    assert client.patch("/api/auth/profile", json={"name": "Alguien"}).status_code == 401
+
+
+def test_cli_creates_the_master_table_sellers_with_temporary_passwords(capsys):
+    """`cli vendedores` (producción): 7 cuentas que deben cambiar su contraseña al entrar."""
+    metadata.drop_all(engine)
+    metadata.create_all(engine)
+    with SessionLocal() as session:
+        cli.create_sellers(session, get_settings())
+        out = capsys.readouterr().out
+        assert "OK: 7 cuentas listas" in out
+        assert "supervisor " not in out
+        temporary = next(line.split()[1] for line in out.splitlines() if "cvillalobos" in line)
+        cli.create_sellers(session, get_settings())  # idempotente
+        assert "OK: 0 cuentas listas" in capsys.readouterr().out
+    client = TestClient(app)
+    r = _login(client, "cvillalobos", temporary)
+    assert r.status_code == 200
+    assert r.json()["must_change_password"] is True
+    assert r.json()["seller"]["zone"] == "Trujillo"
+
+
+def test_cli_simple_reset_gives_username_passwords_that_must_be_changed(capsys):
+    metadata.drop_all(engine)
+    metadata.create_all(engine)
+    with SessionLocal() as session:
+        cli.create_sellers(session, get_settings())
+        cli.create_sellers(session, get_settings(), simple=True, reset=True)
+        assert "eauleste      eauleste2026" in capsys.readouterr().out
+    client = TestClient(app)
+    r = _login(client, "eauleste", "eauleste2026")
+    assert r.status_code == 200
+    assert r.json()["must_change_password"] is True
+    # La contraseña simple no sirve como contraseña definitiva (contiene el usuario).
+    with pytest.raises(DomainError):
+        check_new_password("eauleste2026", "eauleste")

@@ -16,12 +16,12 @@ import { NavLink, Outlet, useLocation } from 'react-router'
 import { useContainer } from '@/app/di'
 import { InstallBanner } from '@/app/install'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
-import { initials } from '@/core/domain/format'
-import { isSupervisor, roleLabel } from '@/modules/auth/domain/session'
-import { useRequiredSession } from '@/modules/auth/ui/use-session'
-import { useUnreadCount } from '@/modules/notifications/ui/hooks'
-import { Logo } from '@/ui/components/brand'
-import { cn } from '@/ui/lib/utils'
+import { initials } from '@/shared/domain/format'
+import { isSupervisor, roleLabel } from '@/features/auth/domain/session'
+import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { useUnreadCount } from '@/features/notifications/ui/hooks'
+import { Logo } from '@/shared/ui/components/brand'
+import { cn } from '@/shared/ui/lib/utils'
 
 const itemCls = (active: boolean) =>
   cn(
@@ -59,8 +59,7 @@ function Sidebar() {
   const { pathname } = useLocation()
   const unread = useUnreadCount()
   const inDash = pathname.startsWith('/dashboards')
-  const [open, setOpen] = useState(true)
-  const expanded = open || inDash
+  const [expanded, setExpanded] = useState(true)
   // El supervisor no registra proyecciones: administra usuarios y ve los dashboards del equipo.
   const supervisor = isSupervisor(seller)
   return (
@@ -69,12 +68,12 @@ function Sidebar() {
         <Logo />
       </div>
       <nav className="grid gap-0.5" aria-label="Principal">
-        {!supervisor && <SideItem to={paths.home} end icon={<Home />} label="Inicio" />}
+        <SideItem to={paths.home} end icon={<Home />} label="Inicio" />
         {!supervisor && <SideItem to={paths.register} icon={<Plus />} label="Registrar" />}
         <button
           type="button"
           aria-expanded={expanded}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setExpanded((v) => !v)}
           className={cn(itemCls(false), inDash && 'bg-secondary text-primary hover:bg-secondary hover:text-primary')}
         >
           <BarChart3 />
@@ -145,6 +144,7 @@ const BOTTOM = [
   { to: paths.profile, icon: User, label: 'Perfil' },
 ]
 const BOTTOM_SUPERVISOR = [
+  { to: paths.home, icon: Home, label: 'Inicio', end: true },
   { to: paths.dashSummary, icon: BarChart3, label: 'Dashboards', end: false },
   { to: paths.accounts, icon: Users, label: 'Usuarios', end: false },
   { to: paths.notifications, icon: Bell, label: 'Avisos', end: false },
@@ -157,7 +157,8 @@ function BottomNav() {
   return (
     <nav
       aria-label="Navegación"
-      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-white/95 px-1.5 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))] backdrop-blur-md dsk:hidden"
+      style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+      className="fixed inset-x-0 bottom-0 z-30 grid border-t bg-white/95 px-1.5 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))] backdrop-blur-md dsk:hidden"
     >
       {items.map(({ to, icon: Icon, label, end }) => (
         <NavLink
@@ -195,7 +196,7 @@ export function AppShell() {
   return (
     <div className="flex min-h-dvh">
       <Sidebar />
-      <main className="min-w-0 flex-1">
+      <main className="@container/main min-w-0 flex-1">
         <div
           key={pathname}
           className={cn(

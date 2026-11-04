@@ -27,4 +27,4 @@ Archivos de log de la plataforma. La carpeta se versiona; los archivos `.log`, n
 ## Código
 
 - Backend: `backend/app/shared/infrastructure/logging/` (configuración, formato, middleware y `client.py` para los reportes del navegador).
-- Frontend: `frontend/src/core/application/error-reporter.ts`, `core/infrastructure/` (envío y captura global) y `ui/components/error-boundary.tsx`.
+- Frontend: `frontend/src/shared/application/error-reporter.ts`, `shared/infrastructure/` (envío y captura global) y `shared/ui/components/error-boundary.tsx`.

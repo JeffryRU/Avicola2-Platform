@@ -73,7 +73,7 @@ def test_unreadable_file_is_logged(service, fake_repo) -> None:
 
 
 def test_bronze_rejects_path_traversal(lakehouse) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="clave de bronze no válida"):
         lakehouse.get_bronze("bronze/../../secreto.txt")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="clave de bronze no válida"):
         lakehouse.get_bronze("silver/orders/_delta_log/0.json")

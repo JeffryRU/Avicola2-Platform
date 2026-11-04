@@ -4,7 +4,7 @@ import io
 
 import pandas as pd
 
-from app.ingest.domain.models import RawTable, UnreadableFile
+from app.ingest.domain.models import RawTable, UnreadableFileError
 from app.ingest.domain.normalize import is_blank, normalize_header
 
 HEADER_SCAN_ROWS = 15
@@ -58,13 +58,13 @@ def read_file(content: bytes, filename: str, known: set[str]) -> RawTable:
                 io.BytesIO(content), sheet_name=None, header=None, dtype=object, **_NA
             )
         else:
-            raise UnreadableFile(
+            raise UnreadableFileError(
                 f"formato no soportado: {filename} (se aceptan .xlsx, .xls y .csv)"
             )
-    except UnreadableFile:
+    except UnreadableFileError:
         raise
     except Exception as exc:  # pandas/openpyxl lanzan varios tipos según el daño del archivo
-        raise UnreadableFile(f"no se pudo leer {filename}: {exc}") from exc
+        raise UnreadableFileError(f"no se pudo leer {filename}: {exc}") from exc
 
     best: tuple[int, str, int] | None = None
     for sheet, raw in sheets.items():
@@ -74,7 +74,7 @@ def read_file(content: bytes, filename: str, known: set[str]) -> RawTable:
         if best is None or score > best[0]:
             best = (score, sheet, row)
     if best is None:
-        raise UnreadableFile(f"{filename} no tiene datos")
+        raise UnreadableFileError(f"{filename} no tiene datos")
     _, sheet, row = best
     return _to_table(sheets[sheet], row, sheet)
 

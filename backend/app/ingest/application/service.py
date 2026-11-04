@@ -14,7 +14,7 @@ from app.ingest.application.ports import (
     IngestRepository,
 )
 from app.ingest.domain.catalog import Catalog
-from app.ingest.domain.models import LogEntry, ParseOutcome, PendingMapping, UnreadableFile
+from app.ingest.domain.models import LogEntry, ParseOutcome, PendingMapping, UnreadableFileError
 from app.ingest.domain.pipeline import parse
 from app.ingest.domain.schema import IngestSchema
 
@@ -90,7 +90,7 @@ class IngestService:
     ) -> IngestResult:
         try:
             raw = self.reader.read(content, file_name, self.schema.known_names())
-        except UnreadableFile as exc:
+        except UnreadableFileError as exc:
             logger.warning("Archivo ilegible %s (%s): %s", file_name, source, exc.message)
             log_id = self.repo.log(
                 LogEntry(

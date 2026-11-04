@@ -28,6 +28,10 @@ class AccountOut(BaseModel):
     must_change_password: bool
 
 
+class ProfileIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
 class ChangePasswordIn(BaseModel):
     current_password: str = Field(min_length=1, max_length=200)
     new_password: str = Field(min_length=1, max_length=200)
@@ -68,6 +72,7 @@ class ProductOut(BaseModel):
     name: str
     kg_per_unit: float
     sort_order: int
+    subcategory: str | None = None
 
 
 class ProjectionOut(BaseModel):

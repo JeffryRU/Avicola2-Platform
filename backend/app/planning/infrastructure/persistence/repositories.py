@@ -25,7 +25,14 @@ class SqlProductRepository:
             select(products).where(products.c.is_active.is_(True))
         ).mappings()
         return [
-            Product(r["id"], r["category"], r["name"], float(r["kg_per_unit"]), r["sort_order"])
+            Product(
+                r["id"],
+                r["category"],
+                r["name"],
+                float(r["kg_per_unit"]),
+                r["sort_order"],
+                r["subcategory"],
+            )
             for r in rows
         ]
 
@@ -96,6 +103,14 @@ class SqlSellerRepository:
             update(sellers)
             .where(sellers.c.username == account.seller.username)
             .values(_security_values(account))
+        )
+        self.session.commit()
+
+    def save_profile(self, seller: Seller) -> None:
+        self.session.execute(
+            update(sellers)
+            .where(sellers.c.username == seller.username)
+            .values(name=seller.name, zone=seller.zone)
         )
         self.session.commit()
 
@@ -206,7 +221,7 @@ class SqlProjectionRepository:
         rows = self.session.execute(
             select(sellers.c.username, sellers.c.id).where(sellers.c.username.in_(usernames))
         ).all()
-        found = {u: i for u, i in rows}
+        found = dict(rows)
         if missing := usernames - set(found):
             raise DomainError(f"El vendedor no existe: {', '.join(sorted(missing))}.")
         return found
