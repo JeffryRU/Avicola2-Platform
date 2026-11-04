@@ -3,8 +3,9 @@
     uv run python -m app.planning.infrastructure.cli init         productos (+ usuarios de prueba)
     uv run python -m app.planning.infrastructure.cli supervisor <usuario> "<nombre>"
                                                         primer supervisor, con contraseña temporal
-    uv run python -m app.planning.infrastructure.cli vendedores   vendedores de la tabla maestra,
-                                                        cada uno con contraseña temporal
+    uv run python -m app.planning.infrastructure.cli vendedores [--simple] [--reset]
+                        vendedores de la tabla maestra con contraseña temporal
+                        (--simple: <usuario>2026; --reset: también a los que ya existen)
     uv run python -m app.planning.infrastructure.cli seed         3 semanas de ejemplo
     uv run python -m app.planning.infrastructure.cli show [n]     resumen y últimas n
     uv run python -m app.planning.infrastructure.cli clear --yes  borra las proyecciones
@@ -15,6 +16,7 @@ Las tablas las crea Alembic (`uv run alembic upgrade head`).
 import os
 import random
 import sys
+from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
 
 import yaml
@@ -130,11 +132,18 @@ def create_supervisor(session: Session, username: str, name: str) -> None:
     print(f"  {temporary}")
 
 
-def create_sellers(session: Session, settings: Settings) -> None:
+# Temporal y obligada a cambiarse al entrar (la política rechaza contraseñas con el usuario).
+SIMPLE_PASSWORD_SUFFIX = "2026"  # noqa: S105
+
+
+def create_sellers(
+    session: Session, settings: Settings, *, simple: bool = False, reset: bool = False
+) -> None:
     """Vendedores de config/planning_seed.yaml (U0001..U0007), con contraseña temporal.
 
-    Sirve en producción: cada contraseña se muestra una sola vez y se pide cambiarla al entrar.
-    Los que ya existen no se tocan (ni su contraseña).
+    Sirve en producción: imprime usuario y contraseña de cada uno, y al entrar se les pide
+    cambiarla. `simple` usa <usuario>2026 (fácil de dictar en una entrevista); `reset` también
+    restablece a los que ya existen y cierra sus sesiones abiertas.
     """
     with (settings.config_dir / "planning_seed.yaml").open(encoding="utf-8") as fh:
         seed = yaml.safe_load(fh)
@@ -143,26 +152,44 @@ def create_sellers(session: Session, settings: Settings) -> None:
         ScryptPasswordHasher(),
         RandomTemporaryPasswords(),
     )
-    created = 0
+    rows: list[tuple[str, str, str, str]] = []
     for s in seed["users"]:
         if s.get("role", SELLER) != SELLER:
             continue
         username = s["username"]
         check_username(username)
-        if repo.get_account(username, active_only=False):
-            print(f"  {username:<12} ya existe (sin cambios)")
+        existing = repo.get_account(username, active_only=False)
+        if existing and not reset:
+            rows.append((username, "(ya existe, sin cambios)", s["name"], s.get("zone") or ""))
             continue
-        temporary = passwords.generate()
-        repo.create(
-            SellerAccount(
-                Seller(username, s["name"], s.get("zone"), SELLER),
-                hasher.hash(temporary),
-                must_change_password=True,
+        password = f"{username}{SIMPLE_PASSWORD_SUFFIX}" if simple else passwords.generate()
+        if existing:
+            repo.save_security(
+                replace(
+                    existing,
+                    password_hash=hasher.hash(password),
+                    must_change_password=True,
+                    failed_logins=0,
+                    locked_until=None,
+                    token_version=existing.token_version + 1,
+                    is_active=True,
+                )
             )
-        )
-        created += 1
-        print(f"  {username:<12} {temporary}   {s['name']} ({s.get('zone') or 'sin zona'})")
-    print(f"OK: {created} vendedores creados. Al entrar, cada uno cambia su contraseña.")
+        else:
+            repo.create(
+                SellerAccount(
+                    Seller(username, s["name"], s.get("zone"), SELLER),
+                    hasher.hash(password),
+                    must_change_password=True,
+                )
+            )
+        rows.append((username, password, s["name"], s.get("zone") or ""))
+    print(f"{'USUARIO':<14}{'CONTRASEÑA':<26}{'NOMBRE':<20}ZONA")
+    for username, password, name, zone in rows:
+        print(f"{username:<14}{password:<26}{name:<20}{zone}")
+    changed = sum(1 for r in rows if not r[1].startswith("("))
+    print()
+    print(f"OK: {changed} cuentas listas. Al entrar, cada uno debe cambiar su contraseña.")
 
 
 def seed_history(session: Session, settings: Settings) -> None:
@@ -244,7 +271,7 @@ def main(argv: list[str]) -> int:
         if cmd == "init":
             init(session, settings)
         elif cmd == "vendedores":
-            create_sellers(session, settings)
+            create_sellers(session, settings, simple="--simple" in argv, reset="--reset" in argv)
         elif cmd == "seed":
             seed_history(session, settings)
         elif cmd == "supervisor" and len(argv) == 3:

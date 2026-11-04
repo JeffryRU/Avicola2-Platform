@@ -118,7 +118,9 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
      ```bash
      docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli vendedores
      ```
-     Muestra una contraseña temporal por vendedor (solo esa vez; se cambia al entrar). Los que ya existen no se tocan.
+     Imprime una tabla con usuario, contraseña temporal, nombre y zona. Cada uno debe cambiar su contraseña al entrar.
+     - `--simple`: contraseña `<usuario>2026` (p. ej. `cvillalobos2026`), fácil de dictar. Como contiene el usuario, la app no la acepta como contraseña definitiva.
+     - `--reset`: también restablece a los que ya existen y cierra sus sesiones. Sin `--reset`, los existentes no se tocan.
 
    En Dokploy y Coolify esto se corre desde la terminal del servicio `backend` (sin el prefijo `docker compose ... exec backend`).
 3. **Editor de n8n** por túnel SSH, desde tu PC:

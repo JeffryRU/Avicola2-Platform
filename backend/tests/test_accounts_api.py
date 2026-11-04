@@ -313,13 +313,29 @@ def test_cli_creates_the_master_table_sellers_with_temporary_passwords(capsys):
     with SessionLocal() as session:
         cli.create_sellers(session, get_settings())
         out = capsys.readouterr().out
-        assert "OK: 7 vendedores creados" in out
+        assert "OK: 7 cuentas listas" in out
         assert "supervisor " not in out
         temporary = next(line.split()[1] for line in out.splitlines() if "cvillalobos" in line)
         cli.create_sellers(session, get_settings())  # idempotente
-        assert "OK: 0 vendedores creados" in capsys.readouterr().out
+        assert "OK: 0 cuentas listas" in capsys.readouterr().out
     client = TestClient(app)
     r = _login(client, "cvillalobos", temporary)
     assert r.status_code == 200
     assert r.json()["must_change_password"] is True
     assert r.json()["seller"]["zone"] == "Trujillo"
+
+
+def test_cli_simple_reset_gives_username_passwords_that_must_be_changed(capsys):
+    metadata.drop_all(engine)
+    metadata.create_all(engine)
+    with SessionLocal() as session:
+        cli.create_sellers(session, get_settings())
+        cli.create_sellers(session, get_settings(), simple=True, reset=True)
+        assert "eauleste      eauleste2026" in capsys.readouterr().out
+    client = TestClient(app)
+    r = _login(client, "eauleste", "eauleste2026")
+    assert r.status_code == 200
+    assert r.json()["must_change_password"] is True
+    # La contraseña simple no sirve como contraseña definitiva (contiene el usuario).
+    with pytest.raises(DomainError):
+        check_new_password("eauleste2026", "eauleste")
