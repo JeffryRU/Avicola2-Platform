@@ -1,32 +1,31 @@
 import { Check, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { dDM, dDow, dFull, dShort, weekLabel } from '@/shared/domain/dates'
+import { dDM, dDow, dFull, dShort, rangeLabel } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
-import { weekAgg } from '@/features/projections/domain/aggregation'
-import { DashboardFilters, DashboardTabs, useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
+import { periodAgg } from '@/features/projections/domain/aggregation'
+import { DashboardTabs, useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
+import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
 import { useCatalog } from '@/features/catalog/ui/hooks'
-import { useWindowData } from '@/features/projections/ui/hooks'
 import { BarChart, useTooltip } from '@/shared/ui/components/charts'
 import { StatusBadge } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
-import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
 import { STATUS_LABEL } from '@/shared/types/labels'
 import { kgAmount, unitsCount } from '@/shared/types/labels'
-import { useDayPath } from '@/features/dashboards/ui/hooks'
+import { useDayPath, usePeriodData } from '@/features/dashboards/ui/hooks'
 
 export function DashboardStatusPage() {
-  const { week, seller } = useDashboardFilters()
+  const { period, sellers } = useDashboardFilters()
   const { catalog } = useCatalog()
-  const data = useWindowData()
-  const mobile = useIsMobile()
+  const data = usePeriodData(period)
   const navigate = useNavigate()
   const dayPath = useDayPath()
   const { bind, node } = useTooltip()
   const title = 'Estado de proyecciones'
-  if (!catalog || !data.data) return <PageHeader title={title} subtitle={weekLabel(week, true)} />
+  const subtitle = rangeLabel(period.from, period.to, true)
+  if (!catalog || !data.data) return <PageHeader title={title} subtitle={subtitle} />
 
-  const days = weekAgg(week, seller, data.data.projections, data.data.sales, catalog)
+  const days = periodAgg(period.dates, sellers, data.data.projections, data.data.sales, catalog)
   const units = days.reduce((s, d) => s + d.u, 0)
   const kg = days.reduce((s, d) => s + d.kg, 0)
   const legend = (
@@ -48,8 +47,8 @@ export function DashboardStatusPage() {
 
   return (
     <div>
-      <PageHeader title={title} subtitle={weekLabel(week, true)} actions={<DashboardFilters />} />
-      {mobile && <DashboardFilters />}
+      <PageHeader title={title} subtitle={subtitle} sticky={false} />
+      <DashboardFilterBar />
       <DashboardTabs />
       <PageBody>
         {legend}

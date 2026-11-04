@@ -17,8 +17,13 @@ export function dataWindow(ref = today()) {
 
 /** Proyecciones y ventas de todos los vendedores en la ventana de datos. */
 export function useWindowData() {
-  const { projections: gateway } = useContainer()
   const { from, to } = dataWindow()
+  return useRangeData(from, to)
+}
+
+/** Proyecciones y ventas de un rango (comparte caché con la ventana cuando coinciden). */
+export function useRangeData(from: string, to: string) {
+  const { projections: gateway } = useContainer()
   return useQuery({
     queryKey: keys.window(from, to),
     queryFn: async () => {

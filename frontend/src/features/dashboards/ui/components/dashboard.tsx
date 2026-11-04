@@ -1,97 +1,50 @@
-import { ArrowDown, ArrowUp, Calendar, Users } from 'lucide-react'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import { NavLink, useSearchParams } from 'react-router'
-import { weekLabel } from '@/shared/domain/dates'
 import { pct1 } from '@/shared/domain/format'
 import { DASHBOARDS } from '@/app/routes'
-import { isSupervisor } from '@/features/auth/domain/session'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { useSellers } from '@/features/dashboards/ui/hooks'
 import { weekOptions } from '@/features/dashboards/domain/weeks'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
+import { checkPeriod, customPeriod, weekPeriod } from '@/features/dashboards/domain/period'
+import { isoDateSchema } from '@/shared/domain/schemas'
 import { cn } from '@/shared/ui/lib/utils'
 
-/** Semana y vendedor elegidos, guardados en la URL (?semana=&vendedor=) para poder compartirla. */
+/**
+ * Filtros de los dashboards guardados en la URL para poder compartirla:
+ * ?semana= o ?desde=&hasta= (rango personalizado), &vendedor=a,b (vacío = todos)&dia=&zona=&tamano=.
+ */
 export function useDashboardFilters() {
   const [params, setParams] = useSearchParams()
   const weeks = weekOptions()
   const asked = params.get('semana') ?? ''
   const week = weeks.includes(asked) ? asked : weeks[0]
-  const seller = params.get('vendedor') ?? 'all'
-  const set = (key: 'semana' | 'vendedor', value: string) => {
-    const next = new URLSearchParams(params)
-    next.set(key, value)
-    setParams(next, { replace: true })
+  const sellers = (params.get('vendedor') ?? '').split(',').filter((v) => v && v !== 'all')
+  const from = params.get('desde') ?? ''
+  const to = params.get('hasta') ?? ''
+  const valid = isoDateSchema.safeParse(from).success && isoDateSchema.safeParse(to).success
+  const period = valid && !checkPeriod(from, to) ? customPeriod(from, to) : weekPeriod(week)
+  /** Cambia varios filtros a la vez (null o '' los quita). Se puede llamar varias veces seguidas. */
+  const update = (patch: Record<string, string | null>) => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        for (const [key, value] of Object.entries(patch)) {
+          if (value) next.set(key, value)
+          else next.delete(key)
+        }
+        return next
+      },
+      { replace: true },
+    )
   }
-  return { week, seller, setWeek: (w: string) => set('semana', w), setSeller: (s: string) => set('vendedor', s) }
-}
-
-const boxCls =
-  // Dos por fila si caben sin cortar el texto; si no, uno por fila.
-  'min-w-[11rem] flex-1 rounded-[14px] bg-card px-2.5 pt-2 pb-2.5 shadow-card dsk:min-w-[220px] dsk:flex-none dsk:px-3 dsk:pt-2.5 dsk:pb-3'
-const triggerCls =
-  'h-11 w-full rounded-[10px] border-[1.5px] bg-white font-semibold [&>span]:flex [&>span]:items-center [&>span]:gap-2.5'
-
-export function DashboardFilters() {
-  const { week, seller, setWeek, setSeller } = useDashboardFilters()
-  const sellers = useSellers().data ?? []
-  // Un vendedor solo ve sus datos (lo filtra el backend): el selector es solo del supervisor.
-  const me = useRequiredSession().seller
-  const team = isSupervisor(me)
-  return (
-    <div className="flex flex-wrap gap-2 px-4 pb-1 dsk:gap-3 dsk:p-0">
-      <div className={boxCls}>
-        <label className="mb-1.5 ml-0.5 block text-[13px] font-bold" id="f-week">
-          Semana
-        </label>
-        <Select value={week} onValueChange={setWeek}>
-          <SelectTrigger aria-labelledby="f-week" className={triggerCls}>
-            <Calendar className="size-[18px] text-ink-2" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {weekOptions().map((w) => (
-              <SelectItem key={w} value={w}>
-                {weekLabel(w)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      {!team && (
-        <div className={boxCls}>
-          <span className="mb-1.5 ml-0.5 block text-[13px] font-bold">Vendedor</span>
-          <div className={cn(triggerCls, 'flex items-center gap-2.5 border px-3')}>
-            <Users className="size-[18px] flex-none text-ink-2" />
-            <span className="min-w-0 truncate">
-              {me.name}{' '}
-              <small className="hidden font-normal text-muted-foreground dsk:inline">· solo tus proyecciones</small>
-            </span>
-          </div>
-        </div>
-      )}
-      {team && (
-        <div className={boxCls}>
-          <label className="mb-1.5 ml-0.5 block text-[13px] font-bold" id="f-seller">
-            Vendedor
-          </label>
-          <Select value={seller} onValueChange={setSeller}>
-            <SelectTrigger aria-labelledby="f-seller" className={triggerCls}>
-              <Users className="size-[18px] text-ink-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los vendedores</SelectItem>
-              {sellers.map((s) => (
-                <SelectItem key={s.username} value={s.username}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-    </div>
-  )
+  return {
+    week,
+    period,
+    sellers,
+    param: (key: string) => params.get(key),
+    update,
+    setWeek: (w: string) => update({ semana: w, desde: null, hasta: null }),
+    setCustom: (a: string, b: string) => update({ desde: a, hasta: b }),
+    setSellers: (list: string[]) => update({ vendedor: list.join(',') || null }),
+  }
 }
 
 /** Pestañas entre dashboards (solo celular; en escritorio están en el menú). */

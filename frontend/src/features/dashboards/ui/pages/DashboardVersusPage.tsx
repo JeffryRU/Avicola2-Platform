@@ -1,29 +1,28 @@
 import { BarChart3, ShoppingCart, Target, TrendingDown } from 'lucide-react'
 import { dDM, dDow, dShort } from '@/shared/domain/dates'
 import { nf0, nf1, pct1 } from '@/shared/domain/format'
-import { versusReal, weekAgg } from '@/features/projections/domain/aggregation'
-import { DashboardFilters, DashboardTabs, useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
+import { periodAgg, versusReal } from '@/features/projections/domain/aggregation'
+import { DashboardTabs, useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
+import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
 import { useCatalog } from '@/features/catalog/ui/hooks'
-import { useWindowData } from '@/features/projections/ui/hooks'
+import { usePeriodData } from '@/features/dashboards/ui/hooks'
 import { CountUp, LineChart } from '@/shared/ui/components/charts'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { Kpi, PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
-import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
 
 const tone = (v: number) => (v < 0 ? 'text-destructive' : 'text-ok')
 
 export function DashboardVersusPage() {
-  const { week, seller } = useDashboardFilters()
+  const { period, sellers } = useDashboardFilters()
   const { catalog } = useCatalog()
-  const data = useWindowData()
-  const mobile = useIsMobile()
+  const data = usePeriodData(period)
   const title = 'Proyección vs Venta Real'
   const subtitle = 'Comparativo de proyección y ventas reales por producto'
   if (!catalog || !data.data) return <PageHeader title={title} subtitle={subtitle} />
 
-  const days = weekAgg(week, seller, data.data.projections, data.data.sales, catalog)
+  const days = periodAgg(period.dates, sellers, data.data.projections, data.data.sales, catalog)
   const vs = versusReal(days, catalog)
   const withReal = days.filter((d) => d.real)
   const points = days
@@ -35,8 +34,8 @@ export function DashboardVersusPage() {
 
   return (
     <div>
-      <PageHeader title={title} subtitle={subtitle} actions={<DashboardFilters />} />
-      {mobile && <DashboardFilters />}
+      <PageHeader title={title} subtitle={subtitle} sticky={false} />
+      <DashboardFilterBar />
       <DashboardTabs />
       <PageBody>
         <div className="mb-3 grid grid-cols-2 gap-2.5 dsk:mb-4 dsk:gap-4 @4xl/main:grid-cols-4">
