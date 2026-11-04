@@ -69,6 +69,9 @@ export function BarChart({
   const ih = H - T - B
   const step = iw / bars.length
   const bw = Math.min(mob ? 30 : 92, step * 0.58)
+  // Con muchos días (rango personalizado) se muestra una etiqueta cada tanto, sin encimarse.
+  const every = Math.max(1, Math.ceil((mob ? 34 : 84) / step))
+  const showValues = step >= (mob ? 22 : 30)
   const y = (v: number) => T + ih - (v / max) * ih
   return (
     <div ref={ref} className="chart relative">
@@ -89,7 +92,7 @@ export function BarChart({
           const top = T + ih - h
           const r = Math.min(6, h)
           const d = `M${x} ${T + ih} V${top + r} Q${x} ${top} ${x + r} ${top} H${x + bw - r} Q${x + bw} ${top} ${x + bw} ${top + r} V${T + ih} Z`
-          const delay = { '--d': `${i * 0.06}s` } as React.CSSProperties
+          const delay = { '--d': `${i * Math.min(0.06, 0.9 / bars.length)}s` } as React.CSSProperties
           return (
             <g
               key={b.key}
@@ -100,13 +103,17 @@ export function BarChart({
             >
               <rect fill="transparent" x={L + step * i} y={T} width={step} height={ih} />
               <path className={b.value ? 'bar' : 'bar zero'} style={delay} d={d} />
-              <text className="val" style={delay} x={cx} y={top - 8} textAnchor="middle">
-                {fmt0(b.value)}
-              </text>
-              <text className="ax2" x={cx} y={H - B + 20} textAnchor="middle">
-                {mob ? b.label : `${b.label} ${b.sublabel}`}
-              </text>
-              {mob && (
+              {showValues && (
+                <text className="val" style={delay} x={cx} y={top - 8} textAnchor="middle">
+                  {fmt0(b.value)}
+                </text>
+              )}
+              {i % every === 0 && (
+                <text className="ax2" x={cx} y={H - B + 20} textAnchor="middle">
+                  {mob ? b.label : `${b.label} ${b.sublabel}`}
+                </text>
+              )}
+              {mob && i % every === 0 && (
                 <text className="ax" x={cx} y={H - B + 35} textAnchor="middle">
                   {b.sublabel}
                 </text>

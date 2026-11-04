@@ -61,14 +61,16 @@ describe('agregados', () => {
   const sales = [{ seller: 'ana', date: ws, units: { B1: 9 } }]
 
   it('suma todos los vendedores o filtra uno', () => {
-    const all = weekAgg(ws, 'all', projections, sales, catalog)
+    const all = weekAgg(ws, [], projections, sales, catalog)
     expect(all[0]).toMatchObject({ confirmed: true, u: 17 })
     expect(all[1].confirmed).toBe(false)
-    expect(weekAgg(ws, 'ana', projections, sales, catalog)[0].u).toBe(10)
+    expect(weekAgg(ws, ['ana'], projections, sales, catalog)[0].u).toBe(10)
+    // Varios vendedores: suma solo los elegidos (uno sin datos no cambia nada).
+    expect(weekAgg(ws, ['ana', 'nadie'], projections, sales, catalog)[0].u).toBe(10)
   })
 
   it('calcula exactitud y desviación con los días que tienen venta', () => {
-    const vs = versusReal(weekAgg(ws, 'ana', projections, sales, catalog), catalog)
+    const vs = versusReal(weekAgg(ws, ['ana'], projections, sales, catalog), catalog)
     expect(vs.daysWithReal).toBe(1)
     expect(vs.deviationPct).toBeCloseTo(-10)
     expect(vs.accuracyPct).toBeCloseTo(90)

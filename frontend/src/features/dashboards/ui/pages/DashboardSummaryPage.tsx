@@ -1,50 +1,47 @@
-import { useState } from 'react'
 import { Calendar, Layers, Package, ShoppingBag } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { addDays, dDM, dDow, dShort } from '@/shared/domain/dates'
+import { dDM, dDow, dShort } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
-import { weekAgg } from '@/features/projections/domain/aggregation'
-import {
-  DashboardFilters,
-  DashboardTabs,
-  Delta,
-  useDashboardFilters,
-} from '@/features/dashboards/ui/components/dashboard'
-import { Segmented } from '@/shared/ui/components/segmented'
+import { periodAgg } from '@/features/projections/domain/aggregation'
+import { previousDates } from '@/features/dashboards/domain/period'
+import { DashboardTabs, Delta, useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
 import { useCatalog } from '@/features/catalog/ui/hooks'
-import { useWindowData } from '@/features/projections/ui/hooks'
 import { BarChart, CountUp, Donut } from '@/shared/ui/components/charts'
-import { Kpi, PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
-import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
-import { cn } from '@/shared/ui/lib/utils'
+import { Kpi, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { STATUS_LABEL } from '@/shared/types/labels'
 import { useDayPath } from '@/features/dashboards/ui/hooks'
+import { DetailFilterMenus, ProductDetail } from '@/features/dashboards/ui/components/product-detail'
+import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
+import { useDetailSelection, usePeriodData } from '@/features/dashboards/ui/hooks'
 
 export function DashboardSummaryPage() {
-  const { week, seller } = useDashboardFilters()
+  const { period, sellers } = useDashboardFilters()
   const { catalog } = useCatalog()
-  const data = useWindowData()
-  const mobile = useIsMobile()
+  const data = usePeriodData(period)
   const navigate = useNavigate()
   const dayPath = useDayPath()
-  const [category, setCategory] = useState<string | null>(null)
-  if (!catalog || !data.data) return <PageHeader title="Planificación de Demanda" subtitle="Resumen semanal" />
+  const detail = useDetailSelection(period.dates, catalog)
+  const subtitle = period.custom ? 'Resumen del período' : 'Resumen semanal'
+  if (!catalog || !data.data) return <PageHeader title="Planificación de Demanda" subtitle={subtitle} />
 
   const { projections, sales } = data.data
-  const days = weekAgg(week, seller, projections, sales, catalog)
-  const prev = weekAgg(addDays(week, -7), seller, projections, sales, catalog)
-  // Variación contra los mismos días confirmados de la semana anterior.
+  const days = periodAgg(period.dates, sellers, projections, sales, catalog)
+  const prev = periodAgg(previousDates(period), sellers, projections, sales, catalog)
+  // Variación contra los mismos días confirmados del período anterior.
   const same = prev.filter((_, i) => days[i].confirmed)
   const units = days.reduce((s, d) => s + d.u, 0)
   const kg = days.reduce((s, d) => s + d.kg, 0)
   const confirmed = days.filter((d) => d.confirmed).length
-  const cat = category ?? catalog.categories[0]
+  const cat = catalog.categories[0]
   const products = catalog.of(cat)
 
   return (
     <div>
-      <PageHeader title="Planificación de Demanda" subtitle="Resumen semanal" actions={<DashboardFilters />} />
-      {mobile && <DashboardFilters />}
+      <PageHeader title="Planificación de Demanda" subtitle={subtitle} sticky={false} />
+      <DashboardFilterBar
+        extra={<DetailFilterMenus dates={period.dates} custom={period.custom} catalog={catalog} />}
+        chips={detail.chips}
+      />
       <DashboardTabs />
       <PageBody>
         <div className="mb-3 grid grid-cols-2 gap-2.5 dsk:mb-4 dsk:gap-4 @4xl/main:grid-cols-4">
@@ -75,8 +72,8 @@ export function DashboardSummaryPage() {
           <Kpi
             icon={<Calendar />}
             label="Días confirmados"
-            value={`${confirmed} de 7`}
-            extra={<Donut pct={(confirmed / 7) * 100} />}
+            value={`${String(confirmed)} de ${String(days.length)}`}
+            extra={<Donut pct={(confirmed / days.length) * 100} />}
             index={2}
           />
           <Kpi
@@ -115,62 +112,13 @@ export function DashboardSummaryPage() {
             />
           </div>
         </Section>
-        <Section
-          title="Detalle por producto (semana)"
-          aside={
-            catalog.categories.length > 1 && (
-              <Segmented
-                value={cat}
-                onChange={setCategory}
-                options={catalog.categories.map((c) => ({ value: c, label: c }))}
-              />
-            )
-          }
-        >
-          <div className="overflow-x-auto px-3 pb-3.5">
-            <table className={tableCls.table}>
-              <thead>
-                <tr>
-                  <th className={tableCls.th}>Producto</th>
-                  {days.map((d) => (
-                    <th key={d.date} className={tableCls.th}>
-                      {dShort(d.date)}
-                    </th>
-                  ))}
-                  <th className={tableCls.th}>Total (unid.)</th>
-                  <th className={tableCls.th}>Total (kg)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((p) => {
-                  const total = days.reduce((s, d) => s + (d.confirmed ? (d.units[p.id] ?? 0) : 0), 0)
-                  return (
-                    <tr key={p.id} className={tableCls.row}>
-                      <td className={tableCls.td}>{p.name}</td>
-                      {days.map((d) => (
-                        <td key={d.date} className={cn(tableCls.td, !d.confirmed && 'text-faint')}>
-                          {d.confirmed ? (d.units[p.id] ?? 0) : '-'}
-                        </td>
-                      ))}
-                      <td className={cn(tableCls.td, 'font-extrabold')}>{nf0(total)}</td>
-                      <td className={tableCls.td}>{nf1(total * p.kg_per_unit)}</td>
-                    </tr>
-                  )
-                })}
-                <tr className={tableCls.total}>
-                  <td>Total</td>
-                  {days.map((d) => (
-                    <td key={d.date} className="text-center">
-                      {nf0(d.u)}
-                    </td>
-                  ))}
-                  <td className="text-center">{nf0(units)}</td>
-                  <td className="text-center">{nf1(kg)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </Section>
+        <ProductDetail
+          dates={period.dates}
+          custom={period.custom}
+          sellers={sellers}
+          catalog={catalog}
+          projections={projections}
+        />
       </PageBody>
     </div>
   )

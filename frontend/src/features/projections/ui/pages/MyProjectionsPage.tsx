@@ -174,7 +174,7 @@ export function MyProjectionsPage() {
           <Section>
             {[1, 2, 3].map((i) => {
               const ws = addDays(current, -7 * i)
-              const agg = weekAgg(ws, seller.username, data.data?.projections ?? [], data.data?.sales ?? [], catalog)
+              const agg = weekAgg(ws, [seller.username], data.data?.projections ?? [], data.data?.sales ?? [], catalog)
               const vs = versusReal(agg, catalog)
               return (
                 <button

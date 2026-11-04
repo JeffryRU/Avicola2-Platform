@@ -63,16 +63,22 @@ export function dFull(s: IsoDate) {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`
 }
 
-export function weekLabel(ws: IsoDate, long = false): string {
-  const a = fromIso(ws)
-  const b = fromIso(addDays(ws, 6))
+/** "2 - 8 nov 2026", "26 oct - 1 nov 2026" o "20 dic 2026 - 5 ene 2027". */
+export function rangeLabel(from: IsoDate, to: IsoDate, long = false): string {
+  const a = fromIso(from)
+  const b = fromIso(to)
   const names = long ? MONTHS_LONG : MONTHS
   const de = long ? ' de ' : ' '
   const tail = `${b.getDate()}${de}${names[b.getMonth()]}${de}${b.getFullYear()}`
+  if (a.getFullYear() !== b.getFullYear()) {
+    return `${a.getDate()}${de}${names[a.getMonth()]}${de}${a.getFullYear()} - ${tail}`
+  }
   return a.getMonth() === b.getMonth()
     ? `${a.getDate()} - ${tail}`
     : `${a.getDate()}${de}${names[a.getMonth()]} - ${tail}`
 }
+
+export const weekLabel = (ws: IsoDate, long = false): string => rangeLabel(ws, addDays(ws, 6), long)
 
 export function relativeDay(s: IsoDate, ref: IsoDate = today()): string | null {
   const n = diffDays(s, ref)

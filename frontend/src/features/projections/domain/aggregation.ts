@@ -47,15 +47,16 @@ export interface DayAgg {
   real: Units | null
 }
 
-/** Total de un día para "todos" los vendedores o uno solo. */
+/** Total de un día para los vendedores elegidos (lista vacía = todos). */
 export function dayAgg(
   date: IsoDate,
-  seller: string, // un usuario o 'all'
+  sellers: readonly string[],
   projections: Projection[],
   sales: DailyUnits[],
   catalog: Catalog,
 ): DayAgg {
-  const mine = (x: { seller: string; date: string }) => x.date === date && (seller === 'all' || x.seller === seller)
+  const pick = new Set(sellers)
+  const mine = (x: { seller: string; date: string }) => x.date === date && (pick.size === 0 || pick.has(x.seller))
   const days = projections.filter((p) => mine(p) && p.status === CONFIRMED)
   const units = days.reduce<Units>((acc, p) => addUnits(acc, p.units), {})
   const realDays = sales.filter(mine)
@@ -63,13 +64,22 @@ export function dayAgg(
   return { date, confirmed: days.length > 0, units, u: sumUnits(units), kg: catalog.kg(units), real }
 }
 
-export const weekAgg = (
-  ws: IsoDate,
-  seller: string, // un usuario o 'all'
+/** Un total por día de las fechas dadas (una semana o un rango personalizado). */
+export const periodAgg = (
+  dates: IsoDate[],
+  sellers: readonly string[], // vacía = todos
   projections: Projection[],
   sales: DailyUnits[],
   catalog: Catalog,
-) => weekDates(ws).map((d) => dayAgg(d, seller, projections, sales, catalog))
+) => dates.map((d) => dayAgg(d, sellers, projections, sales, catalog))
+
+export const weekAgg = (
+  ws: IsoDate,
+  sellers: readonly string[], // vacía = todos
+  projections: Projection[],
+  sales: DailyUnits[],
+  catalog: Catalog,
+) => periodAgg(weekDates(ws), sellers, projections, sales, catalog)
 
 /** Proyección vs venta real (kg) en los días que ya tienen venta. */
 export function versusReal(days: DayAgg[], catalog: Catalog) {

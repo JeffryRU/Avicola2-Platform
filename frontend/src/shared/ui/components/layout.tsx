@@ -10,6 +10,7 @@ export function PageHeader({
   back = '/',
   actions,
   mobileActions,
+  sticky = true,
 }: {
   title: string
   subtitle?: string
@@ -17,9 +18,17 @@ export function PageHeader({
   back?: string | null
   actions?: ReactNode
   mobileActions?: ReactNode
+  /** false: el encabezado se va con el scroll (p. ej. cuando lo fijo es una barra de filtros). */
+  sticky?: boolean
 }) {
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-2.5 bg-background/95 px-4 pt-3.5 pb-3 backdrop-blur-md dsk:static dsk:mb-[22px] dsk:flex-wrap dsk:items-end dsk:gap-4 dsk:bg-transparent dsk:p-0 dsk:backdrop-blur-none">
+    <header
+      className={cn(
+        'flex',
+        sticky && 'sticky top-0 z-20',
+        'items-center gap-2.5 bg-background/95 px-4 pt-3.5 pb-3 backdrop-blur-md dsk:static dsk:mb-[22px] dsk:flex-wrap dsk:items-end dsk:gap-4 dsk:bg-transparent dsk:p-0 dsk:backdrop-blur-none',
+      )}
+    >
       {back !== null && (
         <Link
           to={back}
@@ -133,7 +142,7 @@ export const tableCls = {
   th: 'bg-secondary px-3 py-[11px] text-center font-bold whitespace-nowrap text-foreground first:rounded-tl-[10px] first:text-left last:rounded-tr-[10px]',
   td: 'border-b border-muted px-3 py-2.5 text-center whitespace-nowrap first:text-left',
   total:
-    '[&>td]:border-0 [&>td]:bg-secondary [&>td]:py-[13px] [&>td]:text-[15.5px] [&>td]:font-extrabold [&>td:first-child]:rounded-bl-[10px] [&>td:last-child]:rounded-br-[10px]',
+    '[&>td]:border-0 [&>td]:bg-secondary [&>td]:px-3 [&>td]:py-[13px] [&>td]:text-[15.5px] [&>td]:font-extrabold [&>td:first-child]:rounded-bl-[10px] [&>td:last-child]:rounded-br-[10px]',
   row: 'transition-colors hover:[&>td]:bg-[#F8FBFF]',
 }
 
