@@ -11,6 +11,7 @@ os.environ["INGEST_API_TOKEN"] = ""
 # Las pruebas registran desde hoy hasta 7 días: corte al final del día y ventana amplia.
 # Las de la hora de corte la cambian por la API.
 os.environ["PLANNING_CUTOFF_TIME"] = "23:59"
+os.environ["PLANNING_CUTOFF_DAYS_BEFORE"] = "0"
 os.environ["PLANNING_MAX_DAYS"] = "7"
 
 from datetime import date

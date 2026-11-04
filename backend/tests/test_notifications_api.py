@@ -89,7 +89,8 @@ def test_daily_reminder_only_for_pending_sellers_and_once(client):
     assert r.json() == {"created": 6}  # rnavarro ya envió y el supervisor no proyecta
     assert client.post("/api/internal/notifications/projection-reminders").json() == {"created": 0}
     reminder = _as("hdias").get("/api/notifications").json()["items"][0]
-    assert reminder["title"] == "Proyección pendiente" and reminder["link"] == "/registrar"
+    assert reminder["title"] == "Proyección pendiente"
+    assert reminder["link"].startswith("/registrar?dia=")
     assert _as("rnavarro").get("/api/notifications").json()["unread"] == 0
 
 

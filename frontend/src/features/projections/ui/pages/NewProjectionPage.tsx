@@ -24,7 +24,7 @@ import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
 import { daysCount } from '@/shared/types/labels'
-import { closedDays, windowDates } from '@/features/editing/domain/editing'
+import { closedDays, openDates, windowDates } from '@/features/editing/domain/editing'
 import { closedDaysNote } from '@/features/editing/types/editing'
 import { EditingDays } from '@/features/editing/ui/components/editing-days'
 import { useEditingWindow } from '@/features/editing/ui/hooks'
@@ -58,6 +58,7 @@ export function NewProjectionPage() {
   const editing = useEditingWindow().data
   // Días que se pueden registrar (hoy, mañana y pasado mañana); sin datos aún, sin tope.
   const allowed = editing ? windowDates(editing) : null
+  const firstOpen = editing ? openDates(editing)[0] : undefined
   const mobile = useIsMobile()
   const navigate = useNavigate()
   const client = useQueryClient()
@@ -76,13 +77,15 @@ export function NewProjectionPage() {
   const draft = useMemo(() => {
     let d = catalog ? normalize(stored, catalog, days) : stored
     if (allowed?.length) {
-      // El borrador guardado puede ser de otro día: se lleva a la ventana de registro.
-      if (!allowed.includes(d.start)) d = { ...d, start: allowed[0], units: {} }
+      // Se empieza en el primer día abierto: hoy (y quizá mañana) ya cerró por la hora de corte,
+      // y un borrador guardado puede ser de otro día.
+      const closedStart = closedDays(editing, [d.start]).length > 0
+      if (firstOpen && (!allowed.includes(d.start) || closedStart)) d = { ...d, start: firstOpen, units: {} }
       const room = allowed.length - allowed.indexOf(d.start)
       if (d.days > room) d = { ...d, days: room }
     }
     return d
-  }, [stored, catalog, days, allowed])
+  }, [stored, catalog, days, allowed, editing, firstOpen])
   const setDraft = (next: Draft) => {
     setStored(next)
     drafts.save(next)
@@ -119,7 +122,7 @@ export function NewProjectionPage() {
                     <input
                       id="np-start"
                       type="date"
-                      min={today()}
+                      min={firstOpen ?? today()}
                       max={lastAllowed}
                       value={draft.start}
                       onChange={(e) => {
@@ -127,6 +130,8 @@ export function NewProjectionPage() {
                           return void toast('Elige hoy o una fecha futura')
                         if (lastAllowed && e.target.value > lastAllowed)
                           return void toast(`Solo puedes registrar hasta el ${dShort(lastAllowed)}`)
+                        if (closedDays(editing, [e.target.value]).length)
+                          return void toast(closedDaysNote([e.target.value]))
                         setDraft({ ...draft, start: e.target.value, units: {} })
                       }}
                       className="h-[54px] w-full rounded-[14px] border-[1.5px] bg-white pr-3 pl-12 text-[17px] font-semibold outline-none focus:border-primary focus:ring-4 focus:ring-primary-ring"

@@ -1,6 +1,7 @@
 """Casos de uso de notificaciones: crear (y avisar en tiempo real), listar y marcar leídas."""
 
 import logging
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 
 from app.planning.application.ports import (
@@ -10,6 +11,7 @@ from app.planning.application.ports import (
     ProjectionRepository,
     SellerRepository,
 )
+from app.planning.domain.editing import CutoffPolicy
 from app.planning.domain.models import SELLER, SUPERVISOR, Projection, Seller, SellerAccount
 from app.planning.domain.notifications import (
     ANNOUNCEMENT,
@@ -126,7 +128,8 @@ class NotifyProjectionSubmitted:
 
 
 class SendProjectionReminders:
-    """Recordatorio diario (lo dispara n8n): a cada vendedor sin proyección para hoy."""
+    """Recordatorio diario (lo dispara n8n): a cada vendedor sin proyección para el próximo
+    día que todavía se puede editar (el que cierra primero)."""
 
     def __init__(
         self,
@@ -134,23 +137,29 @@ class SendProjectionReminders:
         projections: ProjectionRepository,
         notifier: Notifier,
         clock: Clock,
+        policy: Callable[[], CutoffPolicy],
     ):
         self.sellers, self.projections = sellers, projections
-        self.notifier, self.clock = notifier, clock
+        self.notifier, self.clock, self.policy = notifier, clock, policy
 
     def __call__(self) -> int:
-        today = self.clock.today()
-        done = {p.seller for p in self.projections.find(today, today)}
+        policy, now, today = self.policy(), self.clock.now(), self.clock.today()
+        day = next((d for d in policy.window(today) if policy.is_open(d, now)), None)
+        if day is None:
+            return 0
+        closes = policy.closes_at(day, now.tzinfo)
+        done = {p.seller for p in self.projections.find(day, day)}
         pending = [
             s for s in self.sellers.list_active() if s.role == SELLER and s.username not in done
         ]
+        when = "hoy" if closes.date() == today else f"el {closes:%d/%m}"
         created = self.notifier.notify(
             pending,
             PROJECTION_REMINDER,
             "Proyección pendiente",
-            f"Aún no registras tu proyección de hoy ({today:%d/%m}).",
-            link="/registrar",
-            dedupe_key=f"reminder-{today.isoformat()}",
+            f"Aún no registras tu proyección del {day:%d/%m}. Cierra {when} a las {closes:%H:%M}.",
+            link=f"/registrar?dia={day.isoformat()}",
+            dedupe_key=f"reminder-{day.isoformat()}",
         )
         logger.info(
             "Recordatorios de proyección: %d enviados (%d pendientes)", created, len(pending)

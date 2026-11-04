@@ -175,3 +175,16 @@ def test_only_supervisor_changes_the_cutoff(client) -> None:
     assert (
         client.put("/api/admin/editing/cutoff", json={**body, "days_before": 9}).status_code == 422
     )
+
+
+def test_reminder_targets_the_next_day_still_open(client) -> None:
+    # Cierre el día anterior: hoy ya cerró, el recordatorio es por mañana (cierra hoy).
+    _login(client, "supervisor")
+    body = {"cutoff_time": "23:59", "days_before": 1}
+    assert client.put("/api/admin/editing/cutoff", json=body).status_code == 200
+    assert client.post("/api/internal/notifications/projection-reminders").status_code == 200
+    _login(client, "hdias")
+    reminder = client.get("/api/notifications").json()["items"][0]
+    tomorrow = (TODAY + timedelta(days=1)).isoformat()
+    assert reminder["link"] == f"/registrar?dia={tomorrow}"
+    assert "Cierra hoy a las 23:59" in reminder["body"]

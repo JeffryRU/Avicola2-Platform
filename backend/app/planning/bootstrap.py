@@ -110,7 +110,9 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         status=SqlStatusProbe(session, schema),
         list_notifications=nt.ListNotifications(notifications),
         mark_notifications_read=nt.MarkNotificationsRead(notifications, clock),
-        send_projection_reminders=nt.SendProjectionReminders(sellers, projections, notifier, clock),
+        send_projection_reminders=nt.SendProjectionReminders(
+            sellers, projections, notifier, clock, editing.policy
+        ),
         announce=nt.Announce(sellers, notifier),
         editing_window=ed.GetEditingWindow(editing, unlocks, clock),
         request_unlock=ed.RequestUnlock(editing, unlocks, sellers, notifier, event_bus, clock),
