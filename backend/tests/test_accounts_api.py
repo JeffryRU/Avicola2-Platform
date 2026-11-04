@@ -304,3 +304,22 @@ def test_update_own_profile_name(client):
 def test_update_profile_requires_session(client):
     client.cookies.clear()
     assert client.patch("/api/auth/profile", json={"name": "Alguien"}).status_code == 401
+
+
+def test_cli_creates_the_master_table_sellers_with_temporary_passwords(capsys):
+    """`cli vendedores` (producción): 7 cuentas que deben cambiar su contraseña al entrar."""
+    metadata.drop_all(engine)
+    metadata.create_all(engine)
+    with SessionLocal() as session:
+        cli.create_sellers(session, get_settings())
+        out = capsys.readouterr().out
+        assert "OK: 7 vendedores creados" in out
+        assert "supervisor " not in out
+        temporary = next(line.split()[1] for line in out.splitlines() if "cvillalobos" in line)
+        cli.create_sellers(session, get_settings())  # idempotente
+        assert "OK: 0 vendedores creados" in capsys.readouterr().out
+    client = TestClient(app)
+    r = _login(client, "cvillalobos", temporary)
+    assert r.status_code == 200
+    assert r.json()["must_change_password"] is True
+    assert r.json()["seller"]["zone"] == "Trujillo"

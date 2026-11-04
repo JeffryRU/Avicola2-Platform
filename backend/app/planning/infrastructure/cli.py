@@ -3,6 +3,8 @@
     uv run python -m app.planning.infrastructure.cli init         productos (+ usuarios de prueba)
     uv run python -m app.planning.infrastructure.cli supervisor <usuario> "<nombre>"
                                                         primer supervisor, con contraseña temporal
+    uv run python -m app.planning.infrastructure.cli vendedores   vendedores de la tabla maestra,
+                                                        cada uno con contraseña temporal
     uv run python -m app.planning.infrastructure.cli seed         3 semanas de ejemplo
     uv run python -m app.planning.infrastructure.cli show [n]     resumen y últimas n
     uv run python -m app.planning.infrastructure.cli clear --yes  borra las proyecciones
@@ -128,6 +130,41 @@ def create_supervisor(session: Session, username: str, name: str) -> None:
     print(f"  {temporary}")
 
 
+def create_sellers(session: Session, settings: Settings) -> None:
+    """Vendedores de config/planning_seed.yaml (U0001..U0007), con contraseña temporal.
+
+    Sirve en producción: cada contraseña se muestra una sola vez y se pide cambiarla al entrar.
+    Los que ya existen no se tocan (ni su contraseña).
+    """
+    with (settings.config_dir / "planning_seed.yaml").open(encoding="utf-8") as fh:
+        seed = yaml.safe_load(fh)
+    repo, hasher, passwords = (
+        SqlSellerRepository(session),
+        ScryptPasswordHasher(),
+        RandomTemporaryPasswords(),
+    )
+    created = 0
+    for s in seed["users"]:
+        if s.get("role", SELLER) != SELLER:
+            continue
+        username = s["username"]
+        check_username(username)
+        if repo.get_account(username, active_only=False):
+            print(f"  {username:<12} ya existe (sin cambios)")
+            continue
+        temporary = passwords.generate()
+        repo.create(
+            SellerAccount(
+                Seller(username, s["name"], s.get("zone"), SELLER),
+                hasher.hash(temporary),
+                must_change_password=True,
+            )
+        )
+        created += 1
+        print(f"  {username:<12} {temporary}   {s['name']} ({s.get('zone') or 'sin zona'})")
+    print(f"OK: {created} vendedores creados. Al entrar, cada uno cambia su contraseña.")
+
+
 def seed_history(session: Session, settings: Settings) -> None:
     """Proyecciones BRASA de los últimos 21 días para cada vendedor (para ver los dashboards)."""
     today = ZoneClock(settings.tz).today()
@@ -206,6 +243,8 @@ def main(argv: list[str]) -> int:
     with SessionLocal() as session:
         if cmd == "init":
             init(session, settings)
+        elif cmd == "vendedores":
+            create_sellers(session, settings)
         elif cmd == "seed":
             seed_history(session, settings)
         elif cmd == "supervisor" and len(argv) == 3:

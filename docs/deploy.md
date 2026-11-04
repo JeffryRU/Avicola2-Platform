@@ -114,7 +114,11 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
    ```
    - `init` carga el catálogo de productos.
    - `supervisor` muestra una contraseña temporal, que se cambia al entrar.
-   - Después, el supervisor crea a los vendedores desde la pantalla **Usuarios**.
+   - Después, el supervisor crea a los vendedores desde la pantalla **Usuarios**, o se cargan de una vez los 7 de la tabla maestra (`config/planning_seed.yaml`):
+     ```bash
+     docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli vendedores
+     ```
+     Muestra una contraseña temporal por vendedor (solo esa vez; se cambia al entrar). Los que ya existen no se tocan.
 
    En Dokploy y Coolify esto se corre desde la terminal del servicio `backend` (sin el prefijo `docker compose ... exec backend`).
 3. **Editor de n8n** por túnel SSH, desde tu PC:
