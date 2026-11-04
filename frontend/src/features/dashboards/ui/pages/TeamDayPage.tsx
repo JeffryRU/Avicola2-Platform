@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, Package, ShoppingBag, ShoppingCart, Users } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router'
 import { paths } from '@/app/routes'
-import { addDays, dDowLong, dFull, formatTime, hhmm, today } from '@/shared/domain/dates'
+import { addDays, dDowLong, dFull, formatTime, hhmm, today, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
 import { isoDateSchema } from '@/shared/domain/schemas'
 import { sumUnits } from '@/features/catalog/domain/catalog'
@@ -16,18 +16,36 @@ import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
 import { NOT_REGISTERED, UNITS_SHORT } from '@/shared/types/labels'
 
-/** Detalle de un día para el supervisor: qué proyectó cada vendedor y el total del equipo. */
+/** Ruta /dashboards/dia/:date: detalle de un día para el supervisor. */
 export function TeamDayPage() {
   const { date = '' } = useParams()
+  if (!isoDateSchema.safeParse(date).success) return <Navigate to={paths.dashSummary} replace />
+  return (
+    <TeamDayView
+      date={date}
+      title="Detalle del día"
+      subtitle={`${dDowLong(date)} ${dFull(date)} · todo el equipo`}
+      back={paths.dashSummary}
+    />
+  )
+}
+
+/** Qué proyectó cada vendedor en un día y el total del equipo (también es el Inicio del supervisor). */
+export function TeamDayView({
+  date,
+  title,
+  subtitle,
+  back,
+}: {
+  date: IsoDate
+  title: string
+  subtitle: string
+  back: string | null
+}) {
   const { catalog } = useCatalog()
   const sellers = useSellers().data
   const data = useWindowData()
-  if (!isoDateSchema.safeParse(date).success) return <Navigate to={paths.dashSummary} replace />
-
-  const title = 'Detalle del día'
-  const subtitle = `${dDowLong(date)} ${dFull(date)} · todo el equipo`
-  if (!catalog || !sellers || !data.data)
-    return <PageHeader title={title} subtitle={subtitle} back={paths.dashSummary} />
+  if (!catalog || !sellers || !data.data) return <PageHeader title={title} subtitle={subtitle} back={back} />
 
   const day = teamDay(date, sellers, data.data.projections, data.data.sales, catalog)
   const pending = day.rows.filter((r) => !r.confirmed)
@@ -44,7 +62,7 @@ export function TeamDayPage() {
 
   return (
     <div>
-      <PageHeader title={title} subtitle={subtitle} back={paths.dashSummary} actions={dayNav} mobileActions={dayNav} />
+      <PageHeader title={title} subtitle={subtitle} back={back} actions={dayNav} mobileActions={dayNav} />
       <PageBody>
         <div className="mb-3 grid grid-cols-2 gap-2.5 dsk:mb-4 dsk:gap-4 @4xl/main:grid-cols-4">
           <Kpi

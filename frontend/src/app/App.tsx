@@ -36,6 +36,9 @@ const DashboardSummaryPage = lazy(() =>
 const DashboardVersusPage = lazy(() =>
   import('@/features/dashboards/ui/pages/DashboardVersusPage').then((m) => ({ default: m.DashboardVersusPage })),
 )
+const SupervisorHomePage = lazy(() =>
+  import('@/features/home/ui/pages/SupervisorHomePage').then((m) => ({ default: m.SupervisorHomePage })),
+)
 const TeamDayPage = lazy(() =>
   import('@/features/dashboards/ui/pages/TeamDayPage').then((m) => ({ default: m.TeamDayPage })),
 )
@@ -129,7 +132,7 @@ function Routed() {
         <Suspense fallback={null}>
           <Routes>
             <Route element={<AppShell />}>
-              <Route index element={<Navigate to={paths.dashSummary} replace />} />
+              <Route index element={<SupervisorHomePage />} />
               <Route path={paths.accounts} element={<AccountsPage />} />
               <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />
               <Route path={paths.dashVersus} element={<DashboardVersusPage />} />
@@ -140,7 +143,7 @@ function Routed() {
               <Route path={paths.profile} element={<ProfilePage onBrandChange={showSplash} />} />
               <Route path={paths.password} element={<ChangePasswordPage />} />
               <Route path={paths.connection} element={<ConnectionPage />} />
-              <Route path="*" element={<Navigate to={paths.dashSummary} replace />} />
+              <Route path="*" element={<Navigate to={paths.home} replace />} />
             </Route>
           </Routes>
         </Suspense>

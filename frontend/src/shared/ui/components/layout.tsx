@@ -13,19 +13,22 @@ export function PageHeader({
 }: {
   title: string
   subtitle?: string
-  back?: string
+  /** null: pantalla raíz, sin botón Volver. */
+  back?: string | null
   actions?: ReactNode
   mobileActions?: ReactNode
 }) {
   return (
     <header className="sticky top-0 z-20 flex items-center gap-2.5 bg-background/95 px-4 pt-3.5 pb-3 backdrop-blur-md dsk:static dsk:mb-[22px] dsk:flex-wrap dsk:items-end dsk:gap-4 dsk:bg-transparent dsk:p-0 dsk:backdrop-blur-none">
-      <Link
-        to={back}
-        aria-label="Volver"
-        className="-ml-2 grid size-[38px] place-items-center rounded-[10px] text-primary dsk:hidden"
-      >
-        <ChevronLeft className="size-6" strokeWidth={2.4} />
-      </Link>
+      {back !== null && (
+        <Link
+          to={back}
+          aria-label="Volver"
+          className="-ml-2 grid size-[38px] place-items-center rounded-[10px] text-primary dsk:hidden"
+        >
+          <ChevronLeft className="size-6" strokeWidth={2.4} />
+        </Link>
+      )}
       <div className="min-w-0 flex-1 dsk:flex-[1_1_auto]">
         <h1 className="text-[22px] font-extrabold tracking-[-0.02em] dsk:text-[34px] dsk:tracking-[-0.035em]">
           {title}
