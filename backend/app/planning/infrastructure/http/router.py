@@ -134,6 +134,12 @@ def me(account: Account) -> s.AccountOut:
     return _account_out(account)
 
 
+@public.patch("/auth/profile")
+def update_profile(use_cases: UseCases, account: Account, body: s.ProfileIn) -> s.AccountOut:
+    """La persona edita su propio perfil (por ahora, el nombre visible)."""
+    return _account_out(use_cases.update_profile(account, body.name))
+
+
 @public.post("/auth/password")
 def change_password(
     use_cases: UseCases, account: Account, body: s.ChangePasswordIn, response: Response

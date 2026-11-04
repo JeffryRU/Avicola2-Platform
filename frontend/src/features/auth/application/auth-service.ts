@@ -4,7 +4,7 @@ import { credentialsSchema, type Credentials, type Session } from '@/features/au
 
 type Listener = (session: Session | null) => void
 
-/** Casos de uso de sesión: iniciar, verificar, cambiar contraseña y cerrar. */
+/** Casos de uso de sesión: iniciar, verificar, editar el perfil, cambiar contraseña y cerrar. */
 export class AuthService {
   private session: Session | null
   private remember: boolean
@@ -40,6 +40,13 @@ export class AuthService {
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) this.clearLocal()
     }
+  }
+
+  /** Guarda el perfil y actualiza la sesión local (el nombre se ve al instante en toda la app). */
+  async updateProfile(name: string): Promise<Session> {
+    const session = await this.gateway.updateProfile(name)
+    this.store(session, this.remember)
+    return session
   }
 
   async changePassword(current: string, next: string): Promise<Session> {

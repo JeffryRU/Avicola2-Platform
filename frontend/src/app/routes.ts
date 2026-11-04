@@ -12,6 +12,7 @@ export const paths = {
   products: '/productos',
   notifications: '/notificaciones',
   profile: '/perfil',
+  profileSettings: '/perfil/datos',
   connection: '/perfil/conexion',
   password: '/perfil/contrasena',
   accounts: '/usuarios',

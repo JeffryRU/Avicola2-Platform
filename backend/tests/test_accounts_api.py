@@ -290,3 +290,17 @@ def test_trusted_frontend_origin_is_allowed_behind_a_proxy():
 def test_trusted_origins_setting_parses_a_comma_list():
     s = Settings(trusted_origins=" https://a.vercel.app/ , https://b-*.vercel.app ,")
     assert s.trusted_origin_list == ("https://a.vercel.app", "https://b-*.vercel.app")
+
+
+def test_update_own_profile_name(client):
+    _login(client)
+    r = client.patch("/api/auth/profile", json={"name": "  Roberto   Navarro Ruiz "})
+    assert r.status_code == 200, r.text
+    assert r.json()["seller"]["name"] == "Roberto Navarro Ruiz"
+    assert client.get("/api/auth/me").json()["seller"]["name"] == "Roberto Navarro Ruiz"
+    assert client.patch("/api/auth/profile", json={"name": "   "}).status_code == 422
+
+
+def test_update_profile_requires_session(client):
+    client.cookies.clear()
+    assert client.patch("/api/auth/profile", json={"name": "Alguien"}).status_code == 401

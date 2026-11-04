@@ -7,6 +7,8 @@ export interface AuthGateway {
   /** Sesión vigente según el servidor (lee la cookie); 401 si no hay. */
   me(): Promise<Session>
   changePassword(current: string, next: string, remember: boolean): Promise<Session>
+  /** Guarda el nombre visible de la propia cuenta. */
+  updateProfile(name: string): Promise<Session>
 }
 
 /** Perfil guardado en el dispositivo para abrir la app sin esperar a la red (sin secretos). */

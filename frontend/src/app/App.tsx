@@ -39,6 +39,9 @@ const DashboardVersusPage = lazy(() =>
 const SupervisorHomePage = lazy(() =>
   import('@/features/home/ui/pages/SupervisorHomePage').then((m) => ({ default: m.SupervisorHomePage })),
 )
+const ProfileSettingsPage = lazy(() =>
+  import('@/features/profile/ui/pages/ProfileSettingsPage').then((m) => ({ default: m.ProfileSettingsPage })),
+)
 const TeamDayPage = lazy(() =>
   import('@/features/dashboards/ui/pages/TeamDayPage').then((m) => ({ default: m.TeamDayPage })),
 )
@@ -140,7 +143,8 @@ function Routed() {
               <Route path="/dashboards/dia/:date" element={<TeamDayPage />} />
               <Route path={paths.products} element={<ProductsPage />} />
               <Route path={paths.notifications} element={<NotificationsPage />} />
-              <Route path={paths.profile} element={<ProfilePage onBrandChange={showSplash} />} />
+              <Route path={paths.profile} element={<ProfilePage />} />
+              <Route path={paths.profileSettings} element={<ProfileSettingsPage />} />
               <Route path={paths.password} element={<ChangePasswordPage />} />
               <Route path={paths.connection} element={<ConnectionPage />} />
               <Route path="*" element={<Navigate to={paths.home} replace />} />
@@ -161,7 +165,8 @@ function Routed() {
               <Route path={paths.dashStatus} element={<DashboardStatusPage />} />
               <Route path={paths.products} element={<ProductsPage />} />
               <Route path={paths.notifications} element={<NotificationsPage />} />
-              <Route path={paths.profile} element={<ProfilePage onBrandChange={showSplash} />} />
+              <Route path={paths.profile} element={<ProfilePage />} />
+              <Route path={paths.profileSettings} element={<ProfileSettingsPage />} />
               <Route path={paths.connection} element={<ConnectionPage />} />
               <Route path={paths.password} element={<ChangePasswordPage />} />
               <Route path="*" element={<Navigate to={paths.home} replace />} />

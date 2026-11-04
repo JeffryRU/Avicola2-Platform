@@ -42,6 +42,19 @@ def check_new_password(password: str, username: str) -> None:
         raise DomainError("Esa contraseña es muy fácil de adivinar. Elige otra.")
 
 
+MAX_NAME = 100
+
+
+def clean_name(name: str) -> str:
+    """Nombre visible: sin espacios sobrantes, no vacío y de largo razonable."""
+    cleaned = " ".join(name.split())
+    if not cleaned:
+        raise DomainError("Ingresa el nombre.")
+    if len(cleaned) > MAX_NAME:
+        raise DomainError(f"El nombre puede tener como máximo {MAX_NAME} caracteres.")
+    return cleaned
+
+
 def check_username(username: str) -> None:
     if not _USERNAME.match(username):
         raise DomainError(

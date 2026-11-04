@@ -106,6 +106,14 @@ class SqlSellerRepository:
         )
         self.session.commit()
 
+    def save_profile(self, seller: Seller) -> None:
+        self.session.execute(
+            update(sellers)
+            .where(sellers.c.username == seller.username)
+            .values(name=seller.name, zone=seller.zone)
+        )
+        self.session.commit()
+
     def list_active(self) -> list[Seller]:
         rows = self.session.execute(
             select(sellers).where(sellers.c.is_active.is_(True)).order_by(sellers.c.id)

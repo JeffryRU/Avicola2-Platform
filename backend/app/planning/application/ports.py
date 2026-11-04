@@ -28,6 +28,10 @@ class SellerRepository(Protocol):
         """Guarda hash, cambio obligatorio, intentos, bloqueo, versión de sesión y estado."""
         ...
 
+    def save_profile(self, seller: Seller) -> None:
+        """Guarda los datos visibles de la cuenta (nombre y zona)."""
+        ...
+
 
 class ProjectionRepository(Protocol):
     def find(

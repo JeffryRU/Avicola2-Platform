@@ -22,6 +22,10 @@ export class HttpAuthGateway implements AuthGateway {
     return this.http.get('/auth/me', sessionSchema)
   }
 
+  updateProfile(name: string) {
+    return this.http.patch('/auth/profile', { name }, sessionSchema)
+  }
+
   changePassword(current: string, next: string, remember: boolean) {
     return this.http.post('/auth/password', { current_password: current, new_password: next, remember }, sessionSchema)
   }

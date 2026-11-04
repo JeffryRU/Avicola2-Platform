@@ -3,7 +3,7 @@ import { type z } from 'zod'
 import { ApiError, type KeyValueStore } from '@/shared/application/ports'
 import { AuthService } from '@/features/auth/application/auth-service'
 import type { AuthGateway } from '@/features/auth/application/ports'
-import { newPasswordSchema, type Session } from '@/features/auth/domain/session'
+import { newPasswordSchema, profileSchema, type Session } from '@/features/auth/domain/session'
 import { StoredSessionRepository } from '@/features/auth/infrastructure/stored-session-repository'
 
 const SESSION: Session = {
@@ -40,6 +40,9 @@ class FakeGateway implements AuthGateway {
   }
   async changePassword() {
     return SESSION
+  }
+  async updateProfile(name: string) {
+    return { ...SESSION, seller: { ...SESSION.seller, name } }
   }
 }
 
@@ -107,5 +110,22 @@ describe('contraseña', () => {
     expect(schema.safeParse({ ...ok, next: 'corta1', confirm: 'corta1' }).success).toBe(false)
     expect(schema.safeParse({ ...ok, next: 'jperez2026', confirm: 'jperez2026' }).success).toBe(false)
     expect(schema.safeParse({ ...ok, next: 'demo1234', confirm: 'demo1234' }).success).toBe(false)
+  })
+})
+
+describe('perfil', () => {
+  it('guardar el nombre actualiza la sesión local', async () => {
+    const { auth, gateway, local, tab } = setup()
+    await auth.login({ username: 'rnavarro', password: 'x', remember: true })
+    await auth.updateProfile('Roberto Navarro Ruiz')
+    expect(auth.current()?.seller.name).toBe('Roberto Navarro Ruiz')
+    // Al reabrir la app, el perfil guardado ya trae el nombre nuevo.
+    const reopened = new AuthService(gateway, new StoredSessionRepository(local, tab))
+    expect(reopened.current()?.seller.name).toBe('Roberto Navarro Ruiz')
+  })
+
+  it('normaliza los espacios del nombre y exige uno', () => {
+    expect(profileSchema.parse({ name: '  Ana   Torres ' }).name).toBe('Ana Torres')
+    expect(profileSchema.safeParse({ name: '   ' }).success).toBe(false)
   })
 })

@@ -38,6 +38,7 @@ class PlanningUseCases:
     authenticate: acc.Authenticate
     current_account: acc.CurrentAccount
     change_password: acc.ChangePassword
+    update_profile: acc.UpdateProfile
     list_accounts: acc.ListAccounts
     create_account: acc.CreateAccount
     reset_password: acc.ResetPassword
@@ -71,6 +72,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         authenticate=acc.Authenticate(sellers, hasher, tokens, clock, lockout),
         current_account=acc.CurrentAccount(sellers, tokens),
         change_password=acc.ChangePassword(sellers, hasher, tokens),
+        update_profile=acc.UpdateProfile(sellers),
         list_accounts=acc.ListAccounts(sellers),
         create_account=acc.CreateAccount(sellers, hasher, passwords),
         reset_password=acc.ResetPassword(sellers, hasher, passwords, event_bus),

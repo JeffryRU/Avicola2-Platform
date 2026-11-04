@@ -11,7 +11,12 @@ from app.planning.application.ports import (
     TemporaryPasswords,
     TokenService,
 )
-from app.planning.domain.accounts import LockoutPolicy, check_new_password, check_username
+from app.planning.domain.accounts import (
+    LockoutPolicy,
+    check_new_password,
+    check_username,
+    clean_name,
+)
 from app.planning.domain.models import ROLES, SELLER, Seller, SellerAccount
 from app.planning.domain.notifications import SESSION_REVOKED, Audience, Event
 from app.shared.domain.errors import (
@@ -133,6 +138,19 @@ class ChangePassword:
         return Session(self.tokens.issue(account.seller.username, updated.token_version), updated)
 
 
+class UpdateProfile:
+    """Cada persona edita su propio nombre. La zona la asigna el supervisor."""
+
+    def __init__(self, sellers: SellerRepository):
+        self.sellers = sellers
+
+    def __call__(self, account: SellerAccount, name: str) -> SellerAccount:
+        seller = replace(account.seller, name=clean_name(name))
+        self.sellers.save_profile(seller)
+        logger.info("%s actualizó su perfil", seller.username)
+        return replace(account, seller=seller)
+
+
 class ListAccounts:
     def __init__(self, sellers: SellerRepository):
         self.sellers = sellers
@@ -152,10 +170,8 @@ class CreateAccount:
         self, actor: SellerAccount, username: str, name: str, zone: str | None, role: str = SELLER
     ) -> NewCredentials:
         require_supervisor(actor)
-        username, name = username.strip().lower(), name.strip()
+        username, name = username.strip().lower(), clean_name(name)
         check_username(username)
-        if not name:
-            raise DomainError("Ingresa el nombre.")
         if role not in ROLES:
             raise DomainError(f"Rol inválido: {role}.")
         if self.sellers.get_account(username, active_only=False):
