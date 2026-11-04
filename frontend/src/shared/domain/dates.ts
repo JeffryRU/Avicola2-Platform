@@ -99,3 +99,9 @@ export function formatTime(hhmm: string): string {
 export function greeting(hour = new Date().getHours()): string {
   return hour < 12 ? '¡Buenos días' : hour < 19 ? '¡Buenas tardes' : '¡Buenas noches'
 }
+
+/** Hora local "HH:MM" de un instante ISO. */
+export const hhmm = (iso: string) => {
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}

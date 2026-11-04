@@ -10,6 +10,7 @@ import {
   dDM,
   dDow,
   formatTime,
+  hhmm,
   today,
   weekDates,
   weekLabel,
@@ -32,12 +33,6 @@ import { Button } from '@/shared/ui/components/shadcn/button'
 import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
 import { NOT_REGISTERED } from '@/shared/types/labels'
-
-/** Hora local "HH:MM" de un instante ISO. */
-const hhmm = (iso: string) => {
-  const d = new Date(iso)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
 
 function ProjectionCard({
   date,

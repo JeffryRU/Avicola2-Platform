@@ -5,6 +5,7 @@ export const paths = {
   registered: '/registrar/listo',
   mine: '/proyecciones',
   day: (date: string) => `/proyecciones/${date}`,
+  teamDay: (date: string) => `/dashboards/dia/${date}`,
   dashSummary: '/dashboards/resumen',
   dashVersus: '/dashboards/vs-venta',
   dashStatus: '/dashboards/estado',

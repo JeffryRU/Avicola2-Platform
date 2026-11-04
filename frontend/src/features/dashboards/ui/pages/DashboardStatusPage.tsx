@@ -1,6 +1,5 @@
 import { Check, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { paths } from '@/app/routes'
 import { dDM, dDow, dFull, dShort, weekLabel } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
 import { weekAgg } from '@/features/projections/domain/aggregation'
@@ -14,8 +13,7 @@ import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
 import { STATUS_LABEL } from '@/shared/types/labels'
 import { kgAmount, unitsCount } from '@/shared/types/labels'
-import { isSupervisor } from '@/features/auth/domain/session'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { useDayPath } from '@/features/dashboards/ui/hooks'
 
 export function DashboardStatusPage() {
   const { week, seller } = useDashboardFilters()
@@ -23,8 +21,7 @@ export function DashboardStatusPage() {
   const data = useWindowData()
   const mobile = useIsMobile()
   const navigate = useNavigate()
-  // El detalle del día es la proyección propia del vendedor: el supervisor no tiene esa pantalla.
-  const canOpenDay = !isSupervisor(useRequiredSession().seller)
+  const dayPath = useDayPath()
   const { bind, node } = useTooltip()
   const title = 'Estado de proyecciones'
   if (!catalog || !data.data) return <PageHeader title={title} subtitle={weekLabel(week, true)} />
@@ -61,8 +58,7 @@ export function DashboardStatusPage() {
             <button
               key={d.date}
               type="button"
-              aria-disabled={!canOpenDay}
-              onClick={canOpenDay ? () => void navigate(paths.day(d.date)) : undefined}
+              onClick={() => void navigate(dayPath(d.date))}
               {...bind(
                 <>
                   <b>{dShort(d.date)}</b>
@@ -72,7 +68,7 @@ export function DashboardStatusPage() {
               )}
               className={cn(
                 'grid justify-items-center gap-0.5 rounded-xl bg-card px-0.5 py-2.5 text-center shadow-card transition dsk:rounded-2xl dsk:px-2 dsk:py-4',
-                canOpenDay ? 'hover:-translate-y-[3px]' : 'cursor-default',
+                'hover:-translate-y-[3px]',
               )}
             >
               <b className="text-[13px] font-extrabold dsk:text-[19px]">{dDow(d.date)}</b>
@@ -104,7 +100,7 @@ export function DashboardStatusPage() {
                 label="Unidades proyectadas por día"
                 width={560}
                 height={330}
-                onSelect={canOpenDay ? (d) => void navigate(paths.day(d)) : undefined}
+                onSelect={(d) => void navigate(dayPath(d))}
                 bars={days.map((d) => ({
                   key: d.date,
                   value: d.u,
@@ -136,8 +132,8 @@ export function DashboardStatusPage() {
                   {days.map((d) => (
                     <tr
                       key={d.date}
-                      className={cn(tableCls.row, canOpenDay && 'cursor-pointer')}
-                      onClick={canOpenDay ? () => void navigate(paths.day(d.date)) : undefined}
+                      className={cn(tableCls.row, 'cursor-pointer')}
+                      onClick={() => void navigate(dayPath(d.date))}
                     >
                       <td className={tableCls.td}>
                         {dDow(d.date)} {dFull(d.date)}

@@ -36,6 +36,9 @@ const DashboardSummaryPage = lazy(() =>
 const DashboardVersusPage = lazy(() =>
   import('@/features/dashboards/ui/pages/DashboardVersusPage').then((m) => ({ default: m.DashboardVersusPage })),
 )
+const TeamDayPage = lazy(() =>
+  import('@/features/dashboards/ui/pages/TeamDayPage').then((m) => ({ default: m.TeamDayPage })),
+)
 const DayDetailPage = lazy(() =>
   import('@/features/projections/ui/pages/DayDetailPage').then((m) => ({ default: m.DayDetailPage })),
 )
@@ -131,6 +134,7 @@ function Routed() {
               <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />
               <Route path={paths.dashVersus} element={<DashboardVersusPage />} />
               <Route path={paths.dashStatus} element={<DashboardStatusPage />} />
+              <Route path="/dashboards/dia/:date" element={<TeamDayPage />} />
               <Route path={paths.products} element={<ProductsPage />} />
               <Route path={paths.notifications} element={<NotificationsPage />} />
               <Route path={paths.profile} element={<ProfilePage onBrandChange={showSplash} />} />
