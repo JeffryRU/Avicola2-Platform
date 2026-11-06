@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { dShort, rangeDates, today, type IsoDate } from '@/shared/domain/dates'
+import { addDays, dShort, rangeDates, today, type IsoDate } from '@/shared/domain/dates'
 import { sumUnits } from '@/features/catalog/domain/catalog'
 import { isoDateSchema } from '@/shared/domain/schemas'
 
@@ -20,7 +20,8 @@ export const draftSchema = z.object({
 })
 export type Draft = z.infer<typeof draftSchema>
 
-export const newDraft = (start: IsoDate = today(), category = ''): Draft => ({
+/** Las proyecciones son de los días siguientes: por defecto empieza mañana. */
+export const newDraft = (start: IsoDate = addDays(today(), 1), category = ''): Draft => ({
   step: 0,
   start,
   days: 3,

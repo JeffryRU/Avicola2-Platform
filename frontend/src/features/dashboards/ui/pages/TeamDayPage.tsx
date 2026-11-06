@@ -14,6 +14,7 @@ import { Note, StatusBadge } from '@/shared/ui/components/feedback'
 import { Kpi, PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
+import { useFirstEditableDay } from '@/features/editing/ui/hooks'
 import { NOT_REGISTERED, UNITS_SHORT } from '@/shared/types/labels'
 
 /** Ruta /dashboards/dia/:date: detalle de un día para el supervisor. */
@@ -45,12 +46,13 @@ export function TeamDayView({
   const { catalog } = useCatalog()
   const sellers = useSellers().data
   const data = useWindowData()
+  const firstEditable = useFirstEditableDay()
   if (!catalog || !sellers || !data.data) return <PageHeader title={title} subtitle={subtitle} back={back} />
 
   const day = teamDay(date, sellers, data.data.projections, data.data.sales, catalog)
   const pending = day.rows.filter((r) => !r.confirmed)
-  // El supervisor edita cualquier día que aún no pasó (aunque haya cerrado).
-  const editable = date >= today()
+  // El supervisor edita cualquier día de la ventana (aunque haya cerrado): desde mañana.
+  const editable = date >= firstEditable
   const { from, to } = dataWindow()
   const prev = addDays(date, -1)
   const next = addDays(date, 1)

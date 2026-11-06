@@ -1,11 +1,17 @@
 import { useState, type ReactNode } from 'react'
 import { Calendar, CalendarRange, ChevronDown, SlidersHorizontal, Users } from 'lucide-react'
+import { toast } from 'sonner'
+import { useContainer } from '@/app/di'
 import { rangeLabel, weekLabel } from '@/shared/domain/dates'
+import type { ExportFormat } from '@/shared/domain/export'
+import { ExportMenu } from '@/shared/ui/components/export-menu'
+import { useCatalog } from '@/features/catalog/ui/hooks'
+import { teamProjectionsTable } from '@/features/dashboards/domain/export'
 import { isSupervisor } from '@/features/auth/domain/session'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { weekOptions } from '@/features/dashboards/domain/weeks'
 import { useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
-import { useSellers } from '@/features/dashboards/ui/hooks'
+import { usePeriodData, useSellers } from '@/features/dashboards/ui/hooks'
 import { CustomPeriodDialog } from '@/features/dashboards/ui/components/custom-period-dialog'
 import {
   ALL_SELLERS_LABEL,
@@ -110,6 +116,8 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
           </span>
         )}
         {extra}
+        <span className="hidden flex-1 dsk:block" />
+        <ExportPeriod />
         {anyActive && (
           <button
             type="button"
@@ -130,6 +138,41 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
         }}
       />
     </div>
+  )
+}
+
+/** Descarga en Excel (o PDF/CSV) las proyecciones del período y vendedores filtrados. */
+function ExportPeriod() {
+  const { period, sellers } = useDashboardFilters()
+  const { catalog } = useCatalog()
+  const data = usePeriodData(period).data
+  const { exporter } = useContainer()
+  const me = useRequiredSession().seller
+  const all = (useSellers().data ?? []).filter((s) => !isSupervisor(s))
+  const team = isSupervisor(me) ? all.filter((s) => !sellers.length || sellers.includes(s.username)) : [me]
+
+  async function run(format: ExportFormat) {
+    if (!catalog || !data) return
+    const range = rangeLabel(period.from, period.to, true)
+    const table = teamProjectionsTable({
+      dates: period.dates,
+      sellers: team,
+      projections: data.projections.filter((p) => period.dates.includes(p.date)),
+      sales: data.sales,
+      catalog,
+      period: range,
+      generatedAt: new Date(),
+    })
+    try {
+      await exporter.export(table, format, `proyecciones_${period.from}_${period.to}`)
+      toast.success(`Archivo descargado (${String(table.rows.length)} filas)`)
+    } catch {
+      toast.error('No se pudo generar el archivo. Inténtalo de nuevo.')
+    }
+  }
+
+  return (
+    <ExportMenu onExport={run} disabled={!catalog || !data || !team.length} className="h-9 flex-none rounded-full" />
   )
 }
 

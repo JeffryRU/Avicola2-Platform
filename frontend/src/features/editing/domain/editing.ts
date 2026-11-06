@@ -23,6 +23,9 @@ export const cutoffSchema = z.object({
   cutoff_time: z.string(),
   days_before: z.number().int(),
   open_days: z.number().int(),
+  // Primer día de la ventana (1 = mañana) y si el bloqueo por horario está activo.
+  starts_in: z.number().int().default(0),
+  enabled: z.boolean().default(true),
 })
 export type Cutoff = z.infer<typeof cutoffSchema>
 
@@ -51,6 +54,7 @@ export const unlockRequestSchema = z.object({
 export const cutoffFormSchema = z.object({
   cutoff_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Usa el formato HH:MM, por ejemplo 07:00.'),
   days_before: z.number().int().min(0).max(7),
+  enabled: z.boolean(),
 })
 
 /** "2026-11-05T07:00:00-05:00" → "07:00" (sin pasar por la zona del navegador). */
@@ -66,8 +70,40 @@ export function closedDays(window: EditingWindow | undefined, dates: IsoDate[]):
 /** Días que el vendedor puede registrar ahora mismo (en orden). */
 export const openDates = (window: EditingWindow) => window.days.filter((d) => d.open).map((d) => d.date)
 
-/** Días que se pueden elegir en Registrar (hoy … pasado mañana). */
+/** Días que se pueden elegir en Registrar (desde mañana, los días de la ventana). */
 export const windowDates = (window: EditingWindow) => window.days.map((d) => d.date)
+
+/** Si pasó la hora de corte del día (con el bloqueo activo), sin importar habilitaciones. */
+export const pastCutoff = (window: EditingWindow, day: EditingDay, now: Date = new Date()) =>
+  window.policy.enabled && new Date(day.closes_at).getTime() <= now.getTime()
+
+/** Clave para reiniciar el formulario del corte cuando cambia lo guardado (p. ej., en otro equipo). */
+export const policyKey = (p: Cutoff) => `${p.cutoff_time}|${String(p.days_before)}|${String(p.enabled)}`
+
+/** Días que se marcan al habilitar: los que ya cerraron o, si ninguno, el primero de la ventana. */
+export function defaultGrantDays(window: EditingWindow, now: Date = new Date()): IsoDate[] {
+  const closed = window.days.filter((d) => pastCutoff(window, d, now)).map((d) => d.date)
+  return closed.length ? closed : window.days.slice(0, 1).map((d) => d.date)
+}
+
+/** Habilitaciones vigentes por vendedor: la última de cada día, si está aprobada y no pasó. */
+export function activeUnlocks(list: Unlock[], from: IsoDate): Map<string, Unlock[]> {
+  const latest = new Map<string, Unlock>()
+  for (const u of list) {
+    const key = `${u.seller}|${u.date}`
+    const seen = latest.get(key)
+    if (!seen || u.id > seen.id) latest.set(key, u)
+  }
+  const bySeller = new Map<string, Unlock[]>()
+  for (const u of latest.values()) {
+    if (u.status !== 'approved' || u.date < from) continue
+    bySeller.set(
+      u.seller,
+      [...(bySeller.get(u.seller) ?? []), u].sort((a, b) => a.date.localeCompare(b.date)),
+    )
+  }
+  return bySeller
+}
 
 const ORDER: Record<UnlockStatus, number> = { requested: 0, approved: 1, rejected: 2, closed: 2 }
 

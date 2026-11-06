@@ -1,7 +1,19 @@
 import { AlertCircle, BarChart3, Bell, Box, ChevronRight, Clock, Check, Package, Plus, ShoppingBag } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import { paths } from '@/app/routes'
-import { dDM, dDow, greeting, today, weekDates, weekStart } from '@/shared/domain/dates'
+import {
+  dDM,
+  dDow,
+  dShort,
+  greeting,
+  relativeDay,
+  today,
+  weekDates,
+  weekStart,
+  type IsoDate,
+} from '@/shared/domain/dates'
+import { closesLabel } from '@/features/editing/types/editing'
+import { useEditingWindow } from '@/features/editing/ui/hooks'
 import { sumUnits } from '@/features/catalog/domain/catalog'
 import { roleLabel } from '@/features/auth/domain/session'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
@@ -17,6 +29,12 @@ import { cn } from '@/shared/ui/lib/utils'
 
 /** Hora límite para confirmar la proyección del día (mensaje informativo del mockup). */
 
+/** "de mañana", "de pasado mañana" o "del Jue 05/11". */
+function dayPhrase(date: IsoDate, ref: IsoDate): string {
+  const rel = relativeDay(date, ref)
+  return rel ? `de ${rel.toLowerCase()}` : `del ${dShort(date)}`
+}
+
 export function HomePage() {
   const { seller } = useRequiredSession()
   const { brand } = useBrand()
@@ -25,6 +43,8 @@ export function HomePage() {
   const { catalog } = useCatalog()
   const unread = useUnreadCount()
   const now = today()
+  // El próximo día que todavía se puede registrar (mañana, salvo que ya haya pasado el corte).
+  const next = useEditingWindow().data?.days.find((d) => d.open)
   const week = weekDates(weekStart(now))
   const confirmed = week.filter((d) => days.has(d)).length
   const weekUnits = week.reduce((s, d) => s + sumUnits(days.get(d)?.units), 0)
@@ -77,16 +97,16 @@ export function HomePage() {
       </div>
 
       <div className="mt-3.5 px-4 dsk:px-0">
-        {!days.has(now) && (
+        {next && !days.has(next.date) && (
           <Note tone="warn" icon={<AlertCircle />} className="mb-3.5">
             <div className="min-w-0 flex-1">
-              <b>Tu proyección de hoy está pendiente.</b>
+              <b>Tu proyección {dayPhrase(next.date, now)} está pendiente.</b>
               <br />
-              Confírmala para que entre a la planificación de producción.
+              {closesLabel(next.closes_at, true, now)}. Confírmala para que entre a la planificación.
             </div>
             <Button
               className="h-10 w-full font-bold dsk:w-auto"
-              onClick={() => navigate(`${paths.register}?dia=${now}`)}
+              onClick={() => navigate(`${paths.register}?dia=${next.date}`)}
             >
               Completar
             </Button>

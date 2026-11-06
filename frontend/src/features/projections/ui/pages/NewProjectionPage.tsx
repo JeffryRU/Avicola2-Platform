@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
-import { dFull, dShort, daysText, today, type IsoDate } from '@/shared/domain/dates'
+import { addDays, dFull, dShort, daysText, today, type IsoDate } from '@/shared/domain/dates'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { isSupervisor } from '@/features/auth/domain/session'
 import { useSellers } from '@/features/dashboards/ui/hooks'
@@ -65,7 +65,7 @@ export function NewProjectionPage() {
   const ownerName = team.find((s) => s.username === owner)?.name ?? owner
   const { days } = useMyDays(owner || undefined)
   const editing = useEditingWindow().data
-  // Días que se pueden registrar (hoy, mañana y pasado mañana); sin datos aún, sin tope.
+  // Días que se pueden registrar (desde mañana); sin datos aún, sin tope.
   const allowed = editing ? windowDates(editing) : null
   const firstOpen = editing ? openDates(editing)[0] : undefined
   const mobile = useIsMobile()
@@ -159,12 +159,12 @@ export function NewProjectionPage() {
                     <input
                       id="np-start"
                       type="date"
-                      min={firstOpen ?? today()}
+                      min={firstOpen ?? addDays(today(), 1)}
                       max={lastAllowed}
                       value={draft.start}
                       onChange={(e) => {
-                        if (!e.target.value || e.target.value < today())
-                          return void toast('Elige hoy o una fecha futura')
+                        if (!e.target.value || e.target.value < (allowed?.[0] ?? addDays(today(), 1)))
+                          return void toast('Las proyecciones son para los días siguientes: elige desde mañana')
                         if (lastAllowed && e.target.value > lastAllowed)
                           return void toast(`Solo puedes registrar hasta el ${dShort(lastAllowed)}`)
                         if (closedDays(editing, [e.target.value]).length)

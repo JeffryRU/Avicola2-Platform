@@ -19,6 +19,12 @@ export class HttpEditingGateway implements EditingGateway {
   decide = (id: number, action: UnlockAction) =>
     this.http.post(`/admin/editing/unlocks/${String(id)}`, { action }, unlockSchema)
 
-  updateCutoff = (cutoffTime: string, daysBefore: number) =>
-    this.http.put('/admin/editing/cutoff', { cutoff_time: cutoffTime, days_before: daysBefore }, cutoffSchema)
+  updateCutoff = (cutoffTime: string, daysBefore: number, enabled: boolean) =>
+    this.http.put('/admin/editing/cutoff', { cutoff_time: cutoffTime, days_before: daysBefore, enabled }, cutoffSchema)
+
+  grant = (username: string, dates: IsoDate[]) =>
+    this.http.post(`/admin/editing/sellers/${encodeURIComponent(username)}/grant`, { dates }, z.array(unlockSchema))
+
+  revoke = (username: string) =>
+    this.http.post(`/admin/editing/sellers/${encodeURIComponent(username)}/revoke`, {}, z.array(unlockSchema))
 }

@@ -1,6 +1,6 @@
 import { useState, type SyntheticEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, KeyRound, Loader2, Lock, Power, UserPlus } from 'lucide-react'
+import { Check, Copy, KeyRound, Loader2, Lock, LockOpen, Power, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
@@ -29,6 +29,11 @@ import { Label } from '@/shared/ui/components/shadcn/label'
 import { cn } from '@/shared/ui/lib/utils'
 import { ACCOUNT_STATE_LABEL } from '@/features/accounts/types/accounts'
 import { ROLE_LABEL } from '@/features/auth/types/roles'
+import { activeUnlocks, policyKey, type EditingWindow, type Unlock } from '@/features/editing/domain/editing'
+import { CUTOFF_TITLE, GRANT_LABEL, REVOKE_LABEL, grantedLabel, revokeDone } from '@/features/editing/types/editing'
+import { useEditingWindow, useRevokeEditing, useUnlocks } from '@/features/editing/ui/hooks'
+import { CutoffForm } from '@/features/editing/ui/components/cutoff-form'
+import { GrantEditingDialog } from '@/features/editing/ui/components/grant-editing'
 
 const KEY = ['admin', 'accounts']
 
@@ -167,7 +172,64 @@ function NewAccountDialog({
   )
 }
 
-function AccountRow({ account, onCredentials }: { account: AdminAccount; onCredentials: (c: NewCredentials) => void }) {
+/** Habilitar o cerrar la edición de proyecciones de un vendedor (aunque haya pasado el corte). */
+function EditingControl({
+  account,
+  granted,
+  onGrant,
+}: {
+  account: AdminAccount
+  granted: Unlock[]
+  onGrant: () => void
+}) {
+  const revoke = useRevokeEditing()
+  const doRevoke = async () => {
+    try {
+      await revoke.mutateAsync(account.username)
+      toast.success(revokeDone(account.name))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo cerrar la edición.')
+    }
+  }
+  if (!granted.length) {
+    return (
+      <Button type="button" variant="outline" size="sm" onClick={onGrant}>
+        <LockOpen /> {GRANT_LABEL}
+      </Button>
+    )
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <span className="rounded-full bg-ok-soft px-2.5 py-1 text-[12.5px] font-bold whitespace-nowrap text-ok">
+        {grantedLabel(granted.map((u) => u.date))}
+      </span>
+      <ConfirmDialog
+        title={`¿Cerrar la edición de ${account.name}?`}
+        description="Volverá a regirse por la hora de corte. Le llega un aviso."
+        confirmLabel={REVOKE_LABEL}
+        onConfirm={doRevoke}
+        trigger={(open) => (
+          <Button type="button" variant="outline" size="sm" onClick={open} disabled={revoke.isPending}>
+            <Lock /> {REVOKE_LABEL}
+          </Button>
+        )}
+      />
+    </span>
+  )
+}
+
+function AccountRow({
+  account,
+  onCredentials,
+  granted,
+  onGrant,
+}: {
+  account: AdminAccount
+  onCredentials: (c: NewCredentials) => void
+  /** Solo para vendedores activos: habilitaciones vigentes (vacía = ninguna). */
+  granted?: Unlock[]
+  onGrant: () => void
+}) {
   const { accounts } = useContainer()
   const client = useQueryClient()
   const refresh = () => void client.invalidateQueries({ queryKey: KEY })
@@ -211,7 +273,8 @@ function AccountRow({ account, onCredentials }: { account: AdminAccount; onCrede
       {own ? (
         <small className="font-semibold text-muted-foreground">Tu cuenta</small>
       ) : (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {granted && <EditingControl account={account} granted={granted} onGrant={onGrant} />}
           <ConfirmDialog
             title={`¿Restablecer la contraseña de ${account.name}?`}
             description="Se genera una contraseña temporal para entregarle y se cierran sus sesiones abiertas. Si la cuenta estaba bloqueada, se desbloquea."
@@ -247,13 +310,28 @@ function AccountRow({ account, onCredentials }: { account: AdminAccount; onCrede
   )
 }
 
-/** Supervisor: alta de vendedores, recuperación de contraseña y desactivación. */
+/** Bloqueo por horario al lado de la lista (el mismo de Habilitaciones). */
+function CutoffPanel({ window }: { window: EditingWindow | undefined }) {
+  return (
+    <Section title={CUTOFF_TITLE} className="@5xl/main:sticky @5xl/main:top-4">
+      {window && <CutoffForm key={policyKey(window.policy)} policy={window.policy} idPrefix="accounts-cutoff" />}
+    </Section>
+  )
+}
+
+/** Supervisor: alta de vendedores, recuperación de contraseña, desactivación y edición. */
 export function AccountsPage() {
   const { accounts } = useContainer()
   const client = useQueryClient()
   const list = useQuery({ queryKey: KEY, queryFn: () => accounts.list() })
   const [creating, setCreating] = useState(false)
   const [credentials, setCredentials] = useState<NewCredentials | null>(null)
+  const [granting, setGranting] = useState<AdminAccount | null>(null)
+  const editing = useEditingWindow().data
+  const unlocks = useUnlocks().data ?? []
+  const granted = editing ? activeUnlocks(unlocks, editing.days[0]?.date ?? '') : null
+  const grantedFor = (a: AdminAccount) =>
+    granted && a.is_active && a.role === 'seller' ? (granted.get(a.username) ?? []) : undefined
 
   const newButton = (
     <Button type="button" onClick={() => setCreating(true)}>
@@ -264,7 +342,7 @@ export function AccountsPage() {
     <div>
       <PageHeader
         title="Usuarios"
-        subtitle="Crea cuentas, restablece contraseñas olvidadas y desactiva accesos."
+        subtitle="Crea cuentas, restablece contraseñas, desactiva accesos y habilita la edición de proyecciones."
         actions={newButton}
         mobileActions={
           <Button type="button" size="icon" aria-label="Nuevo usuario" onClick={() => setCreating(true)}>
@@ -272,23 +350,33 @@ export function AccountsPage() {
           </Button>
         }
       />
-      <PageBody className="dsk:max-w-[880px]">
-        <Section>
-          {list.isPending ? (
-            <div className="grid place-items-center p-10">
-              <Loader2 className="animate-spin text-muted-foreground" />
-            </div>
-          ) : list.isError ? (
-            <EmptyState title="No se pudo cargar">{list.error.message}</EmptyState>
-          ) : (
-            <ul>
-              {list.data.map((a) => (
-                <AccountRow key={a.username} account={a} onCredentials={setCredentials} />
-              ))}
-            </ul>
-          )}
-        </Section>
+      <PageBody>
+        <div className="grid gap-4 @5xl/main:grid-cols-[minmax(0,1fr)_minmax(0,360px)] @5xl/main:items-start">
+          <Section>
+            {list.isPending ? (
+              <div className="grid place-items-center p-10">
+                <Loader2 className="animate-spin text-muted-foreground" />
+              </div>
+            ) : list.isError ? (
+              <EmptyState title="No se pudo cargar">{list.error.message}</EmptyState>
+            ) : (
+              <ul>
+                {list.data.map((a) => (
+                  <AccountRow
+                    key={a.username}
+                    account={a}
+                    onCredentials={setCredentials}
+                    granted={grantedFor(a)}
+                    onGrant={() => setGranting(a)}
+                  />
+                ))}
+              </ul>
+            )}
+          </Section>
+          <CutoffPanel window={editing} />
+        </div>
       </PageBody>
+      <GrantEditingDialog seller={granting} window={editing} onClose={() => setGranting(null)} />
       <NewAccountDialog
         open={creating}
         onOpenChange={setCreating}

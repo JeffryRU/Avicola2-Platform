@@ -1,40 +1,24 @@
-import { useState, type SyntheticEvent } from 'react'
-import { Clock, Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
-import { z } from 'zod'
 import { dShort, formatTime, hhmm } from '@/shared/domain/dates'
 import { dateOf } from '@/features/editing/domain/editing'
 import { paths } from '@/app/routes'
+import { policyKey, sortUnlocks, type Unlock, type UnlockAction } from '@/features/editing/domain/editing'
 import {
-  cutoffFormSchema,
-  sortUnlocks,
-  type Cutoff,
-  type Unlock,
-  type UnlockAction,
-} from '@/features/editing/domain/editing'
-import {
-  CUTOFF_TIME_LABEL,
   CUTOFF_TITLE,
-  DAYS_BEFORE_LABEL,
   NO_REQUESTS_LABEL,
   REQUESTS_TITLE,
-  SAVE_LABEL,
   UNLOCKS_SUBTITLE,
   UNLOCKS_TITLE,
   UNLOCK_ACTION_DONE,
   UNLOCK_ACTION_LABEL,
   UNLOCK_STATUS_LABEL,
-  cutoffRule,
-  daysBeforeLabel,
 } from '@/features/editing/types/editing'
-import { useDecideUnlock, useEditingWindow, useUnlocks, useUpdateCutoff } from '@/features/editing/ui/hooks'
+import { useDecideUnlock, useEditingWindow, useUnlocks } from '@/features/editing/ui/hooks'
+import { CutoffForm } from '@/features/editing/ui/components/cutoff-form'
 import { useSellers } from '@/features/dashboards/ui/hooks'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
-import { Input } from '@/shared/ui/components/shadcn/input'
-import { Label } from '@/shared/ui/components/shadcn/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { cn } from '@/shared/ui/lib/utils'
 
 const STATUS_TONE: Record<Unlock['status'], string> = {
@@ -74,80 +58,6 @@ export function UnlocksPage() {
         </div>
       </PageBody>
     </div>
-  )
-}
-
-const policyKey = (p: Cutoff) => `${p.cutoff_time}|${String(p.days_before)}`
-
-function CutoffForm({ policy }: { policy: Cutoff }) {
-  const update = useUpdateCutoff()
-  const [time, setTime] = useState(policy.cutoff_time)
-  const [daysBefore, setDaysBefore] = useState(policy.days_before)
-  const [error, setError] = useState<string | null>(null)
-  const changed = time !== policy.cutoff_time || daysBefore !== policy.days_before
-
-  function submit(e: SyntheticEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const parsed = cutoffFormSchema.safeParse({ cutoff_time: time, days_before: daysBefore })
-    if (!parsed.success) {
-      setError(z.flattenError(parsed.error).fieldErrors.cutoff_time?.[0] ?? 'Revisa la hora.')
-      return
-    }
-    setError(null)
-    update.mutate(
-      { time: parsed.data.cutoff_time, daysBefore: parsed.data.days_before },
-      {
-        onSuccess: () => toast.success('Horario de corte guardado.'),
-        onError: (err) => setError(err.message),
-      },
-    )
-  }
-
-  return (
-    <form onSubmit={submit} noValidate className="grid gap-4 px-4 pb-4 dsk:px-5 dsk:pb-5">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="grid gap-1.5">
-          <Label htmlFor="cutoff-time">{CUTOFF_TIME_LABEL}</Label>
-          <Input
-            id="cutoff-time"
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            aria-invalid={!!error}
-            className="h-11"
-          />
-        </div>
-        <div className="grid gap-1.5">
-          <Label id="cutoff-days-label">{DAYS_BEFORE_LABEL}</Label>
-          <Select value={String(daysBefore)} onValueChange={(v) => setDaysBefore(Number(v))}>
-            <SelectTrigger aria-labelledby="cutoff-days-label" className="!h-11 w-full bg-white font-semibold">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[0, 1, 2].map((n) => (
-                <SelectItem key={n} value={String(n)}>
-                  {daysBeforeLabel(n)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <p className="flex gap-2 rounded-[12px] bg-muted/60 p-3 text-[13.5px] text-ink-2">
-        <Clock className="mt-0.5 size-4 flex-none" />
-        {cutoffRule(time || policy.cutoff_time, daysBefore)}
-      </p>
-      {error && (
-        <p role="alert" className="text-[13px] font-semibold text-destructive">
-          {error}
-        </p>
-      )}
-      <div className="flex justify-end">
-        <Button type="submit" disabled={!changed || update.isPending} className="h-11 font-bold">
-          {update.isPending ? <Loader2 className="animate-spin" /> : <Save />} {SAVE_LABEL}
-        </Button>
-      </div>
-    </form>
   )
 }
 

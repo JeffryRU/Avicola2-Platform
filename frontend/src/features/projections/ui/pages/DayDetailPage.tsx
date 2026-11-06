@@ -14,6 +14,7 @@ import { PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
 import { STATUS_LABEL } from '@/shared/types/labels'
+import { useFirstEditableDay } from '@/features/editing/ui/hooks'
 
 export function DayDetailPage() {
   const { date = '' } = useParams()
@@ -21,8 +22,10 @@ export function DayDetailPage() {
   const { catalog } = useCatalog()
   const { days } = useMyDays()
   const data = useWindowData()
+  // Desde el primer día que se puede registrar (mañana): hoy ya no se proyecta.
+  const firstEditable = useFirstEditableDay()
   if (!isoDateSchema.safeParse(date).success) return <Navigate to={paths.mine} replace />
-  const editable = date >= today()
+  const editable = date >= firstEditable
   const editLink = `${paths.register}?dia=${date}`
   const day = days.get(date)
 
@@ -33,7 +36,11 @@ export function DayDetailPage() {
         <PageBody>
           <Section>
             <EmptyState title={`${dShort(date)} aún no tiene proyección confirmada`}>
-              {editable ? 'Regístrala para que entre a planificación.' : 'Este día ya pasó sin proyección.'}
+              {editable
+                ? 'Regístrala para que entre a planificación.'
+                : date >= today()
+                  ? 'Las proyecciones se registran para los días siguientes.'
+                  : 'Este día ya pasó sin proyección.'}
               {editable && (
                 <div className="mt-4">
                   <Button asChild className="h-[46px] font-bold">

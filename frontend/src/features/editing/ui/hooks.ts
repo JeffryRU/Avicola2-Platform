@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
-import type { IsoDate } from '@/shared/domain/dates'
+import { today, type IsoDate } from '@/shared/domain/dates'
 import type { UnlockAction } from '@/features/editing/domain/editing'
 
 export const editingKeys = {
@@ -13,6 +13,11 @@ export const editingKeys = {
 export function useEditingWindow() {
   const { editing } = useContainer()
   return useQuery({ queryKey: editingKeys.window, queryFn: () => editing.window(), refetchInterval: 60_000 })
+}
+
+/** Primer día que se puede registrar (mañana, según el servidor); mientras carga, hoy. */
+export function useFirstEditableDay(): IsoDate {
+  return useEditingWindow().data?.days[0]?.date ?? today()
 }
 
 export function useUnlocks(enabled = true) {
@@ -47,7 +52,23 @@ export function useUpdateCutoff() {
   const { editing } = useContainer()
   const refresh = useRefresh()
   return useMutation({
-    mutationFn: ({ time, daysBefore }: { time: string; daysBefore: number }) => editing.updateCutoff(time, daysBefore),
+    mutationFn: ({ time, daysBefore, enabled }: { time: string; daysBefore: number; enabled: boolean }) =>
+      editing.updateCutoff(time, daysBefore, enabled),
     onSuccess: refresh,
   })
+}
+
+export function useGrantEditing() {
+  const { editing } = useContainer()
+  const refresh = useRefresh()
+  return useMutation({
+    mutationFn: ({ username, dates }: { username: string; dates: IsoDate[] }) => editing.grant(username, dates),
+    onSuccess: refresh,
+  })
+}
+
+export function useRevokeEditing() {
+  const { editing } = useContainer()
+  const refresh = useRefresh()
+  return useMutation({ mutationFn: (username: string) => editing.revoke(username), onSuccess: refresh })
 }

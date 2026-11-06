@@ -1,4 +1,4 @@
-import { AlertCircle, Bell, Check, ClipboardCheck, Loader2, LockOpen, Megaphone } from 'lucide-react'
+import { AlertCircle, Bell, CalendarX, Check, ClipboardCheck, Loader2, LockOpen, Megaphone } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import {
@@ -19,6 +19,7 @@ const LOOK: Record<NotificationKind, { icon: typeof Bell; cls: string }> = {
   announcement: { icon: Megaphone, cls: 'bg-ok-soft text-ok' },
   edit_requested: { icon: LockOpen, cls: 'bg-warn-soft text-warn' },
   edit_decided: { icon: LockOpen, cls: 'bg-secondary text-primary' },
+  projection_missed: { icon: CalendarX, cls: 'bg-bad-soft text-destructive' },
 }
 const GENERIC = { icon: Bell, cls: 'bg-muted text-ink-2' }
 

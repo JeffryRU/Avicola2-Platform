@@ -23,7 +23,8 @@ async function toXlsx(table: ExportTable): Promise<Blob> {
   const header = table.columns.map((c) => ({ value: c.label, fontWeight: 'bold' as const }))
   const body = table.rows.map((row) =>
     row.map((value, i) =>
-      table.columns[i].numeric ? { value: Number(value), type: Number } : { value: String(value) },
+      // Una celda numérica vacía (p. ej., «Sin proyección») queda vacía, no en 0.
+      table.columns[i].numeric && value !== '' ? { value: Number(value), type: Number } : { value: String(value) },
     ),
   )
   return writeExcelFile([header, ...body], {

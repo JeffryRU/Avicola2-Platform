@@ -17,6 +17,19 @@ export const SAVE_LABEL = 'Guardar'
 export const CUTOFF_TIME_LABEL = 'Hora de corte'
 export const DAYS_BEFORE_LABEL = 'Cierra'
 export const EDITABLE_DAYS_TITLE = 'Días que puedes registrar'
+export const LOCK_LABEL = 'Bloquear el registro a la hora de corte'
+export const LOCK_OFF_RULE =
+  'El bloqueo está apagado: los vendedores registran y editan cualquier día de la ventana, sin hora límite.'
+export const EDITING_COLUMN_LABEL = 'Edición de proyecciones'
+export const GRANT_LABEL = 'Habilitar edición'
+export const REVOKE_LABEL = 'Cerrar edición'
+export const GRANT_DAYS_LABEL = 'Días que podrá editar'
+export const GRANT_HINT =
+  'Podrá registrar o corregir esos días aunque haya pasado la hora de corte, hasta que cierres la edición. Le llega un aviso.'
+export const grantDone = (name: string) => `Edición habilitada para ${name}.`
+export const revokeDone = (name: string) => `Edición cerrada para ${name}.`
+export const grantedLabel = (dates: IsoDate[]) => `Habilitada: ${dates.map(dShort).join(', ')}`
+export const PAST_CUTOFF_LABEL = 'Ya cerró'
 
 export const UNLOCK_STATUS_LABEL: Record<UnlockStatus, string> = {
   requested: 'Pendiente',
@@ -42,7 +55,8 @@ export const daysBeforeLabel = (n: number) =>
   n === 0 ? 'El mismo día' : n === 1 ? 'El día anterior' : `${String(n)} días antes`
 
 /** "Cada día se puede editar hasta las 07:00 del mismo día." */
-export function cutoffRule(time: string, daysBefore: number): string {
+export function cutoffRule(time: string, daysBefore: number, enabled = true): string {
+  if (!enabled) return LOCK_OFF_RULE
   const when =
     daysBefore === 0
       ? 'de ese mismo día'

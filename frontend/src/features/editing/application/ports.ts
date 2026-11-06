@@ -9,5 +9,9 @@ export interface EditingGateway {
   unlocks(): Promise<Unlock[]>
   request(date: IsoDate, reason: string): Promise<Unlock>
   decide(id: number, action: UnlockAction): Promise<Unlock>
-  updateCutoff(cutoffTime: string, daysBefore: number): Promise<Cutoff>
+  updateCutoff(cutoffTime: string, daysBefore: number, enabled: boolean): Promise<Cutoff>
+  /** El supervisor habilita directamente la edición de un vendedor para esos días. */
+  grant(username: string, dates: IsoDate[]): Promise<Unlock[]>
+  /** El supervisor cierra las habilitaciones vigentes de un vendedor. */
+  revoke(username: string): Promise<Unlock[]>
 }
