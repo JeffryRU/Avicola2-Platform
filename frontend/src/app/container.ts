@@ -96,6 +96,6 @@ export function createContainer(): Container {
     accounts: new HttpAccountsGateway(http),
     editing: new HttpEditingGateway(http),
     history: new HttpHistoryGateway(http),
-    installer: new BrowserAppInstaller(),
+    installer: new BrowserAppInstaller(window, import.meta.env.VITE_ANDROID_APK_URL),
   }
 }

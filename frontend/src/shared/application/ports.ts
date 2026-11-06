@@ -63,8 +63,14 @@ export interface LogSink {
  */
 export type InstallState = 'available' | 'ios' | 'installed' | 'unavailable'
 
+/** Sistema del equipo: decide si se ofrece la app nativa además de la app web. */
+export type DevicePlatform = 'android' | 'ios' | 'other'
+
 export interface AppInstaller {
   state(): InstallState
+  platform(): DevicePlatform
+  /** Instalador de la app nativa para este equipo (APK de la última Release), o null si no hay. */
+  nativeAppUrl(): string | null
   subscribe(listener: () => void): () => void
   /** Muestra el diálogo del navegador; true si la persona aceptó. */
   install(): Promise<boolean>

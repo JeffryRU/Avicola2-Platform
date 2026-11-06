@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react'
-import { Download, PlusSquare, Share, Smartphone, X } from 'lucide-react'
+import { Download, Globe, PlusSquare, Share, Smartphone, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
@@ -26,20 +26,102 @@ function useInstallState(): InstallState {
   )
 }
 
-/** "Instalar": diálogo del navegador (Android/Chrome) o instrucciones (iPhone). */
+/**
+ * "Instalar":
+ * - Android: elegir entre la app nativa (APK de GitHub Releases) y la app web (PWA).
+ * - iPhone: instrucciones de Safari (la app de iOS necesita cuenta de Apple de pago).
+ * - PC: diálogo del navegador.
+ */
 function useInstallAction() {
   const { installer } = useContainer()
   const state = useInstallState()
+  const apkUrl = installer.nativeAppUrl()
   const [iosHelp, setIosHelp] = useState(false)
-  const install = async () => {
-    if (state === 'ios') {
-      setIosHelp(true)
-      return
-    }
+  const [chooser, setChooser] = useState(false)
+  const installWeb = async () => {
+    setChooser(false)
     if (await installer.install()) toast.success('¡Listo! La app quedó instalada en tu dispositivo.')
   }
-  const dialog = <IosInstallDialog open={iosHelp} onOpenChange={setIosHelp} />
-  return { state, install, dialog }
+  const install = async () => {
+    if (apkUrl) setChooser(true)
+    else if (state === 'ios') setIosHelp(true)
+    else await installWeb()
+  }
+  const dialog = (
+    <>
+      <IosInstallDialog open={iosHelp} onOpenChange={setIosHelp} />
+      {apkUrl && (
+        <AndroidInstallDialog
+          open={chooser}
+          onOpenChange={setChooser}
+          apkUrl={apkUrl}
+          webAvailable={state === 'available'}
+          onInstallWeb={installWeb}
+        />
+      )}
+    </>
+  )
+  /** Hay algo que ofrecer: la app nativa (Android) o la app web aún no instalada. */
+  const offerable = Boolean(apkUrl) || state === 'available' || state === 'ios'
+  return { state, install, dialog, offerable }
+}
+
+function AndroidInstallDialog({
+  open,
+  onOpenChange,
+  apkUrl,
+  webAvailable,
+  onInstallWeb,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  apkUrl: string
+  webAvailable: boolean
+  onInstallWeb: () => void
+}) {
+  const { brand } = useBrand()
+  const optionCls = 'flex w-full items-start gap-3 rounded-2xl border bg-card p-3.5 text-left hover:bg-secondary/60'
+  const iconCls = 'grid size-10 flex-none place-items-center rounded-xl bg-secondary text-primary [&>svg]:size-5'
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Instalar {BRANDS[brand].name}</DialogTitle>
+          <DialogDescription>Elige cómo quieres usarla en tu celular:</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2.5">
+          <a href={apkUrl} className={optionCls} onClick={() => onOpenChange(false)} rel="noopener">
+            <span className={iconCls}>
+              <Smartphone />
+            </span>
+            <span className="min-w-0 flex-1">
+              <b className="block">App de Android</b>
+              <small className="text-muted-foreground">
+                Descarga la última versión. Al abrir el archivo, Android te pedirá permitir instalar apps de esta
+                fuente.
+              </small>
+            </span>
+          </a>
+          {webAvailable && (
+            <button type="button" className={optionCls} onClick={onInstallWeb}>
+              <span className={iconCls}>
+                <Globe />
+              </span>
+              <span className="min-w-0 flex-1">
+                <b className="block">App web</b>
+                <small className="text-muted-foreground">Se instala desde el navegador y ocupa muy poco espacio.</small>
+              </span>
+            </button>
+          )}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Ahora no
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 function IosInstallDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
@@ -87,10 +169,10 @@ const snoozeSchema = z.number()
 export function InstallBanner() {
   const { preferences } = useContainer()
   const { brand } = useBrand()
-  const { state, install, dialog } = useInstallAction()
+  const { state, install, dialog, offerable } = useInstallAction()
   const [snoozed, setSnoozed] = useState(() => (preferences.get(SNOOZE_KEY, snoozeSchema) ?? 0) > Date.now())
 
-  if (state === 'installed' || state === 'unavailable' || snoozed) return dialog
+  if (state === 'installed' || !offerable || snoozed) return dialog
   const later = () => {
     preferences.set(SNOOZE_KEY, Date.now() + SNOOZE_DAYS * 86_400_000)
     setSnoozed(true)
@@ -124,10 +206,13 @@ export function InstallBanner() {
   )
 }
 
-/** Opción en Perfil (también en escritorio). Solo si se puede instalar y aún no está instalada. */
+/**
+ * Opción en Perfil (también en escritorio). Solo si hay algo que instalar: la app web aún no
+ * instalada o, en Android, la app nativa (también desde la app web ya instalada).
+ */
 export function InstallOption({ className }: { className: string }) {
-  const { state, install, dialog } = useInstallAction()
-  if (state !== 'available' && state !== 'ios') return dialog
+  const { install, dialog, offerable } = useInstallAction()
+  if (!offerable) return dialog
   return (
     <>
       <button type="button" className={className} onClick={install}>
