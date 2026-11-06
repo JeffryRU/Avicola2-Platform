@@ -10,6 +10,7 @@ import pe.avicola2.app.domain.ChangePasswordRequest
 import pe.avicola2.app.domain.DailyUnits
 import pe.avicola2.app.domain.EditingWindow
 import pe.avicola2.app.domain.EmptyBody
+import pe.avicola2.app.domain.ExportFormat
 import pe.avicola2.app.domain.GrantRequest
 import pe.avicola2.app.domain.LoginRequest
 import pe.avicola2.app.domain.MarkRead
@@ -66,6 +67,12 @@ class HttpPlanningGateway(private val api: ApiClient) : PlanningGateway {
 
     override suspend fun revokeEditing(username: String): List<Unlock> =
         api.post("/admin/editing/sellers/${username.encodeURLPathPart()}/revoke", EmptyBody())
+
+    override suspend fun exportProjections(from: LocalDate, to: LocalDate, seller: String?, format: ExportFormat): ByteArray =
+        api.bytes(
+            "/projections/export",
+            mapOf("date_from" to from, "date_to" to to, "seller" to seller, "format" to format.extension),
+        )
 }
 
 class HttpNotificationsGateway(private val api: ApiClient) : NotificationsGateway {

@@ -5,6 +5,7 @@ import kotlinx.datetime.LocalDate
 import pe.avicola2.app.domain.Account
 import pe.avicola2.app.domain.DailyUnits
 import pe.avicola2.app.domain.EditingWindow
+import pe.avicola2.app.domain.ExportFormat
 import pe.avicola2.app.domain.Notifications
 import pe.avicola2.app.domain.Product
 import pe.avicola2.app.domain.Projection
@@ -47,6 +48,13 @@ interface PlanningGateway {
     suspend fun grantEditing(username: String, dates: List<LocalDate>): List<Unlock>
     /** Supervisor: cierra las habilitaciones vigentes de un vendedor. */
     suspend fun revokeEditing(username: String): List<Unlock>
+    /** Proyecciones del período en Excel, PDF o CSV (el vendedor, lo suyo; el supervisor, todos o uno). */
+    suspend fun exportProjections(from: LocalDate, to: LocalDate, seller: String? = null, format: ExportFormat = ExportFormat.Excel): ByteArray
+}
+
+/** Entrega un archivo generado al sistema para guardarlo o mandarlo (menú «Compartir»). */
+fun interface FileSharer {
+    suspend fun share(fileName: String, mimeType: String, bytes: ByteArray)
 }
 
 interface NotificationsGateway {

@@ -241,3 +241,66 @@ def test_non_bearer_authorization_falls_back_to_cookie(client) -> None:
 def test_web_login_never_returns_token_in_body(client) -> None:
     r = client.post("/api/auth/login", json={"username": "rnavarro", "password": "demo1234"})
     assert "token" not in r.json()
+
+
+# --- Exportar a Excel ---------------------------------------------------------------------
+
+
+def _xlsx_rows(content: bytes) -> list[tuple]:
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    return list(load_workbook(BytesIO(content)).active.iter_rows(values_only=True))
+
+
+def test_export_projections_xlsx(client) -> None:
+    _login(client, "rnavarro")
+    day = TODAY.isoformat()
+    body = {"category": "BRASA", "days": [{"date": day, "units": {"P0001": 5}}]}
+    assert client.post("/api/projections", json=body).status_code == 201
+
+    _login(client, "supervisor")
+    r = client.get(f"/api/projections/export?date_from={day}&date_to={day}")
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("application/vnd.openxmlformats")
+    assert f"proyecciones_{day}_{day}.xlsx" in r.headers["content-disposition"]
+    rows = _xlsx_rows(r.content)
+    assert rows[0][0] == "Proyecciones del equipo"
+    header, data = rows[2], rows[3:]
+    assert header[3] == "Vendedor" and header[11] == "Estado"
+    mine = [row for row in data if row[3] == "Roberto Navarro"]
+    assert any(row[5] == "P0001" and row[8] == 5 for row in mine)
+    # Quien no registró aparece con una fila «Sin proyección».
+    assert any(row[11] == "Sin proyección" and row[3] != "Roberto Navarro" for row in data)
+
+
+def test_seller_exports_only_their_own(client) -> None:
+    _login(client, "hdias")
+    day = TODAY.isoformat()
+    r = client.get(f"/api/projections/export?date_from={day}&date_to={day}&seller=rnavarro")
+    assert r.status_code == 200
+    sellers = {row[3] for row in _xlsx_rows(r.content)[3:]}
+    assert sellers == {"Hebert Días"}
+
+
+def test_export_range_is_limited(client) -> None:
+    _login(client, "supervisor")
+    far = (TODAY + timedelta(days=120)).isoformat()
+    r = client.get(f"/api/projections/export?date_from={TODAY.isoformat()}&date_to={far}")
+    assert r.status_code == 422
+
+
+def test_export_in_the_same_formats_as_the_web(client) -> None:
+    _login(client, "supervisor")
+    day = TODAY.isoformat()
+    base = f"/api/projections/export?date_from={day}&date_to={day}"
+    pdf = client.get(f"{base}&format=pdf")
+    assert pdf.status_code == 200 and pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content.startswith(b"%PDF") and f"_{day}.pdf" in pdf.headers["content-disposition"]
+    csv = client.get(f"{base}&format=csv")
+    assert csv.status_code == 200 and csv.headers["content-type"].startswith("text/csv")
+    text = csv.content.decode("utf-8")
+    assert text.startswith('\ufeff"Fecha","Día","Zona","Vendedor"')
+    assert '"Sin proyección"' in text
+    assert client.get(f"{base}&format=docx").status_code == 422

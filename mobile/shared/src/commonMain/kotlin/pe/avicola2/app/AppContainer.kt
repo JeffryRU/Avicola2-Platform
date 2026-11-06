@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import pe.avicola2.app.application.ApiError
+import pe.avicola2.app.application.FileSharer
 import pe.avicola2.app.application.KeyValueStore
 import pe.avicola2.app.application.PlanningService
 import pe.avicola2.app.application.ServerEvent
@@ -53,7 +55,13 @@ class ServerConfig(private val prefs: KeyValueStore) {
  * `container.ts` en la web). Cada plataforma entrega el almacenamiento seguro del token y las
  * preferencias.
  */
-class AppContainer(tokens: TokenStore, settings: Settings, engine: HttpClientEngine? = null) {
+class AppContainer(
+    tokens: TokenStore,
+    settings: Settings,
+    engine: HttpClientEngine? = null,
+    /** Menú «Compartir» del sistema para los archivos que genera la app (el Excel). */
+    val files: FileSharer = FileSharer { _, _, _ -> throw ApiError("Compartir archivos no está disponible aquí.", 0) },
+) {
     val prefs: KeyValueStore = SettingsStore(settings)
     val server = ServerConfig(prefs)
 

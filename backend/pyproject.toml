@@ -7,6 +7,7 @@ dependencies = [
     "alembic>=1.20.0",
     "deltalake>=1.6.6",
     "fastapi[standard]>=0.143.2",
+    "fpdf2>=2.8",
     "holidays>=0.106",
     "numpy>=2.5.4",
     "openpyxl>=3.1.5",

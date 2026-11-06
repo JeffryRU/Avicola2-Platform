@@ -13,6 +13,7 @@ import pe.avicola2.app.application.ServerEvent
 import pe.avicola2.app.application.SessionService
 import pe.avicola2.app.application.SubmissionQueue
 import pe.avicola2.app.application.SubmitOutcome
+import pe.avicola2.app.domain.ExportFormat
 import pe.avicola2.app.domain.Catalog
 import pe.avicola2.app.domain.DayUnits
 import pe.avicola2.app.infrastructure.ApiClient
@@ -86,6 +87,14 @@ class BackendContractTest {
         assertTrue(suggestion.method.isNotBlank())
         s.planning.sales(open.date, open.date)
         HttpNotificationsGateway(s.api).list()
+
+        // Los mismos formatos que la web: Excel (un zip, «PK»), PDF («%PDF») y CSV (con BOM).
+        val xlsx = s.planning.exportProjections(open.date, open.date, format = ExportFormat.Excel)
+        assertTrue(xlsx.size > 1000 && xlsx.decodeToString(0, 2) == "PK")
+        val pdf = s.planning.exportProjections(open.date, open.date, format = ExportFormat.Pdf)
+        assertTrue(pdf.decodeToString(0, 4) == "%PDF")
+        val csv = s.planning.exportProjections(open.date, open.date, format = ExportFormat.Csv).decodeToString()
+        assertTrue(csv.startsWith("\uFEFF\"Fecha\"") && "Roberto Navarro" in csv)
     }
 
     @Test

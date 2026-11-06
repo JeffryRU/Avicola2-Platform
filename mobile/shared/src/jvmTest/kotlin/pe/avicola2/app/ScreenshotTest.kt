@@ -104,6 +104,8 @@ class ScreenshotTest {
             NewProjectionScreen(seller, sellerAccount, null, onClose = {})
         }
         shot("04-mis-proyecciones", phoneW, phoneH) { ProjectionsScreen(seller, sellerAccount) }
+        // Abre «Exportar»: los mismos formatos que la web.
+        shot("04b-exportar", phoneW, phoneH, taps = listOf(Offset(672f, 65f))) { ProjectionsScreen(seller, sellerAccount) }
         shot("05-avisos", phoneW, phoneH) { NotificationsScreen(NotificationsViewModel(seller)) }
         shot("06-perfil-oscuro", phoneW, phoneH, dark = true) { ProfileScreen(seller, sellerAccount, {}, {}) }
         val (sup, _) = container("supervisor")

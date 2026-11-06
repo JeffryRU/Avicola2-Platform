@@ -14,6 +14,7 @@ import pe.avicola2.app.application.ApiError
 import pe.avicola2.app.infrastructure.ApiClient
 import pe.avicola2.app.infrastructure.HttpAuthGateway
 import pe.avicola2.app.infrastructure.HttpPlanningGateway
+import pe.avicola2.app.domain.ExportFormat
 import pe.avicola2.app.domain.Product
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -121,5 +122,31 @@ class ApiClientTest {
         assertEquals(mapOf("ok" to true), result)
         assertTrue(contentType.startsWith("multipart/form-data"))
         assertEquals("Bearer tok", auth)
+    }
+
+    @Test
+    fun downloadsTheExcelWithTokenAndQuery() = runTest {
+        var auth: String? = null
+        var url = ""
+        val engine = MockEngine { req ->
+            auth = req.headers[HttpHeaders.Authorization]
+            url = req.url.toString()
+            respond(byteArrayOf(0x50, 0x4B, 3, 4), headers = headersOf(HttpHeaders.ContentType, "application/octet-stream"))
+        }
+        val bytes = HttpPlanningGateway(client(engine = engine))
+            .exportProjections(LocalDate(2026, 11, 1), LocalDate(2026, 11, 7), seller = "hdias", format = ExportFormat.Pdf)
+        assertEquals("Bearer tok", auth)
+        assertEquals("https://api.test/api/projections/export?date_from=2026-11-01&date_to=2026-11-07&seller=hdias&format=pdf", url)
+        assertEquals(listOf<Byte>(0x50, 0x4B, 3, 4), bytes.toList())
+    }
+
+    @Test
+    fun downloadErrorsComeAsSpanishMessages() = runTest {
+        val engine = MockEngine { respond("""{"detail":"Exporta como máximo 93 días a la vez."}""", HttpStatusCode.UnprocessableEntity, JSON) }
+        val error = assertFailsWith<ApiError> {
+            HttpPlanningGateway(client(engine = engine)).exportProjections(LocalDate(2026, 1, 1), LocalDate(2026, 12, 1))
+        }
+        assertEquals(422, error.status)
+        assertEquals("Exporta como máximo 93 días a la vez.", error.message)
     }
 }

@@ -74,4 +74,5 @@ fun androidContainer(context: Context): AppContainer = AppContainer(
     settings = SharedPreferencesSettings(context.applicationContext.getSharedPreferences("avicola2", Context.MODE_PRIVATE)),
     // Motor explícito: no depende del ServiceLoader, que R8 puede recortar en la versión release.
     engine = OkHttp.create(),
+    files = AndroidFileSharer(context),
 )

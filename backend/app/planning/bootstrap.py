@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.planning.application import accounts as acc
 from app.planning.application import editing as ed
+from app.planning.application import export as ex
 from app.planning.application import notifications as nt
 from app.planning.application import use_cases as uc
 from app.planning.domain.accounts import LockoutPolicy
@@ -54,6 +55,7 @@ class PlanningUseCases:
     list_projections: uc.ListProjections
     submit_projection: uc.SubmitProjection
     get_sales: uc.GetSales
+    export_projections: ex.ExportProjections
     list_changes: uc.ListChanges
     suggest_projection: uc.SuggestProjection
     status: SqlStatusProbe
@@ -85,6 +87,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     schema = physical_schema(settings.database_url, APP_SCHEMA, settings.db_schema)
     unlocks = SqlUnlockRepository(session)
     history = SqlChangeLog(session)
+    sales = SimulatedSalesSource(projections, clock)
     editing = ed.EditingSettings(
         SqlSettingsRepository(session),
         settings.planning_cutoff_time,
@@ -115,7 +118,8 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             sellers=sellers,
             history=history,
         ),
-        get_sales=uc.GetSales(SimulatedSalesSource(projections, clock)),
+        get_sales=uc.GetSales(sales),
+        export_projections=ex.ExportProjections(products, projections, sales, sellers, clock),
         list_changes=uc.ListChanges(history),
         suggest_projection=uc.SuggestProjection(products, forecaster, settings.planning_max_days),
         status=SqlStatusProbe(session, schema),

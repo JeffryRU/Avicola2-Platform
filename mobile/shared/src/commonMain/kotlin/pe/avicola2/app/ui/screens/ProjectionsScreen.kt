@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,6 +37,7 @@ import pe.avicola2.app.application.QueuedSubmission
 import pe.avicola2.app.application.ServerEvent
 import pe.avicola2.app.domain.Account
 import pe.avicola2.app.domain.Catalog
+import pe.avicola2.app.domain.ExportFormat
 import pe.avicola2.app.domain.Projection
 import pe.avicola2.app.domain.Seller
 import pe.avicola2.app.domain.formatKg
@@ -48,6 +52,7 @@ import pe.avicola2.app.ui.Load
 import pe.avicola2.app.ui.components.Centered
 import pe.avicola2.app.ui.components.ChoiceChip
 import pe.avicola2.app.ui.components.EmptyState
+import pe.avicola2.app.ui.components.ExportMenu
 import pe.avicola2.app.ui.components.ErrorState
 import pe.avicola2.app.ui.components.Loading
 import pe.avicola2.app.ui.components.Pill
@@ -55,6 +60,10 @@ import pe.avicola2.app.ui.components.SectionCard
 import pe.avicola2.app.ui.theme.Success
 import pe.avicola2.app.ui.theme.Warning
 import pe.avicola2.app.ui.userMessage
+
+/** Período de la lista y de la exportación: dos semanas atrás y una adelante. */
+private const val LIST_FROM_DAYS = -14
+private const val LIST_TO_DAYS = 7
 
 data class ProjectionsData(val catalog: Catalog, val projections: List<Projection>, val sellers: List<Seller>)
 
@@ -67,6 +76,20 @@ class ProjectionsViewModel(private val c: AppContainer, private val account: Acc
     init {
         load()
         viewModelScope.launch { c.changes.collect { if (it == ServerEvent.ProjectionsChanged) load() } }
+    }
+
+    /** Descarga el mismo período y filtro que la lista en el formato elegido y abre «Compartir».
+     *  Devuelve el mensaje para el usuario. */
+    suspend fun export(format: ExportFormat): String {
+        val start = today().plusDays(LIST_FROM_DAYS)
+        val end = today().plusDays(LIST_TO_DAYS)
+        return try {
+            val bytes = c.planningGateway.exportProjections(start, end, _seller.value, format)
+            c.files.share("proyecciones_${start}_$end.${format.extension}", format.mimeType, bytes)
+            "${format.label} listo: elige dónde guardarlo o compartirlo."
+        } catch (e: Exception) {
+            e.userMessage()
+        }
     }
 
     fun filter(seller: String?) {
@@ -82,7 +105,7 @@ class ProjectionsViewModel(private val c: AppContainer, private val account: Acc
                 val catalog = async { Catalog(c.planningGateway.catalog()) }
                 val sellers = async { if (account.seller.isSupervisor) c.planningGateway.sellers() else emptyList() }
                 // Dos semanas atrás y una adelante: lo que un vendedor revisa en el día a día.
-                val list = c.planningGateway.projections(today().plusDays(-14), today().plusDays(7), _seller.value)
+                val list = c.planningGateway.projections(today().plusDays(LIST_FROM_DAYS), today().plusDays(LIST_TO_DAYS), _seller.value)
                     .filter { it.confirmed }
                     .sortedWith(compareByDescending<Projection> { it.date }.thenBy { it.seller })
                 _state.value = Load.Ready(ProjectionsData(catalog.await(), list, sellers.await()))
@@ -102,8 +125,19 @@ fun ProjectionsScreen(container: AppContainer, account: Account) {
     val queue by container.planning.queue.items.collectAsState()
     val mine = queue.filter { it.owner == account.seller.username }
     val supervisor = account.seller.isSupervisor
+    val snackbar = remember { SnackbarHostState() }
 
-    Scaffold(topBar = { TopAppBar(title = { Text(if (supervisor) "Proyecciones" else "Mis proyecciones") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(if (supervisor) "Proyecciones" else "Mis proyecciones") },
+                actions = {
+                    ExportMenu(onExport = { snackbar.showSnackbar(vm.export(it)) }, enabled = state is Load.Ready)
+                },
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbar) },
+    ) { padding ->
         Centered(Modifier.padding(padding)) {
             when (val s = state) {
                 Load.Loading -> Loading()
@@ -126,7 +160,7 @@ fun ProjectionsScreen(container: AppContainer, account: Account) {
                             item { Text("En el servidor", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
                         }
                         if (s.value.projections.isEmpty()) {
-                            item { EmptyState("Sin proyecciones", "Aquí verás lo registrado en las últimas dos semanas.") }
+                            item { EmptyState("Sin proyecciones", "Aquí verás lo registrado en las últimas dos semanas. «Exportar» descarga este período en Excel, PDF o CSV.") }
                         }
                         items(s.value.projections, key = { it.id }) { p ->
                             ProjectionCard(p, s.value.catalog, s.value.sellers.firstOrNull { it.username == p.seller }?.name.takeIf { supervisor })

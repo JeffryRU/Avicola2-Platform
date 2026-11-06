@@ -20,6 +20,7 @@ from app.planning.application.use_cases import DayUnits
 from app.planning.bootstrap import PlanningUseCases, build_use_cases
 from app.planning.domain.editing import CutoffPolicy, EditUnlock
 from app.planning.domain.models import Projection, Seller, SellerAccount
+from app.planning.infrastructure.exporters import WRITERS, ExportFormat
 from app.planning.infrastructure.http import schemas as s
 from app.shared.domain.errors import AuthenticationError, ForbiddenError
 from app.shared.infrastructure.database.session import get_session
@@ -263,6 +264,28 @@ def projection_history(
         )
         for c in use_cases.list_changes(viewer, date_from, date_to, seller)
     ]
+
+
+@router.get("/projections/export", response_class=Response)
+def export_projections(
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    date_from: DateFrom,
+    date_to: DateTo,
+    seller: SellerFilter = None,
+    format: Annotated[ExportFormat, Query()] = "xlsx",  # noqa: A002 (nombre del parámetro HTTP)
+) -> Response:
+    """Las proyecciones en Excel, PDF o CSV (lo usa la app móvil; la web arma la misma tabla):
+    el vendedor, lo suyo; el supervisor, el equipo o un vendedor. Incluye la venta real y
+    quién no registró cada día."""
+    table = use_cases.export_projections(viewer, date_from, date_to, seller)
+    writer = WRITERS[format]
+    name = f"proyecciones_{date_from.isoformat()}_{date_to.isoformat()}.{format}"
+    return Response(
+        writer.write(table),
+        media_type=writer.media_type,
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+    )
 
 
 @router.get("/sales")

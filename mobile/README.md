@@ -9,7 +9,7 @@ App de vendedores en **Kotlin Multiplatform + Compose Multiplatform**: un solo c
   - Días abiertos y cerrados, con la hora de corte.
   - Qué días ya registraste y cuáles faltan.
   - "Pedir habilitación" para un día cerrado.
-  - El supervisor ve quién del equipo registró hoy y el total en kg.
+  - El supervisor ve quién del equipo registró el día que se proyecta (mañana) y el total en kg, y habilita o cierra la edición de cada vendedor.
 - **Registrar proyección:**
   1. Categoría y días (hasta 7); el supervisor elige además el vendedor.
   2. Cantidades por producto, con botones − / + o escribiendo el número.
@@ -17,6 +17,7 @@ App de vendedores en **Kotlin Multiplatform + Compose Multiplatform**: un solo c
   - Si ya había algo registrado, se carga para editarlo.
 - **Sin señal:** el envío queda en el celular y se manda solo al volver la conexión, sin duplicarse (el `submission_id` lo genera la app). Si el servidor lo rechaza, se puede reintentar o descartar.
 - **Proyecciones:** las últimas dos semanas y la próxima. El supervisor puede filtrar por vendedor.
+- **Exportar** (componente común `ExportMenu`, el mismo menú de la web): Excel, PDF o CSV del período y el filtro de la lista. El archivo lo arma el servidor (`GET /api/projections/export?format=`), con el mismo contenido que descarga la web, y se abre el menú «Compartir» del sistema para guardarlo o mandarlo.
 - **Avisos en tiempo real** (SSE), con contador de no leídos.
 - **Perfil:** cambiar el nombre y la contraseña, ver el servidor y la versión, y buscar actualizaciones.
 - **Responsive:** barra inferior en el celular y riel lateral en tablet. Tema claro u oscuro según el sistema.

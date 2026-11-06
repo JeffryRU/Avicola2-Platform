@@ -28,6 +28,7 @@ private val container by lazy {
         tokens = KeychainTokenStore(),
         settings = NSUserDefaultsSettings(NSUserDefaults.standardUserDefaults),
         engine = Darwin.create(),
+        files = IosFileSharer(),
     )
 }
 

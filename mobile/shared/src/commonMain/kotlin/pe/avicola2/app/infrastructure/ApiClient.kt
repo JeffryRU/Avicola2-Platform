@@ -17,6 +17,7 @@ import io.ktor.client.request.parameter
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsBytes
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
@@ -89,6 +90,20 @@ class ApiClient(
 
     suspend inline fun <reified T, reified B : Any> put(path: String, body: B): T =
         send(HttpMethod.Put, path) { json(body) }
+
+    /** Descarga un archivo (p. ej., el Excel); los errores llegan como ApiError igual que en JSON. */
+    suspend fun bytes(path: String, query: Map<String, Any?> = emptyMap()): ByteArray {
+        val response = call {
+            http.request(url(path)) {
+                method = HttpMethod.Get
+                authorize()
+                query.forEach { (k, v) -> if (v != null) parameter(k, v) }
+                timeout { requestTimeoutMillis = DOWNLOAD_TIMEOUT_MS }
+            }
+        }
+        checkStatus(response)
+        return response.bodyAsBytes()
+    }
 
     inline fun <reified B : Any> HttpRequestBuilder.json(body: B) {
         contentType(ContentType.Application.Json)
@@ -177,6 +192,7 @@ class ApiClient(
 
     companion object {
         const val UPLOAD_TIMEOUT_MS = 5 * 60_000L
+        const val DOWNLOAD_TIMEOUT_MS = 60_000L
 
         /** FastAPI responde {"detail": "texto"} o {"detail": [{"msg": ...}]} en validaciones. */
         fun errorMessage(body: String): String? {

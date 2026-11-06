@@ -8,6 +8,7 @@ import pe.avicola2.app.application.PlanningService
 import pe.avicola2.app.application.SubmissionQueue
 import pe.avicola2.app.application.SubmitOutcome
 import pe.avicola2.app.application.ValidationError
+import pe.avicola2.app.domain.ExportFormat
 import pe.avicola2.app.domain.DailyUnits
 import pe.avicola2.app.domain.DayUnits
 import pe.avicola2.app.domain.EditingWindow
@@ -42,6 +43,7 @@ private class FakePlanning : PlanningGateway {
     override suspend fun unlocks(): List<Unlock> = emptyList()
     override suspend fun grantEditing(username: String, dates: List<LocalDate>): List<Unlock> = emptyList()
     override suspend fun revokeEditing(username: String): List<Unlock> = emptyList()
+    override suspend fun exportProjections(from: LocalDate, to: LocalDate, seller: String?, format: ExportFormat) = ByteArray(0)
 }
 
 class PlanningServiceTest {
