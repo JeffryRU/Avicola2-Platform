@@ -1,6 +1,8 @@
 """Punto de entrada de la API."""
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -8,6 +10,7 @@ from app.core.config import get_settings
 from app.ingest.infrastructure.http import router as ingest
 from app.planning.infrastructure.http import events as planning_events
 from app.planning.infrastructure.http import router as planning
+from app.planning.infrastructure.scheduler import periodic_tasks
 from app.shared.infrastructure.http import health
 from app.shared.infrastructure.http.errors import register_error_handlers
 from app.shared.infrastructure.http.security import install_security
@@ -28,7 +31,15 @@ for problem in problems:
 
 # La documentación interactiva expone todos los endpoints: solo en local.
 docs = {} if settings.is_local else {"docs_url": None, "redoc_url": None, "openapi_url": None}
-app = FastAPI(title="Avícola 2 — Planificación de saca", version="0.1.0", **docs)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async with periodic_tasks(settings):
+        yield
+
+
+app = FastAPI(title="Avícola 2 — Planificación de saca", version="0.1.0", lifespan=lifespan, **docs)
 register_error_handlers(app)
 install_security(app, https=settings.cookie_secure, trusted_origins=settings.trusted_origin_list)
 install_request_logging(app)

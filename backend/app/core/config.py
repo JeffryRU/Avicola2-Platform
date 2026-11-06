@@ -41,13 +41,21 @@ class Settings(BaseSettings):
     login_max_attempts: int = Field(5, ge=1)
     login_lock_minutes: int = Field(15, ge=1)
 
-    # Proyecciones: días que se pueden registrar desde hoy y semanas de historia para la sugerencia.
+    # Proyecciones: días que se pueden registrar y semanas de historia para la sugerencia.
     planning_max_days: int = Field(7, ge=1)
+    # Primer día que se puede registrar: 1 = mañana (las proyecciones son de los días siguientes);
+    # 0 = también hoy.
+    planning_starts_in_days: int = Field(1, ge=0, le=1)
     # Hora de corte por defecto (el supervisor la cambia desde la app): la proyección de un día
     # se edita hasta esa hora, PLANNING_CUTOFF_DAYS_BEFORE días antes (1 = el día anterior).
     planning_cutoff_time: str = "19:00"
     planning_cutoff_days_before: int = Field(1, ge=0, le=7)
+    # Bloqueo por horario encendido por defecto (el supervisor lo apaga o enciende desde la app).
+    planning_cutoff_enabled: bool = True
     planning_suggestion_weeks: int = Field(4, ge=1)
+    # Cada cuántos segundos la API revisa si pasó un corte para avisar quién no registró
+    # (0 = no lo revisa: lo dispara n8n con POST /api/internal/notifications/missed-projections).
+    planning_scheduler_seconds: int = Field(60, ge=0)
 
     # Build del frontend (React) que sirve FastAPI; si no existe, no se monta.
     frontend_dist_dir: Path = Path(__file__).resolve().parents[3] / "frontend" / "dist"

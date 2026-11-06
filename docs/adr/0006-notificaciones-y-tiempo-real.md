@@ -29,6 +29,7 @@
 - **API:**
   - `GET /api/notifications` y `POST /api/notifications/read` para el usuario.
   - `POST /api/internal/notifications` y `POST /api/internal/notifications/projection-reminders` para n8n, con el token de servicio `X-Api-Token`.
+  - Avisos de quién no registró al pasar la hora de corte: una tarea periódica dentro de la API (cada `PLANNING_SCHEDULER_SECONDS`), porque la hora la cambia el supervisor y un cron fijo de n8n no la seguiría. Es idempotente (clave por día), así que varios workers o n8n (`POST /api/internal/notifications/missed-projections`) no duplican avisos.
 
 ### Tiempo real
 

@@ -13,6 +13,10 @@ os.environ["INGEST_API_TOKEN"] = ""
 os.environ["PLANNING_CUTOFF_TIME"] = "23:59"
 os.environ["PLANNING_CUTOFF_DAYS_BEFORE"] = "0"
 os.environ["PLANNING_MAX_DAYS"] = "7"
+# Desde hoy (las pruebas del inicio en mañana lo cambian) y sin la revisión periódica de cortes.
+os.environ["PLANNING_STARTS_IN_DAYS"] = "0"
+os.environ["PLANNING_CUTOFF_ENABLED"] = "true"
+os.environ["PLANNING_SCHEDULER_SECONDS"] = "0"
 
 from datetime import date
 from pathlib import Path

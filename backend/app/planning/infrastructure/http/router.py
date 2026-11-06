@@ -374,6 +374,12 @@ def projection_reminders(use_cases: UseCases) -> s.CreatedOut:
     return s.CreatedOut(created=use_cases.send_projection_reminders())
 
 
+@internal.post("/notifications/missed-projections")
+def missed_projections(use_cases: UseCases) -> s.CreatedOut:
+    """Avisos de quién no registró pasado el corte (la API ya lo revisa cada minuto)."""
+    return s.CreatedOut(created=use_cases.notify_missed_projections())
+
+
 # --- Hora de corte y habilitaciones de edición -----------------------------------------
 
 
@@ -395,6 +401,8 @@ def _cutoff_out(policy: CutoffPolicy) -> s.CutoffOut:
         cutoff_time=f"{policy.cutoff:%H:%M}",
         days_before=policy.days_before,
         open_days=policy.open_days,
+        starts_in=policy.starts_in,
+        enabled=policy.enabled,
     )
 
 
@@ -438,4 +446,20 @@ def decide_unlock(
 
 @admin.put("/editing/cutoff")
 def update_cutoff(use_cases: UseCases, actor: ActiveAccount, body: s.CutoffIn) -> s.CutoffOut:
-    return _cutoff_out(use_cases.update_cutoff(actor.seller, body.cutoff_time, body.days_before))
+    return _cutoff_out(
+        use_cases.update_cutoff(actor.seller, body.cutoff_time, body.days_before, body.enabled)
+    )
+
+
+@admin.post("/editing/sellers/{username}/grant")
+def grant_editing(
+    use_cases: UseCases, actor: ActiveAccount, username: str, body: s.GrantEditingIn
+) -> list[s.UnlockOut]:
+    """El supervisor habilita la edición de un vendedor para los días elegidos."""
+    return [_unlock_out(u) for u in use_cases.grant_editing(actor.seller, username, body.dates)]
+
+
+@admin.post("/editing/sellers/{username}/revoke")
+def revoke_editing(use_cases: UseCases, actor: ActiveAccount, username: str) -> list[s.UnlockOut]:
+    """El supervisor cierra las habilitaciones vigentes del vendedor."""
+    return [_unlock_out(u) for u in use_cases.revoke_editing(actor.seller, username)]

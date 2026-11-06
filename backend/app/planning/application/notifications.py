@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from datetime import timedelta
 
 from app.planning.application.ports import (
     Clock,
@@ -10,6 +11,7 @@ from app.planning.application.ports import (
     NotificationRepository,
     ProjectionRepository,
     SellerRepository,
+    UnlockRepository,
 )
 from app.planning.domain.editing import CutoffPolicy
 from app.planning.domain.models import SELLER, SUPERVISOR, Projection, Seller, SellerAccount
@@ -17,6 +19,7 @@ from app.planning.domain.notifications import (
     ANNOUNCEMENT,
     AUDIENCES,
     NOTIFICATION_CREATED,
+    PROJECTION_MISSED,
     PROJECTION_REMINDER,
     PROJECTION_SUBMITTED,
     PROJECTIONS_CHANGED,
@@ -178,6 +181,82 @@ class SendProjectionReminders:
             "Recordatorios de proyección: %d enviados (%d pendientes)", created, len(pending)
         )
         return created
+
+
+# Se avisa por los cortes de las últimas horas: tras un reinicio no llegan avisos de días viejos.
+MISSED_LOOKBACK = timedelta(hours=6)
+
+
+class NotifyMissedProjections:
+    """Pasada la hora de corte de un día: avisa a cada vendedor que no registró su proyección y
+    a los supervisores, con la lista. Cada aviso sale una sola vez (dedupe por día), así que se
+    puede llamar seguido (la API lo revisa cada minuto; también lo puede disparar n8n)."""
+
+    def __init__(
+        self,
+        sellers: SellerRepository,
+        projections: ProjectionRepository,
+        unlocks: UnlockRepository,
+        notifier: Notifier,
+        clock: Clock,
+        policy: Callable[[], CutoffPolicy],
+    ):
+        self.sellers, self.projections, self.unlocks = sellers, projections, unlocks
+        self.notifier, self.clock, self.policy = notifier, clock, policy
+
+    def __call__(self) -> int:
+        policy, now, today = self.policy(), self.clock.now(), self.clock.today()
+        created = 0
+        for day in policy.closed_recently(today, now, MISSED_LOOKBACK):
+            created += self._notify(day, policy, now.tzinfo)
+        return created
+
+    def _notify(self, day, policy: CutoffPolicy, tz) -> int:
+        active = self.sellers.list_active()
+        done = {p.seller for p in self.projections.find(day, day)}
+        missing = [s for s in active if s.role == SELLER and s.username not in done]
+        if not missing:
+            return 0
+        closes = policy.closes_at(day, tz)
+        key = f"missed-{day.isoformat()}"
+        # Al vendedor con habilitación no se le pide que la pida: ya puede registrar.
+        unlocked = {
+            s.username for s in missing if (u := self.unlocks.latest(s.username, day)) and u.is_open
+        }
+        created = 0
+        for seller in missing:
+            hint = (
+                "Tienes habilitación: regístrala cuanto antes."
+                if seller.username in unlocked
+                else "Si aún la necesitas, pide una habilitación al supervisor."
+            )
+            created += self.notifier.notify(
+                [seller],
+                PROJECTION_MISSED,
+                "No registraste tu proyección",
+                f"La del {day:%d/%m} cerró el {closes:%d/%m} a las {closes:%H:%M}. {hint}",
+                link=f"/registrar?dia={day.isoformat()}",
+                dedupe_key=key,
+            )
+        names = _names([s.name for s in missing])
+        count = len(missing)
+        supervisors = [s for s in active if s.role == SUPERVISOR]
+        created += self.notifier.notify(
+            supervisors,
+            PROJECTION_MISSED,
+            f"{count} {'vendedor' if count == 1 else 'vendedores'} sin proyección del {day:%d/%m}",
+            f"Pasó la hora de corte ({closes:%H:%M}) y {'falta' if count == 1 else 'faltan'}: "
+            f"{names}.",
+            link=f"/dashboards/dia/{day.isoformat()}",
+            dedupe_key=key,
+        )
+        logger.info("Sin proyección del %s pasado el corte: %d vendedor(es)", day, count)
+        return created
+
+
+def _names(names: list[str]) -> str:
+    names = sorted(names)
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} y {names[-1]}"
 
 
 class Announce:

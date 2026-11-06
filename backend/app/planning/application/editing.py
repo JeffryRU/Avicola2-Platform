@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 CUTOFF_TIME_KEY = "cutoff_time"
 CUTOFF_DAYS_BEFORE_KEY = "cutoff_days_before"
+CUTOFF_ENABLED_KEY = "cutoff_enabled"
 # Cuántos días atrás se listan las solicitudes.
 HISTORY_DAYS = 30
 UNLOCKS_LINK = "/habilitaciones"
@@ -58,24 +59,34 @@ class EditingSettings:
         default_cutoff: str,
         default_days_before: int,
         open_days: int,
+        starts_in: int = 0,
+        default_enabled: bool = True,
     ):
         self.settings = settings
         self.default_cutoff, self.default_days_before = default_cutoff, default_days_before
-        self.open_days = open_days
+        self.open_days, self.starts_in, self.default_enabled = open_days, starts_in, default_enabled
 
     def policy(self) -> CutoffPolicy:
         cutoff = self.settings.get(CUTOFF_TIME_KEY) or self.default_cutoff
         days_before = self.settings.get(CUTOFF_DAYS_BEFORE_KEY)
+        enabled = self.settings.get(CUTOFF_ENABLED_KEY)
         return CutoffPolicy(
             parse_cutoff(cutoff),
             int(days_before) if days_before is not None else self.default_days_before,
             self.open_days,
+            self.starts_in,
+            enabled == "1" if enabled is not None else self.default_enabled,
         )
 
-    def save(self, cutoff: str, days_before: int, by: str, at: datetime) -> CutoffPolicy:
-        policy = CutoffPolicy(parse_cutoff(cutoff), days_before, self.open_days)  # valida
+    def save(
+        self, cutoff: str, days_before: int, enabled: bool, by: str, at: datetime
+    ) -> CutoffPolicy:
+        policy = CutoffPolicy(  # valida
+            parse_cutoff(cutoff), days_before, self.open_days, self.starts_in, enabled
+        )
         self.settings.set(CUTOFF_TIME_KEY, f"{policy.cutoff:%H:%M}", by, at)
         self.settings.set(CUTOFF_DAYS_BEFORE_KEY, str(policy.days_before), by, at)
+        self.settings.set(CUTOFF_ENABLED_KEY, "1" if policy.enabled else "0", by, at)
         return policy
 
 
@@ -88,10 +99,13 @@ class EditingRules:
     def check(self, seller: Seller, day: date, today: date, now: datetime) -> bool:
         """Lanza un error si no se puede guardar; devuelve True si es pasada la hora de corte."""
         policy = self.settings.policy()
-        last = policy.last_day(today)
+        first, last = policy.first_day(today), policy.last_day(today)
         if day > last:
             raise DomainError(f"Solo puedes registrar hasta el {last:%d/%m/%Y}.")
-        if policy.is_open(day, now):
+        if day < first and not seller.is_supervisor:
+            # Las proyecciones son de los días siguientes; el supervisor puede corregir hoy.
+            raise DomainError(f"Las proyecciones se registran desde el {first:%d/%m/%Y}.")
+        if day >= first and policy.is_open(day, now):
             return False
         if seller.is_supervisor:
             return True
@@ -234,12 +248,139 @@ class UpdateCutoff:
     def __init__(self, settings: EditingSettings, events: EventPublisher, clock: Clock):
         self.settings, self.events, self.clock = settings, events, clock
 
-    def __call__(self, actor: Seller, cutoff: str, days_before: int) -> CutoffPolicy:
+    def __call__(
+        self, actor: Seller, cutoff: str, days_before: int, enabled: bool = True
+    ) -> CutoffPolicy:
         _require_supervisor(actor)
-        policy = self.settings.save(cutoff, days_before, actor.username, self.clock.now())
+        policy = self.settings.save(cutoff, days_before, enabled, actor.username, self.clock.now())
         self.events.publish(Event(EDITING_CHANGED, Audience.role("seller", SUPERVISOR), {}))
-        logger.info("%s cambió el corte a %s (%d días antes)", actor.username, cutoff, days_before)
+        logger.info(
+            "%s cambió el corte a %s (%d días antes, bloqueo %s)",
+            actor.username,
+            cutoff,
+            days_before,
+            "activo" if enabled else "apagado",
+        )
         return policy
+
+
+class GrantEditing:
+    """El supervisor habilita directamente la edición de un vendedor para ciertos días.
+
+    Sirve también para un día aún abierto: la habilitación rige cuando pase la hora de corte.
+    Si el vendedor ya la había pedido, se aprueba su solicitud.
+    """
+
+    def __init__(
+        self,
+        settings: EditingSettings,
+        unlocks: UnlockRepository,
+        sellers: SellerRepository,
+        notifier: Notifier,
+        events: EventPublisher,
+        clock: Clock,
+    ):
+        self.settings, self.unlocks, self.sellers = settings, unlocks, sellers
+        self.notifier, self.events, self.clock = notifier, events, clock
+
+    def __call__(self, actor: Seller, username: str, days: list[date]) -> list[EditUnlock]:
+        _require_supervisor(actor)
+        seller = _target_seller(self.sellers, username)
+        policy, now, today = self.settings.policy(), self.clock.now(), self.clock.today()
+        window = policy.window(today)
+        chosen = sorted(set(days))
+        if not chosen:
+            raise DomainError("Elige al menos un día.")
+        if any(d not in window for d in chosen):
+            raise DomainError("Solo se habilitan los días que se pueden registrar.")
+        granted = []
+        for day in chosen:
+            latest = self.unlocks.latest(seller.username, day)
+            if latest and latest.status == APPROVED:
+                granted.append(latest)
+                continue
+            if latest and latest.status == REQUESTED:
+                unlock = latest.decide("approve", actor.username, now)
+                self.unlocks.save(unlock)
+            else:
+                unlock = self.unlocks.add(
+                    EditUnlock(
+                        seller.username,
+                        day,
+                        f"Habilitada por {actor.name}",
+                        APPROVED,
+                        now,
+                        decided_by=actor.username,
+                        decided_at=now,
+                    )
+                )
+            granted.append(unlock)
+            _publish_change(self.events, unlock)
+        self.notifier.notify(
+            [seller],
+            EDIT_DECIDED,
+            DECIDED_TITLE["approve"],
+            f"Ya puedes editar tu proyección del {_dates_text(chosen)}.",
+            link="/registrar",
+        )
+        logger.info("%s habilitó la edición de %s: %s", actor.username, username, chosen)
+        return granted
+
+
+class RevokeEditing:
+    """El supervisor cierra todas las habilitaciones vigentes de un vendedor."""
+
+    def __init__(
+        self,
+        unlocks: UnlockRepository,
+        sellers: SellerRepository,
+        notifier: Notifier,
+        events: EventPublisher,
+        clock: Clock,
+    ):
+        self.unlocks, self.sellers = unlocks, sellers
+        self.notifier, self.events, self.clock = notifier, events, clock
+
+    def __call__(self, actor: Seller, username: str) -> list[EditUnlock]:
+        _require_supervisor(actor)
+        seller = _target_seller(self.sellers, username)
+        now, today = self.clock.now(), self.clock.today()
+        # La lista viene de la más nueva a la más antigua: la primera de cada día es la vigente.
+        seen: set[date] = set()
+        open_ = []
+        for unlock in self.unlocks.list_since(today, seller.username):
+            if unlock.date not in seen and unlock.status == APPROVED:
+                open_.append(unlock)
+            seen.add(unlock.date)
+        closed = []
+        for unlock in open_:
+            done = unlock.decide("close", actor.username, now)
+            self.unlocks.save(done)
+            closed.append(done)
+            _publish_change(self.events, done)
+        if closed:
+            self.notifier.notify(
+                [seller],
+                EDIT_DECIDED,
+                DECIDED_TITLE["close"],
+                f"La edición del {_dates_text([u.date for u in closed])} volvió a cerrarse.",
+                link="/registrar",
+            )
+        logger.info("%s cerró %d habilitación(es) de %s", actor.username, len(closed), username)
+        return closed
+
+
+def _target_seller(sellers: SellerRepository, username: str) -> Seller:
+    account = sellers.get_account(username, active_only=True)
+    if account is None or account.seller.is_supervisor:
+        raise NotFoundError("No existe un vendedor activo con ese usuario.")
+    return account.seller
+
+
+def _dates_text(days: list[date]) -> str:
+    """[5/11, 6/11, 7/11] → "05/11, 06/11 y 07/11"."""
+    labels = [f"{d:%d/%m}" for d in sorted(days)]
+    return labels[0] if len(labels) == 1 else f"{', '.join(labels[:-1])} y {labels[-1]}"
 
 
 def _decided_body(action: str, day: date) -> str:

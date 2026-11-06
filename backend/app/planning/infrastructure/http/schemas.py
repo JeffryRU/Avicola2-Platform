@@ -202,6 +202,9 @@ class CutoffOut(BaseModel):
     cutoff_time: str
     days_before: int
     open_days: int
+    # Primer día de la ventana (1 = mañana) y si el bloqueo por horario está activo.
+    starts_in: int
+    enabled: bool
 
 
 class EditingWindowOut(BaseModel):
@@ -221,6 +224,13 @@ class UnlockDecisionIn(BaseModel):
 class CutoffIn(BaseModel):
     cutoff_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     days_before: int = Field(ge=0, le=7)
+    enabled: bool = True
+
+
+class GrantEditingIn(BaseModel):
+    """Días que el supervisor habilita para un vendedor."""
+
+    dates: list[date] = Field(min_length=1, max_length=31)
 
 
 class ChangeOut(BaseModel):

@@ -2,7 +2,8 @@
 
 Regla (configurable por el supervisor, ver docs/assumptions.md): la proyección de un día D se
 puede registrar o editar hasta la hora de corte de D menos `days_before` días. Pasada esa hora,
-el vendedor necesita una habilitación del supervisor, que pide indicando el motivo.
+el vendedor necesita una habilitación del supervisor, que pide indicando el motivo (o que el
+supervisor le da directamente). El supervisor puede apagar el bloqueo por horario.
 """
 
 import re
@@ -45,30 +46,50 @@ def clean_reason(reason: str) -> str:
 
 @dataclass(frozen=True)
 class CutoffPolicy:
-    """Hasta cuándo se edita cada día y cuántos días se pueden registrar (hoy incluido)."""
+    """Hasta cuándo se edita cada día y qué días se pueden registrar.
+
+    `starts_in`: el primer día de la ventana (0 = hoy, 1 = mañana); `open_days`: cuántos días
+    tiene. `enabled`: si el bloqueo por horario está activo (apagado, todo día de la ventana
+    queda abierto).
+    """
 
     cutoff: time
     days_before: int = 0
     open_days: int = 3
+    starts_in: int = 0
+    enabled: bool = True
 
     def __post_init__(self) -> None:
         if not 0 <= self.days_before <= MAX_DAYS_BEFORE:
             raise DomainError(f"Los días de anticipación deben estar entre 0 y {MAX_DAYS_BEFORE}.")
         if self.open_days < 1:
             raise DomainError("Debe poder registrarse al menos un día.")
+        if self.starts_in < 0:
+            raise DomainError("La ventana no puede empezar en el pasado.")
 
     def closes_at(self, day: date, tz: tzinfo | None) -> datetime:
         return datetime.combine(day - timedelta(days=self.days_before), self.cutoff, tzinfo=tz)
 
+    def first_day(self, today: date) -> date:
+        return today + timedelta(days=self.starts_in)
+
     def last_day(self, today: date) -> date:
-        return today + timedelta(days=self.open_days - 1)
+        return self.first_day(today) + timedelta(days=self.open_days - 1)
 
     def window(self, today: date) -> list[date]:
-        """Días que se pueden registrar: hoy, mañana, pasado mañana… (`open_days`)."""
-        return [today + timedelta(days=i) for i in range(self.open_days)]
+        """Días que se pueden registrar: desde `first_day` (mañana), `open_days` días."""
+        first = self.first_day(today)
+        return [first + timedelta(days=i) for i in range(self.open_days)]
 
     def is_open(self, day: date, now: datetime) -> bool:
-        return now < self.closes_at(day, now.tzinfo)
+        return not self.enabled or now < self.closes_at(day, now.tzinfo)
+
+    def closed_recently(self, today: date, now: datetime, within: timedelta) -> list[date]:
+        """Días cuyo corte pasó hace menos de `within` (para avisar quién no registró)."""
+        if not self.enabled:
+            return []
+        candidates = (today + timedelta(days=i) for i in range(-1, self.days_before + 2))
+        return [d for d in candidates if now - within < self.closes_at(d, now.tzinfo) <= now]
 
 
 @dataclass(frozen=True)

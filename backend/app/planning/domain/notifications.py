@@ -12,7 +12,16 @@ PROJECTION_SUBMITTED = "projection_submitted"  # al supervisor: un vendedor envi
 ANNOUNCEMENT = "announcement"  # aviso general (n8n): ventas actualizadas, catálogo, etc.
 EDIT_REQUESTED = "edit_requested"  # al supervisor: un vendedor pide editar un día cerrado
 EDIT_DECIDED = "edit_decided"  # al vendedor: su solicitud se aprobó, rechazó o se volvió a cerrar
-KINDS = (PROJECTION_REMINDER, PROJECTION_SUBMITTED, ANNOUNCEMENT, EDIT_REQUESTED, EDIT_DECIDED)
+# Pasó la hora de corte sin proyección: al vendedor que no registró y, con la lista, al supervisor.
+PROJECTION_MISSED = "projection_missed"
+KINDS = (
+    PROJECTION_REMINDER,
+    PROJECTION_SUBMITTED,
+    ANNOUNCEMENT,
+    EDIT_REQUESTED,
+    EDIT_DECIDED,
+    PROJECTION_MISSED,
+)
 
 # Eventos del canal en tiempo real. Solo avisan que algo cambió: los datos se piden por la API.
 NOTIFICATION_CREATED = "notification"

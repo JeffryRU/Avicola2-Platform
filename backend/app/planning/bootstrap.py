@@ -60,12 +60,15 @@ class PlanningUseCases:
     list_notifications: nt.ListNotifications
     mark_notifications_read: nt.MarkNotificationsRead
     send_projection_reminders: nt.SendProjectionReminders
+    notify_missed_projections: nt.NotifyMissedProjections
     announce: nt.Announce
     editing_window: ed.GetEditingWindow
     request_unlock: ed.RequestUnlock
     list_unlocks: ed.ListUnlocks
     decide_unlock: ed.DecideUnlock
     update_cutoff: ed.UpdateCutoff
+    grant_editing: ed.GrantEditing
+    revoke_editing: ed.RevokeEditing
 
 
 def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
@@ -87,6 +90,8 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         settings.planning_cutoff_time,
         settings.planning_cutoff_days_before,
         settings.planning_max_days,
+        settings.planning_starts_in_days,
+        settings.planning_cutoff_enabled,
     )
     return PlanningUseCases(
         authenticate=acc.Authenticate(sellers, hasher, tokens, clock, lockout),
@@ -119,10 +124,15 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         send_projection_reminders=nt.SendProjectionReminders(
             sellers, projections, notifier, clock, editing.policy
         ),
+        notify_missed_projections=nt.NotifyMissedProjections(
+            sellers, projections, unlocks, notifier, clock, editing.policy
+        ),
         announce=nt.Announce(sellers, notifier),
         editing_window=ed.GetEditingWindow(editing, unlocks, clock),
         request_unlock=ed.RequestUnlock(editing, unlocks, sellers, notifier, event_bus, clock),
         list_unlocks=ed.ListUnlocks(unlocks, clock),
         decide_unlock=ed.DecideUnlock(unlocks, sellers, notifier, event_bus, clock),
         update_cutoff=ed.UpdateCutoff(editing, event_bus, clock),
+        grant_editing=ed.GrantEditing(editing, unlocks, sellers, notifier, event_bus, clock),
+        revoke_editing=ed.RevokeEditing(unlocks, sellers, notifier, event_bus, clock),
     )
