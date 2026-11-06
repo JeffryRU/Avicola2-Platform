@@ -1,0 +1,37 @@
+# Proyecto de Xcode generado con XcodeGen (no se versiona el .xcodeproj):
+#   brew install xcodegen && cd mobile/iosApp && xcodegen && open iosApp.xcodeproj
+name: iosApp
+options:
+  bundleIdPrefix: pe.avicola2
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  iosApp:
+    type: application
+    platform: iOS
+    sources:
+      - iosApp
+    settings:
+      base:
+        PRODUCT_NAME: Noraves
+        PRODUCT_BUNDLE_IDENTIFIER: pe.avicola2.app
+        INFOPLIST_FILE: iosApp/Info.plist
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        # El framework de Kotlin (módulo shared) lo compila Gradle en el paso previo.
+        FRAMEWORK_SEARCH_PATHS: "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
+        OTHER_LDFLAGS: "$(inherited) -framework Shared"
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        ENABLE_BITCODE: NO
+    preBuildScripts:
+      - name: Compilar Kotlin (shared)
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "YES" = "$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED" ]; then
+            echo "Se omite Gradle: lo hace el IDE."
+            exit 0
+          fi
+          cd "$SRCROOT/.."
+          ./gradlew :shared:embedAndSignAppleFrameworkForXcode
