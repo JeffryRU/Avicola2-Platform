@@ -1,0 +1,81 @@
+# App móvil (mobile/): pruebas, APK de Android y compilación de iOS en cada cambio.
+# Las versiones publicadas las arma mobile-release.yml al crear un tag v*.
+name: Mobile
+
+on:
+  push:
+    branches: [main, develop, migracion-kotlin]
+    paths: [mobile/**, .github/workflows/mobile.yml]
+  pull_request:
+    paths: [mobile/**, .github/workflows/mobile.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android (pruebas + APK)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Pruebas de la lógica común (JVM)
+        run: ./gradlew :shared:jvmTest --console=plain
+      - name: APK de prueba (debug)
+        run: ./gradlew :androidApp:assembleDebug :androidApp:lintDebug --console=plain
+      - uses: actions/upload-artifact@v7
+        with:
+          name: noraves-debug-apk
+          path: mobile/androidApp/build/outputs/apk/debug/*.apk
+          retention-days: 14
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: reportes-android
+          path: |
+            mobile/shared/build/reports/
+            mobile/androidApp/build/reports/
+
+  ios:
+    name: iOS (pruebas en simulador + compilación)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Pruebas de la lógica común (simulador de iOS)
+        run: ./gradlew :shared:iosSimulatorArm64Test --console=plain
+      - name: Generar el proyecto de Xcode
+        working-directory: mobile/iosApp
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Compilar la app (simulador, sin firma)
+        working-directory: mobile/iosApp
+        run: |
+          xcodebuild -project iosApp.xcodeproj -scheme iosApp -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -n 40
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: reportes-ios
+          path: mobile/shared/build/reports/

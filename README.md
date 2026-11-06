@@ -30,6 +30,11 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
 - API `/api/*` en el backend con arquitectura hexagonal (`backend/app/planning`), login de vendedores con JWT.
 - Base de datos intercambiable por `DATABASE_URL`: Supabase hoy; Azure SQL configurado para más adelante. Nombres de tablas en `backend/config/tables.yaml`.
 
+**App móvil (Android e iOS)** — [ADR 0009](docs/adr/0009-app-movil-kotlin-multiplatform.md), [`mobile/README.md`](mobile/README.md):
+- Kotlin Multiplatform + Compose Multiplatform en `mobile/`, con la misma lógica que la web: registro con cola offline, avisos en tiempo real, sugerencias y vista del supervisor.
+- Se publica en GitHub Releases al crear un tag `v*`. En Android, el botón "Instalar" de la web ofrece la app nativa (APK) o la app web.
+- El backend acepta `Authorization: Bearer` para la app (`POST /api/auth/token`); la web sigue con la cookie HttpOnly.
+
 ## Requisitos
 
 - Docker Desktop (con Compose v2.20 o superior).
@@ -99,6 +104,13 @@ pnpm lint && pnpm test && pnpm build
 ```
 
 Las capas (`domain`, `application`, `infrastructure`, `ui`) las vigila ESLint: el dominio no importa React y la interfaz no importa adaptadores.
+
+- **HTTP:** axios detrás del puerto `HttpClient`. Para subir archivos con barra de progreso: `http.upload(path, file, schema, { onProgress, signal, fields })`.
+- **`VITE_ANDROID_APK_URL`:** enlace del botón "App de Android". Por defecto apunta a la última Release de GitHub; vacío lo oculta.
+
+## Desarrollo de la app móvil
+
+Ver [`mobile/README.md`](mobile/README.md) (requisitos, comandos, pruebas contra el backend local y cómo publicar una versión).
 
 ## Datos sintéticos y plantilla
 

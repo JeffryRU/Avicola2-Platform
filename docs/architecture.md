@@ -79,7 +79,8 @@ flowchart LR
 | **React** | UI por rol | Lógica de negocio |
 
 ### Stack
-- **Frontend:** React + Vite + TypeScript, shadcn/ui + Tailwind, TanStack Query, Recharts, pnpm. Refine es opcional (solo si el equipo ya lo conoce).
+- **Frontend:** React + Vite + TypeScript, shadcn/ui + Tailwind, TanStack Query, axios, Recharts, pnpm. Refine es opcional (solo si el equipo ya lo conoce).
+- **App móvil:** Kotlin Multiplatform + Compose Multiplatform (Android e iOS), Ktor, kotlinx.serialization. Se distribuye por GitHub Releases ([ADR 0009](adr/0009-app-movil-kotlin-multiplatform.md)).
 - **Backend:** Python 3.12, FastAPI, SQLAlchemy 2 + Alembic, psycopg 3, Pydantic v2, uv, ruff.
 - **Base de datos:** Supabase Cloud (Postgres gestionado).
 - **Datos:** `deltalake` (delta-rs), DuckDB (extensión `delta`), pandas, openpyxl.
@@ -293,6 +294,8 @@ Se exportan como JSON en `n8n/workflows/`.
 - **Modelos** (admin): métricas por versión y botón de reentrenar.
 - **Asistente** (fase 2): chat.
 - **Usuarios** (admin).
+
+La app móvil (`mobile/`) cubre por ahora el flujo de los vendedores y la vista del equipo del supervisor (ver [`mobile/README.md`](../mobile/README.md)).
 
 ---
 

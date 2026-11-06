@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.russhwolf.settings.SharedPreferencesSettings
+import io.ktor.client.engine.okhttp.OkHttp
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -71,4 +72,6 @@ class KeystoreTokenStore(context: Context) : TokenStore {
 fun androidContainer(context: Context): AppContainer = AppContainer(
     tokens = KeystoreTokenStore(context.applicationContext),
     settings = SharedPreferencesSettings(context.applicationContext.getSharedPreferences("avicola2", Context.MODE_PRIVATE)),
+    // Motor explícito: no depende del ServiceLoader, que R8 puede recortar en la versión release.
+    engine = OkHttp.create(),
 )

@@ -4,6 +4,7 @@ import androidx.compose.ui.window.ComposeUIViewController
 import com.russhwolf.settings.ExperimentalSettingsImplementation
 import com.russhwolf.settings.KeychainSettings
 import com.russhwolf.settings.NSUserDefaultsSettings
+import io.ktor.client.engine.darwin.Darwin
 import platform.Foundation.NSUserDefaults
 import platform.UIKit.UIViewController
 import pe.avicola2.app.application.TokenStore
@@ -26,6 +27,7 @@ private val container by lazy {
     AppContainer(
         tokens = KeychainTokenStore(),
         settings = NSUserDefaultsSettings(NSUserDefaults.standardUserDefaults),
+        engine = Darwin.create(),
     )
 }
 
