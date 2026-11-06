@@ -41,6 +41,12 @@ interface PlanningGateway {
     suspend fun sales(from: LocalDate, to: LocalDate, seller: String? = null): List<DailyUnits>
     suspend fun editingWindow(): EditingWindow
     suspend fun requestUnlock(date: LocalDate, reason: String): Unlock
+    /** Supervisor: las solicitudes y habilitaciones de todos (últimos 30 días). */
+    suspend fun unlocks(): List<Unlock>
+    /** Supervisor: habilita la edición de un vendedor aunque haya pasado el corte. */
+    suspend fun grantEditing(username: String, dates: List<LocalDate>): List<Unlock>
+    /** Supervisor: cierra las habilitaciones vigentes de un vendedor. */
+    suspend fun revokeEditing(username: String): List<Unlock>
 }
 
 interface NotificationsGateway {

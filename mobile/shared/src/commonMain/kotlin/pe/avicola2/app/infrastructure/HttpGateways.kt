@@ -1,5 +1,6 @@
 package pe.avicola2.app.infrastructure
 
+import io.ktor.http.encodeURLPathPart
 import kotlinx.datetime.LocalDate
 import pe.avicola2.app.application.AuthGateway
 import pe.avicola2.app.application.NotificationsGateway
@@ -8,6 +9,8 @@ import pe.avicola2.app.domain.Account
 import pe.avicola2.app.domain.ChangePasswordRequest
 import pe.avicola2.app.domain.DailyUnits
 import pe.avicola2.app.domain.EditingWindow
+import pe.avicola2.app.domain.EmptyBody
+import pe.avicola2.app.domain.GrantRequest
 import pe.avicola2.app.domain.LoginRequest
 import pe.avicola2.app.domain.MarkRead
 import pe.avicola2.app.domain.MarkReadResult
@@ -55,6 +58,14 @@ class HttpPlanningGateway(private val api: ApiClient) : PlanningGateway {
 
     override suspend fun requestUnlock(date: LocalDate, reason: String): Unlock =
         api.post("/editing/unlocks", UnlockRequest(date, reason))
+
+    override suspend fun unlocks(): List<Unlock> = api.get("/editing/unlocks")
+
+    override suspend fun grantEditing(username: String, dates: List<LocalDate>): List<Unlock> =
+        api.post("/admin/editing/sellers/${username.encodeURLPathPart()}/grant", GrantRequest(dates))
+
+    override suspend fun revokeEditing(username: String): List<Unlock> =
+        api.post("/admin/editing/sellers/${username.encodeURLPathPart()}/revoke", EmptyBody())
 }
 
 class HttpNotificationsGateway(private val api: ApiClient) : NotificationsGateway {

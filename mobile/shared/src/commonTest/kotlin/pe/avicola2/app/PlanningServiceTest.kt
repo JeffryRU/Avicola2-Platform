@@ -39,6 +39,9 @@ private class FakePlanning : PlanningGateway {
     override suspend fun sales(from: LocalDate, to: LocalDate, seller: String?): List<DailyUnits> = emptyList()
     override suspend fun editingWindow(): EditingWindow = error("no usado")
     override suspend fun requestUnlock(date: LocalDate, reason: String): Unlock = error("no usado")
+    override suspend fun unlocks(): List<Unlock> = emptyList()
+    override suspend fun grantEditing(username: String, dates: List<LocalDate>): List<Unlock> = emptyList()
+    override suspend fun revokeEditing(username: String): List<Unlock> = emptyList()
 }
 
 class PlanningServiceTest {

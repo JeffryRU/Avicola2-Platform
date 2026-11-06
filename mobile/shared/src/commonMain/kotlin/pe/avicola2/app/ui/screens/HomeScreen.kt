@@ -34,6 +34,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +66,7 @@ import pe.avicola2.app.domain.plusDays
 import pe.avicola2.app.domain.relative
 import pe.avicola2.app.domain.short
 import pe.avicola2.app.domain.today
+import pe.avicola2.app.domain.Unlock
 import pe.avicola2.app.ui.Load
 import pe.avicola2.app.ui.components.Centered
 import pe.avicola2.app.ui.components.ErrorState
@@ -81,9 +83,11 @@ data class HomeData(
     val days: List<EditingDay>,
     val projections: List<Projection>,
     val sellers: List<Seller>,
+    /** Solo para el supervisor: solicitudes y habilitaciones (para «Habilitar edición»). */
+    val unlocks: List<Unlock> = emptyList(),
 )
 
-class HomeViewModel(private val c: AppContainer) : ViewModel() {
+class HomeViewModel(private val c: AppContainer, private val supervisor: Boolean) : ViewModel() {
     private val _state = MutableStateFlow<Load<HomeData>>(Load.Loading)
     val state: StateFlow<Load<HomeData>> = _state.asStateFlow()
 
@@ -106,7 +110,8 @@ class HomeViewModel(private val c: AppContainer) : ViewModel() {
                 val from = days.minOfOrNull { it.date } ?: today()
                 val to = days.maxOfOrNull { it.date } ?: today().plusDays(6)
                 val projections = c.planningGateway.projections(from, to)
-                _state.value = Load.Ready(HomeData(catalog.await(), days, projections, sellers.await()))
+                val unlocks = if (supervisor) c.planningGateway.unlocks() else emptyList()
+                _state.value = Load.Ready(HomeData(catalog.await(), days, projections, sellers.await(), unlocks))
             } catch (e: Exception) {
                 if (current is Load.Ready && silent) _state.value = current.copy(refreshing = false)
                 else _state.value = Load.Failed(e.userMessage())
@@ -116,6 +121,12 @@ class HomeViewModel(private val c: AppContainer) : ViewModel() {
 
     suspend fun requestUnlock(date: LocalDate, reason: String) {
         c.planningGateway.requestUnlock(date, reason)
+        load(silent = true)
+    }
+
+    /** Supervisor: habilita o cierra la edición de un vendedor para el día que se proyecta. */
+    suspend fun setEditing(username: String, day: LocalDate, enabled: Boolean) {
+        if (enabled) c.planningGateway.grantEditing(username, listOf(day)) else c.planningGateway.revokeEditing(username)
         load(silent = true)
     }
 }
@@ -129,7 +140,8 @@ fun HomeScreen(
     onRegister: (LocalDate?) -> Unit,
     onOpenUpdate: (AppRelease) -> Unit,
 ) {
-    val vm = viewModel { HomeViewModel(container) }
+    val vm = viewModel { HomeViewModel(container, account.seller.isSupervisor) }
+    val scope = rememberCoroutineScope()
     val state by vm.state.collectAsState()
     val queue by container.planning.queue.items.collectAsState()
     val snackbar = remember { SnackbarHostState() }
@@ -176,6 +188,17 @@ fun HomeScreen(
                         onFlush = {
                             container.notifyChanged(ServerEvent.Connected)
                         },
+                        onSetEditing = { seller, day, enabled ->
+                            scope.launch {
+                                val message = try {
+                                    vm.setEditing(seller.username, day, enabled)
+                                    if (enabled) "Edición habilitada para ${seller.name}." else "Edición cerrada para ${seller.name}."
+                                } catch (e: Exception) {
+                                    e.userMessage()
+                                }
+                                snackbar.showSnackbar(message)
+                            }
+                        },
                     )
                 }
             }
@@ -205,6 +228,7 @@ private fun HomeContent(
     onUnlock: (LocalDate) -> Unit,
     onOpenUpdate: (AppRelease) -> Unit,
     onFlush: () -> Unit,
+    onSetEditing: (Seller, LocalDate, Boolean) -> Unit,
 ) {
     val me = account.seller.username
     val supervisor = account.seller.isSupervisor
@@ -240,7 +264,7 @@ private fun HomeContent(
             }
         }
         if (supervisor) {
-            item { TeamToday(data) }
+            item { TeamDay(data, onSetEditing) }
         }
         item {
             Text(
@@ -274,9 +298,10 @@ private fun DayCard(
                 Text(day.date.relative(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
                     when {
-                        day.open && closes != null -> "Puedes registrar hasta las ${closes.hhmm()}"
+                        day.unlock?.status == "approved" -> "Habilitado por el supervisor"
+                        day.open && closes != null -> "Puedes registrar hasta ${closes.date.relative().lowercase()} a las ${closes.hhmm()}"
                         day.open -> "Abierto"
-                        day.unlock?.status == "pending" -> "Cerrado · solicitud enviada"
+                        day.unlock?.status == "requested" -> "Cerrado · solicitud enviada"
                         else -> "Cerrado para cambios"
                     },
                     style = MaterialTheme.typography.bodySmall,
@@ -300,21 +325,23 @@ private fun DayCard(
                 }
             }
         }
-        if (!supervisor && !day.open && day.unlock?.status != "pending") {
+        if (!supervisor && !day.open && day.unlock?.status != "requested") {
             TextButton(onClick = onUnlock, modifier = Modifier.padding(top = 4.dp)) { Text("Pedir habilitación") }
         }
     }
 }
 
-/** Supervisor: quién ya registró hoy y cuántos kg suma el equipo. */
+/** Supervisor: quién ya registró el día que se proyecta (mañana), cuánto suma el equipo, y
+ *  habilitar o cerrar la edición de cada vendedor. */
 @Composable
-private fun TeamToday(data: HomeData) {
-    val day = today()
+private fun TeamDay(data: HomeData, onSetEditing: (Seller, LocalDate, Boolean) -> Unit) {
+    val day = data.days.firstOrNull()?.date ?: today().plusDays(1)
     val sellers = data.sellers.filter { !it.isSupervisor }
     val todays = data.projections.filter { it.date == day && it.confirmed }
     val done = sellers.filter { s -> todays.any { it.seller == s.username } }
+    val granted = activeGrants(data.unlocks, day)
     SectionCard {
-        Text("Equipo hoy", style = MaterialTheme.typography.titleMedium)
+        Text("Equipo · ${day.relative()}", style = MaterialTheme.typography.titleMedium)
         Row(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
             Stat("Registraron", "${done.size} de ${sellers.size}", Modifier.weight(1f))
             Stat("Total", formatKg(todays.sumOf { it.totalKg }), Modifier.weight(1f))
@@ -328,9 +355,21 @@ private fun TeamToday(data: HomeData) {
                 }
                 if (kg > 0) Pill(formatKg(kg), Success) else Pill("Falta", Warning)
             }
+            val open = s.username in granted
+            TextButton(onClick = { onSetEditing(s, day, !open) }, modifier = Modifier.padding(bottom = 2.dp)) {
+                Text(if (open) "Cerrar edición" else "Habilitar edición")
+            }
         }
     }
 }
+
+/** Vendedores con la edición habilitada desde `from` (la última habilitación de cada día manda). */
+internal fun activeGrants(unlocks: List<Unlock>, from: LocalDate): Set<String> =
+    unlocks.groupBy { it.seller to it.date }
+        .mapNotNull { (_, list) -> list.maxBy { it.id } }
+        .filter { it.status == "approved" && it.date >= from }
+        .map { it.seller }
+        .toSet()
 
 @Composable
 private fun UnlockDialog(date: LocalDate, onDismiss: () -> Unit, onSend: suspend (String) -> Unit) {

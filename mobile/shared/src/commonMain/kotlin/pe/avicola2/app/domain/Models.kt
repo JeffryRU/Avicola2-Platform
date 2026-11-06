@@ -113,6 +113,10 @@ data class CutoffPolicy(
     @SerialName("cutoff_time") val cutoffTime: String,
     @SerialName("days_before") val daysBefore: Int,
     @SerialName("open_days") val openDays: Int,
+    /** Primer día de la ventana (1 = mañana). */
+    @SerialName("starts_in") val startsIn: Int = 0,
+    /** Si el bloqueo por horario está activo. */
+    val enabled: Boolean = true,
 )
 
 @Serializable
@@ -120,6 +124,13 @@ data class EditingWindow(val policy: CutoffPolicy, val days: List<EditingDay>)
 
 @Serializable
 data class UnlockRequest(val date: LocalDate, val reason: String)
+
+/** El supervisor habilita la edición de un vendedor para esos días. */
+@Serializable
+data class GrantRequest(val dates: List<LocalDate>)
+
+@Serializable
+class EmptyBody
 
 @Serializable
 data class Notification(
