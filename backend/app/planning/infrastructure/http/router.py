@@ -2,13 +2,16 @@
 
 La sesión viaja en una cookie HttpOnly (`nv_session`): el JavaScript de la página no puede
 leer el token, y no aparece en el cuerpo de ninguna respuesta ni en el almacenamiento local.
+
+La app móvil no usa cookies: pide el token con `POST /api/auth/token` y lo envía en
+`Authorization: Bearer <token>` (ADR 0009). El navegador nunca recibe el token en el cuerpo.
 """
 
 from dataclasses import asdict
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, Query, Response, status
+from fastapi import APIRouter, Cookie, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -31,10 +34,28 @@ def get_use_cases(session: Annotated[Session, Depends(get_session)]) -> Planning
 
 
 UseCases = Annotated[PlanningUseCases, Depends(get_use_cases)]
-SessionToken = Annotated[str | None, Cookie(alias=SESSION_COOKIE)]
+SessionCookie = Annotated[str | None, Cookie(alias=SESSION_COOKIE)]
+AuthorizationHeader = Annotated[str | None, Header(alias="Authorization")]
 
 
-def current_account(use_cases: UseCases, token: SessionToken = None) -> SellerAccount:
+def session_token(
+    cookie: SessionCookie = None, authorization: AuthorizationHeader = None
+) -> str | None:
+    """Token de la sesión: `Authorization: Bearer` (app móvil) o la cookie (navegador).
+
+    El encabezado no lo adjunta el navegador por su cuenta, así que no abre la puerta a CSRF.
+    """
+    if authorization:
+        scheme, _, value = authorization.partition(" ")
+        if scheme.lower() == "bearer" and value.strip():
+            return value.strip()
+    return cookie
+
+
+SessionToken = Annotated[str | None, Depends(session_token)]
+
+
+def current_account(use_cases: UseCases, token: SessionToken) -> SellerAccount:
     if not token:
         raise AuthenticationError("Inicia sesión para continuar.")
     return use_cases.current_account(token)
@@ -116,6 +137,15 @@ def _projection_out(p: Projection) -> s.ProjectionOut:
 def login(use_cases: UseCases, body: s.LoginIn, response: Response) -> s.AccountOut:
     session = use_cases.authenticate(body.username, body.password)
     return _login_response(response, session, body.remember)
+
+
+@public.post("/auth/token")
+def issue_token(use_cases: UseCases, body: s.TokenLoginIn) -> s.TokenOut:
+    """Login de la app móvil: el token va en el cuerpo y la app lo guarda cifrado."""
+    session = use_cases.authenticate(body.username, body.password)
+    account = _account_out(session.account)
+    ttl = get_settings().auth_token_ttl_hours * 3600
+    return s.TokenOut(**account.model_dump(), token=session.token, expires_in=ttl)
 
 
 @public.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)

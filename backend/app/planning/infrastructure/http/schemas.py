@@ -28,6 +28,21 @@ class AccountOut(BaseModel):
     must_change_password: bool
 
 
+class TokenLoginIn(BaseModel):
+    """Login de la app móvil (sin cookie ni "recordarme": el token dura lo que dura)."""
+
+    username: str = Field(min_length=1, max_length=50)
+    password: str = Field(min_length=1, max_length=200)
+
+
+class TokenOut(AccountOut):
+    """Solo para la app móvil: el navegador nunca recibe el token en el cuerpo."""
+
+    token: str
+    token_type: Literal["bearer"] = "bearer"  # noqa: S105 (tipo de token, no un secreto)
+    expires_in: int = Field(description="Segundos hasta que vence el token.")
+
+
 class ProfileIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 

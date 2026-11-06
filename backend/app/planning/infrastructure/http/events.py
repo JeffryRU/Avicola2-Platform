@@ -8,9 +8,8 @@ reconecta solo, usa la misma cookie de sesión y pasa sin problemas por Caddy o 
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.config import get_settings
@@ -18,7 +17,7 @@ from app.planning.bootstrap import build_use_cases
 from app.planning.domain.models import SellerAccount
 from app.planning.domain.notifications import SESSION_REVOKED, Event
 from app.planning.infrastructure.events import Subscription, event_bus
-from app.planning.infrastructure.http.router import SESSION_COOKIE
+from app.planning.infrastructure.http.router import SessionToken
 from app.shared.domain.errors import AuthenticationError, ForbiddenError
 from app.shared.infrastructure.database.session import SessionLocal
 
@@ -60,9 +59,7 @@ async def _stream(request: Request, subscription: Subscription) -> AsyncIterator
 
 
 @router.get("/events")
-async def events(
-    request: Request, token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None
-) -> StreamingResponse:
+async def events(request: Request, token: SessionToken) -> StreamingResponse:
     account = await asyncio.to_thread(_authenticate, token)
 
     async def body() -> AsyncIterator[str]:

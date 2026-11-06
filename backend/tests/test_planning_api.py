@@ -184,3 +184,60 @@ def test_supervisor_can_filter_any_seller(client) -> None:
     params = {"date_from": _day(-7), "date_to": _day(-1), "seller": "hdias"}
     sales = client.get("/api/sales", params=params).json()
     assert len(sales) == 7 and all(s["seller"] == "hdias" for s in sales)
+
+
+# --- App móvil: token Bearer -----------------------------------------------------------
+
+
+def _token(client, username="rnavarro", password="demo1234") -> str:
+    r = client.post("/api/auth/token", json={"username": username, "password": password})
+    assert r.status_code == 200, r.text
+    return r.json()["token"]
+
+
+def test_token_login_returns_bearer_without_cookie(client) -> None:
+    r = client.post("/api/auth/token", json={"username": "rnavarro", "password": "demo1234"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["token_type"] == "bearer"
+    assert body["expires_in"] == get_settings().auth_token_ttl_hours * 3600
+    assert body["seller"]["username"] == "rnavarro"
+    assert "nv_session" not in r.cookies
+    assert not client.cookies
+
+
+def test_token_login_rejects_bad_password(client) -> None:
+    r = client.post("/api/auth/token", json={"username": "rnavarro", "password": "mal"})
+    assert r.status_code == 401
+    assert "token" not in r.json()
+
+
+def test_bearer_token_authenticates_requests(client) -> None:
+    token = _token(client)
+    r = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+    assert r.json()["seller"]["username"] == "rnavarro"
+    r = client.get("/api/sellers", headers={"Authorization": f"bearer {token}"})
+    assert r.status_code == 200
+
+
+def test_invalid_bearer_is_rejected(client) -> None:
+    r = client.get("/api/sellers", headers={"Authorization": "Bearer nope"})
+    assert r.status_code == 401
+
+
+def test_bearer_takes_precedence_over_cookie(client) -> None:
+    _login(client)  # cookie de rnavarro
+    r = client.get("/api/auth/me", headers={"Authorization": "Bearer nope"})
+    assert r.status_code == 401
+
+
+def test_non_bearer_authorization_falls_back_to_cookie(client) -> None:
+    _login(client)
+    r = client.get("/api/auth/me", headers={"Authorization": "Basic abc"})
+    assert r.status_code == 200
+
+
+def test_web_login_never_returns_token_in_body(client) -> None:
+    r = client.post("/api/auth/login", json={"username": "rnavarro", "password": "demo1234"})
+    assert "token" not in r.json()
