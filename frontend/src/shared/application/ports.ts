@@ -9,15 +9,31 @@ export interface KeyValueStore {
   remove(key: string): void
 }
 
+/** Opciones de una subida de archivos. */
+export interface UploadOptions {
+  /** Progreso de 0 a 100 mientras se envía el archivo (sirve para una barra de progreso). */
+  onProgress?: (percent: number) => void
+  /** Cancela la subida (p. ej., la persona toca "Cancelar"). */
+  signal?: AbortSignal
+  /** Campos de texto que acompañan al archivo en el mismo formulario. */
+  fields?: Record<string, string>
+  /** Nombre del campo del archivo en el formulario (por defecto, "file"). */
+  fieldName?: string
+  /** Las subidas pesadas tardan más que una consulta: por defecto, 5 minutos. */
+  timeoutMs?: number
+}
+
 /** Cliente HTTP que valida cada respuesta con un esquema de zod. */
 export interface HttpClient {
   get<T>(path: string, schema: z.ZodType<T>, query?: Record<string, string | number | undefined>): Promise<T>
   post<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
   patch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
   put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
+  /** Sube un archivo (multipart/form-data) e informa el progreso. */
+  upload<T>(path: string, file: Blob, schema: z.ZodType<T>, options?: UploadOptions): Promise<T>
 }
 
-/** Error de la API con el código HTTP (0 = sin conexión o sin respuesta). */
+/** Error de la API con el código HTTP (0 = sin conexión, sin respuesta o cancelada). */
 export class ApiError extends Error {
   readonly status: number
   constructor(message: string, status: number) {

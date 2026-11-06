@@ -3,7 +3,7 @@ import type { AppInstaller, KeyValueStore } from '@/shared/application/ports'
 import { BrowserAppInstaller } from '@/shared/infrastructure/browser-app-installer'
 import { BrowserStore } from '@/shared/infrastructure/browser-store'
 import { clearCachedApiData } from '@/shared/infrastructure/cached-data'
-import { FetchHttpClient } from '@/shared/infrastructure/fetch-http-client'
+import { AxiosHttpClient } from '@/shared/infrastructure/axios-http-client'
 import { installGlobalErrorCapture } from '@/shared/infrastructure/global-error-capture'
 import { HttpLogSink } from '@/shared/infrastructure/http-log-sink'
 import type { AccountsGateway } from '@/features/accounts/application/ports'
@@ -64,7 +64,7 @@ export function createContainer(): Container {
     version: __APP_VERSION__,
   })
   installGlobalErrorCapture(errors)
-  const http = new FetchHttpClient({
+  const http = new AxiosHttpClient({
     baseUrl,
     timeoutMs: 15_000,
     onUnauthorized: () => auth?.expire(),
