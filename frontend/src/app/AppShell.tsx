@@ -19,7 +19,7 @@ import { useContainer } from '@/app/di'
 import { InstallBanner } from '@/app/install'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
 import { initials } from '@/shared/domain/format'
-import { isSupervisor, roleLabel } from '@/features/auth/domain/session'
+import { can, hasTeamView, roleLabel } from '@/features/auth/domain/session'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { useUnreadCount } from '@/features/notifications/ui/hooks'
 import { useUnlocks } from '@/features/editing/ui/hooks'
@@ -58,14 +58,16 @@ function SideItem({
 
 function Sidebar() {
   const { auth } = useContainer()
-  const { seller } = useRequiredSession()
+  const session = useRequiredSession()
+  const { seller } = session
   const { pathname } = useLocation()
   const unread = useUnreadCount()
   const inDash = pathname.startsWith('/dashboards')
   const [expanded, setExpanded] = useState(true)
   // El supervisor no registra proyecciones: administra usuarios y ve los dashboards del equipo.
-  const supervisor = isSupervisor(seller)
-  const pending = (useUnlocks(supervisor).data ?? []).filter((u) => u.status === 'requested').length
+  const supervisor = hasTeamView(session)
+  const editing = can(session, 'manage_editing')
+  const pending = (useUnlocks(editing).data ?? []).filter((u) => u.status === 'requested').length
   return (
     <aside className="sticky top-0 hidden h-dvh w-[268px] flex-none flex-col overflow-y-auto border-r bg-side px-3.5 pt-[22px] pb-4 dsk:flex">
       <div className="px-2.5 pb-[22px]">
@@ -104,19 +106,21 @@ function Sidebar() {
         )}
         {supervisor ? (
           <>
-            <SideItem to={paths.accounts} icon={<Users />} label="Usuarios" />
-            <SideItem
-              to={paths.unlocks}
-              icon={<LockOpen />}
-              label="Habilitaciones"
-              extra={
-                pending > 0 && (
-                  <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-warn px-1.5 text-[11px] font-extrabold text-white not-italic">
-                    {pending}
-                  </em>
-                )
-              }
-            />
+            {can(session, 'manage_accounts') && <SideItem to={paths.accounts} icon={<Users />} label="Usuarios" />}
+            {editing && (
+              <SideItem
+                to={paths.unlocks}
+                icon={<LockOpen />}
+                label="Habilitaciones"
+                extra={
+                  pending > 0 && (
+                    <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-warn px-1.5 text-[11px] font-extrabold text-white not-italic">
+                      {pending}
+                    </em>
+                  )
+                }
+              />
+            )}
           </>
         ) : (
           <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
@@ -171,7 +175,10 @@ const BOTTOM_SUPERVISOR = [
 ]
 
 function BottomNav() {
-  const items = isSupervisor(useRequiredSession().seller) ? BOTTOM_SUPERVISOR : BOTTOM
+  const session = useRequiredSession()
+  const items = hasTeamView(session)
+    ? BOTTOM_SUPERVISOR.filter((i) => i.to !== paths.accounts || can(session, 'manage_accounts'))
+    : BOTTOM
   const unread = useUnreadCount()
   return (
     <nav

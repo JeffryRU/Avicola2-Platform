@@ -7,7 +7,7 @@ import { AppShell } from '@/app/AppShell'
 import type { Container } from '@/app/container'
 import { ContainerProvider, useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
-import { isSupervisor } from '@/features/auth/domain/session'
+import { can, hasTeamView } from '@/features/auth/domain/session'
 import { ForcedPasswordChange } from '@/features/auth/ui/ChangePasswordPage'
 import { LoginPage } from '@/features/auth/ui/LoginPage'
 import { useRealtime } from '@/features/notifications/ui/hooks'
@@ -137,13 +137,13 @@ function Routed() {
         <LoginPage onLoggedIn={showSplash} />
       ) : session.must_change_password ? (
         <ForcedPasswordChange />
-      ) : isSupervisor(session.seller) ? (
+      ) : hasTeamView(session) ? (
         <Suspense fallback={null}>
           <Routes>
             <Route element={<AppShell />}>
               <Route index element={<SupervisorHomePage />} />
-              <Route path={paths.accounts} element={<AccountsPage />} />
-              <Route path={paths.unlocks} element={<UnlocksPage />} />
+              {can(session, 'manage_accounts') && <Route path={paths.accounts} element={<AccountsPage />} />}
+              {can(session, 'manage_editing') && <Route path={paths.unlocks} element={<UnlocksPage />} />}
               <Route path={paths.register} element={<NewProjectionPage />} />
               <Route path={paths.history} element={<HistoryPage />} />
               <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />

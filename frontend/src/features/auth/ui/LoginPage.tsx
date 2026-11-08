@@ -153,7 +153,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
           </div>
           {DEMO && (
             <p className="mt-4 text-[12.5px] text-muted-foreground">
-              Usuarios de prueba: rnavarro, hdias, mcordova y supervisor (contraseña demo1234).
+              Usuarios de prueba: rnavarro, hdias, mcordova, supervisor y general (contraseña demo1234).
             </p>
           )}
         </form>

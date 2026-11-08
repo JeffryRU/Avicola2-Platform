@@ -1,16 +1,18 @@
 import { useState, type SyntheticEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, KeyRound, Loader2, Lock, LockOpen, Power, UserPlus } from 'lucide-react'
+import { Check, Copy, KeyRound, Loader2, Lock, LockOpen, Power, UserCog, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
 import {
   accountState,
   newAccountSchema,
+  otherRoles,
   type AccountState,
   type AdminAccount,
   type NewCredentials,
 } from '@/features/accounts/domain/accounts'
+import type { Role } from '@/features/auth/domain/session'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { ConfirmDialog } from '@/shared/ui/components/confirm-dialog'
 import { EmptyState } from '@/shared/ui/components/feedback'
@@ -28,7 +30,7 @@ import { Input } from '@/shared/ui/components/shadcn/input'
 import { Label } from '@/shared/ui/components/shadcn/label'
 import { cn } from '@/shared/ui/lib/utils'
 import { ACCOUNT_STATE_LABEL } from '@/features/accounts/types/accounts'
-import { ROLE_LABEL } from '@/features/auth/types/roles'
+import { ROLE_HINT, ROLE_LABEL, roleName } from '@/features/auth/types/roles'
 import { activeUnlocks, policyKey, type EditingWindow, type Unlock } from '@/features/editing/domain/editing'
 import { CUTOFF_TITLE, GRANT_LABEL, REVOKE_LABEL, grantedLabel, revokeDone } from '@/features/editing/types/editing'
 import { useEditingWindow, useRevokeEditing, useUnlocks } from '@/features/editing/ui/hooks'
@@ -94,6 +96,53 @@ function CredentialsDialog({ credentials, onClose }: { credentials: NewCredentia
 
 type FormErrors = Partial<Record<'username' | 'name' | 'zone' | 'form', string>>
 
+/** Elegir un rol entre los que el backend permite (con qué hace cada uno). */
+function RolePicker({
+  name,
+  roles,
+  value,
+  onChange,
+  current,
+}: {
+  name: string
+  roles: Role[]
+  value: Role
+  onChange: (role: Role) => void
+  /** Rol actual de la cuenta (se marca como tal). */
+  current?: string
+}) {
+  return (
+    <fieldset className="grid gap-2">
+      <legend className="mb-1.5 text-sm font-semibold">Rol</legend>
+      {roles.map((role) => (
+        <label
+          key={role}
+          className={cn(
+            'flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors',
+            value === role && 'border-primary bg-secondary',
+          )}
+        >
+          <input
+            type="radio"
+            name={name}
+            value={role}
+            checked={value === role}
+            onChange={() => onChange(role)}
+            className="mt-0.5 size-[18px] accent-primary"
+          />
+          <span className="grid gap-0.5">
+            <b className="text-sm">
+              {ROLE_LABEL[role]}
+              {role === current && <small className="font-semibold text-muted-foreground"> · actual</small>}
+            </b>
+            <small className="text-muted-foreground">{ROLE_HINT[role]}</small>
+          </span>
+        </label>
+      ))}
+    </fieldset>
+  )
+}
+
 function NewAccountDialog({
   open,
   onOpenChange,
@@ -104,6 +153,9 @@ function NewAccountDialog({
   onCreated: (c: NewCredentials) => void
 }) {
   const { accounts } = useContainer()
+  // Roles que esta persona puede crear (el supervisor, solo vendedores): lo decide el backend.
+  const roles = useRequiredSession().manageable_roles
+  const [role, setRole] = useState<Role>('seller')
   const [errors, setErrors] = useState<FormErrors>({})
   const create = useMutation({ mutationFn: (a: Parameters<typeof accounts.create>[0]) => accounts.create(a) })
 
@@ -114,7 +166,7 @@ function NewAccountDialog({
       username: form.get('username') ?? '',
       name: form.get('name') ?? '',
       zone: form.get('zone') ?? '',
-      role: form.get('supervisor') === 'on' ? 'supervisor' : 'seller',
+      role,
     })
     if (!parsed.success) {
       const flat = z.flattenError(parsed.error).fieldErrors
@@ -124,6 +176,7 @@ function NewAccountDialog({
     setErrors({})
     try {
       onCreated(await create.mutateAsync(parsed.data))
+      setRole('seller')
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : 'No se pudo crear la cuenta.' })
     }
@@ -152,10 +205,7 @@ function NewAccountDialog({
           {field('username', 'Usuario', 'Minúsculas, sin espacios. Ej.: ltorres')}
           {field('name', 'Nombre completo')}
           {field('zone', 'Zona (opcional)')}
-          <label className="flex items-center gap-2 text-sm font-semibold">
-            <input type="checkbox" name="supervisor" className="size-[18px] accent-primary" /> Es supervisor (administra
-            cuentas y ve a todos los vendedores)
-          </label>
+          {roles.length > 1 && <RolePicker name="na-role" roles={roles} value={role} onChange={setRole} />}
           {errors.form && (
             <p role="alert" className="text-[13px] font-semibold text-destructive">
               {errors.form}
@@ -165,6 +215,72 @@ function NewAccountDialog({
         <DialogFooter>
           <Button type="submit" form="new-account" disabled={create.isPending}>
             {create.isPending ? <Loader2 className="animate-spin" /> : <UserPlus />} Crear usuario
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Cambiar el rol de una cuenta (solo el supervisor general; el backend dice a qué roles). */
+function ChangeRoleDialog({ account, onClose }: { account: AdminAccount | null; onClose: () => void }) {
+  const { accounts } = useContainer()
+  const client = useQueryClient()
+  const [role, setRole] = useState<Role | null>(null)
+  const change = useMutation({
+    mutationFn: (next: { username: string; role: Role }) => accounts.changeRole(next.username, next.role),
+  })
+  const close = () => {
+    setRole(null)
+    change.reset()
+    onClose()
+  }
+  // Si su rol actual no es uno que se pueda elegir, se parte del primero permitido.
+  const current = account?.assignable_roles.find((r) => r === account.role)
+  const selected: Role = role ?? current ?? account?.assignable_roles[0] ?? 'seller'
+  const unchanged = !account || selected === account.role
+
+  async function save() {
+    if (!account || unchanged) return
+    try {
+      await change.mutateAsync({ username: account.username, role: selected })
+      toast.success(`${account.name} ahora es ${ROLE_LABEL[selected].toLowerCase()}.`)
+      void client.invalidateQueries({ queryKey: KEY })
+      close()
+    } catch {
+      // El error se muestra en el diálogo.
+    }
+  }
+
+  return (
+    <Dialog open={!!account} onOpenChange={(open) => !open && close()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Cambiar el rol de {account?.name}</DialogTitle>
+          <DialogDescription>
+            Sus sesiones abiertas se cierran: al volver a entrar, verá la app según su nuevo rol.
+          </DialogDescription>
+        </DialogHeader>
+        {account && (
+          <RolePicker
+            name="cr-role"
+            roles={account.assignable_roles}
+            value={selected}
+            onChange={setRole}
+            current={account.role}
+          />
+        )}
+        {change.isError && (
+          <p role="alert" className="text-[13px] font-semibold text-destructive">
+            {change.error instanceof Error ? change.error.message : 'No se pudo cambiar el rol.'}
+          </p>
+        )}
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={close}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={save} disabled={unchanged || change.isPending}>
+            {change.isPending ? <Loader2 className="animate-spin" /> : <UserCog />} Cambiar rol
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -223,12 +339,14 @@ function AccountRow({
   onCredentials,
   granted,
   onGrant,
+  onChangeRole,
 }: {
   account: AdminAccount
   onCredentials: (c: NewCredentials) => void
   /** Solo para vendedores activos: habilitaciones vigentes (vacía = ninguna). */
   granted?: Unlock[]
   onGrant: () => void
+  onChangeRole: () => void
 }) {
   const { accounts } = useContainer()
   const client = useQueryClient()
@@ -262,7 +380,7 @@ function AccountRow({
       <div className="min-w-0 flex-[1_1_200px]">
         <b className="block">
           {account.name}{' '}
-          {account.role === 'supervisor' && <small className="text-primary">· {ROLE_LABEL.supervisor}</small>}
+          {account.role !== 'seller' && <small className="text-primary">· {roleName(account.role)}</small>}
         </b>
         <small className="text-muted-foreground">
           {account.username}
@@ -272,9 +390,17 @@ function AccountRow({
       <StateBadge state={state} />
       {own ? (
         <small className="font-semibold text-muted-foreground">Tu cuenta</small>
+      ) : !account.can_manage ? (
+        // Un supervisor no gestiona a otros supervisores: eso lo hace el supervisor general.
+        <small className="font-semibold text-muted-foreground">Lo gestiona el supervisor general</small>
       ) : (
         <div className="flex flex-wrap gap-2">
           {granted && <EditingControl account={account} granted={granted} onGrant={onGrant} />}
+          {otherRoles(account).length > 0 && (
+            <Button type="button" variant="outline" size="sm" onClick={onChangeRole}>
+              <UserCog /> Rol
+            </Button>
+          )}
           <ConfirmDialog
             title={`¿Restablecer la contraseña de ${account.name}?`}
             description="Se genera una contraseña temporal para entregarle y se cierran sus sesiones abiertas. Si la cuenta estaba bloqueada, se desbloquea."
@@ -319,7 +445,8 @@ function CutoffPanel({ window }: { window: EditingWindow | undefined }) {
   )
 }
 
-/** Supervisor: alta de vendedores, recuperación de contraseña, desactivación y edición. */
+/** Supervisores: alta de cuentas, recuperación de contraseña, desactivación, edición y roles.
+ *  Qué cuentas puede tocar cada uno lo decide el backend (`can_manage`, `assignable_roles`). */
 export function AccountsPage() {
   const { accounts } = useContainer()
   const client = useQueryClient()
@@ -327,6 +454,7 @@ export function AccountsPage() {
   const [creating, setCreating] = useState(false)
   const [credentials, setCredentials] = useState<NewCredentials | null>(null)
   const [granting, setGranting] = useState<AdminAccount | null>(null)
+  const [changingRole, setChangingRole] = useState<AdminAccount | null>(null)
   const editing = useEditingWindow().data
   const unlocks = useUnlocks().data ?? []
   const granted = editing ? activeUnlocks(unlocks, editing.days[0]?.date ?? '') : null
@@ -368,6 +496,7 @@ export function AccountsPage() {
                     onCredentials={setCredentials}
                     granted={grantedFor(a)}
                     onGrant={() => setGranting(a)}
+                    onChangeRole={() => setChangingRole(a)}
                   />
                 ))}
               </ul>
@@ -377,6 +506,7 @@ export function AccountsPage() {
         </div>
       </PageBody>
       <GrantEditingDialog seller={granting} window={editing} onClose={() => setGranting(null)} />
+      <ChangeRoleDialog account={changingRole} onClose={() => setChangingRole(null)} />
       <NewAccountDialog
         open={creating}
         onOpenChange={setCreating}

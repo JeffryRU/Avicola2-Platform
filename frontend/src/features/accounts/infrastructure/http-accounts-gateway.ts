@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { HttpClient } from '@/shared/application/ports'
 import type { AccountsGateway } from '@/features/accounts/application/ports'
 import { adminAccountSchema, newCredentialsSchema, type NewAccount } from '@/features/accounts/domain/accounts'
+import type { Role } from '@/features/auth/domain/session'
 
 export class HttpAccountsGateway implements AccountsGateway {
   private readonly http: HttpClient
@@ -18,4 +19,7 @@ export class HttpAccountsGateway implements AccountsGateway {
 
   setActive = (username: string, active: boolean) =>
     this.http.patch(`/admin/accounts/${encodeURIComponent(username)}`, { active }, adminAccountSchema)
+
+  changeRole = (username: string, role: Role) =>
+    this.http.put(`/admin/accounts/${encodeURIComponent(username)}/role`, { role }, adminAccountSchema)
 }

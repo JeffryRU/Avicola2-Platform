@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { roleSchema } from '@/features/auth/domain/session'
+import { roleSchema, type Role } from '@/features/auth/domain/session'
 import type { AccountState } from '@/features/accounts/types/accounts'
 
 export type { AccountState }
@@ -9,10 +9,17 @@ export const adminAccountSchema = z.object({
   username: z.string(),
   name: z.string(),
   zone: z.string().nullable(),
-  role: roleSchema,
+  // Texto libre: una cuenta con un rol que esta versión no conoce (dato antiguo, rol nuevo del
+  // backend) se muestra tal cual en vez de dejar toda la pantalla Usuarios sin cargar.
+  role: z.string(),
   is_active: z.boolean(),
   must_change_password: z.boolean(),
   locked_until: z.string().nullable(),
+  // Lo que quien mira puede hacer con esta cuenta: lo decide el backend (domain/permissions.py).
+  can_manage: z.boolean(),
+  assignable_roles: z
+    .array(z.string())
+    .transform((list) => list.filter((r): r is Role => roleSchema.safeParse(r).success)),
 })
 export type AdminAccount = z.infer<typeof adminAccountSchema>
 
@@ -43,3 +50,6 @@ export function accountState(account: AdminAccount, now: Date): AccountState {
   if (account.must_change_password) return 'must_change'
   return 'active'
 }
+
+/** Roles a los que se puede pasar la cuenta, sin contar el que ya tiene (vacío: no se puede cambiar). */
+export const otherRoles = (account: AdminAccount): Role[] => account.assignable_roles.filter((r) => r !== account.role)

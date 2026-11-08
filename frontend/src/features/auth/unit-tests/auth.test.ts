@@ -9,6 +9,8 @@ import { StoredSessionRepository } from '@/features/auth/infrastructure/stored-s
 const SESSION: Session = {
   seller: { username: 'jperez', name: 'Juan Pérez', zone: 'Zona Norte', role: 'seller' },
   must_change_password: false,
+  permissions: [],
+  manageable_roles: [],
 }
 
 class MemoryStore implements KeyValueStore {
