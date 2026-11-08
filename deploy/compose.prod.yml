@@ -78,6 +78,9 @@ services:
       DB_POSTGRESDB_POOL_SIZE: ${N8N_DB_POOL_SIZE:-2}
       DB_POSTGRESDB_SSL_ENABLED: ${N8N_DB_SSL_ENABLED:-true}
       DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED: ${N8N_DB_SSL_REJECT_UNAUTHORIZED:-false}
+      # Puerto interno fijo: N8N_PORT del .env es solo el del host (abajo) y Coolify
+      # pasa todo el .env al contenedor; con 5679 choca con el Task Broker de n8n.
+      N8N_PORT: "5678"
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Falta N8N_ENCRYPTION_KEY (no cambiarla después)}
       # URL pública de n8n (la que recibe los webhooks, p. ej., Telegram).
       N8N_HOST: ${N8N_DOMAIN:?Falta N8N_DOMAIN}
