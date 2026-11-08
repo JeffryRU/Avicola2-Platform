@@ -29,8 +29,8 @@ Además, la app será un **módulo de ARIS**, el sistema que registra a los clie
 
 ### Cuentas
 
-- **Roles `seller` y `supervisor`:** `varchar` validado por la app, no un ENUM.
-- **El supervisor crea las cuentas** (pantalla Usuarios). Nadie se registra solo, porque es una app interna. El primer supervisor se crea por consola (`cli supervisor`).
+- **Roles `seller` y `supervisor`:** `varchar` validado por la app, no un ENUM. Se agregó `general_supervisor` y los permisos pasaron a una sola fuente ([ADR 0010](0010-roles-y-permisos.md)).
+- **El supervisor crea las cuentas** (pantalla Usuarios). Nadie se registra solo, porque es una app interna. El primer supervisor se crea por consola (`cli supervisor --general`).
 - **Recuperación de contraseña asistida:** el supervisor la restablece y obtiene una **contraseña temporal**, que se muestra una sola vez.
   - Con la contraseña temporal, la API solo permite cambiar la contraseña o cerrar sesión (`must_change_password`).
   - Restablecer también desbloquea la cuenta y cierra las sesiones abiertas.

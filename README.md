@@ -78,11 +78,12 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
 
 - **Base de datos:** la elige `DATABASE_URL` (Supabase, Azure SQL, Postgres local o SQLite para demos). Para Azure SQL ver la sección correspondiente de `.env.example`.
 - **Nombres de tablas:** `backend/config/tables.yaml` (renombrar una tabla ya creada requiere una migración).
-- **Catálogo y usuarios de prueba:** `backend/config/planning_seed.yaml`. Los usuarios de prueba (`supervisor` y los 7 vendedores de la tabla maestra, contraseña `demo1234`) solo se crean con `APP_ENV=local`.
-- **Comandos** (`cd backend`): `uv run python -m app.planning.infrastructure.cli init | seed | show [n] | clear --yes | supervisor <usuario> "<nombre>"`.
+- **Catálogo y usuarios de prueba:** `backend/config/planning_seed.yaml`. Los usuarios de prueba (`general` como supervisor general, `supervisor` y los 7 vendedores de la tabla maestra, contraseña `demo1234`) solo se crean con `APP_ENV=local`.
+- **Comandos** (`cd backend`): `uv run python -m app.planning.infrastructure.cli init | seed | show [n] | clear --yes | supervisor <usuario> "<nombre>" [--general] | rol <usuario> <rol>`.
 - **Cuentas y seguridad** ([ADR 0005](docs/adr/0005-seguridad-de-sesion-y-cuentas.md)):
   - La sesión va en una cookie HttpOnly. El token no aparece en las respuestas ni en el almacenamiento del navegador.
-  - El **supervisor** crea las cuentas y restablece las contraseñas olvidadas desde la pantalla **Usuarios**: entrega una contraseña temporal que el vendedor cambia al entrar.
+  - El **supervisor** crea las cuentas de los vendedores y restablece las contraseñas olvidadas desde la pantalla **Usuarios**: entrega una contraseña temporal que el vendedor cambia al entrar.
+  - El **supervisor general** además gestiona a los supervisores y cambia roles. Los permisos están en una sola fuente ([ADR 0010](docs/adr/0010-roles-y-permisos.md)).
   - Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.
   - Cada vendedor ve solo sus datos.
 - **Notificaciones en tiempo real** ([ADR 0006](docs/adr/0006-notificaciones-y-tiempo-real.md)):
@@ -91,7 +92,7 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
   - n8n puede enviar avisos con `POST /api/internal/notifications`.
 - **En producción** (`APP_ENV` distinto de `local`):
   - La API no arranca sin un `AUTH_SECRET` de al menos 32 caracteres, sin `INGEST_API_TOKEN` o sin HTTPS para la cookie.
-  - El primer supervisor se crea con `cli supervisor`.
+  - El primer supervisor se crea con `cli supervisor <usuario> "<nombre>" --general` (supervisor general, [ADR 0010](docs/adr/0010-roles-y-permisos.md)).
 - **Venta real:** todavía simulada, como en el mockup. **"Sugerir con historial":** promedio del mismo día de la semana; ahí se conectará el modelo de ML.
 
 ## Desarrollo del frontend

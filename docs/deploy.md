@@ -110,10 +110,11 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
 2. **Primer supervisor** (los usuarios de prueba no existen en producción):
    ```bash
    docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli init
-   docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli supervisor <usuario> "<Nombre Apellido>"
+   docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli supervisor <usuario> "<Nombre Apellido>" --general
    ```
    - `init` carga el catálogo de productos.
-   - `supervisor` muestra una contraseña temporal, que se cambia al entrar.
+   - `supervisor` muestra una contraseña temporal, que se cambia al entrar. Con `--general` crea un supervisor general, el único que gestiona a otros supervisores y cambia roles ([ADR 0010](adr/0010-roles-y-permisos.md)).
+   - Si ya había un supervisor de antes, se lo asciende con `cli rol <usuario> general_supervisor`.
    - Después, el supervisor crea a los vendedores desde la pantalla **Usuarios**, o se cargan de una vez los 7 de la tabla maestra (`config/planning_seed.yaml`):
      ```bash
      docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli vendedores
