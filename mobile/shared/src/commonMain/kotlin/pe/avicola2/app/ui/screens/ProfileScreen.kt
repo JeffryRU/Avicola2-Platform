@@ -59,7 +59,7 @@ fun ProfileScreen(
                 SectionCard {
                     Text(account.seller.name, style = MaterialTheme.typography.titleLarge)
                     Text(
-                        listOfNotNull(if (account.seller.isSupervisor) "Supervisor" else "Vendedor", account.seller.zone).joinToString(" · "),
+                        listOfNotNull(account.seller.roleLabel, account.seller.zone).joinToString(" · "),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     HorizontalDivider(Modifier.padding(vertical = 10.dp))

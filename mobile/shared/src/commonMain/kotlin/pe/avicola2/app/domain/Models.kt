@@ -14,7 +14,17 @@ data class Seller(
     val zone: String? = null,
     val role: String,
 ) {
-    val isSupervisor: Boolean get() = role == "supervisor"
+    /** Vista de supervisión: todo rol que no es vendedor (supervisor y supervisor general).
+     *  Qué puede hacer cada uno lo decide el backend (domain/permissions.py). */
+    val isSupervisor: Boolean get() = role != "seller"
+
+    val roleLabel: String
+        get() = when (role) {
+            "seller" -> "Vendedor"
+            "supervisor" -> "Supervisor"
+            "general_supervisor" -> "Supervisor general"
+            else -> role
+        }
 }
 
 @Serializable
