@@ -79,3 +79,27 @@ def catalog():
 @pytest.fixture
 def fake_repo() -> FakeIngestRepository:
     return FakeIngestRepository()
+
+
+class FastHasher:
+    """Scrypt es lento a propósito; en los tests de propiedades y fuzzing solo importa la
+    autorización, y hacen miles de logins."""
+
+    dummy_hash = "x:"
+
+    def hash(self, password: str) -> str:
+        return f"x:{password}"
+
+    def verify(self, password: str, stored: str) -> bool:
+        return stored == f"x:{password}"
+
+
+@pytest.fixture
+def fast_hasher(monkeypatch):
+    monkeypatch.setattr("app.planning.bootstrap.ScryptPasswordHasher", FastHasher)
+    monkeypatch.setattr("app.planning.infrastructure.cli.ScryptPasswordHasher", FastHasher)
+
+
+def examples(default: int) -> int:
+    """Intensidad de Hypothesis: ligera por defecto (CI); `FUZZ_EXAMPLES=200`, a fondo."""
+    return int(os.environ.get("FUZZ_EXAMPLES", default))

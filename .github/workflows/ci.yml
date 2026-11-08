@@ -30,7 +30,22 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run pytest -q
+      - run: uv run pytest -q -m "not fuzz"
+
+  backend-fuzz:
+    # Fuzzing de la API (Schemathesis) y máquina de estados de roles (Hypothesis), en paralelo.
+    name: Backend (fuzzing + propiedades)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run pytest -q -m fuzz
 
   frontend:
     name: Frontend (lint + vitest + build)
