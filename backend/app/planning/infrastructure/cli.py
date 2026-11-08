@@ -1,8 +1,13 @@
 """Comandos de consola de la planificación (equivalen a los `npm run db:*` del mockup).
 
     uv run python -m app.planning.infrastructure.cli init         productos (+ usuarios de prueba)
-    uv run python -m app.planning.infrastructure.cli supervisor <usuario> "<nombre>"
-                                                        primer supervisor, con contraseña temporal
+    uv run python -m app.planning.infrastructure.cli supervisor <usuario> "<nombre>" [--general]
+                        supervisor con contraseña temporal (--general: supervisor general,
+                        el único que gestiona a otros supervisores; el primero debe serlo)
+    uv run python -m app.planning.infrastructure.cli rol <usuario> <rol>
+                        cambia el rol de una cuenta y cierra sus sesiones (p. ej., para
+                        ascender a supervisor general a un supervisor que ya existe).
+                        Roles: seller, supervisor, general_supervisor
     uv run python -m app.planning.infrastructure.cli vendedores [--simple] [--reset]
                         vendedores de la tabla maestra con contraseña temporal
                         (--simple: <usuario>2026; --reset: también a los que ya existen)
@@ -16,7 +21,6 @@ Las tablas las crea Alembic (`uv run alembic upgrade head`).
 import os
 import random
 import sys
-from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
 
 import yaml
@@ -25,9 +29,17 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.planning.application.use_cases import DayUnits, SubmitProjection
-from app.planning.domain.accounts import check_username
-from app.planning.domain.models import SELLER, SUPERVISOR, Seller, SellerAccount
+from app.planning.domain.accounts import AccountChange, ChangeOutcome, check_username
+from app.planning.domain.models import SELLER, Seller, SellerAccount
+from app.planning.domain.permissions import (
+    GENERAL_SUPERVISOR,
+    GUARDIAN_ROLE,
+    ROLE_LABELS,
+    ROLES,
+    SUPERVISOR,
+)
 from app.planning.infrastructure.clock import ZoneClock
+from app.planning.infrastructure.persistence.notifications import SqlNotificationRepository
 from app.planning.infrastructure.persistence.repositories import (
     SqlProductRepository,
     SqlProjectionRepository,
@@ -93,7 +105,9 @@ def init(session: Session, settings: Settings) -> None:
     if not settings.is_local:
         # Fuera de local no se crean cuentas con contraseña conocida.
         print("Usuarios de prueba omitidos (APP_ENV no es local). Crea el primer supervisor con:")
-        print('  python -m app.planning.infrastructure.cli supervisor <usuario> "<nombre>"')
+        print(
+            '  python -m app.planning.infrastructure.cli supervisor <usuario> "<nombre>" --general'
+        )
         return
     password = os.environ.get("PLANNING_DEMO_PASSWORD", "demo1234")
     hasher = ScryptPasswordHasher()
@@ -113,23 +127,70 @@ def init(session: Session, settings: Settings) -> None:
     print(f"OK: {len(seed['users'])} usuarios de prueba listos (solo local).")
 
 
-def create_supervisor(session: Session, username: str, name: str) -> None:
-    """Primer supervisor: luego él crea las demás cuentas desde la app."""
+def create_supervisor(session: Session, username: str, name: str, general: bool = False) -> int:
+    """Primer supervisor (general): luego él crea las demás cuentas desde la app."""
     check_username(username)
+    role = GENERAL_SUPERVISOR if general else SUPERVISOR
     repo = SqlSellerRepository(session)
     if repo.get_account(username, active_only=False):
         print(f"El usuario {username} ya existe.")
-        return
+        return 1
+    if not general and not any(a.seller.role == GUARDIAN_ROLE for a in _active_accounts(repo)):
+        # Sin supervisor general nadie podría gestionar supervisores ni cambiar roles.
+        print(
+            f"Todavía no hay un {ROLE_LABELS[GUARDIAN_ROLE]} activo: "
+            "crea primero uno con --general."
+        )
+        return 1
     temporary = RandomTemporaryPasswords().generate()
     repo.create(
         SellerAccount(
-            Seller(username, name, None, SUPERVISOR),
+            Seller(username, name, None, role),
             ScryptPasswordHasher().hash(temporary),
             must_change_password=True,
         )
     )
-    print(f"OK: supervisor {username} creado. Contraseña temporal (se pide cambiarla al entrar):")
+    print(f"OK: {ROLE_LABELS[role]} {username} creado. Contraseña temporal (cámbiala al entrar):")
     print(f"  {temporary}")
+    return 0
+
+
+def _active_accounts(repo: SqlSellerRepository) -> list[SellerAccount]:
+    return [a for a in repo.list_accounts() if a.is_active]
+
+
+def set_role(session: Session, username: str, role: str) -> int:
+    """Cambia el rol desde la consola (sin actor: para quien administra el servidor)."""
+    if role not in ROLES:
+        print(f"Rol inválido: {role}. Usa uno de: {', '.join(ROLES)}.")
+        return 1
+    repo = SqlSellerRepository(session)
+    account = repo.get_account(username, active_only=False)
+    if account is None:
+        print(f"El usuario {username} no existe.")
+        return 1
+    if account.seller.role == role:
+        print(f"{username} ya es {ROLE_LABELS[role]}.")
+        return 0
+    # Mismo cambio atómico que la app (sin actor): respeta que quede un supervisor general.
+    outcome = repo.apply(
+        AccountChange(
+            target=account.seller.username,
+            target_roles=frozenset({account.seller.role}),
+            role=role,
+            revoke_sessions=True,
+        )
+    )
+    if outcome is ChangeOutcome.LAST_GUARDIAN:
+        print(f"No: {username} es el último {ROLE_LABELS[GUARDIAN_ROLE]} activo.")
+        return 1
+    if outcome is not ChangeOutcome.APPLIED:
+        print(f"No se pudo: la cuenta {username} cambió mientras tanto. Vuelve a intentarlo.")
+        return 1
+    # Sus avisos eran de su rol anterior. Las sesiones abiertas se cierran por la versión.
+    SqlNotificationRepository(session).delete_for(account.seller.username)
+    print(f"OK: {username} ahora es {ROLE_LABELS[role]}. Sus sesiones abiertas se cerraron.")
+    return 0
 
 
 # Temporal y obligada a cambiarse al entrar (la política rechaza contraseñas con el usuario).
@@ -164,15 +225,13 @@ def create_sellers(
             continue
         password = f"{username}{SIMPLE_PASSWORD_SUFFIX}" if simple else passwords.generate()
         if existing:
-            repo.save_security(
-                replace(
-                    existing,
+            repo.apply(
+                AccountChange(
+                    target=existing.seller.username,
+                    target_roles=frozenset({SELLER}),
                     password_hash=hasher.hash(password),
-                    must_change_password=True,
-                    failed_logins=0,
-                    locked_until=None,
-                    token_version=existing.token_version + 1,
-                    is_active=True,
+                    active=True,
+                    revoke_sessions=True,
                 )
             )
         else:
@@ -198,7 +257,7 @@ def seed_history(session: Session, settings: Settings) -> None:
     product_repo, projection_repo = SqlProductRepository(session), SqlProjectionRepository(session)
     brasa = [p for p in product_repo.list_active() if p.category == "BRASA"]
     total = 0
-    for seller in [s for s in SqlSellerRepository(session).list_active() if not s.is_supervisor]:
+    for seller in [s for s in SqlSellerRepository(session).list_active() if s.is_seller]:
         f = SELLER_FACTOR.get(seller.username, 1.0)
         for back in range(21, 0, -1):
             day = today - timedelta(days=back)
@@ -274,8 +333,12 @@ def main(argv: list[str]) -> int:
             create_sellers(session, settings, simple="--simple" in argv, reset="--reset" in argv)
         elif cmd == "seed":
             seed_history(session, settings)
-        elif cmd == "supervisor" and len(argv) == 3:
-            create_supervisor(session, argv[1].strip().lower(), argv[2].strip())
+        elif cmd == "supervisor" and len(args := [a for a in argv if a != "--general"]) == 3:
+            return create_supervisor(
+                session, args[1].strip().lower(), args[2].strip(), general="--general" in argv
+            )
+        elif cmd == "rol" and len(argv) == 3:
+            return set_role(session, argv[1].strip().lower(), argv[2].strip())
         elif cmd == "show":
             show(session, int(argv[1]) if len(argv) > 1 else 20)
         elif cmd == "clear" and "--yes" in argv:

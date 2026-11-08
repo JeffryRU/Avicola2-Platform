@@ -6,19 +6,31 @@ from dataclasses import dataclass, replace
 from app.planning.application.ports import (
     Clock,
     EventPublisher,
+    NotificationRepository,
     PasswordHasher,
     SellerRepository,
     TemporaryPasswords,
     TokenService,
 )
 from app.planning.domain.accounts import (
+    AccountChange,
+    ChangeOutcome,
     LockoutPolicy,
     check_new_password,
     check_username,
     clean_name,
 )
-from app.planning.domain.models import ROLES, SELLER, Seller, SellerAccount
+from app.planning.domain.models import SELLER, Seller, SellerAccount
 from app.planning.domain.notifications import SESSION_REVOKED, Audience, Event
+from app.planning.domain.permissions import (
+    GUARDIAN_ROLE,
+    ROLE_LABELS,
+    ROLES,
+    Permission,
+    assignable_roles,
+    can_manage,
+    require,
+)
 from app.shared.domain.errors import (
     AuthenticationError,
     ConflictError,
@@ -48,8 +60,17 @@ class NewCredentials:
 
 
 def require_supervisor(actor: SellerAccount) -> None:
-    if not actor.seller.is_supervisor:
-        raise ForbiddenError("Solo un supervisor puede hacer esto.")
+    require(actor.seller.role, Permission.MANAGE_ACCOUNTS, "Solo un supervisor puede hacer esto.")
+
+
+def _check_role(role: str) -> None:
+    if role not in ROLES:
+        raise DomainError(f"Rol inválido: {role}.")
+
+
+def _forbidden_role(role: str) -> ForbiddenError:
+    # .get: un rol que no está en la tabla (dato antiguo, SQL manual) no debe dar un 500.
+    return ForbiddenError(f"No puedes gestionar cuentas de {ROLE_LABELS.get(role, role)}.")
 
 
 class Authenticate:
@@ -81,7 +102,8 @@ class Authenticate:
         if not valid:
             failed, locked_until = self.policy.after_failure(account.failed_logins, now)
             self.sellers.save_security(
-                replace(account, failed_logins=failed, locked_until=locked_until)
+                replace(account, failed_logins=failed, locked_until=locked_until),
+                expected_version=account.token_version,
             )
             if locked_until:
                 logger.warning("Cuenta %s bloqueada por intentos fallidos", username)
@@ -91,7 +113,8 @@ class Authenticate:
 
         if account.failed_logins or account.locked_until:
             account = replace(account, failed_logins=0, locked_until=None)
-            self.sellers.save_security(account)
+            if not self.sellers.save_security(account, expected_version=account.token_version):
+                raise AuthenticationError(INVALID_CREDENTIALS)  # la cambiaron justo ahora
         logger.info("Login de %s", username)
         return Session(self.tokens.issue(username, account.token_version), account)
 
@@ -133,7 +156,9 @@ class ChangePassword:
             must_change_password=False,
             token_version=account.token_version + 1,
         )
-        self.sellers.save_security(updated)
+        # Si mientras tanto la restablecieron o la desactivaron, no se pisa ese cambio.
+        if not self.sellers.save_security(updated, expected_version=account.token_version):
+            raise AuthenticationError(INVALID_SESSION)
         logger.info("%s cambió su contraseña", account.seller.username)
         return Session(self.tokens.issue(account.seller.username, updated.token_version), updated)
 
@@ -170,10 +195,11 @@ class CreateAccount:
         self, actor: SellerAccount, username: str, name: str, zone: str | None, role: str = SELLER
     ) -> NewCredentials:
         require_supervisor(actor)
+        _check_role(role)
+        if not can_manage(actor.seller.role, role):
+            raise _forbidden_role(role)
         username, name = username.strip().lower(), clean_name(name)
         check_username(username)
-        if role not in ROLES:
-            raise DomainError(f"Rol inválido: {role}.")
         if self.sellers.get_account(username, active_only=False):
             raise ConflictError(f"El usuario {username} ya existe.")
         temporary = self.passwords.generate()
@@ -188,6 +214,13 @@ class CreateAccount:
 
 
 class _ManageAccount:
+    """Base de las acciones sobre otra cuenta (restablecer, activar, cambiar de rol).
+
+    Decide con lo que lee y luego aplica el cambio con `SellerRepository.apply`, que vuelve a
+    comprobar actor y cuenta destino en la misma transacción: si algo cambió entre medio (la
+    ascendieron, degradaron al actor...), no se escribe nada.
+    """
+
     def __init__(self, sellers: SellerRepository, events: EventPublisher):
         self.sellers, self.events = sellers, events
 
@@ -197,12 +230,40 @@ class _ManageAccount:
 
     def _target(self, actor: SellerAccount, username: str) -> SellerAccount:
         require_supervisor(actor)
-        if username == actor.seller.username:
-            raise DomainError("No puedes hacer esto con tu propia cuenta; usa Cambiar contraseña.")
         target = self.sellers.get_account(username, active_only=False)
         if target is None:
             raise NotFoundError(f"El usuario {username} no existe.")
+        # Con el usuario guardado, no con el de la ruta: en una base que no distingue
+        # mayúsculas, "GENERAL" encuentra a "general" y no debe colarse como otra cuenta.
+        if target.seller.username == actor.seller.username:
+            raise DomainError("No puedes hacer esto con tu propia cuenta; usa Cambiar contraseña.")
+        if not can_manage(actor.seller.role, target.seller.role):
+            raise _forbidden_role(target.seller.role)
         return target
+
+    def _apply(self, actor: SellerAccount, target: SellerAccount, **changes) -> SellerAccount:
+        outcome = self.sellers.apply(
+            AccountChange(
+                target=target.seller.username,
+                target_roles=frozenset({target.seller.role}),
+                actor=actor.seller.username,
+                actor_role=actor.seller.role,
+                actor_version=actor.token_version,
+                **changes,
+            )
+        )
+        if outcome is ChangeOutcome.ACTOR_CHANGED:
+            raise AuthenticationError(INVALID_SESSION)  # te cambiaron el rol o la sesión
+        if outcome is ChangeOutcome.NOT_FOUND:
+            raise NotFoundError(f"El usuario {target.seller.username} no existe.")
+        if outcome is ChangeOutcome.TARGET_CHANGED:
+            raise ConflictError("La cuenta cambió mientras tanto. Recarga e inténtalo de nuevo.")
+        if outcome is ChangeOutcome.LAST_GUARDIAN:
+            raise ConflictError(f"Debe quedar al menos un {ROLE_LABELS[GUARDIAN_ROLE]} activo.")
+        updated = self.sellers.get_account(target.seller.username, active_only=False)
+        if updated is None:  # no debería pasar: se acaba de escribir
+            raise NotFoundError(f"El usuario {target.seller.username} no existe.")
+        return updated
 
 
 class ResetPassword(_ManageAccount):
@@ -221,35 +282,65 @@ class ResetPassword(_ManageAccount):
     def __call__(self, actor: SellerAccount, username: str) -> NewCredentials:
         target = self._target(actor, username)
         temporary = self.passwords.generate()
-        updated = replace(
-            target,
-            password_hash=self.hasher.hash(temporary),
-            must_change_password=True,
-            failed_logins=0,
-            locked_until=None,
-            token_version=target.token_version + 1,
+        updated = self._apply(
+            actor, target, password_hash=self.hasher.hash(temporary), revoke_sessions=True
         )
-        self.sellers.save_security(updated)
-        self._revoke_sessions(username, "Tu supervisor restableció tu contraseña.")
-        logger.info("%s restableció la contraseña de %s", actor.seller.username, username)
+        name = updated.seller.username
+        self._revoke_sessions(name, "Tu supervisor restableció tu contraseña.")
+        logger.info("%s restableció la contraseña de %s", actor.seller.username, name)
         return NewCredentials(updated, temporary)
 
 
 class SetAccountActive(_ManageAccount):
     def __call__(self, actor: SellerAccount, username: str, active: bool) -> SellerAccount:
         target = self._target(actor, username)
-        updated = replace(
-            target,
-            is_active=active,
-            token_version=target.token_version + (0 if active else 1),
-        )
-        self.sellers.save_security(updated)
+        updated = self._apply(actor, target, active=active, revoke_sessions=not active)
+        name = updated.seller.username
         if not active:
-            self._revoke_sessions(username, "Tu cuenta fue desactivada.")
+            self._revoke_sessions(name, "Tu cuenta fue desactivada.")
         logger.info(
-            "%s %s la cuenta %s",
+            "%s %s la cuenta %s", actor.seller.username, "activó" if active else "desactivó", name
+        )
+        return updated
+
+
+class ChangeRole(_ManageAccount):
+    """Solo quien tiene CHANGE_ROLES (el supervisor general) y dentro de MANAGEABLE_ROLES.
+
+    Cierra las sesiones de la cuenta (sus permisos cambian y debe volver a entrar) y borra sus
+    avisos: eran de su rol anterior (un ex supervisor no debe seguir viendo los del equipo).
+    """
+
+    def __init__(
+        self,
+        sellers: SellerRepository,
+        events: EventPublisher,
+        notifications: NotificationRepository,
+    ):
+        super().__init__(sellers, events)
+        self.notifications = notifications
+
+    def __call__(self, actor: SellerAccount, username: str, role: str) -> SellerAccount:
+        require(
+            actor.seller.role,
+            Permission.CHANGE_ROLES,
+            "Solo el supervisor general puede cambiar roles.",
+        )
+        _check_role(role)
+        target = self._target(actor, username)
+        if role not in assignable_roles(actor.seller.role, target.seller.role):
+            raise _forbidden_role(role)
+        if role == target.seller.role:
+            return target
+        updated = self._apply(actor, target, role=role, revoke_sessions=True)
+        name = updated.seller.username
+        self.notifications.delete_for(name)
+        self._revoke_sessions(name, "Tu rol cambió. Vuelve a iniciar sesión.")
+        logger.info(
+            "%s cambió el rol de %s: %s → %s",
             actor.seller.username,
-            "activó" if active else "desactivó",
-            username,
+            name,
+            target.seller.role,
+            role,
         )
         return updated

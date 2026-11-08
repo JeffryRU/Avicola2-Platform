@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from app.planning.application.notifications import Notifier
+from app.planning.application.notifications import Notifier, team_audience
 from app.planning.application.ports import (
     Clock,
     EventPublisher,
@@ -20,7 +20,7 @@ from app.planning.domain.editing import (
     clean_reason,
     parse_cutoff,
 )
-from app.planning.domain.models import SUPERVISOR, Seller
+from app.planning.domain.models import Seller
 from app.planning.domain.notifications import (
     EDIT_DECIDED,
     EDIT_REQUESTED,
@@ -28,6 +28,7 @@ from app.planning.domain.notifications import (
     Audience,
     Event,
 )
+from app.planning.domain.permissions import ROLES, Permission, require
 from app.shared.domain.errors import ConflictError, DomainError, ForbiddenError, NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -46,8 +47,7 @@ DECIDED_TITLE = {
 
 
 def _require_supervisor(actor: Seller) -> None:
-    if not actor.is_supervisor:
-        raise ForbiddenError("Solo un supervisor puede hacer esto.")
+    require(actor.role, Permission.MANAGE_EDITING, "Solo un supervisor puede hacer esto.")
 
 
 class EditingSettings:
@@ -102,12 +102,12 @@ class EditingRules:
         first, last = policy.first_day(today), policy.last_day(today)
         if day > last:
             raise DomainError(f"Solo puedes registrar hasta el {last:%d/%m/%Y}.")
-        if day < first and not seller.is_supervisor:
+        if day < first and not seller.can(Permission.MANAGE_EDITING):
             # Las proyecciones son de los días siguientes; el supervisor puede corregir hoy.
             raise DomainError(f"Las proyecciones se registran desde el {first:%d/%m/%Y}.")
         if day >= first and policy.is_open(day, now):
             return False
-        if seller.is_supervisor:
+        if seller.can(Permission.MANAGE_EDITING):
             return True
         unlock = self.unlocks.latest(seller.username, day)
         if unlock and unlock.is_open:
@@ -143,9 +143,15 @@ class GetEditingWindow:
         policy, now, today = self.settings.policy(), self.clock.now(), self.clock.today()
         days = []
         for day in policy.window(today):
-            unlock = None if viewer.is_supervisor else self.unlocks.latest(viewer.username, day)
+            unlock = (
+                None
+                if viewer.can(Permission.MANAGE_EDITING)
+                else self.unlocks.latest(viewer.username, day)
+            )
             open_ = (
-                policy.is_open(day, now) or viewer.is_supervisor or bool(unlock and unlock.is_open)
+                policy.is_open(day, now)
+                or viewer.can(Permission.MANAGE_EDITING)
+                or bool(unlock and unlock.is_open)
             )
             days.append(DayWindow(day, policy.closes_at(day, now.tzinfo), open_, unlock))
         return EditingWindow(policy, days)
@@ -167,7 +173,7 @@ class RequestUnlock:
         self.notifier, self.events, self.clock = notifier, events, clock
 
     def __call__(self, seller: Seller, day: date, reason: str) -> EditUnlock:
-        if seller.is_supervisor:
+        if seller.can(Permission.MANAGE_EDITING):
             raise ForbiddenError("El supervisor puede editar sin habilitación.")
         policy, now, today = self.settings.policy(), self.clock.now(), self.clock.today()
         if day not in policy.window(today):
@@ -182,7 +188,7 @@ class RequestUnlock:
         saved = self.unlocks.add(
             EditUnlock(seller.username, day, clean_reason(reason), REQUESTED, now)
         )
-        supervisors = [s for s in self.sellers.list_active() if s.role == SUPERVISOR]
+        supervisors = [s for s in self.sellers.list_active() if s.can(Permission.MANAGE_EDITING)]
         self.notifier.notify(
             supervisors,
             EDIT_REQUESTED,
@@ -191,7 +197,7 @@ class RequestUnlock:
             link=UNLOCKS_LINK,
             dedupe_key=f"unlock-{saved.id}",
         )
-        _publish_change(self.events, saved)
+        _publish_change(self.events, self.sellers, saved)
         logger.info("%s pidió habilitación para el %s", seller.username, day)
         return saved
 
@@ -204,7 +210,9 @@ class ListUnlocks:
 
     def __call__(self, viewer: Seller) -> list[EditUnlock]:
         since = self.clock.today() - timedelta(days=HISTORY_DAYS)
-        return self.unlocks.list_since(since, None if viewer.is_supervisor else viewer.username)
+        return self.unlocks.list_since(
+            since, None if viewer.can(Permission.MANAGE_EDITING) else viewer.username
+        )
 
 
 class DecideUnlock:
@@ -237,7 +245,7 @@ class DecideUnlock:
                 _decided_body(action, decided.date),
                 link="/registrar",
             )
-        _publish_change(self.events, decided)
+        _publish_change(self.events, self.sellers, decided)
         logger.info("%s: %s la habilitación %s", actor.username, action, unlock_id)
         return decided
 
@@ -253,7 +261,7 @@ class UpdateCutoff:
     ) -> CutoffPolicy:
         _require_supervisor(actor)
         policy = self.settings.save(cutoff, days_before, enabled, actor.username, self.clock.now())
-        self.events.publish(Event(EDITING_CHANGED, Audience.role("seller", SUPERVISOR), {}))
+        self.events.publish(Event(EDITING_CHANGED, Audience.role(*ROLES), {}))
         logger.info(
             "%s cambió el corte a %s (%d días antes, bloqueo %s)",
             actor.username,
@@ -315,7 +323,7 @@ class GrantEditing:
                     )
                 )
             granted.append(unlock)
-            _publish_change(self.events, unlock)
+            _publish_change(self.events, self.sellers, unlock)
         self.notifier.notify(
             [seller],
             EDIT_DECIDED,
@@ -357,7 +365,7 @@ class RevokeEditing:
             done = unlock.decide("close", actor.username, now)
             self.unlocks.save(done)
             closed.append(done)
-            _publish_change(self.events, done)
+            _publish_change(self.events, self.sellers, done)
         if closed:
             self.notifier.notify(
                 [seller],
@@ -372,7 +380,7 @@ class RevokeEditing:
 
 def _target_seller(sellers: SellerRepository, username: str) -> Seller:
     account = sellers.get_account(username, active_only=True)
-    if account is None or account.seller.is_supervisor:
+    if account is None or not account.seller.is_seller:
         raise NotFoundError("No existe un vendedor activo con ese usuario.")
     return account.seller
 
@@ -391,9 +399,9 @@ def _decided_body(action: str, day: date) -> str:
     return f"La edición del {day:%d/%m} volvió a cerrarse."
 
 
-def _publish_change(events: EventPublisher, unlock: EditUnlock) -> None:
+def _publish_change(events: EventPublisher, sellers: SellerRepository, unlock: EditUnlock) -> None:
     """Refresca la pantalla del vendedor y la de los supervisores."""
-    audience = Audience(usernames=frozenset({unlock.seller}), roles=frozenset({SUPERVISOR}))
+    audience = team_audience(sellers, Permission.MANAGE_EDITING, unlock.seller)
     events.publish(
         Event(EDITING_CHANGED, audience, {"seller": unlock.seller, "date": unlock.date.isoformat()})
     )

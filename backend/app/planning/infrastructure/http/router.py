@@ -20,10 +20,18 @@ from app.planning.application.use_cases import DayUnits
 from app.planning.bootstrap import PlanningUseCases, build_use_cases
 from app.planning.domain.editing import CutoffPolicy, EditUnlock
 from app.planning.domain.models import Projection, Seller, SellerAccount
+from app.planning.domain.permissions import (
+    Permission,
+    assignable_roles,
+    can_manage,
+    manageable_roles,
+    permissions_of,
+)
 from app.planning.infrastructure.exporters import WRITERS, ExportFormat
 from app.planning.infrastructure.http import schemas as s
 from app.shared.domain.errors import AuthenticationError, ForbiddenError
 from app.shared.infrastructure.database.session import get_session
+from app.shared.infrastructure.http.params import DbIdPath
 from app.shared.infrastructure.http.service_token import require_service_token
 
 SESSION_COOKIE = "nv_session"
@@ -77,9 +85,27 @@ Account = Annotated[SellerAccount, Depends(current_account)]
 ActiveAccount = Annotated[SellerAccount, Depends(active_account)]
 CurrentSeller = Annotated[Seller, Depends(current_seller)]
 
+
+def requires(permission: Permission):
+    """Primera barrera, a nivel de router: sin el permiso, ningún endpoint del grupo responde.
+    Los casos de uso vuelven a comprobarlo (y las reglas sobre la cuenta destino)."""
+
+    def check(account: ActiveAccount) -> SellerAccount:
+        if not account.seller.can(permission):
+            raise ForbiddenError("No tienes permiso para hacer esto.")
+        return account
+
+    return Depends(check)
+
+
 public = APIRouter(prefix="/api", tags=["planning"])
 router = APIRouter(prefix="/api", tags=["planning"], dependencies=[Depends(active_account)])
-admin = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(active_account)])
+admin = APIRouter(
+    prefix="/api/admin", tags=["admin"], dependencies=[requires(Permission.MANAGE_ACCOUNTS)]
+)
+editing_admin = APIRouter(
+    prefix="/api/admin", tags=["admin"], dependencies=[requires(Permission.MANAGE_EDITING)]
+)
 
 
 def _set_session_cookie(response: Response, token: str, remember: bool) -> None:
@@ -96,18 +122,26 @@ def _set_session_cookie(response: Response, token: str, remember: bool) -> None:
 
 
 def _account_out(account: SellerAccount) -> s.AccountOut:
+    role = account.seller.role
     return s.AccountOut(
         seller=s.SellerOut(**asdict(account.seller)),
         must_change_password=account.must_change_password,
+        permissions=[p.value for p in Permission if p in permissions_of(role)],
+        manageable_roles=list(manageable_roles(role)),
     )
 
 
-def _admin_out(account: SellerAccount) -> s.AdminAccountOut:
+def _admin_out(account: SellerAccount, actor: SellerAccount) -> s.AdminAccountOut:
+    own = account.seller.username == actor.seller.username
+    actor_role, role = actor.seller.role, account.seller.role
     return s.AdminAccountOut(
         **asdict(account.seller),
         is_active=account.is_active,
         must_change_password=account.must_change_password,
         locked_until=account.locked_until,
+        # La propia cuenta se gestiona desde Perfil, nunca desde Usuarios.
+        can_manage=not own and can_manage(actor_role, role),
+        assignable_roles=[] if own else list(assignable_roles(actor_role, role)),
     )
 
 
@@ -319,7 +353,7 @@ def suggestions(
 
 @admin.get("/accounts")
 def list_accounts(use_cases: UseCases, actor: ActiveAccount) -> list[s.AdminAccountOut]:
-    return [_admin_out(a) for a in use_cases.list_accounts(actor)]
+    return [_admin_out(a, actor) for a in use_cases.list_accounts(actor)]
 
 
 @admin.post("/accounts", status_code=status.HTTP_201_CREATED)
@@ -328,7 +362,8 @@ def create_account(
 ) -> s.NewCredentialsOut:
     created = use_cases.create_account(actor, body.username, body.name, body.zone, body.role)
     return s.NewCredentialsOut(
-        account=_admin_out(created.account), temporary_password=created.temporary_password
+        account=_admin_out(created.account, actor),
+        temporary_password=created.temporary_password,
     )
 
 
@@ -337,7 +372,7 @@ def reset_password(use_cases: UseCases, actor: ActiveAccount, username: str) -> 
     """Recuperación de contraseña: genera una temporal que el vendedor cambia al entrar."""
     reset = use_cases.reset_password(actor, username)
     return s.NewCredentialsOut(
-        account=_admin_out(reset.account), temporary_password=reset.temporary_password
+        account=_admin_out(reset.account, actor), temporary_password=reset.temporary_password
     )
 
 
@@ -345,7 +380,15 @@ def reset_password(use_cases: UseCases, actor: ActiveAccount, username: str) -> 
 def set_active(
     use_cases: UseCases, actor: ActiveAccount, username: str, body: s.SetActiveIn
 ) -> s.AdminAccountOut:
-    return _admin_out(use_cases.set_account_active(actor, username, body.active))
+    return _admin_out(use_cases.set_account_active(actor, username, body.active), actor)
+
+
+@admin.put("/accounts/{username}/role", dependencies=[requires(Permission.CHANGE_ROLES)])
+def change_role(
+    use_cases: UseCases, actor: ActiveAccount, username: str, body: s.ChangeRoleIn
+) -> s.AdminAccountOut:
+    """Solo el supervisor general. La cuenta cambiada vuelve a iniciar sesión."""
+    return _admin_out(use_cases.change_role(actor, username, body.role), actor)
 
 
 # --- Notificaciones --------------------------------------------------------------------
@@ -460,21 +503,21 @@ def request_unlock(
     return _unlock_out(use_cases.request_unlock(seller, body.date, body.reason))
 
 
-@admin.post("/editing/unlocks/{unlock_id}")
+@editing_admin.post("/editing/unlocks/{unlock_id}")
 def decide_unlock(
-    use_cases: UseCases, actor: ActiveAccount, unlock_id: int, body: s.UnlockDecisionIn
+    use_cases: UseCases, actor: ActiveAccount, unlock_id: DbIdPath, body: s.UnlockDecisionIn
 ) -> s.UnlockOut:
     return _unlock_out(use_cases.decide_unlock(actor.seller, unlock_id, body.action))
 
 
-@admin.put("/editing/cutoff")
+@editing_admin.put("/editing/cutoff")
 def update_cutoff(use_cases: UseCases, actor: ActiveAccount, body: s.CutoffIn) -> s.CutoffOut:
     return _cutoff_out(
         use_cases.update_cutoff(actor.seller, body.cutoff_time, body.days_before, body.enabled)
     )
 
 
-@admin.post("/editing/sellers/{username}/grant")
+@editing_admin.post("/editing/sellers/{username}/grant")
 def grant_editing(
     use_cases: UseCases, actor: ActiveAccount, username: str, body: s.GrantEditingIn
 ) -> list[s.UnlockOut]:
@@ -482,7 +525,7 @@ def grant_editing(
     return [_unlock_out(u) for u in use_cases.grant_editing(actor.seller, username, body.dates)]
 
 
-@admin.post("/editing/sellers/{username}/revoke")
+@editing_admin.post("/editing/sellers/{username}/revoke")
 def revoke_editing(use_cases: UseCases, actor: ActiveAccount, username: str) -> list[s.UnlockOut]:
     """El supervisor cierra las habilitaciones vigentes del vendedor."""
     return [_unlock_out(u) for u in use_cases.revoke_editing(actor.seller, username)]

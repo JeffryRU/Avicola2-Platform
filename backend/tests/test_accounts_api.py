@@ -48,6 +48,8 @@ def test_login_sets_httponly_cookie_and_never_returns_the_token(client):
             "role": "seller",
         },
         "must_change_password": False,
+        "permissions": [],
+        "manageable_roles": [],
     }
     cookie = r.headers["set-cookie"]
     assert cookie.startswith("nv_session=")

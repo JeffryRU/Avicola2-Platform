@@ -17,6 +17,7 @@ from app.planning.application.ports import (
 from app.planning.application.use_cases import visible_seller
 from app.planning.domain.catalog import Catalog
 from app.planning.domain.models import CONFIRMED, SELLER, Seller
+from app.planning.domain.permissions import Permission
 from app.shared.domain.errors import DomainError
 
 # Un período de exportación razonable para un archivo que se abre en el celular.
@@ -142,7 +143,7 @@ class ExportProjections:
         return ExportTable(table.title, subtitle, COLUMNS, rows)
 
     def _team(self, viewer: Seller, only: str | None) -> list[Seller]:
-        if not viewer.is_supervisor:
+        if not viewer.can(Permission.VIEW_TEAM):
             return [viewer]
         team = [s for s in self.sellers.list_active() if s.role == SELLER]
         if only:

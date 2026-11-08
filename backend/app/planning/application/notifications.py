@@ -14,7 +14,7 @@ from app.planning.application.ports import (
     UnlockRepository,
 )
 from app.planning.domain.editing import CutoffPolicy
-from app.planning.domain.models import SELLER, SUPERVISOR, Projection, Seller, SellerAccount
+from app.planning.domain.models import SELLER, Projection, Seller, SellerAccount
 from app.planning.domain.notifications import (
     ANNOUNCEMENT,
     AUDIENCES,
@@ -27,9 +27,22 @@ from app.planning.domain.notifications import (
     Event,
     Notification,
 )
+from app.planning.domain.permissions import Permission
 from app.shared.domain.errors import DomainError, NotFoundError
 
 logger = logging.getLogger(__name__)
+
+
+def team_audience(sellers: SellerRepository, permission: Permission, *usernames: str) -> Audience:
+    """Destinatarios de un evento del equipo, resueltos AHORA con los roles de la base.
+
+    No se filtra por el rol que tenía cada conexión en tiempo real al abrirse: si a un
+    supervisor lo degradan (también desde la consola, en otro proceso), deja de recibir los
+    eventos del equipo al instante.
+    """
+    staff = (s.username for s in sellers.list_active() if s.can(permission))
+    return Audience.users(*usernames, *staff)
+
 
 MAX_LIST = 100
 
@@ -124,7 +137,7 @@ class NotifyProjectionSubmitted:
                 link="/historial",
             )
         else:
-            supervisors = [s for s in self.sellers.list_active() if s.role == SUPERVISOR]
+            supervisors = [s for s in self.sellers.list_active() if s.can(Permission.VIEW_TEAM)]
             self.notifier.notify(
                 supervisors,
                 PROJECTION_SUBMITTED,
@@ -133,7 +146,7 @@ class NotifyProjectionSubmitted:
                 link="/dashboards/estado",
             )
         # El propio vendedor también: sus otros dispositivos actualizan su historial.
-        audience = Audience(usernames=frozenset({seller.username}), roles=frozenset({SUPERVISOR}))
+        audience = team_audience(self.sellers, Permission.VIEW_TEAM, seller.username)
         self.events.publish(
             Event(
                 PROJECTIONS_CHANGED,
@@ -240,7 +253,7 @@ class NotifyMissedProjections:
             )
         names = _names([s.name for s in missing])
         count = len(missing)
-        supervisors = [s for s in active if s.role == SUPERVISOR]
+        supervisors = [s for s in active if s.can(Permission.VIEW_TEAM)]
         created += self.notifier.notify(
             supervisors,
             PROJECTION_MISSED,

@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 from app.core.config import get_settings
 from app.planning.bootstrap import build_use_cases
 from app.planning.domain.models import SellerAccount
-from app.planning.domain.notifications import SESSION_REVOKED, Event
+from app.planning.domain.notifications import SESSION_REVOKED, Audience, Event
 from app.planning.infrastructure.events import Subscription, event_bus
 from app.planning.infrastructure.http.router import SessionToken
 from app.shared.domain.errors import AuthenticationError, ForbiddenError
@@ -45,12 +45,27 @@ def _format(event: Event) -> str:
     return f"event: {event.type}\ndata: {json.dumps(event.data, ensure_ascii=False)}\n\n"
 
 
-async def _stream(request: Request, subscription: Subscription) -> AsyncIterator[str]:
+async def _still_valid(token: str | None) -> bool:
+    try:
+        await asyncio.to_thread(_authenticate, token)
+    except (AuthenticationError, ForbiddenError):
+        return False
+    return True
+
+
+async def _stream(
+    request: Request, subscription: Subscription, token: str | None
+) -> AsyncIterator[str]:
     yield f"retry: {RETRY_MS}\n: conectado\n\n"
     while not await request.is_disconnected():
         try:
             event = await asyncio.wait_for(subscription.next(), HEARTBEAT_SECONDS)
         except TimeoutError:
+            # Revalida la sesión: un cambio hecho por otro proceso (la consola, otra réplica)
+            # no llega por este bus en memoria, pero sí sube la versión de sesión en la base.
+            if not await _still_valid(token):
+                yield _format(Event(SESSION_REVOKED, Audience(), {"reason": "Sesión vencida."}))
+                return
             yield ": ping\n\n"
             continue
         yield _format(event)
@@ -64,7 +79,7 @@ async def events(request: Request, token: SessionToken) -> StreamingResponse:
 
     async def body() -> AsyncIterator[str]:
         async with event_bus.subscribe(account.seller.username, account.seller.role) as sub:
-            async for chunk in _stream(request, sub):
+            async for chunk in _stream(request, sub, token):
                 yield chunk
 
     return StreamingResponse(

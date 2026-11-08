@@ -3,7 +3,9 @@
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import Enum
 
+from app.planning.domain.permissions import GUARDIAN_ROLE
 from app.shared.domain.errors import DomainError
 
 MIN_PASSWORD, MAX_PASSWORD = 8, 128
@@ -75,3 +77,46 @@ class LockoutPolicy:
         if failed >= self.max_attempts:
             return 0, now + timedelta(minutes=self.lock_minutes)
         return failed, None
+
+
+class ChangeOutcome(Enum):
+    APPLIED = "applied"
+    NOT_FOUND = "not_found"
+    ACTOR_CHANGED = "actor_changed"  # el actor ya no tiene ese rol o su sesión cambió
+    TARGET_CHANGED = "target_changed"  # la cuenta destino cambió de rol mientras tanto
+    LAST_GUARDIAN = "last_guardian"  # dejaría sin ninguna cuenta activa de GUARDIAN_ROLE
+
+
+@dataclass(frozen=True)
+class AccountChange:
+    """Cambio administrativo sobre una cuenta, con las condiciones que deben seguir valiendo
+    al momento de escribir.
+
+    El caso de uso decide con lo que leyó; entre esa lectura y la escritura otra petición pudo
+    cambiar algo (ascender a la cuenta destino, degradar al actor...). Por eso el repositorio
+    vuelve a comprobar todo en la misma transacción, con las filas bloqueadas, y solo escribe
+    las columnas que cambian (nunca una "foto" vieja de la cuenta).
+    """
+
+    target: str
+    # Roles que la cuenta destino debe seguir teniendo (los que el actor puede gestionar).
+    target_roles: frozenset[str]
+    # Quién lo pide; None = la consola del servidor (sin actor que comprobar).
+    actor: str | None = None
+    actor_role: str | None = None
+    actor_version: int | None = None
+    # Lo que cambia (None = no se toca).
+    role: str | None = None
+    active: bool | None = None
+    # Restablecer: nueva contraseña temporal (obligada a cambiarse) y desbloqueo.
+    password_hash: str | None = None
+    # Sube la versión de sesión: los tokens anteriores de la cuenta dejan de valer.
+    revoke_sessions: bool = False
+    keep_one_active: str = GUARDIAN_ROLE
+
+    def removes_guardian(self, current_role: str, current_active: bool) -> bool:
+        """¿Esta cuenta deja de ser una cuenta activa de `keep_one_active`?"""
+        if current_role != self.keep_one_active or not current_active:
+            return False
+        demoted = self.role is not None and self.role != self.keep_one_active
+        return demoted or self.active is False

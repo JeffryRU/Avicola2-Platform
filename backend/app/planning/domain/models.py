@@ -4,10 +4,10 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from uuid import UUID
 
+# Roles y permisos: domain/permissions.py es la fuente única.
+from app.planning.domain.permissions import SELLER, Permission, can
+
 CONFIRMED = "confirmed"
-# Roles (varchar validado por la app, no ENUM). El supervisor administra cuentas y ve a todos.
-SELLER, SUPERVISOR = "seller", "supervisor"
-ROLES = (SELLER, SUPERVISOR)
 
 
 @dataclass(frozen=True)
@@ -32,8 +32,12 @@ class Seller:
     role: str = SELLER
 
     @property
-    def is_supervisor(self) -> bool:
-        return self.role == SUPERVISOR
+    def is_seller(self) -> bool:
+        """Vendedor del equipo: registra proyecciones y aparece en los dashboards."""
+        return self.role == SELLER
+
+    def can(self, permission: Permission) -> bool:
+        return can(self.role, permission)
 
 
 @dataclass(frozen=True)

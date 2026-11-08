@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.planning.domain.notifications import Notification
@@ -103,3 +103,11 @@ class SqlNotificationRepository:
         count = self.session.execute(query.values(read_at=_utc(now))).rowcount
         self.session.commit()
         return count
+
+    def delete_for(self, username: str) -> None:
+        seller_id = self._seller_id(username)
+        if seller_id is not None:
+            self.session.execute(
+                delete(notifications).where(notifications.c.seller_id == seller_id)
+            )
+            self.session.commit()

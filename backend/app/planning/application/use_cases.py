@@ -22,6 +22,7 @@ from app.planning.application.ports import (
 from app.planning.domain.catalog import Catalog
 from app.planning.domain.history import CREATED, UPDATED, ProjectionChange
 from app.planning.domain.models import SELLER, DailyUnits, Product, Projection, Seller
+from app.planning.domain.permissions import Permission
 from app.shared.domain.errors import DomainError, ForbiddenError, NotFoundError
 
 if TYPE_CHECKING:
@@ -42,7 +43,7 @@ class GetCatalog:
 
 def visible_seller(viewer: Seller, requested: str | None) -> str | None:
     """Un vendedor solo ve lo suyo; el supervisor, a todos o al que filtre."""
-    return requested if viewer.is_supervisor else viewer.username
+    return requested if viewer.can(Permission.VIEW_TEAM) else viewer.username
 
 
 class ListSellers:
@@ -50,7 +51,7 @@ class ListSellers:
         self.sellers = sellers
 
     def __call__(self, viewer: Seller) -> list[Seller]:
-        if not viewer.is_supervisor:
+        if not viewer.can(Permission.VIEW_TEAM):
             return [viewer]
         return [s for s in self.sellers.list_active() if s.role == SELLER]
 
@@ -154,14 +155,14 @@ class SubmitProjection:
 
     def _target(self, author: Seller, on_behalf: str | None) -> Seller:
         """El supervisor elige el vendedor; un vendedor solo registra lo suyo."""
-        if not author.is_supervisor:
+        if not author.can(Permission.VIEW_TEAM):
             if on_behalf and on_behalf != author.username:
                 raise ForbiddenError("Solo puedes registrar tus propias proyecciones.")
             return author
         if not on_behalf:
             raise DomainError("Elige el vendedor de la proyección.")
         account = self.sellers.get_account(on_behalf) if self.sellers else None
-        if account is None or account.seller.is_supervisor:
+        if account is None or not account.seller.is_seller:
             raise NotFoundError("No existe ese vendedor.")
         return account.seller
 

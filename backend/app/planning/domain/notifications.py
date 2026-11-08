@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from app.planning.domain.models import SELLER, SUPERVISOR
+from app.planning.domain.permissions import ROLES, SELLER, Permission, roles_with
 
 # Tipos de notificación (varchar validado por la app).
 PROJECTION_REMINDER = "projection_reminder"  # recordatorio: falta la proyección de hoy (n8n)
@@ -30,7 +30,11 @@ EDITING_CHANGED = "editing.changed"  # hora de corte o habilitaciones
 SESSION_REVOKED = "session.revoked"
 
 # A quién va un aviso general.
-AUDIENCES = {"all": (SELLER, SUPERVISOR), "sellers": (SELLER,), "supervisors": (SUPERVISOR,)}
+AUDIENCES = {
+    "all": ROLES,
+    "sellers": (SELLER,),
+    "supervisors": roles_with(Permission.VIEW_TEAM),
+}
 
 
 @dataclass(frozen=True)

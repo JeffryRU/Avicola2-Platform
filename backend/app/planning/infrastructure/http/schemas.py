@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.shared.infrastructure.http.params import DbId
+
 
 class LoginIn(BaseModel):
     username: str = Field(min_length=1, max_length=50)
@@ -26,6 +28,11 @@ class AccountOut(BaseModel):
 
     seller: SellerOut
     must_change_password: bool
+    # Resueltos por el backend (domain/permissions.py): los clientes no repiten las reglas.
+    permissions: list[str]
+    manageable_roles: list[str] = Field(
+        description="Roles de las cuentas que esta persona puede crear y gestionar."
+    )
 
 
 class TokenLoginIn(BaseModel):
@@ -61,6 +68,11 @@ class AdminAccountOut(BaseModel):
     is_active: bool
     must_change_password: bool
     locked_until: datetime | None
+    # Lo que puede hacer con esta cuenta quien la consulta (calculado por el backend).
+    can_manage: bool
+    assignable_roles: list[str] = Field(
+        description="Roles a los que quien consulta puede cambiar esta cuenta (vacío: ninguno)."
+    )
 
 
 class CreateAccountIn(BaseModel):
@@ -79,6 +91,10 @@ class NewCredentialsOut(BaseModel):
 
 class SetActiveIn(BaseModel):
     active: bool
+
+
+class ChangeRoleIn(BaseModel):
+    role: str = Field(min_length=1, max_length=20)
 
 
 class ProductOut(BaseModel):
@@ -157,7 +173,7 @@ class NotificationsOut(BaseModel):
 class MarkReadIn(BaseModel):
     """Sin `ids` se marcan todas como leídas."""
 
-    ids: list[int] | None = Field(None, max_length=200)
+    ids: list[DbId] | None = Field(None, max_length=200)
 
 
 class MarkReadOut(BaseModel):

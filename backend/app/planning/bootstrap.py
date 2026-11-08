@@ -50,6 +50,7 @@ class PlanningUseCases:
     create_account: acc.CreateAccount
     reset_password: acc.ResetPassword
     set_account_active: acc.SetAccountActive
+    change_role: acc.ChangeRole
     get_catalog: uc.GetCatalog
     list_sellers: uc.ListSellers
     list_projections: uc.ListProjections
@@ -105,6 +106,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         create_account=acc.CreateAccount(sellers, hasher, passwords),
         reset_password=acc.ResetPassword(sellers, hasher, passwords, event_bus),
         set_account_active=acc.SetAccountActive(sellers, event_bus),
+        change_role=acc.ChangeRole(sellers, event_bus, notifications),
         get_catalog=uc.GetCatalog(products),
         list_sellers=uc.ListSellers(sellers),
         list_projections=uc.ListProjections(projections),

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Protocol
 
+from app.planning.domain.accounts import AccountChange, ChangeOutcome
 from app.planning.domain.editing import EditUnlock
 from app.planning.domain.history import ProjectionChange
 from app.planning.domain.models import DailyUnits, Product, Projection, Seller, SellerAccount
@@ -26,12 +27,22 @@ class SellerRepository(Protocol):
     def list_accounts(self) -> list[SellerAccount]: ...
     def create(self, account: SellerAccount) -> None: ...
 
-    def save_security(self, account: SellerAccount) -> None:
-        """Guarda hash, cambio obligatorio, intentos, bloqueo, versión de sesión y estado."""
+    def save_security(self, account: SellerAccount, expected_version: int) -> bool:
+        """Lo que la propia persona cambia al entrar o al cambiar su contraseña: hash, cambio
+        obligatorio, intentos, bloqueo y versión de sesión. Nunca el rol ni el estado.
+
+        Solo escribe si la versión de sesión sigue siendo `expected_version` (si no, otra
+        petición la cambió: un restablecimiento, una desactivación...) y devuelve si escribió.
+        """
         ...
 
     def save_profile(self, seller: Seller) -> None:
         """Guarda los datos visibles de la cuenta (nombre y zona)."""
+        ...
+
+    def apply(self, change: AccountChange) -> ChangeOutcome:
+        """Cambio administrativo atómico: vuelve a comprobar las condiciones de `change` con las
+        filas bloqueadas y escribe solo lo que cambia. Ver domain/accounts.AccountChange."""
         ...
 
 
@@ -107,6 +118,10 @@ class NotificationRepository(Protocol):
 
     def mark_read(self, username: str, ids: list[int] | None, now: datetime) -> int:
         """Marca como leídas las indicadas (o todas si `ids` es None). Devuelve cuántas."""
+        ...
+
+    def delete_for(self, username: str) -> None:
+        """Borra todos los avisos de la persona (p. ej., al cambiar de rol)."""
         ...
 
 

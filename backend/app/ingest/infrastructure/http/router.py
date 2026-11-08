@@ -15,6 +15,7 @@ from app.ingest.bootstrap import IngestUseCases, build_use_cases
 from app.ingest.domain.models import LogRecord, MappingRecord
 from app.ingest.infrastructure.http.schemas import LogOut, MappingBody, MappingOut, TransformRequest
 from app.shared.infrastructure.database.session import get_session
+from app.shared.infrastructure.http.params import DbIdPath
 from app.shared.infrastructure.http.service_token import require_service_token
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
@@ -72,14 +73,14 @@ def list_mappings(
 
 
 @router.put("/mappings/{mapping_id}/proposal", response_model=MappingOut)
-def propose_mapping(use_cases: UseCases, mapping_id: int, body: MappingBody) -> MappingRecord:
+def propose_mapping(use_cases: UseCases, mapping_id: DbIdPath, body: MappingBody) -> MappingRecord:
     """Guarda una propuesta de mapeo (la usa el flujo de IA de n8n). Queda pendiente."""
     return use_cases.propose_mapping(mapping_id, body.mapping)
 
 
 @router.post("/mappings/{mapping_id}/confirm")
 def confirm_mapping(
-    use_cases: UseCases, mapping_id: int, body: MappingBody | None = None
+    use_cases: UseCases, mapping_id: DbIdPath, body: MappingBody | None = None
 ) -> dict[str, Any]:
     """Confirma el mapeo (el enviado o la propuesta) y reprocesa los archivos pendientes."""
     result = use_cases.confirm_mapping(mapping_id, body.mapping if body else None)

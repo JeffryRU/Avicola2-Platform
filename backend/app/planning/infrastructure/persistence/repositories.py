@@ -3,9 +3,10 @@
 from collections import defaultdict
 from datetime import UTC, date, datetime
 
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, insert, or_, select, update
 from sqlalchemy.orm import Session
 
+from app.planning.domain.accounts import AccountChange, ChangeOutcome
 from app.planning.domain.models import Product, Projection, ProjectionLine, Seller, SellerAccount
 from app.planning.infrastructure.persistence.tables import (
     products,
@@ -98,13 +99,88 @@ class SqlSellerRepository:
         )
         self.session.commit()
 
-    def save_security(self, account: SellerAccount) -> None:
-        self.session.execute(
+    def save_security(self, account: SellerAccount, expected_version: int) -> bool:
+        values = _security_values(account)
+        del values["is_active"]  # el estado solo lo cambia `apply` (administración)
+        result = self.session.execute(
             update(sellers)
-            .where(sellers.c.username == account.seller.username)
-            .values(_security_values(account))
+            .where(
+                sellers.c.username == account.seller.username,
+                sellers.c.token_version == expected_version,
+            )
+            .values(values)
         )
         self.session.commit()
+        return result.rowcount == 1
+
+    def apply(self, change: AccountChange) -> ChangeOutcome:
+        try:
+            outcome = self._apply(change)
+        except Exception:
+            self.session.rollback()
+            raise
+        if outcome is ChangeOutcome.APPLIED:
+            self.session.commit()
+        else:
+            self.session.rollback()
+        return outcome
+
+    def _apply(self, change: AccountChange) -> ChangeOutcome:
+        # Bloquea (en orden fijo, sin interbloqueos) al actor, a la cuenta destino y a todas las
+        # cuentas del rol que no puede quedar vacío: dos peticiones simultáneas que se degradan
+        # mutuamente se ejecutan una tras otra, y la segunda ve lo que hizo la primera.
+        names = [change.target, *([change.actor] if change.actor else [])]
+        rows = {
+            r["username"]: r
+            for r in self.session.execute(
+                select(sellers)
+                .where(or_(sellers.c.username.in_(names), sellers.c.role == change.keep_one_active))
+                .order_by(sellers.c.username)
+                .with_for_update()
+            ).mappings()
+        }
+        target = rows.get(change.target)
+        if target is None:
+            return ChangeOutcome.NOT_FOUND
+        if change.actor is not None:
+            actor = rows.get(change.actor)
+            if (
+                actor is None
+                or not actor["is_active"]
+                or actor["role"] != change.actor_role
+                or actor["token_version"] != change.actor_version
+            ):
+                return ChangeOutcome.ACTOR_CHANGED
+        if target["role"] not in change.target_roles:
+            return ChangeOutcome.TARGET_CHANGED
+        if change.removes_guardian(target["role"], target["is_active"]):
+            others = [
+                r
+                for name, r in rows.items()
+                if name != change.target and r["role"] == change.keep_one_active and r["is_active"]
+            ]
+            if not others:
+                return ChangeOutcome.LAST_GUARDIAN
+
+        values: dict = {}
+        if change.role is not None:
+            values["role"] = change.role
+        if change.active is not None:
+            values["is_active"] = change.active
+        if change.password_hash is not None:
+            values.update(
+                password_hash=change.password_hash,
+                must_change_password=True,
+                failed_logins=0,
+                locked_until=None,
+            )
+        if change.revoke_sessions:
+            values["token_version"] = sellers.c.token_version + 1
+        if values:
+            self.session.execute(
+                update(sellers).where(sellers.c.username == change.target).values(values)
+            )
+        return ChangeOutcome.APPLIED
 
     def save_profile(self, seller: Seller) -> None:
         self.session.execute(

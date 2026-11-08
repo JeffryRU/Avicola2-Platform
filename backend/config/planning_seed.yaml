@@ -19,9 +19,10 @@ products:
 
 # Vendedores (id_usuario U0001..U0007 de la tabla maestra). Solo se crean con APP_ENV=local, con la
 # contraseña de PLANNING_DEMO_PASSWORD (por defecto demo1234). En producción, el primer supervisor
-# se crea con `cli supervisor` y él da de alta a los vendedores desde la app.
-# SUPUESTO: el supervisor es de prueba; la tabla maestra no indica quién administra las cuentas.
+# se crea con `cli supervisor --general` y él da de alta las demás cuentas desde la app.
+# SUPUESTO: los supervisores son de prueba; la tabla maestra no indica quién administra las cuentas.
 users:
+  - {username: general, name: Supervisor general de prueba, role: general_supervisor}
   - {username: supervisor, name: Supervisor de prueba, role: supervisor}
   - {username: rnavarro, name: Roberto Navarro, zone: Trujillo}       # U0001
   - {username: hdias, name: Hebert Días, zone: Chiclayo}               # U0002
