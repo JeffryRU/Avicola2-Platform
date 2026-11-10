@@ -84,6 +84,13 @@ class CutoffPolicy:
     def is_open(self, day: date, now: datetime) -> bool:
         return not self.enabled or now < self.closes_at(day, now.tzinfo)
 
+    def closing_soon(self, today: date, now: datetime, within: timedelta) -> list[date]:
+        """Días que siguen abiertos y cuyo corte llega en `within` o menos (aviso previo)."""
+        if not self.enabled:
+            return []
+        candidates = (today + timedelta(days=i) for i in range(self.days_before + 2))
+        return [d for d in candidates if now < self.closes_at(d, now.tzinfo) <= now + within]
+
     def closed_recently(self, today: date, now: datetime, within: timedelta) -> list[date]:
         """Días cuyo corte pasó hace menos de `within` (para avisar quién no registró)."""
         if not self.enabled:
