@@ -440,6 +440,12 @@ def projection_reminders(use_cases: UseCases) -> s.CreatedOut:
     return s.CreatedOut(created=use_cases.send_projection_reminders())
 
 
+@internal.post("/notifications/closing-soon")
+def closing_soon(use_cases: UseCases) -> s.CreatedOut:
+    """Aviso previo al corte a quien aún no registró (la API ya lo revisa cada minuto)."""
+    return s.CreatedOut(created=use_cases.notify_closing_soon())
+
+
 @internal.post("/notifications/missed-projections")
 def missed_projections(use_cases: UseCases) -> s.CreatedOut:
     """Avisos de quién no registró pasado el corte (la API ya lo revisa cada minuto)."""

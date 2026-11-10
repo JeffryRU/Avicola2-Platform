@@ -359,3 +359,63 @@ def test_periodic_check_runs_with_its_own_session(client) -> None:
     from app.planning.infrastructure.scheduler import check_missed_projections
 
     assert check_missed_projections(get_settings()) == 0
+
+
+def test_closing_soon_days() -> None:
+    policy = CutoffPolicy(time(19, 0), days_before=1)
+    half_hour = timedelta(minutes=30)
+    today = DAY - timedelta(days=1)
+
+    def at(hour: int, minute: int) -> datetime:
+        return datetime(2026, 11, 4, hour, minute, tzinfo=UTC)
+
+    assert policy.closing_soon(today, at(18, 29), half_hour) == []
+    assert policy.closing_soon(today, at(18, 30), half_hour) == [DAY]
+    assert policy.closing_soon(today, at(18, 59), half_hour) == [DAY]
+    assert policy.closing_soon(today, at(19, 0), half_hour) == []  # ya cerró
+    off = CutoffPolicy(time(19, 0), days_before=1, enabled=False)
+    assert off.closing_soon(today, at(18, 45), half_hour) == []
+
+
+def test_closing_soon_notifications(client, from_tomorrow) -> None:
+    tomorrow = TODAY + timedelta(days=1)
+    _login(client, "rnavarro")
+    assert _submit(client, 1).status_code == 201
+
+    run = "/api/internal/notifications/closing-soon"
+    from_tomorrow.at = from_tomorrow.at.replace(hour=18, minute=20)
+    assert client.post(run).json()["created"] == 0  # faltan 40 min: todavía no
+
+    from_tomorrow.at = from_tomorrow.at.replace(hour=18, minute=30)
+    assert client.post(run).json()["created"] == 6  # los vendedores que no registraron
+    assert client.post(run).json()["created"] == 0  # una sola vez
+
+    _login(client, "hdias")
+    items = client.get("/api/notifications").json()["items"]
+    closing = [n for n in items if n["title"] == "Tu proyección cierra pronto"]
+    assert len(closing) == 1 and closing[0]["kind"] == "projection_reminder"
+    assert f"del {tomorrow:%d/%m}" in closing[0]["body"] and "19:00" in closing[0]["body"]
+    assert closing[0]["link"] == f"/registrar?dia={tomorrow.isoformat()}"
+    for who in ("rnavarro", "supervisor"):  # ya registró / no proyecta
+        _login(client, who)
+        items = client.get("/api/notifications").json()["items"]
+        assert not any(n["title"] == "Tu proyección cierra pronto" for n in items)
+
+
+def test_closing_soon_follows_the_configured_cutoff(client, from_tomorrow) -> None:
+    run = "/api/internal/notifications/closing-soon"
+    from_tomorrow.at = from_tomorrow.at.replace(hour=18, minute=30)
+    assert client.post(run).json()["created"] == 7
+    # El supervisor atrasa el corte a las 20:00: a las 18:30 ya no toca avisar.
+    _login(client, "supervisor")
+    body = {"cutoff_time": "20:00", "days_before": 1}
+    assert client.put("/api/admin/editing/cutoff", json=body).status_code == 200
+    assert client.post(run).json()["created"] == 0
+    from_tomorrow.at = from_tomorrow.at.replace(hour=19, minute=31)
+    assert client.post(run).json()["created"] == 7  # aviso con la hora nueva
+
+
+def test_periodic_check_covers_both_notices(client) -> None:
+    from app.planning.infrastructure.scheduler import check_cutoffs
+
+    assert check_cutoffs(get_settings()) == 0

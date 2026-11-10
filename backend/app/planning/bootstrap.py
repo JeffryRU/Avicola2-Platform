@@ -5,6 +5,7 @@ toca solo este archivo.
 """
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
@@ -64,6 +65,7 @@ class PlanningUseCases:
     mark_notifications_read: nt.MarkNotificationsRead
     send_projection_reminders: nt.SendProjectionReminders
     notify_missed_projections: nt.NotifyMissedProjections
+    notify_closing_soon: nt.NotifyClosingSoon
     announce: nt.Announce
     editing_window: ed.GetEditingWindow
     request_unlock: ed.RequestUnlock
@@ -96,6 +98,12 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         settings.planning_max_days,
         settings.planning_starts_in_days,
         settings.planning_cutoff_enabled,
+    )
+    # Al aviso previo se le suma el intervalo de revisión: así sale con AL MENOS los minutos
+    # configurados de anticipación aunque la revisión caiga justo después de entrar en ventana.
+    minutes = settings.planning_closing_reminder_minutes
+    closing_lead = timedelta(
+        minutes=minutes, seconds=settings.planning_scheduler_seconds if minutes else 0
     )
     return PlanningUseCases(
         authenticate=acc.Authenticate(sellers, hasher, tokens, clock, lockout),
@@ -132,6 +140,9 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         ),
         notify_missed_projections=nt.NotifyMissedProjections(
             sellers, projections, unlocks, notifier, clock, editing.policy
+        ),
+        notify_closing_soon=nt.NotifyClosingSoon(
+            sellers, projections, notifier, clock, editing.policy, closing_lead
         ),
         announce=nt.Announce(sellers, notifier),
         editing_window=ed.GetEditingWindow(editing, unlocks, clock),

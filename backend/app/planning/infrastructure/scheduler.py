@@ -1,4 +1,5 @@
-"""Tareas periódicas dentro de la API: avisar quién no registró cuando pasa la hora de corte.
+"""Tareas periódicas dentro de la API: avisar antes del corte a quien aún no registró y, cuando
+pasa la hora de corte, quién no registró.
 
 Corre en el proceso de la API (sin depender de n8n). Con varios workers cada uno revisa, pero
 los avisos llevan clave de deduplicación por día, así que el resultado es el mismo.
@@ -21,6 +22,16 @@ def check_missed_projections(settings: Settings) -> int:
         return build_use_cases(session, settings).notify_missed_projections()
 
 
+def check_closing_soon(settings: Settings) -> int:
+    with SessionLocal() as session:
+        return build_use_cases(session, settings).notify_closing_soon()
+
+
+def check_cutoffs(settings: Settings) -> int:
+    """Una revisión completa: aviso previo al corte y aviso de corte pasado."""
+    return check_closing_soon(settings) + check_missed_projections(settings)
+
+
 async def _every(seconds: int, job: Callable[[], int]) -> None:
     while True:
         await asyncio.sleep(seconds)
@@ -28,7 +39,7 @@ async def _every(seconds: int, job: Callable[[], int]) -> None:
             await asyncio.to_thread(job)
         except Exception:
             # Un fallo (p. ej., la base no responde) no detiene la tarea: se reintenta luego.
-            logger.exception("Falló la revisión de proyecciones sin registrar")
+            logger.exception("Falló la revisión de cortes")
 
 
 @contextlib.asynccontextmanager
@@ -37,7 +48,7 @@ async def periodic_tasks(settings: Settings) -> AsyncIterator[None]:
     seconds = settings.planning_scheduler_seconds
     task = None
     if seconds > 0:
-        task = asyncio.create_task(_every(seconds, lambda: check_missed_projections(settings)))
+        task = asyncio.create_task(_every(seconds, lambda: check_cutoffs(settings)))
         logger.info("Revisión de cortes cada %d s", seconds)
     try:
         yield

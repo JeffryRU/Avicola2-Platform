@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     # Cada cuántos segundos la API revisa si pasó un corte para avisar quién no registró
     # (0 = no lo revisa: lo dispara n8n con POST /api/internal/notifications/missed-projections).
     planning_scheduler_seconds: int = Field(60, ge=0)
+    # Minutos de anticipación con que se avisa, antes del corte, a quien aún no registró
+    # (0 = sin aviso previo). El corte es el vigente: si el supervisor lo cambia, el aviso lo sigue.
+    planning_closing_reminder_minutes: int = Field(30, ge=0, le=720)
 
     # Build del frontend (React) que sirve FastAPI; si no existe, no se monta.
     frontend_dist_dir: Path = Path(__file__).resolve().parents[3] / "frontend" / "dist"

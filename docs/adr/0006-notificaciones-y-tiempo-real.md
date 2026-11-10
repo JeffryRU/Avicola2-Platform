@@ -24,6 +24,7 @@
   |---|---|---|
   | `projection_submitted` | Un vendedor envía su proyección | Supervisores |
   | `projection_reminder` | El cron de n8n (lun–sáb 9:00) encuentra que falta la proyección de hoy | Cada vendedor que no la registró (una vez por día, por `dedupe_key`) |
+  | `projection_reminder` | Faltan 30 min (configurable) para la hora de corte vigente; lo revisa la API cada minuto | Cada vendedor que aún no registró ese día (una vez por día y hora de corte) |
   | `announcement` | n8n envía un aviso, p. ej., carga de Excel con problemas o ventas actualizadas | Todos, un rol o un usuario |
 
 - **API:**

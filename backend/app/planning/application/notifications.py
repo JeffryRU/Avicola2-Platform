@@ -196,6 +196,51 @@ class SendProjectionReminders:
         return created
 
 
+class NotifyClosingSoon:
+    """Antes de la hora de corte de un día: avisa a cada vendedor que aún no registró su
+    proyección, con `lead` de anticipación. La hora sale de la política vigente (la que el
+    supervisor configuró), no de un horario fijo. Cada aviso sale una sola vez por día y hora
+    de corte: si el supervisor mueve el corte, se avisa de nuevo con la hora nueva."""
+
+    def __init__(
+        self,
+        sellers: SellerRepository,
+        projections: ProjectionRepository,
+        notifier: Notifier,
+        clock: Clock,
+        policy: Callable[[], CutoffPolicy],
+        lead: timedelta,
+    ):
+        self.sellers, self.projections = sellers, projections
+        self.notifier, self.clock, self.policy, self.lead = notifier, clock, policy, lead
+
+    def __call__(self) -> int:
+        if self.lead <= timedelta(0):
+            return 0
+        policy, now, today = self.policy(), self.clock.now(), self.clock.today()
+        created = 0
+        for day in policy.closing_soon(today, now, self.lead):
+            closes = policy.closes_at(day, now.tzinfo)
+            done = {p.seller for p in self.projections.find(day, day)}
+            pending = [
+                s for s in self.sellers.list_active() if s.role == SELLER and s.username not in done
+            ]
+            minutes = max(1, int((closes - now).total_seconds() // 60))
+            sent = self.notifier.notify(
+                pending,
+                PROJECTION_REMINDER,
+                "Tu proyección cierra pronto",
+                f"Aún no registras tu proyección del {day:%d/%m}. Cierra a las {closes:%H:%M} "
+                f"(en {minutes} min).",
+                link=f"/registrar?dia={day.isoformat()}",
+                dedupe_key=f"closing-{day.isoformat()}-{closes:%H%M}",
+            )
+            if sent:
+                logger.info("Aviso previo al corte del %s: %d vendedor(es)", day, sent)
+            created += sent
+        return created
+
+
 # Se avisa por los cortes de las últimas horas: tras un reinicio no llegan avisos de días viejos.
 MISSED_LOOKBACK = timedelta(hours=6)
 

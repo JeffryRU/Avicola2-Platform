@@ -39,6 +39,7 @@ Schedule (lun–sáb 9:00, America/Lima) → POST /api/internal/notifications/pr
 
 - **Qué hace:** a cada vendedor activo que todavía no registró su proyección del próximo día abierto (mañana, salvo que ya haya pasado el corte), le llega la notificación "Proyección pendiente", en el momento si tiene la app abierta. Se envía como máximo una vez por vendedor y día: volver a ejecutarlo no repite el aviso.
 - **Hora:** se cambia en el nodo *Schedule* (expresión cron `0 9 * * 1-6`). Es solo la hora del recordatorio: la hora límite la fija el supervisor en la app.
+- **Antes del corte** tampoco hace falta n8n: la API avisa a quien aún no registró con `PLANNING_CLOSING_REMINDER_MINUTES` de anticipación (30 por defecto) sobre la hora de corte vigente. Con la revisión apagada, n8n puede llamar a `POST /api/internal/notifications/closing-soon` cada minuto.
 - **Pasado el corte** no hace falta n8n: la API revisa cada minuto y avisa a quien no registró y al supervisor (`PLANNING_SCHEDULER_SECONDS`). Si se apaga esa revisión (`0`), n8n puede llamar a `POST /api/internal/notifications/missed-projections` con la misma frecuencia.
 - **Reintentos:** 3 intentos, separados 5 s, si el backend no responde.
 
