@@ -108,6 +108,7 @@ admin = APIRouter(
 editing_admin = APIRouter(
     prefix="/api/admin", tags=["admin"], dependencies=[requires(Permission.MANAGE_EDITING)]
 )
+saca = APIRouter(prefix="/api/saca", tags=["saca"], dependencies=[requires(Permission.VIEW_SACA)])
 stock = APIRouter(
     prefix="/api/stock", tags=["stock"], dependencies=[requires(Permission.VIEW_STOCK)]
 )
@@ -573,3 +574,36 @@ def register_stock(
     """El jefe de despacho registra (o corrige) el stock del día: unidades y kg por producto."""
     entries = [StockEntry(line.product_id, line.units, line.kg) for line in body.lines]
     return _stock_out(use_cases.register_stock(actor, day, entries))
+
+
+# --- Cálculo de saca ----------------------------------------------------------------------
+
+
+@saca.get("")
+def calculate_saca(
+    use_cases: UseCases, viewer: CurrentSeller, day: Annotated[date, Query(alias="date")]
+) -> s.SacaOut:
+    """Cuánto pedir a granja para el día: max(proyección, pedidos confirmados) − stock."""
+    plan = use_cases.calculate_saca(viewer, day)
+    totals = ("projected", "ordered", "demand", "stock", "request", "request_kg", "live_kg")
+    return s.SacaOut(
+        date=plan.date,
+        lines=[
+            s.SacaLineOut(
+                product_id=line.product.id,
+                projected=line.projected,
+                ordered=line.ordered,
+                demand=line.demand,
+                stock=line.stock,
+                request=line.request,
+                request_kg=line.request_kg,
+            )
+            for line in plan.lines
+        ],
+        **{name: getattr(plan, name) for name in totals},
+        yield_factor=plan.yield_factor,
+        stock_date=plan.stock_date,
+        sellers_registered=plan.sellers_registered,
+        sellers_total=plan.sellers_total,
+        orders_available=plan.orders_available,
+    )

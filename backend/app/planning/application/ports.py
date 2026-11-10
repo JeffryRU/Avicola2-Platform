@@ -70,6 +70,19 @@ class StockRepository(Protocol):
         ...
 
 
+class ConfirmedOrdersSource(Protocol):
+    """Pedidos confirmados de clientes por producto para un día (unidades).
+
+    Hoy no hay fuente: ARIS aún no se integra. Cuando entren (por Excel o por ARIS), un
+    adaptador implementa este puerto y el cálculo de saca no cambia.
+    """
+
+    # False: no hay fuente conectada (el cálculo usa solo las proyecciones).
+    available: bool
+
+    def units(self, day: date) -> dict[str, int]: ...
+
+
 class SalesSource(Protocol):
     """Venta real por vendedor, día y producto (hoy simulada; luego, ERP o lakehouse)."""
 

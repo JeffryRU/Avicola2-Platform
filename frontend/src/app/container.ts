@@ -30,6 +30,8 @@ import { HttpHistoryGateway } from '@/features/history/infrastructure/http-histo
 import { HttpEditingGateway } from '@/features/editing/infrastructure/http-editing-gateway'
 import type { StockGateway } from '@/features/stock/application/ports'
 import { HttpStockGateway } from '@/features/stock/infrastructure/http-stock-gateway'
+import type { SacaGateway } from '@/features/saca/application/ports'
+import { HttpSacaGateway } from '@/features/saca/infrastructure/http-saca-gateway'
 import { BrowserTableExporter } from '@/shared/infrastructure/table-exporter'
 import { StoredDraftRepository, StoredSubmissionQueue } from '@/features/projections/infrastructure/stored-repositories'
 
@@ -52,6 +54,7 @@ export interface Container {
   editing: EditingGateway
   history: HistoryGateway
   stock: StockGateway
+  saca: SacaGateway
   installer: AppInstaller
 }
 
@@ -100,6 +103,7 @@ export function createContainer(): Container {
     editing: new HttpEditingGateway(http),
     history: new HttpHistoryGateway(http),
     stock: new HttpStockGateway(http),
+    saca: new HttpSacaGateway(http),
     installer: new BrowserAppInstaller(window, import.meta.env.VITE_ANDROID_APK_URL),
   }
 }
