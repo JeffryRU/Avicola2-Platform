@@ -1,4 +1,4 @@
-import { ChevronRight, History, KeyRound, LockOpen, LogOut, PackageCheck, UserCog } from 'lucide-react'
+import { Bird, ChevronRight, History, KeyRound, LockOpen, LogOut, PackageCheck, UserCog } from 'lucide-react'
 import { Link } from 'react-router'
 import { useContainer } from '@/app/di'
 import { InstallOption } from '@/app/install'
@@ -51,6 +51,18 @@ export function ProfilePage() {
               <span className="min-w-0 flex-1">
                 <b className="block">Habilitaciones</b>
                 <small className="text-muted-foreground">Horario de corte y solicitudes de edición</small>
+              </span>
+              <ChevronRight className="size-[18px]" />
+            </Link>
+          )}
+          {can(session, 'view_saca') && (
+            <Link to={paths.saca} className={optCls}>
+              <span className={cn(tileCls, 'bg-secondary text-primary')}>
+                <Bird />
+              </span>
+              <span className="min-w-0 flex-1">
+                <b className="block">Cálculo de saca</b>
+                <small className="text-muted-foreground">Cuánto pedir a granja cada día</small>
               </span>
               <ChevronRight className="size-[18px]" />
             </Link>

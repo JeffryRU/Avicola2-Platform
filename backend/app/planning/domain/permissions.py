@@ -36,10 +36,17 @@ class Permission(StrEnum):
     VIEW_STOCK = "view_stock"
     # Registrar o corregir el stock de despacho (unidades y kg por producto y día).
     MANAGE_STOCK = "manage_stock"
+    # Ver el cálculo de saca: cuánto pedir a granja por día.
+    VIEW_SACA = "view_saca"
 
 
 _SUPERVISION = frozenset(
-    {Permission.VIEW_TEAM, Permission.MANAGE_EDITING, Permission.MANAGE_ACCOUNTS}
+    {
+        Permission.VIEW_TEAM,
+        Permission.MANAGE_EDITING,
+        Permission.MANAGE_ACCOUNTS,
+        Permission.VIEW_SACA,
+    }
 )
 
 ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {

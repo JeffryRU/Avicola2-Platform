@@ -14,12 +14,14 @@ from app.planning.application import accounts as acc
 from app.planning.application import editing as ed
 from app.planning.application import export as ex
 from app.planning.application import notifications as nt
+from app.planning.application import saca as sc
 from app.planning.application import stock as st
 from app.planning.application import use_cases as uc
 from app.planning.domain.accounts import LockoutPolicy
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.events import event_bus
 from app.planning.infrastructure.forecast import WeekdayAverageForecaster
+from app.planning.infrastructure.orders import NoConfirmedOrders
 from app.planning.infrastructure.persistence.editing import (
     SqlSettingsRepository,
     SqlUnlockRepository,
@@ -78,6 +80,7 @@ class PlanningUseCases:
     revoke_editing: ed.RevokeEditing
     register_stock: st.RegisterStock
     list_stock: st.ListStock
+    calculate_saca: sc.CalculateSaca
 
 
 def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
@@ -159,4 +162,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         revoke_editing=ed.RevokeEditing(unlocks, sellers, notifier, event_bus, clock),
         register_stock=st.RegisterStock(products, stock, clock),
         list_stock=st.ListStock(stock),
+        calculate_saca=sc.CalculateSaca(
+            products, projections, stock, NoConfirmedOrders(), sellers, settings.yield_factor
+        ),
     )

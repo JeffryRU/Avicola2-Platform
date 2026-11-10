@@ -19,6 +19,7 @@ export const paths = {
   unlocks: '/habilitaciones',
   history: '/historial',
   stock: '/stock',
+  saca: '/saca',
 } as const
 
 export const DASHBOARDS = [

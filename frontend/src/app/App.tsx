@@ -70,6 +70,7 @@ const ProductsPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import('@/features/profile/ui/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
 )
+const SacaPage = lazy(() => import('@/features/saca/ui/pages/SacaPage').then((m) => ({ default: m.SacaPage })))
 const StockPage = lazy(() => import('@/features/stock/ui/pages/StockPage').then((m) => ({ default: m.StockPage })))
 const SuccessPage = lazy(() =>
   import('@/features/projections/ui/pages/SuccessPage').then((m) => ({ default: m.SuccessPage })),
@@ -146,6 +147,7 @@ function Routed() {
               {can(session, 'manage_accounts') && <Route path={paths.accounts} element={<AccountsPage />} />}
               {can(session, 'manage_editing') && <Route path={paths.unlocks} element={<UnlocksPage />} />}
               {can(session, 'view_stock') && <Route path={paths.stock} element={<StockPage />} />}
+              {can(session, 'view_saca') && <Route path={paths.saca} element={<SacaPage />} />}
               <Route path={paths.register} element={<NewProjectionPage />} />
               <Route path={paths.history} element={<HistoryPage />} />
               <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />

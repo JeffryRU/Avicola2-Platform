@@ -75,6 +75,7 @@ def test_session_exposes_resolved_permissions(client):
         "manage_editing",
         "manage_accounts",
         "view_stock",
+        "view_saca",
     }
     assert me["manageable_roles"] == ["seller"]
     me = _as("general").get("/api/auth/me").json()

@@ -295,3 +295,35 @@ class StockDayOut(BaseModel):
     total_kg: float
     recorded_by: str
     recorded_at: datetime
+
+
+# --- Cálculo de saca ----------------------------------------------------------------------
+
+
+class SacaLineOut(BaseModel):
+    product_id: str
+    projected: int
+    ordered: int
+    demand: int = Field(description="El mayor entre lo proyectado y los pedidos confirmados.")
+    stock: int
+    request: int = Field(description="Unidades (aves) a pedir a granja: demanda menos stock.")
+    request_kg: float
+
+
+class SacaOut(BaseModel):
+    date: date
+    lines: list[SacaLineOut]
+    projected: int
+    ordered: int
+    demand: int
+    stock: int
+    request: int
+    request_kg: float
+    live_kg: float = Field(description="Kg vivos estimados (kg de producto entre el rendimiento).")
+    yield_factor: float
+    stock_date: date | None = Field(
+        description="Día del stock descontado; null si no hay reciente."
+    )
+    sellers_registered: int
+    sellers_total: int
+    orders_available: bool = Field(description="False: aún no hay fuente de pedidos confirmados.")
