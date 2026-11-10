@@ -5,7 +5,7 @@ Cada clase hace una sola cosa y recibe sus dependencias como puertos.
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -81,7 +81,8 @@ class DayUnits:
 
 
 class SubmitProjection:
-    """Guarda (o reemplaza) la proyección de cada día enviado."""
+    """Guarda la proyección de cada día enviado. Si el día ya tenía una, el registro nuevo es
+    otra hoja que la reemplaza (INS-06): vale la última y el historial conserva las anteriores."""
 
     def __init__(
         self,
@@ -124,6 +125,7 @@ class SubmitProjection:
             self.clock.now(),
         )
         submission = submission_id or uuid4()
+        current = self._current(seller, category, [d.date for d in days])
         result, late = [], set()
         for day in sorted(days, key=lambda d: d.date):
             if day.date < today:
@@ -136,8 +138,13 @@ class SubmitProjection:
             )
             if projection.total_units == 0:
                 raise DomainError(f"El día {day.date:%d/%m/%Y} no tiene unidades.")
+            before = current.get(day.date)
+            if before:
+                # Reenviar lo mismo no abre una hoja nueva.
+                same = before.units == projection.units
+                projection = replace(projection, sheet=before.sheet + (0 if same else 1))
             result.append(projection)
-        changes = self._changes(author, seller, category, result, late, now)
+        changes = self._changes(author, seller, category, result, current, late, now)
         self.projections.replace(result)
         if self.history and changes:
             self.history.add(changes)
@@ -169,24 +176,25 @@ class SubmitProjection:
             raise NotFoundError("No existe ese vendedor.")
         return account.seller
 
+    def _current(self, seller: Seller, category: str, dates: list[date]) -> dict[date, Projection]:
+        """La proyección vigente de cada día enviado (la hoja anterior, si existe)."""
+        found = self.projections.find(min(dates), max(dates), seller.username)
+        return {p.date: p for p in found if p.category == category}
+
     def _changes(
         self,
         author: Seller,
         seller: Seller,
         category: str,
         saved: list[Projection],
+        current: dict[date, Projection],
         late: set[date],
         now: datetime,
     ) -> list[ProjectionChange]:
         """Lo que cambió respecto de lo guardado (si nada cambió, no se registra)."""
         if not self.history:
             return []
-        dates = [p.date for p in saved]
-        before = {
-            p.date: p.units
-            for p in self.projections.find(min(dates), max(dates), seller.username)
-            if p.category == category
-        }
+        before = {day: p.units for day, p in current.items()}
         return [
             ProjectionChange(
                 seller.username,
@@ -198,6 +206,7 @@ class SubmitProjection:
                 p.units,
                 now,
                 p.date in late,
+                sheet=p.sheet,
             )
             for p in saved
             if before.get(p.date) != p.units

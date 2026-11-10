@@ -15,6 +15,7 @@ const DAY = '2026-11-03'
 const projection = (who: string, units: Record<string, number>, status = 'confirmed'): Projection => ({
   id: `${who}-${DAY}`,
   submission_id: 's',
+  sheet: 1,
   seller: who,
   date: DAY,
   category: 'BRASA',

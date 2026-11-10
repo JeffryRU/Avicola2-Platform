@@ -15,6 +15,8 @@ export const projectionSchema = z.object({
   total_kg: z.number(),
   submitted_at: z.string(),
   units: unitsSchema,
+  // Hoja de registro vigente (1 la primera; cada registro nuevo abre otra que la reemplaza).
+  sheet: z.number().int().positive().default(1),
 })
 export type Projection = z.infer<typeof projectionSchema>
 

@@ -108,6 +108,7 @@ export function HistoryPage() {
                     <th className={tableCls.th}>{COLUMNS.day}</th>
                     <th className={tableCls.th}>{COLUMNS.who}</th>
                     <th className={tableCls.th}>{COLUMNS.action}</th>
+                    <th className={tableCls.th}>{COLUMNS.sheet}</th>
                     <th className={tableCls.th}>{COLUMNS.units}</th>
                     <th className={cn(tableCls.th, '!text-left')}>{COLUMNS.detail}</th>
                   </tr>
@@ -162,6 +163,7 @@ function ChangeRow({
           </span>
         )}
       </td>
+      <td className={tableCls.td}>{c.sheet ?? '—'}</td>
       <td className={cn(tableCls.td, 'font-bold')}>{unitsChange(c.before_total, c.after_total)}</td>
       <td className={cn(tableCls.td, '!text-left text-[13px] whitespace-normal text-ink-2')}>
         {lines.map((l) => `${l.product}: ${c.before ? `${String(l.before)} → ` : ''}${String(l.after)}`).join(' · ')}

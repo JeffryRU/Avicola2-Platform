@@ -304,3 +304,35 @@ def test_export_in_the_same_formats_as_the_web(client) -> None:
     assert text.startswith('\ufeff"Fecha","Día","Zona","Vendedor"')
     assert '"Sin proyección"' in text
     assert client.get(f"{base}&format=docx").status_code == 422
+
+
+def test_each_new_registration_opens_a_new_sheet(client) -> None:
+    """INS-06: registrar de nuevo un día abre otra hoja que reemplaza a la anterior (no suma)."""
+    _login(client)
+    day = _day(1)
+
+    def submit(units: int) -> None:
+        body = {"category": "BRASA", "days": [{"date": day, "units": {"P0001": units}}]}
+        assert client.post("/api/projections", json=body).status_code == 201
+
+    params = {"date_from": day, "date_to": day}
+    submit(100)
+    assert client.get("/api/projections", params=params).json()[0]["sheet"] == 1
+    submit(60)  # segunda hoja del mismo día
+    rows = client.get("/api/projections", params=params).json()
+    assert len(rows) == 1 and rows[0]["sheet"] == 2
+    assert rows[0]["total_units"] == 60  # vale la última hoja: no se suman 100 + 60
+    submit(60)  # reenviar lo mismo no abre una hoja nueva
+    assert client.get("/api/projections", params=params).json()[0]["sheet"] == 2
+    submit(75)
+    assert client.get("/api/projections", params=params).json()[0]["sheet"] == 3
+
+    today = str(TODAY)
+    history = client.get(
+        "/api/projections/history", params={"date_from": today, "date_to": today}
+    ).json()
+    assert [(h["sheet"], h["before_total"], h["after_total"]) for h in reversed(history)] == [
+        (1, None, 100),
+        (2, 100, 60),
+        (3, 60, 75),
+    ]

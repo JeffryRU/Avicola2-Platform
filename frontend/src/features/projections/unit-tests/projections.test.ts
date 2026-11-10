@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { addDays, daysText, weekStart } from '@/shared/domain/dates'
 import { myDays, versusReal, weekAgg, type MyDay } from '@/features/projections/domain/aggregation'
 import { Catalog } from '@/features/catalog/domain/catalog'
-import { emptyDays, newDraft, submittableDraft } from '@/features/projections/domain/draft'
+import {
+  copyPreviousSheets,
+  emptyDays,
+  newDraft,
+  openNewSheets,
+  previousSheets,
+  submittableDraft,
+} from '@/features/projections/domain/draft'
 import { parseCell } from '@/shared/domain/format'
 import { projectionsTable } from '@/features/projections/domain/export'
 import { tableToCsv } from '@/shared/domain/export'
@@ -18,6 +25,7 @@ const TODAY = '2026-11-02'
 const projection = (seller: string, date: string, units: Record<string, number>): Projection => ({
   id: `${seller}-${date}`,
   submission_id: 's',
+  sheet: 1,
   seller,
   date,
   category: 'BRASA',
@@ -133,5 +141,36 @@ describe('exportación', () => {
     })
     expect(csv.startsWith('\uFEFF"Producto"')).toBe(true)
     expect(csv).toContain('"Pollo ""entero"""')
+  })
+})
+
+describe('hojas de registro (INS-06)', () => {
+  const day = '2026-11-03'
+  const draft = { ...newDraft(day, 'BRASA'), days: 2 }
+  const days = new Map([[day, { category: 'BRASA', units: { B1: 10, B2: 4 }, sheet: 1 }]])
+
+  it('la hoja nueva abre en blanco y es la siguiente a la vigente', () => {
+    const previous = previousSheets(draft, days)
+    expect(previous).toEqual([{ date: day, sheet: 1, units: { B1: 10, B2: 4 } }])
+    const opened = openNewSheets(draft, previous, new Set(['B1', 'B2']))
+    expect(opened.units).toEqual({ [day]: {}, [addDays(day, 1)]: {} })
+  })
+
+  it('no toma como hoja anterior la de otra categoría', () => {
+    expect(previousSheets({ ...draft, category: 'OTRA' }, days)).toEqual([])
+  })
+
+  it('con un tamaño elegido, lo que no se ve conserva la hoja anterior', () => {
+    const opened = openNewSheets(draft, previousSheets(draft, days), new Set(['B1']))
+    expect(opened.units[day]).toEqual({ B2: 4 })
+  })
+
+  it('copiar la hoja anterior no pisa lo ya escrito', () => {
+    const previous = previousSheets(draft, days)
+    const visible = new Set(['B1', 'B2'])
+    const blank = openNewSheets(draft, previous, visible)
+    expect(copyPreviousSheets(blank, previous, visible).units[day]).toEqual({ B1: 10, B2: 4 })
+    const typed = { ...blank, units: { ...blank.units, [day]: { B1: 7 } } }
+    expect(copyPreviousSheets(typed, previous, visible).units[day]).toEqual({ B1: 7 })
   })
 })

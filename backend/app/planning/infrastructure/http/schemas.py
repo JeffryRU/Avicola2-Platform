@@ -117,6 +117,9 @@ class ProjectionOut(BaseModel):
     total_kg: float
     submitted_at: datetime
     units: dict[str, int]
+    sheet: int = Field(
+        description="Hoja de registro vigente: 1 la primera, 2 si se registró de nuevo…"
+    )
 
 
 class DayIn(BaseModel):
@@ -262,6 +265,7 @@ class ChangeOut(BaseModel):
     after_total: int
     after_cutoff: bool
     changed_at: datetime
+    sheet: int | None
 
 
 # --- Stock de despacho -------------------------------------------------------------------

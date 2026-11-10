@@ -28,6 +28,7 @@ export const COLUMNS = {
   day: 'Día proyectado',
   who: 'Quién',
   action: 'Acción',
+  sheet: 'Hoja',
   units: 'Unidades',
   detail: 'Detalle',
 } as const
