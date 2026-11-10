@@ -78,7 +78,7 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
 
 - **Base de datos:** la elige `DATABASE_URL` (Supabase, Azure SQL, Postgres local o SQLite para demos). Para Azure SQL ver la sección correspondiente de `.env.example`.
 - **Nombres de tablas:** `backend/config/tables.yaml` (renombrar una tabla ya creada requiere una migración).
-- **Catálogo y usuarios de prueba:** `backend/config/planning_seed.yaml`. Los usuarios de prueba (`general` como supervisor general, `supervisor` y los 7 vendedores de la tabla maestra, contraseña `demo1234`) solo se crean con `APP_ENV=local`.
+- **Catálogo y usuarios de prueba:** `backend/config/planning_seed.yaml`. Los usuarios de prueba (`general` como supervisor general, `supervisor`, `despacho` como jefe de despacho y los 7 vendedores de la tabla maestra, contraseña `demo1234`) solo se crean con `APP_ENV=local`.
 - **Comandos** (`cd backend`): `uv run python -m app.planning.infrastructure.cli init | seed | show [n] | clear --yes | supervisor <usuario> "<nombre>" [--general] | rol <usuario> <rol>`.
 - **Cuentas y seguridad** ([ADR 0005](docs/adr/0005-seguridad-de-sesion-y-cuentas.md)):
   - La sesión va en una cookie HttpOnly. El token no aparece en las respuestas ni en el almacenamiento del navegador.

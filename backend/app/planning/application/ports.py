@@ -12,6 +12,7 @@ from app.planning.domain.editing import EditUnlock
 from app.planning.domain.history import ProjectionChange
 from app.planning.domain.models import DailyUnits, Product, Projection, Seller, SellerAccount
 from app.planning.domain.notifications import Event, Notification
+from app.planning.domain.stock import DailyStock
 
 
 class ProductRepository(Protocol):
@@ -54,6 +55,18 @@ class ProjectionRepository(Protocol):
     def replace(self, projections: list[Projection]) -> None:
         """Guarda las proyecciones en una sola transacción; reemplaza la de la misma
         terna (vendedor, fecha, categoría) si ya existía."""
+        ...
+
+
+class StockRepository(Protocol):
+    """Stock de despacho por día."""
+
+    def find(self, date_from: date, date_to: date) -> list[DailyStock]:
+        """Días con registro en el rango, del más reciente al más antiguo."""
+        ...
+
+    def save(self, stock: DailyStock) -> None:
+        """Guarda el día en una sola transacción y reemplaza lo que hubiera de ese día."""
         ...
 
 

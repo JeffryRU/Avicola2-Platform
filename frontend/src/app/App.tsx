@@ -70,6 +70,7 @@ const ProductsPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import('@/features/profile/ui/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
 )
+const StockPage = lazy(() => import('@/features/stock/ui/pages/StockPage').then((m) => ({ default: m.StockPage })))
 const SuccessPage = lazy(() =>
   import('@/features/projections/ui/pages/SuccessPage').then((m) => ({ default: m.SuccessPage })),
 )
@@ -144,6 +145,7 @@ function Routed() {
               <Route index element={<SupervisorHomePage />} />
               {can(session, 'manage_accounts') && <Route path={paths.accounts} element={<AccountsPage />} />}
               {can(session, 'manage_editing') && <Route path={paths.unlocks} element={<UnlocksPage />} />}
+              {can(session, 'view_stock') && <Route path={paths.stock} element={<StockPage />} />}
               <Route path={paths.register} element={<NewProjectionPage />} />
               <Route path={paths.history} element={<HistoryPage />} />
               <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />
@@ -156,6 +158,21 @@ function Routed() {
               <Route path={paths.profileSettings} element={<ProfileSettingsPage />} />
               <Route path={paths.password} element={<ChangePasswordPage />} />
               <Route path={paths.connection} element={<ConnectionPage />} />
+              <Route path="*" element={<Navigate to={paths.home} replace />} />
+            </Route>
+          </Routes>
+        </Suspense>
+      ) : can(session, 'view_stock') ? (
+        // Jefe de despacho: su inicio es el stock; no proyecta ni ve dashboards.
+        <Suspense fallback={null}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route index element={<StockPage />} />
+              <Route path={paths.notifications} element={<NotificationsPage />} />
+              <Route path={paths.profile} element={<ProfilePage />} />
+              <Route path={paths.profileSettings} element={<ProfileSettingsPage />} />
+              <Route path={paths.connection} element={<ConnectionPage />} />
+              <Route path={paths.password} element={<ChangePasswordPage />} />
               <Route path="*" element={<Navigate to={paths.home} replace />} />
             </Route>
           </Routes>

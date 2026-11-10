@@ -156,6 +156,9 @@ class SubmitProjection:
     def _target(self, author: Seller, on_behalf: str | None) -> Seller:
         """El supervisor elige el vendedor; un vendedor solo registra lo suyo."""
         if not author.can(Permission.VIEW_TEAM):
+            if not author.is_seller:
+                # P. ej., el jefe de despacho: tiene cuenta, pero no proyecta.
+                raise ForbiddenError("Tu rol no registra proyecciones.")
             if on_behalf and on_behalf != author.username:
                 raise ForbiddenError("Solo puedes registrar tus propias proyecciones.")
             return author

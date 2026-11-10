@@ -18,6 +18,7 @@ export const paths = {
   accounts: '/usuarios',
   unlocks: '/habilitaciones',
   history: '/historial',
+  stock: '/stock',
 } as const
 
 export const DASHBOARDS = [

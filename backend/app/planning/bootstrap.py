@@ -14,6 +14,7 @@ from app.planning.application import accounts as acc
 from app.planning.application import editing as ed
 from app.planning.application import export as ex
 from app.planning.application import notifications as nt
+from app.planning.application import stock as st
 from app.planning.application import use_cases as uc
 from app.planning.domain.accounts import LockoutPolicy
 from app.planning.infrastructure.clock import ZoneClock
@@ -31,6 +32,7 @@ from app.planning.infrastructure.persistence.repositories import (
     SqlSellerRepository,
 )
 from app.planning.infrastructure.persistence.status import SqlStatusProbe
+from app.planning.infrastructure.persistence.stock import SqlStockRepository
 from app.planning.infrastructure.sales import SimulatedSalesSource
 from app.planning.infrastructure.security import (
     JwtTokenService,
@@ -74,6 +76,8 @@ class PlanningUseCases:
     update_cutoff: ed.UpdateCutoff
     grant_editing: ed.GrantEditing
     revoke_editing: ed.RevokeEditing
+    register_stock: st.RegisterStock
+    list_stock: st.ListStock
 
 
 def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
@@ -90,6 +94,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     schema = physical_schema(settings.database_url, APP_SCHEMA, settings.db_schema)
     unlocks = SqlUnlockRepository(session)
     history = SqlChangeLog(session)
+    stock = SqlStockRepository(session)
     sales = SimulatedSalesSource(projections, clock)
     editing = ed.EditingSettings(
         SqlSettingsRepository(session),
@@ -152,4 +157,6 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         update_cutoff=ed.UpdateCutoff(editing, event_bus, clock),
         grant_editing=ed.GrantEditing(editing, unlocks, sellers, notifier, event_bus, clock),
         revoke_editing=ed.RevokeEditing(unlocks, sellers, notifier, event_bus, clock),
+        register_stock=st.RegisterStock(products, stock, clock),
+        list_stock=st.ListStock(stock),
     )

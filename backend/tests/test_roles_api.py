@@ -70,7 +70,12 @@ def test_unknown_role_has_no_permissions():
 
 def test_session_exposes_resolved_permissions(client):
     me = _as("supervisor").get("/api/auth/me").json()
-    assert set(me["permissions"]) == {"view_team", "manage_editing", "manage_accounts"}
+    assert set(me["permissions"]) == {
+        "view_team",
+        "manage_editing",
+        "manage_accounts",
+        "view_stock",
+    }
     assert me["manageable_roles"] == ["seller"]
     me = _as("general").get("/api/auth/me").json()
     assert "change_roles" in me["permissions"]
