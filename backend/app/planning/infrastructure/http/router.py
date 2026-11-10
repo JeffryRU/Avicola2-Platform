@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.planning.application.accounts import Session as AuthSession
+from app.planning.application.stock import StockEntry
 from app.planning.application.use_cases import DayUnits
 from app.planning.bootstrap import PlanningUseCases, build_use_cases
 from app.planning.domain.editing import CutoffPolicy, EditUnlock
@@ -27,6 +28,7 @@ from app.planning.domain.permissions import (
     manageable_roles,
     permissions_of,
 )
+from app.planning.domain.stock import DailyStock
 from app.planning.infrastructure.exporters import WRITERS, ExportFormat
 from app.planning.infrastructure.http import schemas as s
 from app.shared.domain.errors import AuthenticationError, ForbiddenError
@@ -105,6 +107,9 @@ admin = APIRouter(
 )
 editing_admin = APIRouter(
     prefix="/api/admin", tags=["admin"], dependencies=[requires(Permission.MANAGE_EDITING)]
+)
+stock = APIRouter(
+    prefix="/api/stock", tags=["stock"], dependencies=[requires(Permission.VIEW_STOCK)]
 )
 
 
@@ -535,3 +540,34 @@ def grant_editing(
 def revoke_editing(use_cases: UseCases, actor: ActiveAccount, username: str) -> list[s.UnlockOut]:
     """El supervisor cierra las habilitaciones vigentes del vendedor."""
     return [_unlock_out(u) for u in use_cases.revoke_editing(actor.seller, username)]
+
+
+# --- Stock de despacho -------------------------------------------------------------------
+
+
+def _stock_out(day: DailyStock) -> s.StockDayOut:
+    return s.StockDayOut(
+        date=day.date,
+        lines=[s.StockLineOut(**asdict(line)) for line in day.lines],
+        total_units=day.total_units,
+        total_kg=day.total_kg,
+        recorded_by=day.recorded_by,
+        recorded_at=day.recorded_at,
+    )
+
+
+@stock.get("")
+def list_stock(
+    use_cases: UseCases, viewer: CurrentSeller, date_from: DateFrom, date_to: DateTo
+) -> list[s.StockDayOut]:
+    """Stock registrado por día (solo los días con registro), del más reciente al más antiguo."""
+    return [_stock_out(d) for d in use_cases.list_stock(viewer, date_from, date_to)]
+
+
+@stock.put("/{day}", dependencies=[requires(Permission.MANAGE_STOCK)])
+def register_stock(
+    use_cases: UseCases, actor: CurrentSeller, day: date, body: s.StockIn
+) -> s.StockDayOut:
+    """El jefe de despacho registra (o corrige) el stock del día: unidades y kg por producto."""
+    entries = [StockEntry(line.product_id, line.units, line.kg) for line in body.lines]
+    return _stock_out(use_cases.register_stock(actor, day, entries))

@@ -262,3 +262,32 @@ class ChangeOut(BaseModel):
     after_total: int
     after_cutoff: bool
     changed_at: datetime
+
+
+# --- Stock de despacho -------------------------------------------------------------------
+
+
+class StockLineIn(BaseModel):
+    product_id: str = Field(min_length=1, max_length=10)
+    units: int = Field(ge=0, le=1_000_000)
+    # Sin kg, se calcula con el peso promedio del producto.
+    kg: float | None = Field(default=None, ge=0, le=10_000_000)
+
+
+class StockIn(BaseModel):
+    lines: list[StockLineIn] = Field(min_length=1, max_length=200)
+
+
+class StockLineOut(BaseModel):
+    product_id: str
+    units: int
+    kg: float
+
+
+class StockDayOut(BaseModel):
+    date: date
+    lines: list[StockLineOut]
+    total_units: int
+    total_kg: float
+    recorded_by: str
+    recorded_at: datetime

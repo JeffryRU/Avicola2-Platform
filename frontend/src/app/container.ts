@@ -28,6 +28,8 @@ import type { EditingGateway } from '@/features/editing/application/ports'
 import type { HistoryGateway } from '@/features/history/application/ports'
 import { HttpHistoryGateway } from '@/features/history/infrastructure/http-history-gateway'
 import { HttpEditingGateway } from '@/features/editing/infrastructure/http-editing-gateway'
+import type { StockGateway } from '@/features/stock/application/ports'
+import { HttpStockGateway } from '@/features/stock/infrastructure/http-stock-gateway'
 import { BrowserTableExporter } from '@/shared/infrastructure/table-exporter'
 import { StoredDraftRepository, StoredSubmissionQueue } from '@/features/projections/infrastructure/stored-repositories'
 
@@ -49,6 +51,7 @@ export interface Container {
   accounts: AccountsGateway
   editing: EditingGateway
   history: HistoryGateway
+  stock: StockGateway
   installer: AppInstaller
 }
 
@@ -96,6 +99,7 @@ export function createContainer(): Container {
     accounts: new HttpAccountsGateway(http),
     editing: new HttpEditingGateway(http),
     history: new HttpHistoryGateway(http),
+    stock: new HttpStockGateway(http),
     installer: new BrowserAppInstaller(window, import.meta.env.VITE_ANDROID_APK_URL),
   }
 }

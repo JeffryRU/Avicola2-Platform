@@ -79,16 +79,16 @@ OK, REJECTED = "ok", "rejected"
 
 def oracle(actor_role: str, op: str, target_role: str | None, new_role: str | None, own: bool):
     """La especificación, escrita a mano (no usa domain/permissions.py)."""
-    if actor_role == "seller":
+    if actor_role in ("seller", "dispatch_chief"):
         return REJECTED
     if op == "create":
-        if new_role not in ("seller", "supervisor", "general_supervisor"):
+        if new_role not in ("seller", "dispatch_chief", "supervisor", "general_supervisor"):
             return REJECTED
         return OK if actor_role == "general_supervisor" or new_role == "seller" else REJECTED
     if target_role is None or own:  # no existe, o es la propia cuenta
         return REJECTED
     if op == "role":
-        valid = new_role in ("seller", "supervisor", "general_supervisor")
+        valid = new_role in ("seller", "dispatch_chief", "supervisor", "general_supervisor")
         return OK if actor_role == "general_supervisor" and valid else REJECTED
     # reset, activate, deactivate
     return OK if actor_role == "general_supervisor" or target_role == "seller" else REJECTED

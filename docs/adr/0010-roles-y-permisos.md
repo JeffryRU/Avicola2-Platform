@@ -21,8 +21,11 @@
 | Rol | Permisos | Crea y gestiona |
 |---|---|---|
 | Vendedor | ninguno | nadie |
-| Supervisor | ver equipo, edición, cuentas | solo vendedores |
-| Supervisor general | todos, también cambiar roles | todas las cuentas (también otros supervisores generales) |
+| Jefe de despacho | ver y registrar el stock de despacho | nadie |
+| Supervisor | ver equipo, edición, cuentas, ver el stock | solo vendedores |
+| Supervisor general | todos, también cambiar roles y registrar el stock | todas las cuentas (también otros supervisores generales) |
+
+**Actualización (2026-11-10):** se agregó el rol `dispatch_chief` (jefe de despacho) con los permisos `view_stock` y `manage_stock`. No proyecta, no ve al equipo y no aparece como vendedor. El supervisor general tiene `manage_stock` porque nadie gestiona un rol con más permisos que el suyo. En la web, el jefe de despacho entra directo a **Stock de despacho**; la app móvil aún no tiene esa pantalla.
 
 - Los casos de uso preguntan por un permiso (`seller.can(Permission.X)`), nunca por el nombre del rol. "¿Es vendedor del equipo?" se pregunta con `is_seller`.
 - Un rol desconocido no tiene permisos: nunca se abre por defecto. Gestionar una cuenta con un rol desconocido da 403, no 500.

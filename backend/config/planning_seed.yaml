@@ -20,10 +20,12 @@ products:
 # Vendedores (id_usuario U0001..U0007 de la tabla maestra). Solo se crean con APP_ENV=local, con la
 # contraseña de PLANNING_DEMO_PASSWORD (por defecto demo1234). En producción, el primer supervisor
 # se crea con `cli supervisor --general` y él da de alta las demás cuentas desde la app.
+# El jefe de despacho de prueba (`despacho`) registra el stock de despacho.
 # SUPUESTO: los supervisores son de prueba; la tabla maestra no indica quién administra las cuentas.
 users:
   - {username: general, name: Supervisor general de prueba, role: general_supervisor}
   - {username: supervisor, name: Supervisor de prueba, role: supervisor}
+  - {username: despacho, name: Jefe de despacho de prueba, role: dispatch_chief}
   - {username: rnavarro, name: Roberto Navarro, zone: Trujillo}       # U0001
   - {username: hdias, name: Hebert Días, zone: Chiclayo}               # U0002
   - {username: mcordova, name: Miguel Córdova, zone: Piura}            # U0003

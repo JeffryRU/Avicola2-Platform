@@ -11,10 +11,13 @@ from app.shared.domain.errors import ForbiddenError
 
 # Roles: varchar validado por la app, no ENUM.
 SELLER, SUPERVISOR, GENERAL_SUPERVISOR = "seller", "supervisor", "general_supervisor"
-ROLES = (SELLER, SUPERVISOR, GENERAL_SUPERVISOR)
+# Jefe de despacho: registra el stock que queda en despacho; no proyecta ni ve al equipo.
+DISPATCH_CHIEF = "dispatch_chief"
+ROLES = (SELLER, DISPATCH_CHIEF, SUPERVISOR, GENERAL_SUPERVISOR)
 
 ROLE_LABELS = {
     SELLER: "vendedor",
+    DISPATCH_CHIEF: "jefe de despacho",
     SUPERVISOR: "supervisor",
     GENERAL_SUPERVISOR: "supervisor general",
 }
@@ -29,6 +32,10 @@ class Permission(StrEnum):
     MANAGE_ACCOUNTS = "manage_accounts"
     # Cambiar el rol de una cuenta existente (dentro de MANAGEABLE_ROLES).
     CHANGE_ROLES = "change_roles"
+    # Ver el stock de despacho registrado por día.
+    VIEW_STOCK = "view_stock"
+    # Registrar o corregir el stock de despacho (unidades y kg por producto y día).
+    MANAGE_STOCK = "manage_stock"
 
 
 _SUPERVISION = frozenset(
@@ -37,14 +44,20 @@ _SUPERVISION = frozenset(
 
 ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
     SELLER: frozenset(),
-    SUPERVISOR: _SUPERVISION,
-    GENERAL_SUPERVISOR: _SUPERVISION | {Permission.CHANGE_ROLES},
+    DISPATCH_CHIEF: frozenset({Permission.VIEW_STOCK, Permission.MANAGE_STOCK}),
+    # El supervisor consulta el stock (lo necesita para la saca) pero no lo registra.
+    SUPERVISOR: _SUPERVISION | {Permission.VIEW_STOCK},
+    # El supervisor general crea jefes de despacho, así que tiene también sus permisos
+    # (nadie gestiona un rol con más permisos que el suyo).
+    GENERAL_SUPERVISOR: _SUPERVISION
+    | {Permission.CHANGE_ROLES, Permission.VIEW_STOCK, Permission.MANAGE_STOCK},
 }
 
 # Cuentas que cada rol crea y gestiona: el supervisor, solo vendedores; el supervisor general,
 # todas (también otros supervisores generales). Nadie se gestiona a sí mismo desde Usuarios.
 MANAGEABLE_ROLES: dict[str, tuple[str, ...]] = {
     SELLER: (),
+    DISPATCH_CHIEF: (),
     SUPERVISOR: (SELLER,),
     GENERAL_SUPERVISOR: ROLES,
 }

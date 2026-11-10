@@ -36,6 +36,7 @@ describe('roles y permisos en la sesión', () => {
     expect(roleLabel(general)).toBe('Supervisor general')
     expect(roleLabel({ ...seller, role: 'supervisor' })).toBe('Supervisor')
     expect(roleLabel(seller)).toBe('Vendedor, Trujillo')
+    expect(roleLabel({ ...seller, zone: null, role: 'dispatch_chief' })).toBe('Jefe de despacho')
   })
 
   it('la vista de supervisión sale del permiso; sin permisos guardados (perfil viejo), del rol', () => {
@@ -47,5 +48,14 @@ describe('roles y permisos en la sesión', () => {
     // Un rol de staff sin view_team (p. ej., uno futuro) no hereda la vista por no ser vendedor.
     const other = { ...base, seller: { ...seller, role: 'supervisor' }, permissions: ['manage_editing'] }
     expect(hasTeamView(sessionSchema.parse(other))).toBe(false)
+    // El jefe de despacho: solo stock, sin vista de supervisión.
+    const chief = {
+      ...base,
+      seller: { ...seller, role: 'dispatch_chief' },
+      permissions: ['view_stock', 'manage_stock'],
+    }
+    const parsed = sessionSchema.parse(chief)
+    expect(hasTeamView(parsed)).toBe(false)
+    expect(can(parsed, 'manage_stock')).toBe(true)
   })
 })

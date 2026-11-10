@@ -32,7 +32,7 @@ sellers = Table(
     Column("name", String(100), nullable=False),
     Column("zone", String(50)),
     Column("password_hash", String(200), nullable=False),
-    # seller | supervisor: varchar validado por la app (domain/models.ROLES), no ENUM.
+    # Rol: varchar validado por la app (domain/permissions.ROLES), no ENUM.
     Column("role", String(20), nullable=False, server_default="seller"),
     # Seguridad: cambio obligatorio (contraseña temporal), bloqueo por intentos y versión
     # de sesión (al subirla se invalidan los tokens emitidos antes).
@@ -150,4 +150,19 @@ projection_changes = Table(
     # Día del cambio en la zona del negocio (para filtrar sin depender del motor).
     Column("changed_on", Date, nullable=False),
     Index(None, "seller_id", "changed_on"),
+)
+
+dispatch_stock = Table(
+    TABLES["dispatch_stock"],
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("date", Date, nullable=False),
+    Column("product_id", String(10), ForeignKey(TABLES.fk("products")), nullable=False),
+    Column("units", Integer, nullable=False),
+    Column("kg", Numeric(10, 2, asdecimal=False), nullable=False),
+    Column("recorded_by", String(50), nullable=False),
+    Column("recorded_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("date", "product_id"),
+    CheckConstraint("units >= 0", name="units_non_negative"),
+    CheckConstraint("kg >= 0", name="kg_non_negative"),
 )

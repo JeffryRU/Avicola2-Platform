@@ -1,10 +1,10 @@
-import { ChevronRight, History, KeyRound, LockOpen, LogOut, UserCog } from 'lucide-react'
+import { ChevronRight, History, KeyRound, LockOpen, LogOut, PackageCheck, UserCog } from 'lucide-react'
 import { Link } from 'react-router'
 import { useContainer } from '@/app/di'
 import { InstallOption } from '@/app/install'
 import { paths } from '@/app/routes'
 import { initials } from '@/shared/domain/format'
-import { isSupervisor, roleLabel } from '@/features/auth/domain/session'
+import { can, hasTeamView, roleLabel } from '@/features/auth/domain/session'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
@@ -15,7 +15,10 @@ const tileCls = 'grid size-10 flex-none place-items-center rounded-xl [&>svg]:si
 
 export function ProfilePage() {
   const { auth } = useContainer()
-  const { seller } = useRequiredSession()
+  const session = useRequiredSession()
+  const { seller } = session
+  // El jefe de despacho no proyecta: no tiene historial de proyecciones.
+  const projects = hasTeamView(session) || !can(session, 'view_stock')
   return (
     <div>
       <PageHeader title="Perfil" />
@@ -40,7 +43,7 @@ export function ProfilePage() {
             </span>
             <ChevronRight className="size-[18px]" />
           </Link>
-          {isSupervisor(seller) && (
+          {can(session, 'manage_editing') && (
             <Link to={paths.unlocks} className={optCls}>
               <span className={cn(tileCls, 'bg-ok-soft text-ok')}>
                 <LockOpen />
@@ -52,16 +55,30 @@ export function ProfilePage() {
               <ChevronRight className="size-[18px]" />
             </Link>
           )}
-          <Link to={paths.history} className={optCls}>
-            <span className={cn(tileCls, 'bg-secondary text-primary')}>
-              <History />
-            </span>
-            <span className="min-w-0 flex-1">
-              <b className="block">Historial de cambios</b>
-              <small className="text-muted-foreground">Quién creó o modificó cada proyección</small>
-            </span>
-            <ChevronRight className="size-[18px]" />
-          </Link>
+          {hasTeamView(session) && can(session, 'view_stock') && (
+            <Link to={paths.stock} className={optCls}>
+              <span className={cn(tileCls, 'bg-ok-soft text-ok')}>
+                <PackageCheck />
+              </span>
+              <span className="min-w-0 flex-1">
+                <b className="block">Stock de despacho</b>
+                <small className="text-muted-foreground">Lo que quedó en despacho cada día</small>
+              </span>
+              <ChevronRight className="size-[18px]" />
+            </Link>
+          )}
+          {projects && (
+            <Link to={paths.history} className={optCls}>
+              <span className={cn(tileCls, 'bg-secondary text-primary')}>
+                <History />
+              </span>
+              <span className="min-w-0 flex-1">
+                <b className="block">Historial de cambios</b>
+                <small className="text-muted-foreground">Quién creó o modificó cada proyección</small>
+              </span>
+              <ChevronRight className="size-[18px]" />
+            </Link>
+          )}
           <InstallOption className={optCls} />
           <Link to={paths.password} className={optCls}>
             <span className={cn(tileCls, 'bg-warn-soft text-warn')}>

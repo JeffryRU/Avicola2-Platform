@@ -9,6 +9,7 @@ import {
   Home,
   LockOpen,
   LogOut,
+  PackageCheck,
   Plus,
   Settings,
   User,
@@ -68,8 +69,58 @@ function Sidebar() {
   const supervisor = hasTeamView(session)
   const editing = can(session, 'manage_editing')
   const pending = (useUnlocks(editing).data ?? []).filter((u) => u.status === 'requested').length
+  // El jefe de despacho solo ve el stock: no proyecta ni tiene dashboards.
+  const dispatch = !supervisor && can(session, 'view_stock')
+  const bell = (
+    <SideItem
+      to={paths.notifications}
+      icon={<Bell />}
+      label="Notificaciones"
+      extra={
+        unread > 0 && (
+          <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1.5 text-[11px] font-extrabold text-white not-italic">
+            {unread}
+          </em>
+        )
+      }
+    />
+  )
+  const footer = (
+    <div className="mt-auto grid gap-0.5 pt-4">
+      <div className="mb-2 flex items-center gap-3 px-3 py-2.5">
+        <div className="grid size-10 flex-none place-items-center rounded-full bg-secondary text-sm font-extrabold text-primary">
+          {initials(seller.name)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <b className="block text-sm">{seller.name}</b>
+          <small className="text-muted-foreground">{roleLabel(seller)}</small>
+        </div>
+      </div>
+      <SideItem to={paths.profile} icon={<Settings />} label="Configuración" />
+      <button type="button" className={itemCls(false)} onClick={auth.logout}>
+        <LogOut />
+        <span>Cerrar sesión</span>
+      </button>
+    </div>
+  )
+  const asideCls =
+    'sticky top-0 hidden h-dvh w-[268px] flex-none flex-col overflow-y-auto border-r bg-side px-3.5 pt-[22px] pb-4 dsk:flex'
+  if (dispatch) {
+    return (
+      <aside className={asideCls}>
+        <div className="px-2.5 pb-[22px]">
+          <Logo />
+        </div>
+        <nav className="grid gap-0.5" aria-label="Principal">
+          <SideItem to={paths.home} end icon={<PackageCheck />} label="Stock de despacho" />
+          {bell}
+        </nav>
+        {footer}
+      </aside>
+    )
+  }
   return (
-    <aside className="sticky top-0 hidden h-dvh w-[268px] flex-none flex-col overflow-y-auto border-r bg-side px-3.5 pt-[22px] pb-4 dsk:flex">
+    <aside className={asideCls}>
       <div className="px-2.5 pb-[22px]">
         <Logo />
       </div>
@@ -125,37 +176,12 @@ function Sidebar() {
         ) : (
           <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
         )}
+        {can(session, 'view_stock') && <SideItem to={paths.stock} icon={<PackageCheck />} label="Stock de despacho" />}
         <SideItem to={paths.history} icon={<History />} label="Historial" />
         <SideItem to={paths.products} icon={<Box />} label="Productos" />
-        <SideItem
-          to={paths.notifications}
-          icon={<Bell />}
-          label="Notificaciones"
-          extra={
-            unread > 0 && (
-              <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1.5 text-[11px] font-extrabold text-white not-italic">
-                {unread}
-              </em>
-            )
-          }
-        />
+        {bell}
       </nav>
-      <div className="mt-auto grid gap-0.5 pt-4">
-        <div className="mb-2 flex items-center gap-3 px-3 py-2.5">
-          <div className="grid size-10 flex-none place-items-center rounded-full bg-secondary text-sm font-extrabold text-primary">
-            {initials(seller.name)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <b className="block text-sm">{seller.name}</b>
-            <small className="text-muted-foreground">{roleLabel(seller)}</small>
-          </div>
-        </div>
-        <SideItem to={paths.profile} icon={<Settings />} label="Configuración" />
-        <button type="button" className={itemCls(false)} onClick={auth.logout}>
-          <LogOut />
-          <span>Cerrar sesión</span>
-        </button>
-      </div>
+      {footer}
     </aside>
   )
 }
@@ -174,11 +200,19 @@ const BOTTOM_SUPERVISOR = [
   { to: paths.profile, icon: User, label: 'Perfil', end: false },
 ]
 
+const BOTTOM_DISPATCH = [
+  { to: paths.home, icon: PackageCheck, label: 'Stock', end: true },
+  { to: paths.notifications, icon: Bell, label: 'Avisos', end: false },
+  { to: paths.profile, icon: User, label: 'Perfil', end: false },
+]
+
 function BottomNav() {
   const session = useRequiredSession()
   const items = hasTeamView(session)
     ? BOTTOM_SUPERVISOR.filter((i) => i.to !== paths.accounts || can(session, 'manage_accounts'))
-    : BOTTOM
+    : can(session, 'view_stock')
+      ? BOTTOM_DISPATCH
+      : BOTTOM
   const unread = useUnreadCount()
   return (
     <nav
