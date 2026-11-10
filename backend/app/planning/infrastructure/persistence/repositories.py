@@ -230,6 +230,7 @@ class SqlProjectionRepository:
                 lines=tuple(lines[h["id"]]),
                 submitted_at=h["updated_at"] or h["submitted_at"],
                 status=h["status"],
+                sheet=h["sheet"],
             )
             for h in heads
         ]
@@ -258,6 +259,7 @@ class SqlProjectionRepository:
                 "status": p.status,
                 "total_units": p.total_units,
                 "total_kg": p.total_kg,
+                "sheet": p.sheet,
             }
             if current is None:
                 current = p.id

@@ -66,7 +66,7 @@ class ProjectionLine:
 
 @dataclass(frozen=True)
 class Projection:
-    """Proyección de un vendedor para un día y una categoría (única por esa terna)."""
+    """Proyección vigente de un vendedor para un día y una categoría (única por esa terna)."""
 
     id: UUID
     submission_id: UUID
@@ -76,6 +76,9 @@ class Projection:
     lines: tuple[ProjectionLine, ...]
     submitted_at: datetime
     status: str = CONFIRMED
+    # Hoja de registro: 1 la primera vez; cada registro que cambia las unidades abre una nueva.
+    # La última hoja es la que vale (reemplaza a la anterior; no se suman).
+    sheet: int = 1
 
     @property
     def total_units(self) -> int:

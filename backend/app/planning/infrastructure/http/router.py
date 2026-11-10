@@ -167,6 +167,7 @@ def _projection_out(p: Projection) -> s.ProjectionOut:
         total_kg=p.total_kg,
         submitted_at=p.submitted_at,
         units=p.units,
+        sheet=p.sheet,
     )
 
 
@@ -300,6 +301,7 @@ def projection_history(
             after_total=c.after_total,
             after_cutoff=c.after_cutoff,
             changed_at=c.changed_at,
+            sheet=c.sheet,
         )
         for c in use_cases.list_changes(viewer, date_from, date_to, seller)
     ]

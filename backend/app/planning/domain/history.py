@@ -23,6 +23,8 @@ class ProjectionChange:
     # Se hizo pasada la hora de corte (con habilitación o por el supervisor).
     after_cutoff: bool = False
     id: int | None = None
+    # Número de la hoja de registro que dejó este cambio (None en cambios anteriores a las hojas).
+    sheet: int | None = None
 
     @property
     def before_total(self) -> int | None:

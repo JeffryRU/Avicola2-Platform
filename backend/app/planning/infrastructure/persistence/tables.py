@@ -70,6 +70,8 @@ projections = Table(
     Column("total_kg", Numeric(10, 2, asdecimal=False), nullable=False),
     Column("submitted_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True)),
+    # Hoja de registro vigente (1, 2, ...): cada registro que cambia las unidades abre una nueva.
+    Column("sheet", Integer, nullable=False, server_default="1"),
     UniqueConstraint("seller_id", "date", "category"),
 )
 
@@ -146,6 +148,8 @@ projection_changes = Table(
     Column("before_total", Integer),
     Column("after_total", Integer, nullable=False),
     Column("after_cutoff", Boolean, nullable=False, default=False),
+    # Hoja que dejó el cambio; NULL en los cambios anteriores a las hojas de registro.
+    Column("sheet", Integer),
     Column("changed_at", DateTime(timezone=True), nullable=False),
     # Día del cambio en la zona del negocio (para filtrar sin depender del motor).
     Column("changed_on", Date, nullable=False),

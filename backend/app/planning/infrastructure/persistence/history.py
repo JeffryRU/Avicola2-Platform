@@ -36,6 +36,7 @@ class SqlChangeLog:
                     "before_total": c.before_total,
                     "after_total": c.after_total,
                     "after_cutoff": c.after_cutoff,
+                    "sheet": c.sheet,
                     "changed_at": c.changed_at,
                     "changed_on": c.changed_at.date(),
                 }
@@ -65,6 +66,7 @@ class SqlChangeLog:
                 changed_at=r["changed_at"],
                 after_cutoff=r["after_cutoff"],
                 id=r["id"],
+                sheet=r["sheet"],
             )
             for r in self.session.execute(query).mappings()
         ]

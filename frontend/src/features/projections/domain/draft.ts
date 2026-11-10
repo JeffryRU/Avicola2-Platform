@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { addDays, dShort, rangeDates, today, type IsoDate } from '@/shared/domain/dates'
 import { sumUnits } from '@/features/catalog/domain/catalog'
+import type { Units } from '@/features/catalog/domain/schemas'
 import { isoDateSchema } from '@/shared/domain/schemas'
 
 export const MAX_DAYS = 7
@@ -52,4 +53,53 @@ export function submittableDraft(ref: IsoDate = today()) {
 /** Días sin unidades (para marcarlos en rojo). */
 export function emptyDays(d: Draft): IsoDate[] {
   return draftDates(d).filter((date) => sumUnits(d.units[date]) === 0)
+}
+
+/** Hoja vigente de un día del borrador (misma categoría). */
+export interface PreviousSheet {
+  date: IsoDate
+  sheet: number
+  units: Units
+}
+
+/**
+ * INS-06: cada registro abre una hoja nueva. Devuelve las hojas vigentes de los días del borrador
+ * (misma categoría): la que se envíe ahora será la siguiente y la reemplaza, no se suma.
+ */
+export function previousSheets(
+  draft: Draft,
+  days: ReadonlyMap<IsoDate, { category: string; units: Units; sheet?: number }>,
+): PreviousSheet[] {
+  return draftDates(draft).flatMap((date) => {
+    const day = days.get(date)
+    return day?.category === draft.category ? [{ date, sheet: day.sheet ?? 1, units: day.units }] : []
+  })
+}
+
+const pick = (units: Units, keep: (id: string) => boolean): Units =>
+  Object.fromEntries(Object.entries(units).filter(([id]) => keep(id)))
+
+/**
+ * Abre la hoja nueva de cada día: en blanco para los productos que se ven. Los que no se ven
+ * (otro tamaño de brasa) conservan lo de la hoja anterior, porque se envía el día completo.
+ */
+export function openNewSheets(draft: Draft, previous: PreviousSheet[], visible: ReadonlySet<string>): Draft {
+  const before = new Map(previous.map((p) => [p.date, p.units]))
+  const units = { ...draft.units }
+  for (const date of draftDates(draft)) {
+    units[date] ??= pick(before.get(date) ?? {}, (id) => !visible.has(id))
+  }
+  return { ...draft, units }
+}
+
+/** Copia a la hoja nueva lo de la anterior, solo en los días donde aún no se escribió nada visible. */
+export function copyPreviousSheets(draft: Draft, previous: PreviousSheet[], visible: ReadonlySet<string>): Draft {
+  const units = { ...draft.units }
+  for (const p of previous) {
+    const day = units[p.date] ?? {}
+    if (!Object.keys(day).some((id) => visible.has(id))) {
+      units[p.date] = { ...day, ...pick(p.units, (id) => visible.has(id)) }
+    }
+  }
+  return { ...draft, units }
 }

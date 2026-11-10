@@ -13,6 +13,8 @@ export interface MyDay {
   submittedAt: string
   sync: SyncState
   error?: string | null
+  /** Hoja de registro vigente en el servidor (los envíos en cola aún no tienen número). */
+  sheet?: number
 }
 
 /** Lo confirmado en el servidor + lo que está en la cola del dispositivo (gana la cola). */
@@ -20,7 +22,14 @@ export function myDays(projections: Projection[], queue: Submission[], me: strin
   const out = new Map<IsoDate, MyDay>()
   for (const p of projections) {
     if (p.seller === me && p.status === CONFIRMED) {
-      out.set(p.date, { date: p.date, category: p.category, units: p.units, submittedAt: p.submitted_at, sync: 'ok' })
+      out.set(p.date, {
+        date: p.date,
+        category: p.category,
+        units: p.units,
+        submittedAt: p.submitted_at,
+        sync: 'ok',
+        sheet: p.sheet,
+      })
     }
   }
   for (const s of queue.filter((q) => q.seller === me)) {

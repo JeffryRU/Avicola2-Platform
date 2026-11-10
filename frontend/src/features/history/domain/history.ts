@@ -21,6 +21,8 @@ export const changeSchema = z.object({
   after_total: z.number().int(),
   after_cutoff: z.boolean(),
   changed_at: z.string(),
+  // Hoja de registro que dejó el cambio (sin número en los cambios anteriores a las hojas).
+  sheet: z.number().int().nullish(),
 })
 export type ProjectionChange = z.infer<typeof changeSchema>
 

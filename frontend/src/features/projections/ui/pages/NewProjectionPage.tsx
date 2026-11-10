@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, ArrowRight, Calendar, ChevronLeft, Info, Loader2, Lock, Wand2 } from 'lucide-react'
+import { AlertCircle, ArrowRight, Calendar, ChevronLeft, Copy, Files, Info, Loader2, Lock, Wand2 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
@@ -11,7 +11,16 @@ import { isSupervisor } from '@/features/auth/domain/session'
 import { useSellers } from '@/features/dashboards/ui/hooks'
 import type { MyDay } from '@/features/projections/domain/aggregation'
 import type { Catalog } from '@/features/catalog/domain/catalog'
-import { draftDates, emptyDays, newDraft, submittableDraft, type Draft } from '@/features/projections/domain/draft'
+import {
+  copyPreviousSheets,
+  draftDates,
+  emptyDays,
+  newDraft,
+  openNewSheets,
+  previousSheets,
+  submittableDraft,
+  type Draft,
+} from '@/features/projections/domain/draft'
 import { isoDateSchema } from '@/shared/domain/schemas'
 import { DaysSlider } from '@/features/projections/ui/components/days-slider'
 import { ProjectionMatrix } from '@/features/projections/ui/components/projection-matrix'
@@ -31,16 +40,10 @@ import { closedDaysNote } from '@/features/editing/types/editing'
 import { EditingDays } from '@/features/editing/ui/components/editing-days'
 import { useEditingWindow } from '@/features/editing/ui/hooks'
 
-/** Completa las unidades de cada fecha con lo ya confirmado (si es de la misma categoría). */
-function withExisting(draft: Draft, days: Map<IsoDate, MyDay>): Draft {
-  const units = { ...draft.units }
-  for (const d of draftDates(draft)) {
-    if (!units[d]) {
-      const mine = days.get(d)
-      units[d] = mine?.category === draft.category ? { ...mine.units } : {}
-    }
-  }
-  return { ...draft, units }
+/** Abre la hoja nueva de cada día (INS-06): en blanco, sin precargar lo ya registrado. */
+function withNewSheets(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): Draft {
+  const visible = new Set(catalog.selected(draft).map((p) => p.id))
+  return openNewSheets(draft, previousSheets(draft, days), visible)
 }
 
 function normalize(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): Draft {
@@ -49,7 +52,7 @@ function normalize(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): D
     d = { ...d, category: days.get(d.start)?.category ?? catalog.categories[0], subcategory: null, units: {} }
   }
   if (d.subcategory && !catalog.subcategories(d.category).includes(d.subcategory)) d = { ...d, subcategory: null }
-  return d.step === 1 ? withExisting(d, days) : d
+  return d.step === 1 ? withNewSheets(d, catalog, days) : d
 }
 
 export function NewProjectionPage() {
@@ -109,6 +112,9 @@ export function NewProjectionPage() {
   const choiceIndex = choices.findIndex((c) => c.category === draft.category && c.subcategory === draft.subcategory)
   const invalid = draft.tried ? emptyDays(draft) : []
   const alreadyConfirmed = dates.filter((d) => days.has(d))
+  // Hojas vigentes de esos días: lo que se envíe ahora es la hoja siguiente y las reemplaza.
+  const previous = previousSheets(draft, days)
+  const visibleIds = new Set(products.map((p) => p.id))
   const closed = closedDays(editing, dates)
   const lastAllowed = allowed?.at(-1)
   const room = allowed ? allowed.length - Math.max(0, allowed.indexOf(draft.start)) : undefined
@@ -197,8 +203,9 @@ export function NewProjectionPage() {
                   {alreadyConfirmed.length > 0 && (
                     <Note tone="warn" icon={<Info />} className="mt-3">
                       <div>
-                        Ya confirmaste {alreadyConfirmed.map(dShort).join(', ')}. Si continúas, verás esos valores y
-                        podrás corregirlos.
+                        Ya registraste {alreadyConfirmed.map(dShort).join(', ')}. Al continuar se abre una hoja nueva en
+                        blanco para {alreadyConfirmed.length === 1 ? 'ese día' : 'esos días'}: al enviarla reemplaza a
+                        la anterior (no se suman).
                       </div>
                     </Note>
                   )}
@@ -272,7 +279,7 @@ export function NewProjectionPage() {
             <Button
               className="h-[54px] flex-1 rounded-[14px] text-[16.5px] font-bold dsk:min-w-[220px] dsk:flex-none"
               disabled={closed.length > 0 || !owner}
-              onClick={() => setDraft(withExisting({ ...draft, step: 1, tried: false }, days))}
+              onClick={() => setDraft(withNewSheets({ ...draft, step: 1, tried: false }, loaded, days))}
             >
               Continuar <ArrowRight className="size-5" />
             </Button>
@@ -370,6 +377,23 @@ export function NewProjectionPage() {
             </button>
           </div>
         </Section>
+        {previous.length > 0 && (
+          <Note tone="warn" icon={<Files />} className="mb-3.5">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="min-w-0 flex-1">
+                <b>Hoja nueva.</b> {previous.map((p) => `${dShort(p.date)}: hoja ${String(p.sheet + 1)}`).join(' · ')}.
+                Reemplaza a la anterior al enviarla; no se suman.
+              </span>
+              <Button
+                variant="outline"
+                className="h-9 flex-none bg-white font-bold"
+                onClick={() => setDraft(copyPreviousSheets(draft, previous, visibleIds))}
+              >
+                <Copy /> Copiar la hoja anterior
+              </Button>
+            </div>
+          </Note>
+        )}
         {invalid.length > 0 && (
           <Note tone="bad" icon={<AlertCircle />} className="mb-3.5 animate-shake">
             <div>Ingresa al menos un producto para {invalid.map(dShort).join(', ')}.</div>

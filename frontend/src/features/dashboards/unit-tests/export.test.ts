@@ -16,6 +16,7 @@ const sellers = [
 const projection: Projection = {
   id: '1',
   submission_id: 's',
+  sheet: 1,
   seller: 'a',
   date: '2026-11-05',
   category: 'BRASA',
