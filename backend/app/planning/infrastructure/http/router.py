@@ -651,6 +651,14 @@ def calculate_saca(
     )
 
 
+@saca.put("/factors", dependencies=[requires(Permission.MANAGE_EDITING)])
+def set_saca_factors(
+    use_cases: UseCases, actor: CurrentSeller, body: s.SacaFactorsIn
+) -> s.SacaFactorsOut:
+    """Un supervisor cambia por cuánto se multiplica lo que hace falta de cada tipo."""
+    return s.SacaFactorsOut(factors=use_cases.set_saca_factors(actor, body.factors))
+
+
 # --- Producción diaria --------------------------------------------------------------------
 
 

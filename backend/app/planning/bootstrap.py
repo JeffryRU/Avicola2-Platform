@@ -85,6 +85,7 @@ class PlanningUseCases:
     register_stock: st.RegisterStock
     list_stock: st.ListStock
     calculate_saca: sc.CalculateSaca
+    set_saca_factors: sc.SetSacaFactors
     register_production: pr.RegisterProduction
     list_production: pr.ListProduction
     forecast_arrival: pr.ForecastArrival
@@ -112,8 +113,10 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     stock = SqlStockRepository(session)
     production = SqlProductionRepository(session)
     sales = SimulatedSalesSource(projections, clock)
+    stored_settings = SqlSettingsRepository(session)
+    saca_factors = sc.SacaFactors(stored_settings, settings.saca_group_factors)
     editing = ed.EditingSettings(
-        SqlSettingsRepository(session),
+        stored_settings,
         settings.planning_cutoff_time,
         settings.planning_cutoff_days_before,
         settings.planning_max_days,
@@ -184,8 +187,9 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             settings.yield_factor,
             production,
             arrival_model,
-            settings.saca_group_factors,
+            saca_factors,
         ),
+        set_saca_factors=sc.SetSacaFactors(products, stored_settings, clock),
         register_production=pr.RegisterProduction(products, production, clock),
         list_production=pr.ListProduction(production),
         forecast_arrival=pr.ForecastArrival(products, production, clock, arrival_model),

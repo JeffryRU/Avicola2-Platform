@@ -207,3 +207,31 @@ def test_loaded_orders_enter_the_saca_with_either_method(client) -> None:
     r = client.get("/api/saca", params={"date": str(TOMORROW), "method": "max"})
     assert r.json()["method"] == "max" and r.json()["request"] == 200  # manda lo mayor
     assert client.get("/api/saca", params={"date": str(TOMORROW), "method": "x"}).status_code == 422
+
+
+def test_supervisors_change_the_factor_of_each_type(client) -> None:
+    _login(client, "rnavarro")
+    body = {"category": "BRASA", "days": [{"date": str(TOMORROW), "units": {"P0001": 100}}]}
+    assert client.post("/api/projections", json=body).status_code == 201
+    change = {"factors": {"Brasa chica": 0.9, "Brasa grande": 0.5}}
+    assert client.put("/api/saca/factors", json=change).status_code == 403  # un vendedor no
+    _login(client, "despacho")
+    assert client.put("/api/saca/factors", json=change).status_code == 403
+
+    _login(client, "supervisor")
+    assert _saca(client, TOMORROW)["farm_order"] == 80  # de partida, chica × 0,80
+    saved = client.put("/api/saca/factors", json=change)
+    assert saved.status_code == 200, saved.text
+    # Lo que no se indicó (mediana) queda en 1: se pide completo.
+    assert saved.json()["factors"] == {
+        "Brasa chica": 0.9,
+        "Brasa mediana": 1.0,
+        "Brasa grande": 0.5,
+    }
+    plan = _saca(client, TOMORROW)
+    assert plan["farm_order"] == 90
+    assert {g["name"]: g["factor"] for g in plan["groups"]}["Brasa grande"] == 0.5
+
+    for bad in ({"Brasa enorme": 1}, {"Brasa chica": -0.1}, {"Brasa chica": 3}, {}):
+        r = client.put("/api/saca/factors", json={"factors": bad})
+        assert r.status_code in (400, 422), bad

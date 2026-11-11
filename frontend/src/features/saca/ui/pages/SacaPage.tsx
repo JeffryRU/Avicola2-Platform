@@ -1,15 +1,19 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { AlertCircle, Check, Minus, TriangleAlert } from 'lucide-react'
+import { useState, type SyntheticEvent } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertCircle, Check, Minus, Pencil, TriangleAlert } from 'lucide-react'
+import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
 import { addDays, dDowLong, dShort, today, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
+import { can } from '@/features/auth/domain/session'
+import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { bySubcategory } from '@/features/catalog/domain/catalog'
 import type { Product } from '@/features/catalog/domain/schemas'
 import { useCatalog } from '@/features/catalog/ui/hooks'
 import {
   SACA_METHODS,
   missingSellers,
+  parseFactors,
   sacaDays,
   sacaMethodSchema,
   storeMethod,
@@ -22,8 +26,12 @@ import {
   ARRIVAL_HINT,
   BIRDS_LABEL,
   BY_PRODUCT_TITLE,
+  CANCEL,
   COLUMNS,
   DAY_LABEL,
+  EDIT_FACTORS_LABEL,
+  FACTORS_INVALID,
+  FACTORS_SAVED,
   FARM_COLUMNS,
   FARM_ORDER_HINT,
   FORMULA,
@@ -40,6 +48,7 @@ import {
   ORDERS_OK,
   SACA_SUBTITLE,
   SACA_TITLE,
+  SAVE_FACTORS,
   SOURCE,
   SOURCES_TITLE,
   TODAY_LABEL,
@@ -152,40 +161,127 @@ function Hero({ plan }: { plan: Saca }) {
           </div>
         </dl>
       </div>
-      {plan.groups.length > 0 && (
-        <div className="mt-4 rounded-[14px] bg-white/12 px-3.5 py-3">
-          {/* Ancho: tabla. Angosto: el tipo a la izquierda y la cuenta a la derecha. */}
-          <div className="hidden sm:block">
-            <div className={cn(farmCols, 'pb-1 text-[11.5px] font-bold tracking-[0.04em] text-white/75 uppercase')}>
-              <span>{FARM_COLUMNS.type}</span>
-              <span className="text-right">{FARM_COLUMNS.need}</span>
-              <span className="text-right">{FARM_COLUMNS.factor}</span>
-              <span className="text-right">{FARM_COLUMNS.order}</span>
-            </div>
-          </div>
-          {plan.groups.map((g) => (
-            <div
-              key={g.name}
-              className="border-t border-white/15 py-1.5 text-[15px] first:border-t-0 sm:first:border-t"
-            >
-              <div className={cn(farmCols, 'hidden sm:grid')}>
-                <b className="truncate">{g.name}</b>
-                <span className="text-right tabular-nums">{nf0(g.need)}</span>
-                <span className="text-right text-white/85 tabular-nums">× {nf2(g.factor)}</span>
-                <b className="text-right text-[17px] tabular-nums">{nf0(g.farm_order)}</b>
-              </div>
-              <div className="flex items-baseline gap-2 sm:hidden">
-                <b className="min-w-0 flex-1 truncate">{g.name}</b>
-                <span className="text-[13px] whitespace-nowrap text-white/85 tabular-nums">
-                  {nf0(g.need)} × {nf2(g.factor)}
-                </span>
-                <b className="min-w-[2.5rem] text-right text-[17px] tabular-nums">{nf0(g.farm_order)}</b>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {plan.groups.length > 0 && <FarmOrder plan={plan} />}
     </section>
+  )
+}
+
+/** Pedido final por tipo. Los supervisores cambian el factor con el lápiz. */
+function FarmOrder({ plan }: { plan: Saca }) {
+  const session = useRequiredSession()
+  const { saca } = useContainer()
+  const client = useQueryClient()
+  const [draft, setDraft] = useState<Record<string, string> | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const save = useMutation({
+    mutationFn: (factors: Record<string, number>) => saca.setFactors(factors),
+    onSuccess: () => {
+      setDraft(null)
+      toast.success(FACTORS_SAVED)
+      void client.invalidateQueries({ queryKey: ['saca'] })
+    },
+    onError: (e) => setError(e.message),
+  })
+  const start = () => {
+    setError(null)
+    setDraft(Object.fromEntries(plan.groups.map((g) => [g.name, String(g.factor)])))
+  }
+  const submit = (e: SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const factors = draft && parseFactors(draft)
+    if (!factors) {
+      setError(FACTORS_INVALID)
+      return
+    }
+    setError(null)
+    save.mutate(factors)
+  }
+  const factorInput =
+    'h-9 w-[4.5rem] rounded-[8px] border border-white/40 bg-white/15 px-2 text-right text-[15px] font-bold text-white tabular-nums outline-none focus:border-white'
+
+  if (draft) {
+    return (
+      <form onSubmit={submit} className="mt-4 rounded-[14px] bg-white/12 px-3.5 py-3">
+        {plan.groups.map((g) => (
+          <label
+            key={g.name}
+            className="flex items-center gap-2 border-t border-white/15 py-1.5 text-[15px] first:border-t-0"
+          >
+            <b className="min-w-0 flex-1 truncate">{g.name}</b>
+            <span className="text-[13px] text-white/85 tabular-nums">{nf0(g.need)} ×</span>
+            <input
+              inputMode="decimal"
+              aria-label={`Factor de ${g.name}`}
+              value={draft[g.name] ?? ''}
+              onChange={(e) => setDraft({ ...draft, [g.name]: e.target.value.replace(/[^\d.,]/g, '').slice(0, 5) })}
+              className={factorInput}
+            />
+          </label>
+        ))}
+        {error && (
+          <p role="alert" className="pt-1 text-[13px] font-semibold text-white">
+            {error}
+          </p>
+        )}
+        <div className="mt-2 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setDraft(null)}
+            className="h-9 rounded-[8px] px-3 text-[13.5px] font-bold"
+          >
+            {CANCEL}
+          </button>
+          <button
+            type="submit"
+            disabled={save.isPending}
+            className="h-9 rounded-[8px] bg-white px-4 text-[13.5px] font-bold text-primary disabled:opacity-60"
+          >
+            {SAVE_FACTORS}
+          </button>
+        </div>
+      </form>
+    )
+  }
+  return (
+    <div className="relative mt-4 rounded-[14px] bg-white/12 px-3.5 py-3">
+      {can(session, 'manage_editing') && (
+        <button
+          type="button"
+          onClick={start}
+          aria-label={EDIT_FACTORS_LABEL}
+          title={EDIT_FACTORS_LABEL}
+          className="absolute -top-3 right-2 grid size-8 place-items-center rounded-full bg-white text-primary shadow-card"
+        >
+          <Pencil className="size-4" />
+        </button>
+      )}
+      {/* Ancho: tabla. Angosto: el tipo a la izquierda y la cuenta a la derecha. */}
+      <div className="hidden sm:block">
+        <div className={cn(farmCols, 'pb-1 text-[11.5px] font-bold tracking-[0.04em] text-white/75 uppercase')}>
+          <span>{FARM_COLUMNS.type}</span>
+          <span className="text-right">{FARM_COLUMNS.need}</span>
+          <span className="text-right">{FARM_COLUMNS.factor}</span>
+          <span className="text-right">{FARM_COLUMNS.order}</span>
+        </div>
+      </div>
+      {plan.groups.map((g) => (
+        <div key={g.name} className="border-t border-white/15 py-1.5 text-[15px] first:border-t-0 sm:first:border-t">
+          <div className={cn(farmCols, 'hidden sm:grid')}>
+            <b className="truncate">{g.name}</b>
+            <span className="text-right tabular-nums">{nf0(g.need)}</span>
+            <span className="text-right text-white/85 tabular-nums">× {nf2(g.factor)}</span>
+            <b className="text-right text-[17px] tabular-nums">{nf0(g.farm_order)}</b>
+          </div>
+          <div className="flex items-baseline gap-2 sm:hidden">
+            <b className="min-w-0 flex-1 truncate">{g.name}</b>
+            <span className="text-[13px] whitespace-nowrap text-white/85 tabular-nums">
+              {nf0(g.need)} × {nf2(g.factor)}
+            </span>
+            <b className="min-w-[2.5rem] text-right text-[17px] tabular-nums">{nf0(g.farm_order)}</b>
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 

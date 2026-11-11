@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     planning_starts_in_days: int = Field(1, ge=0, le=1)
     # Hora de corte por defecto (el supervisor la cambia desde la app): la proyección de un día
     # se edita hasta esa hora, PLANNING_CUTOFF_DAYS_BEFORE días antes (1 = el día anterior).
-    planning_cutoff_time: str = "19:00"
+    planning_cutoff_time: str = "14:00"
     planning_cutoff_days_before: int = Field(1, ge=0, le=7)
     # Bloqueo por horario encendido por defecto (el supervisor lo apaga o enciende desde la app).
     planning_cutoff_enabled: bool = True

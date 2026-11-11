@@ -70,6 +70,20 @@ export const sacaSchema = z.object({
 })
 export type Saca = z.infer<typeof sacaSchema>
 
+export const MAX_FACTOR = 2
+/** Factores escritos por el supervisor (texto) → números; null si alguno no es válido. */
+export function parseFactors(draft: Record<string, string>): Record<string, number> | null {
+  const out: Record<string, number> = {}
+  for (const [name, raw] of Object.entries(draft)) {
+    const text = raw.trim().replace(',', '.')
+    if (!/^\d+(\.\d+)?$/.test(text)) return null
+    const value = Number(text)
+    if (value > MAX_FACTOR) return null
+    out[name] = value
+  }
+  return out
+}
+
 /** Días que se pueden consultar: desde ayer hasta una semana adelante (por defecto, mañana). */
 export const sacaDays = (ref: IsoDate): IsoDate[] => Array.from({ length: 9 }, (_, i) => addDays(ref, i - 1))
 

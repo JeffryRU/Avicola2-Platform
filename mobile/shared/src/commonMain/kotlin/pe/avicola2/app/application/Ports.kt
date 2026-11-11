@@ -75,6 +75,9 @@ interface ProductionGateway {
 /** Cuánto pedir a granja para un día. */
 interface SacaGateway {
     suspend fun plan(day: LocalDate, method: String = SACA_METHOD_DEFAULT): Saca
+
+    /** Solo supervisores: por cuánto se multiplica lo que hace falta de cada tipo. */
+    suspend fun setFactors(factors: Map<String, Double>): Map<String, Double>
 }
 
 /** Entrega un archivo generado al sistema para guardarlo o mandarlo (menú «Compartir»). */

@@ -25,6 +25,11 @@ export const FORMULA: Record<SacaMethod, string> = {
 export const FARM_ORDER_HINT =
   'A granja se pide por tipo: se suman proyección, pedidos y stock de sus productos, y lo que hace falta se multiplica por el factor del tipo.'
 export const FARM_COLUMNS = { type: 'Tipo', need: 'Hace falta', factor: 'Factor', order: 'Pedir' } as const
+export const EDIT_FACTORS_LABEL = 'Cambiar por cuánto se multiplica'
+export const FACTORS_SAVED = 'Factores guardados.'
+export const FACTORS_INVALID = 'Escribe un número entre 0 y 2 en cada tipo (por ejemplo 0,80).'
+export const SAVE_FACTORS = 'Guardar'
+export const CANCEL = 'Cancelar'
 export const NEED_LABEL = 'aves hacen falta'
 
 /** Panel "Con qué datos se calculó". */
