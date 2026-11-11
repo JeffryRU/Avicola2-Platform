@@ -1,5 +1,6 @@
 package pe.avicola2.app.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -23,7 +25,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -201,17 +203,19 @@ private fun Sources(plan: Saca, onOpenStock: (() -> Unit)?) {
         SourceRow(
             ok = missing == 0,
             label = "Proyecciones",
-            value = "${plan.sellersRegistered} de ${plan.sellersTotal} " + if (plan.sellersTotal == 1) "vendedor" else "vendedores",
+            value = "${plan.sellersRegistered} de ${plan.sellersTotal}",
             note = when (missing) {
-                0 -> null
+                0 -> "Registraron todos los vendedores."
                 1 -> "Falta 1 vendedor: el pedido puede quedar corto."
-                else -> "Faltan $missing: el pedido puede quedar corto."
+                else -> "Faltan $missing vendedores: el pedido puede quedar corto."
             },
         ) {
             LinearProgressIndicator(
                 progress = { if (plan.sellersTotal == 0) 0f else plan.sellersRegistered.toFloat() / plan.sellersTotal },
                 color = if (missing == 0) Success else Warning,
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                drawStopIndicator = {},
+                gapSize = 0.dp,
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             )
         }
@@ -222,7 +226,14 @@ private fun Sources(plan: Saca, onOpenStock: (() -> Unit)?) {
             value = plan.stockDate?.let { "${formatNumber(plan.stock.toDouble())} unid." },
             note = plan.stockDate?.let { "Registro del ${it.short()}." } ?: "Sin registro en los 3 días anteriores: no se descuenta nada.",
         ) {
-            if (onOpenStock != null) TextButton(onClick = onOpenStock, contentPadding = PaddingValues(0.dp)) { Text("Ver stock") }
+            if (onOpenStock != null) {
+                Text(
+                    "Ver stock",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 2.dp).clickable(role = Role.Button, onClick = onOpenStock).padding(vertical = 6.dp),
+                )
+            }
         }
         HorizontalDivider()
         SourceRow(
@@ -248,14 +259,14 @@ private fun SourceRow(ok: Boolean?, label: String, value: String?, note: String?
         false -> Warning
         null -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val icon: ImageVector? = when (ok) {
+    val icon: ImageVector = when (ok) {
         true -> Icons.Filled.Check
         false -> Icons.Filled.Warning
-        null -> null
+        null -> Icons.Filled.Info
     }
     Row(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         Surface(color = color.copy(alpha = 0.14f), shape = CircleShape, modifier = Modifier.padding(top = 2.dp).size(28.dp)) {
-            if (icon != null) Icon(icon, null, tint = color, modifier = Modifier.padding(6.dp))
+            Icon(icon, null, tint = color, modifier = Modifier.padding(6.dp))
         }
         Column(Modifier.padding(start = 12.dp).weight(1f)) {
             Row {

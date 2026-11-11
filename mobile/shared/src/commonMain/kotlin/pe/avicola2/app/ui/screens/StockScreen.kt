@@ -406,8 +406,9 @@ private fun StockRows(vm: StockViewModel, products: List<Product>, record: Stock
     }
 }
 
-private val UNITS_WIDTH = 84.dp
-private val KG_WIDTH = 96.dp
+// Caben junto al nombre del producto desde 320 dp de ancho.
+private val UNITS_WIDTH = 72.dp
+private val KG_WIDTH = 84.dp
 
 @Composable
 private fun NumberField(
