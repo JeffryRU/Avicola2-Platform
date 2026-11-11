@@ -85,6 +85,7 @@ class PlanningUseCases:
     calculate_saca: sc.CalculateSaca
     register_production: pr.RegisterProduction
     list_production: pr.ListProduction
+    forecast_arrival: pr.ForecastArrival
 
 
 def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
@@ -178,4 +179,5 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         ),
         register_production=pr.RegisterProduction(products, production, clock),
         list_production=pr.ListProduction(production),
+        forecast_arrival=pr.ForecastArrival(products, production, clock),
     )

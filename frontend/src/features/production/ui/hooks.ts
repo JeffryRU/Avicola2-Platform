@@ -10,6 +10,11 @@ export function useProduction(from: IsoDate, to: IsoDate) {
   return useQuery({ queryKey: [...keys.all, from, to], queryFn: () => production.list(from, to) })
 }
 
+export function useArrivalForecast() {
+  const { production } = useContainer()
+  return useQuery({ queryKey: [...keys.all, 'forecast'], queryFn: () => production.forecast() })
+}
+
 export function useRegisterProduction() {
   const { production } = useContainer()
   const client = useQueryClient()

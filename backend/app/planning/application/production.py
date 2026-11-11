@@ -6,14 +6,21 @@ from datetime import date
 
 from app.planning.application.ports import Clock, ProductionRepository, ProductRepository
 from app.planning.application.use_cases import _check_range
-from app.planning.domain.models import Seller
+from app.planning.domain.catalog import Catalog
+from app.planning.domain.models import Product, Seller
 from app.planning.domain.permissions import Permission, require
 from app.planning.domain.production import (
+    LOOKBACK,
     MAX_BIRDS,
+    ArrivalCheck,
+    ArrivalRates,
     DailyProduction,
     ProductionLine,
+    arrival_rates,
+    check_arrival,
     check_production_date,
 )
+from app.planning.domain.saca import product_group
 from app.shared.domain.errors import DomainError
 
 logger = logging.getLogger(__name__)
@@ -81,3 +88,47 @@ class ListProduction:
         )
         _check_range(date_from, date_to)
         return self.production.find(date_from, date_to)
+
+
+@dataclass(frozen=True)
+class ArrivalForecast:
+    """El modelo de llegada listo para proyectar, y cómo le fue en los últimos días."""
+
+    # Tipos de pedido (Brasa chica, mediana, grande) con sus productos, en el orden del catálogo.
+    groups: list[tuple[str, list[Product]]]
+    # None si todavía falta historia de producción.
+    rates: ArrivalRates | None
+    # Lo último que se pidió de cada tipo: punto de partida para proyectar.
+    last_request: dict[str, float]
+    checks: list[ArrivalCheck]
+
+
+class ForecastArrival:
+    """Ajusta el modelo de llegada por rango con la producción registrada hasta hoy."""
+
+    def __init__(self, products: ProductRepository, production: ProductionRepository, clock: Clock):
+        self.products, self.production, self.clock = products, production, clock
+
+    def __call__(self, viewer: Seller) -> ArrivalForecast:
+        require(
+            viewer.role, Permission.VIEW_PRODUCTION, "No tienes permiso para ver la producción."
+        )
+        products = Catalog(self.products.list_active()).products
+        group_of = {p.id: product_group(p) for p in products}
+        groups: dict[str, list[Product]] = {}
+        for product in products:
+            groups.setdefault(group_of[product.id], []).append(product)
+        today = self.clock.today()
+        history = self.production.find(today - LOOKBACK, today)
+        last_request: dict[str, float] = {}
+        latest = max((d for d in history if d.ordered > 0), key=lambda d: d.date, default=None)
+        for line in latest.lines if latest else ():
+            group = group_of.get(line.product_id)
+            if group:
+                last_request[group] = round(last_request.get(group, 0.0) + line.ordered, 2)
+        return ArrivalForecast(
+            list(groups.items()),
+            arrival_rates(history, group_of),
+            last_request,
+            check_arrival(history, group_of),
+        )

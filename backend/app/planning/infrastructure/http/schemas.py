@@ -375,3 +375,50 @@ class ProductionDayOut(BaseModel):
     quality_b: int
     recorded_by: str
     recorded_at: datetime
+
+
+class ForecastProductOut(BaseModel):
+    product_id: str
+    share: float = Field(description="Aves que llegan de este rango por cada ave pedida del tipo.")
+    quality_a_rate: float = Field(description="Parte de esas aves que sale en calidad A (0 a 1).")
+
+
+class ForecastGroupOut(BaseModel):
+    name: str
+    last_ordered: float = Field(description="Lo último que se pidió a granja de este tipo.")
+    products: list[ForecastProductOut]
+
+
+class ForecastCheckOut(BaseModel):
+    date: date
+    error: float
+    naive_error: float
+
+
+class ForecastProductCheckOut(BaseModel):
+    product_id: str
+    ordered: float
+    expected: int
+    produced: int
+
+
+class ForecastAccuracyOut(BaseModel):
+    """Comprobación sobre días ya ocurridos: cada uno se estimó solo con los anteriores."""
+
+    days: int
+    error: float = Field(description="Aves mal ubicadas de rango por cada ave que llegó.")
+    naive_error: float = Field(description="El mismo error suponiendo que llega lo pedido.")
+    by_day: list[ForecastCheckOut]
+    by_product: list[ForecastProductCheckOut]
+
+
+class ArrivalForecastOut(BaseModel):
+    available: bool = Field(description="false si aún falta historia de producción.")
+    method: str
+    half_life_days: float
+    min_days: int
+    days: int
+    date_from: date | None
+    date_to: date | None
+    groups: list[ForecastGroupOut]
+    accuracy: ForecastAccuracyOut | None

@@ -70,6 +70,9 @@ const ProductsPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import('@/features/profile/ui/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })),
 )
+const ForecastPage = lazy(() =>
+  import('@/features/production/ui/pages/ForecastPage').then((m) => ({ default: m.ForecastPage })),
+)
 const ProductionPage = lazy(() =>
   import('@/features/production/ui/pages/ProductionPage').then((m) => ({ default: m.ProductionPage })),
 )
@@ -152,6 +155,7 @@ function Routed() {
               {can(session, 'view_stock') && <Route path={paths.stock} element={<StockPage />} />}
               {can(session, 'view_saca') && <Route path={paths.saca} element={<SacaPage />} />}
               {can(session, 'view_production') && <Route path={paths.production} element={<ProductionPage />} />}
+              {can(session, 'view_production') && <Route path={paths.forecast} element={<ForecastPage />} />}
               <Route path={paths.register} element={<NewProjectionPage />} />
               <Route path={paths.history} element={<HistoryPage />} />
               <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />
@@ -175,6 +179,7 @@ function Routed() {
             <Route element={<AppShell />}>
               <Route index element={<StockPage />} />
               {can(session, 'view_production') && <Route path={paths.production} element={<ProductionPage />} />}
+              {can(session, 'view_production') && <Route path={paths.forecast} element={<ForecastPage />} />}
               <Route path={paths.notifications} element={<NotificationsPage />} />
               <Route path={paths.profile} element={<ProfilePage />} />
               <Route path={paths.profileSettings} element={<ProfileSettingsPage />} />

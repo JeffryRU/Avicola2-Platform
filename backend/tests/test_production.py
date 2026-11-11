@@ -13,7 +13,9 @@ from app.planning.domain.production import (
     MIN_HISTORY_DAYS,
     DailyProduction,
     ProductionLine,
+    check_arrival,
     estimate_arrival,
+    overall_error,
 )
 from app.planning.infrastructure import cli
 from app.planning.infrastructure.clock import ZoneClock
@@ -67,6 +69,19 @@ def test_no_estimate_without_enough_history() -> None:
         DailyProduction(date(2026, 12, 1) + timedelta(days=i), blank, "x", AT) for i in range(30)
     ]
     assert estimate_arrival(history + empty, GROUPS, {"chica": 100}) is None
+
+
+def test_the_model_is_checked_against_days_that_already_happened() -> None:
+    history = [_day(i, p1=400, p2=600) for i in range(20)]
+    checks = check_arrival(history, GROUPS)
+    # Solo se comprueban días que ya tenían detrás la historia mínima.
+    assert [c.date for c in checks] == [d.date for d in history[MIN_HISTORY_DAYS:]]
+    # Cada día llega igual que los anteriores: el modelo acierta; suponer lo pedido, no.
+    assert checks[0].expected == {"P1": 400, "P2": 600, "P6": 500}
+    assert overall_error(checks) == 0
+    # Se pidieron 1000 en P1 y llegaron 400 (600 de más) y 600 en P2 sin pedir: 1200 de 1500.
+    assert overall_error(checks, naive=True) == pytest.approx(0.8)
+    assert check_arrival(history[:MIN_HISTORY_DAYS], GROUPS) == []
 
 
 # --- Importación del Excel ---------------------------------------------------------------
@@ -211,3 +226,40 @@ def test_saca_estimates_what_will_arrive_per_range(client) -> None:
     assert (by_id["P0001"]["expected"], by_id["P0003"]["expected"]) == (0, 200)
     assert (by_id["P0004"]["expected"], by_id["P0004"]["expected_a"]) == (300, 225)
     assert by_id["P0006"]["expected"] == 0  # mediana: no se pidió nada
+
+
+def test_forecast_page_data(client) -> None:
+    _login(client, "despacho")
+    empty = client.get("/api/production/forecast").json()
+    assert empty["available"] is False and empty["accuracy"] is None
+    assert [g["name"] for g in empty["groups"]] == ["Brasa chica", "Brasa mediana", "Brasa grande"]
+
+    with SessionLocal() as session:
+        from app.planning.infrastructure.persistence.production import SqlProductionRepository
+
+        repo = SqlProductionRepository(session)
+        for back in range(1, 21):
+            lines = (ProductionLine("P0003", 1000, 400, 0), ProductionLine("P0004", 0, 600, 150))
+            repo.write(DailyProduction(TODAY - timedelta(days=back), lines, "importacion", AT))
+        session.commit()
+
+    body = client.get("/api/production/forecast").json()
+    assert body["available"] is True and body["days"] == 20
+    chica = body["groups"][0]
+    assert chica["last_ordered"] == 1000
+    rates = {p["product_id"]: p for p in chica["products"]}
+    assert rates["P0003"]["share"] == pytest.approx(0.4)
+    assert rates["P0004"]["share"] == pytest.approx(0.6)
+    assert rates["P0004"]["quality_a_rate"] == pytest.approx(0.75)
+    accuracy = body["accuracy"]
+    assert accuracy["days"] == 6 and accuracy["error"] == 0 and accuracy["naive_error"] == 1.2
+    by_product = {p["product_id"]: p for p in accuracy["by_product"]}
+    assert by_product["P0004"] == {
+        "product_id": "P0004",
+        "ordered": 0,
+        "expected": 3600,
+        "produced": 3600,
+    }
+
+    _login(client, "rnavarro")
+    assert client.get("/api/production/forecast").status_code == 403

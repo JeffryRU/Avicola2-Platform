@@ -16,6 +16,7 @@ import {
   Settings,
   User,
   Users,
+  TrendingUp,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { useContainer } from '@/app/di'
@@ -116,6 +117,7 @@ function Sidebar() {
         <nav className="grid gap-0.5" aria-label="Principal">
           <SideItem to={paths.home} end icon={<PackageCheck />} label="Stock de despacho" />
           {can(session, 'view_production') && <SideItem to={paths.production} icon={<Factory />} label="Producción" />}
+          {can(session, 'view_production') && <SideItem to={paths.forecast} icon={<TrendingUp />} label="Pronóstico" />}
           {bell}
         </nav>
         {footer}
@@ -181,6 +183,7 @@ function Sidebar() {
         )}
         {can(session, 'view_saca') && <SideItem to={paths.saca} icon={<Bird />} label="Cálculo de saca" />}
         {can(session, 'view_production') && <SideItem to={paths.production} icon={<Factory />} label="Producción" />}
+        {can(session, 'view_production') && <SideItem to={paths.forecast} icon={<TrendingUp />} label="Pronóstico" />}
         {can(session, 'view_stock') && <SideItem to={paths.stock} icon={<PackageCheck />} label="Stock de despacho" />}
         <SideItem to={paths.history} icon={<History />} label="Historial" />
         <SideItem to={paths.products} icon={<Box />} label="Productos" />
@@ -208,6 +211,7 @@ const BOTTOM_SUPERVISOR = [
 const BOTTOM_DISPATCH = [
   { to: paths.home, icon: PackageCheck, label: 'Stock', end: true },
   { to: paths.production, icon: Factory, label: 'Producción', end: false },
+  { to: paths.forecast, icon: TrendingUp, label: 'Pronóstico', end: false },
   { to: paths.notifications, icon: Bell, label: 'Avisos', end: false },
   { to: paths.profile, icon: User, label: 'Perfil', end: false },
 ]
