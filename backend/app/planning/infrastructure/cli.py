@@ -11,6 +11,9 @@
     uv run python -m app.planning.infrastructure.cli vendedores [--simple] [--reset]
                         vendedores de la tabla maestra con contraseña temporal
                         (--simple: <usuario>2026; --reset: también a los que ya existen)
+    uv run python -m app.planning.infrastructure.cli produccion <archivo.xlsx>
+                        carga la historia de producción (hoja DB_CALIDA_B: pedido, producción y
+                        calidad B por rango); reemplaza los días que ya estuvieran cargados
     uv run python -m app.planning.infrastructure.cli seed         3 semanas de ejemplo
     uv run python -m app.planning.infrastructure.cli show [n]     resumen y últimas n
     uv run python -m app.planning.infrastructure.cli clear --yes  borra las proyecciones
@@ -22,6 +25,7 @@ import os
 import random
 import sys
 from datetime import UTC, date, datetime, time, timedelta
+from pathlib import Path
 
 import yaml
 from sqlalchemy import delete, func, insert, select, update
@@ -40,6 +44,7 @@ from app.planning.domain.permissions import (
 )
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.persistence.notifications import SqlNotificationRepository
+from app.planning.infrastructure.persistence.production import SqlProductionRepository
 from app.planning.infrastructure.persistence.repositories import (
     SqlProductRepository,
     SqlProjectionRepository,
@@ -51,6 +56,7 @@ from app.planning.infrastructure.persistence.tables import (
     projections,
     sellers,
 )
+from app.planning.infrastructure.production_import import read_production
 from app.planning.infrastructure.security import RandomTemporaryPasswords, ScryptPasswordHasher
 from app.shared.infrastructure.database.session import SessionLocal
 from app.shared.infrastructure.logging.setup import configure_from_settings
@@ -283,6 +289,26 @@ class _DayClock:
         return datetime.combine(self.day, time(8, 30), tzinfo=UTC)
 
 
+def import_production(session: Session, settings: Settings, path: Path) -> int:
+    if not path.is_file():
+        print(f"No existe el archivo {path}.")
+        return 1
+    brasa = [p for p in SqlProductRepository(session).list_active() if p.category == "BRASA"]
+    days, skipped = read_production(path, brasa, ZoneClock(settings.tz).now())
+    repo = SqlProductionRepository(session)
+    for day in days:
+        repo.write(day)
+    session.commit()
+    if not days:
+        print("No se encontró ningún día con datos.")
+        return 1
+    print(
+        f"OK: {len(days)} días de producción cargados ({days[0].date} a {days[-1].date}); "
+        f"{skipped} filas descartadas."
+    )
+    return 0
+
+
 def show(session: Session, limit: int) -> None:
     n, units, kg = session.execute(
         select(
@@ -339,6 +365,8 @@ def main(argv: list[str]) -> int:
             )
         elif cmd == "rol" and len(argv) == 3:
             return set_role(session, argv[1].strip().lower(), argv[2].strip())
+        elif cmd == "produccion" and len(argv) == 2:
+            return import_production(session, settings, Path(argv[1]))
         elif cmd == "show":
             show(session, int(argv[1]) if len(argv) > 1 else 20)
         elif cmd == "clear" and "--yes" in argv:

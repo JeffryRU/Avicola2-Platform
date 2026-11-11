@@ -19,7 +19,13 @@ export const SOURCE = {
   projections: 'Proyecciones',
   stock: 'Stock de despacho',
   orders: 'Pedidos confirmados',
+  arrival: 'Llegada estimada por rango',
 } as const
+export const NO_ARRIVAL = 'Sin historia de producción suficiente (mínimo 14 días registrados).'
+export const ARRIVAL_HINT =
+  'A granja se pide por tipo y las aves llegan repartidas entre rangos. «Llegará» reparte lo pedido según la producción reciente (pesan más los últimos días).'
+export const arrivalNote = (days: number, from: string, to: string) =>
+  `Con ${String(days)} días de producción, del ${from} al ${to}.`
 export const NO_STOCK = 'Sin registro en los 3 días anteriores: no se descuenta nada.'
 export const NO_ORDERS = 'Sin conectar (ARIS aún no se integra): se usan solo las proyecciones.'
 export const ORDERS_OK = 'Conectados.'
@@ -30,6 +36,8 @@ export const COLUMNS = {
   ordered: 'Pedidos',
   stock: 'Stock',
   request: 'Pedir',
+  expected: 'Llegará',
+  expectedA: 'Calidad A',
   kg: 'Kg',
   total: 'Total',
 } as const

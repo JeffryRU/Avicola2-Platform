@@ -25,3 +25,4 @@ tables:
   edit_unlocks: np_edit_unlocks
   projection_changes: np_projection_changes
   dispatch_stock: np_dispatch_stock
+  production: np_production

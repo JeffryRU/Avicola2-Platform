@@ -25,6 +25,8 @@
 | Supervisor | ver equipo, edición, cuentas, ver el stock | solo vendedores |
 | Supervisor general | todos, también cambiar roles y registrar el stock | todas las cuentas (también otros supervisores generales) |
 
+**Actualización (2026-11-11, producción):** permisos `view_production` (jefe de despacho y supervisores) y `manage_production` (jefe de despacho y supervisor general).
+
 **Actualización (2026-11-11):** permiso `view_saca` (cálculo de saca) para supervisor y supervisor general.
 
 **Actualización (2026-11-10):** se agregó el rol `dispatch_chief` (jefe de despacho) con los permisos `view_stock` y `manage_stock`. No proyecta, no ve al equipo y no aparece como vendedor. El supervisor general tiene `manage_stock` porque nadie gestiona un rol con más permisos que el suyo. En la web y en la app móvil, el jefe de despacho entra directo a **Stock de despacho**. La app móvil ya lee `permissions` de la sesión para decidir las pestañas (antes trataba como supervisor a todo rol que no fuera vendedor).

@@ -2,7 +2,8 @@
 # `python -m app.planning.infrastructure.cli init` los carga o actualiza; los productos que ya
 # no están aquí se desactivan (no se borran: las proyecciones antiguas los siguen citando).
 # `subcategory` agrupa la tabla de proyección (Brasa chica/mediana/grande); la proyección es por
-# categoría, como en el mockup. `kg_per_unit` es la columna «Peso» (kg por unidad, promedio).
+# categoría, como en el mockup. Los grupos son los del negocio al pedir a granja: chica = rangos
+# B0–B4 (Brasa 1–5), mediana = B5–B6 (Brasa 6–7), grande = B7–B9 (Brasa 8–10). `kg_per_unit` es la columna «Peso» (kg por unidad, promedio).
 
 products:
   BRASA:
@@ -10,9 +11,9 @@ products:
     - {id: P0002, name: Brasa 2, subcategory: Brasa chica, kg_per_unit: 1.2}
     - {id: P0003, name: Brasa 3, subcategory: Brasa chica, kg_per_unit: 1.3}
     - {id: P0004, name: Brasa 4, subcategory: Brasa chica, kg_per_unit: 1.4}
-    - {id: P0005, name: Brasa 5, subcategory: Brasa mediana, kg_per_unit: 1.5}
+    - {id: P0005, name: Brasa 5, subcategory: Brasa chica, kg_per_unit: 1.5}
     - {id: P0006, name: Brasa 6, subcategory: Brasa mediana, kg_per_unit: 1.6}
-    - {id: P0007, name: Brasa 7, subcategory: Brasa grande, kg_per_unit: 1.7}
+    - {id: P0007, name: Brasa 7, subcategory: Brasa mediana, kg_per_unit: 1.7}
     - {id: P0008, name: Brasa 8, subcategory: Brasa grande, kg_per_unit: 1.8}
     - {id: P0009, name: Brasa 9, subcategory: Brasa grande, kg_per_unit: 1.9}
     - {id: P0010, name: Brasa 10, subcategory: Brasa grande, kg_per_unit: 2.0}

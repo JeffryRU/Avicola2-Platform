@@ -12,6 +12,7 @@ from app.planning.domain.editing import EditUnlock
 from app.planning.domain.history import ProjectionChange
 from app.planning.domain.models import DailyUnits, Product, Projection, Seller, SellerAccount
 from app.planning.domain.notifications import Event, Notification
+from app.planning.domain.production import DailyProduction
 from app.planning.domain.stock import DailyStock
 
 
@@ -66,6 +67,18 @@ class StockRepository(Protocol):
         ...
 
     def save(self, stock: DailyStock) -> None:
+        """Guarda el día en una sola transacción y reemplaza lo que hubiera de ese día."""
+        ...
+
+
+class ProductionRepository(Protocol):
+    """Producción diaria: lo pedido a granja y lo que llegó, por producto."""
+
+    def find(self, date_from: date, date_to: date) -> list[DailyProduction]:
+        """Días con registro en el rango, del más reciente al más antiguo."""
+        ...
+
+    def save(self, production: DailyProduction) -> None:
         """Guarda el día en una sola transacción y reemplaza lo que hubiera de ese día."""
         ...
 

@@ -98,6 +98,8 @@ def test_saca_adds_the_team_and_subtracts_the_latest_stock(client) -> None:
         "stock": 30,
         "request": 120,
         "request_kg": 120.0,
+        "expected": None,  # sin historia de producción todavía
+        "expected_a": None,
     }
     assert by_id["P0006"]["request"] == 0  # 40 proyectadas, 60 en stock
     assert plan["projected"] == 190 and plan["stock"] == 90 and plan["request"] == 120

@@ -308,6 +308,19 @@ class SacaLineOut(BaseModel):
     stock: int
     request: int = Field(description="Unidades (aves) a pedir a granja: demanda menos stock.")
     request_kg: float
+    expected: int | None = Field(
+        description="Aves que se espera que lleguen en este rango (null: sin historia suficiente)."
+    )
+    expected_a: int | None = Field(description="De las esperadas, cuántas en calidad A.")
+
+
+class SacaForecastOut(BaseModel):
+    """Con qué se estimó la llegada por rango."""
+
+    method: str
+    days: int
+    date_from: date
+    date_to: date
 
 
 class SacaOut(BaseModel):
@@ -327,3 +340,38 @@ class SacaOut(BaseModel):
     sellers_registered: int
     sellers_total: int
     orders_available: bool = Field(description="False: aún no hay fuente de pedidos confirmados.")
+    forecast: SacaForecastOut | None = Field(
+        description="Estimación de llegada por rango; null si falta historia de producción."
+    )
+
+
+# --- Producción diaria --------------------------------------------------------------------
+
+
+class ProductionLineIn(BaseModel):
+    product_id: str = Field(min_length=1, max_length=10)
+    ordered: float = Field(default=0, ge=0, le=1_000_000)
+    produced: int = Field(ge=0, le=1_000_000)
+    quality_b: int = Field(default=0, ge=0, le=1_000_000)
+
+
+class ProductionIn(BaseModel):
+    lines: list[ProductionLineIn] = Field(min_length=1, max_length=200)
+
+
+class ProductionLineOut(BaseModel):
+    product_id: str
+    ordered: float
+    produced: int
+    quality_a: int
+    quality_b: int
+
+
+class ProductionDayOut(BaseModel):
+    date: date
+    lines: list[ProductionLineOut]
+    ordered: float
+    produced: int
+    quality_b: int
+    recorded_by: str
+    recorded_at: datetime

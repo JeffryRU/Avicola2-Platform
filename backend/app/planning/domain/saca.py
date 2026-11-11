@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from app.planning.domain.models import Product
+from app.planning.domain.production import ArrivalEstimate
 
 # El stock de hace más días ya no representa lo que hay en despacho: no se descuenta.
 STOCK_MAX_AGE_DAYS = 3
@@ -53,6 +54,8 @@ class SacaPlan:
     # ¿Hay una fuente de pedidos confirmados conectada? (hoy no: ARIS aún no se integra)
     orders_available: bool
     yield_factor: float
+    # Qué se espera que llegue por producto si se pide esto (None: aún no hay historia suficiente).
+    arrival: ArrivalEstimate | None = None
 
     def _sum(self, field: str) -> int:
         return sum(getattr(line, field) for line in self.lines)
@@ -82,10 +85,22 @@ class SacaPlan:
     def request_kg(self) -> float:
         return round(sum(line.request_kg for line in self.lines), 2)
 
+    def request_by_group(self) -> dict[str, float]:
+        """Lo que se pide de cada tipo (Brasa chica...): a granja se pide por tipo, no por rango."""
+        totals: dict[str, float] = {}
+        for line in self.lines:
+            group = product_group(line.product)
+            totals[group] = totals.get(group, 0.0) + line.request
+        return totals
+
     @property
     def live_kg(self) -> float:
         """Kg vivos estimados: kg de producto entre el rendimiento (kg de producto por kg vivo)."""
         return round(self.request_kg / self.yield_factor, 2)
+
+
+def product_group(product: Product) -> str:
+    return product.subcategory or product.category
 
 
 def stock_window(day: date) -> tuple[date, date]:

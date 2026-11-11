@@ -9,6 +9,7 @@ import type { Product } from '@/features/catalog/domain/schemas'
 import { useCatalog } from '@/features/catalog/ui/hooks'
 import { missingSellers, sacaDays, type Saca, type SacaLine } from '@/features/saca/domain/saca'
 import {
+  ARRIVAL_HINT,
   BIRDS_LABEL,
   BY_PRODUCT_TITLE,
   COLUMNS,
@@ -17,6 +18,7 @@ import {
   HERO_LABEL,
   KG_LABEL,
   LIVE_LABEL,
+  NO_ARRIVAL,
   NO_ORDERS,
   NO_STOCK,
   NOTHING_BODY,
@@ -28,6 +30,7 @@ import {
   SOURCES_TITLE,
   TODAY_LABEL,
   TOMORROW_LABEL,
+  arrivalNote,
   coverageText,
   missingNote,
 } from '@/features/saca/types/saca'
@@ -189,27 +192,41 @@ function Sources({ plan }: { plan: Saca }) {
         >
           <small className={small}>{plan.orders_available ? ORDERS_OK : NO_ORDERS}</small>
         </SourceRow>
+        <SourceRow tone={plan.forecast ? 'ok' : 'off'} label={SOURCE.arrival}>
+          <small className={small}>
+            {plan.forecast
+              ? arrivalNote(plan.forecast.days, dShort(plan.forecast.date_from), dShort(plan.forecast.date_to))
+              : NO_ARRIVAL}
+          </small>
+        </SourceRow>
       </ul>
-      <p className="border-t border-muted px-4 py-3 text-[12.5px] text-muted-foreground dsk:px-5">{FORMULA}</p>
+      <p className="border-t border-muted px-4 py-3 text-[12.5px] text-muted-foreground dsk:px-5">
+        {FORMULA}
+        {plan.forecast && <span className="mt-1.5 block">{ARRIVAL_HINT}</span>}
+      </p>
     </Section>
   )
 }
 
-const colsCls = (orders: boolean) =>
-  cn(
-    'grid items-center gap-x-3',
-    // Angosto: producto y lo que hay que pedir. Ancho: todas las columnas del cálculo.
-    'grid-cols-[minmax(0,1fr)_5.5rem]',
-    orders
-      ? 'sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,0.7fr))_minmax(0,1fr)_minmax(0,0.7fr)]'
-      : 'sm:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,0.7fr))_minmax(0,1fr)_minmax(0,0.7fr)]',
-  )
+/** Angosto: producto y lo que hay que pedir. Ancho: todas las columnas del cálculo. */
+const colsCls = (orders: boolean, arrival: boolean) =>
+  cn('grid items-center gap-x-3 grid-cols-[minmax(0,1fr)_5.5rem]', COLS[`${orders ? 3 : 2}-${arrival ? 2 : 1}`])
+// Producto · proyección (· pedidos) · stock · pedir · (llegará · calidad A |) kg
+const COLS: Record<string, string> = {
+  '2-1': 'sm:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,0.7fr))_minmax(0,1fr)_minmax(0,0.7fr)]',
+  '3-1': 'sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,0.7fr))_minmax(0,1fr)_minmax(0,0.7fr)]',
+  '2-2': 'sm:grid-cols-[minmax(0,1.4fr)_repeat(2,minmax(0,0.7fr))_minmax(0,0.9fr)_repeat(2,minmax(0,0.7fr))]',
+  '3-2': 'sm:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,0.7fr))_minmax(0,0.9fr)_repeat(2,minmax(0,0.7fr))]',
+}
 const numCls = 'hidden text-right text-[14px] tabular-nums sm:block'
 
 function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
   const lines = new Map(plan.lines.map((l) => [l.product_id, l]))
   const max = Math.max(1, ...plan.lines.map((l) => l.request))
-  const cols = colsCls(plan.orders_available)
+  const arrival = !!plan.forecast
+  const cols = colsCls(plan.orders_available, arrival)
+  const expectedTotal = plan.lines.reduce((s, l) => s + (l.expected ?? 0), 0)
+  const expectedATotal = plan.lines.reduce((s, l) => s + (l.expected_a ?? 0), 0)
   const sum = (ps: Product[], pick: (l: SacaLine) => number) =>
     ps.reduce((s, p) => {
       const line = lines.get(p.id)
@@ -223,7 +240,14 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
         {plan.orders_available && <span className="hidden text-right sm:block">{COLUMNS.ordered}</span>}
         <span className="hidden text-right sm:block">{COLUMNS.stock}</span>
         <span className="text-right">{COLUMNS.request}</span>
-        <span className="hidden text-right sm:block">{COLUMNS.kg}</span>
+        {arrival ? (
+          <>
+            <span className="hidden text-right sm:block">{COLUMNS.expected}</span>
+            <span className="hidden text-right sm:block">{COLUMNS.expectedA}</span>
+          </>
+        ) : (
+          <span className="hidden text-right sm:block">{COLUMNS.kg}</span>
+        )}
       </div>
       <div className="grid gap-3">
         {bySubcategory(products).map((g) => (
@@ -237,7 +261,7 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
             {g.products.map((p) => {
               const l = lines.get(p.id)
               if (!l) return null
-              const idle = l.demand === 0 && l.stock === 0
+              const idle = l.demand === 0 && l.stock === 0 && !l.expected
               return (
                 <div
                   key={p.id}
@@ -265,13 +289,30 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
                         style={{ width: `${String(Math.round((l.request / max) * 100))}%` }}
                       />
                     </span>
-                    {l.request > 0 && (
+                    {arrival ? (
                       <small className="mt-0.5 block text-[12px] text-muted-foreground tabular-nums sm:hidden">
-                        {nf1(l.request_kg)} kg
+                        llegarán {nf0(l.expected ?? 0)}
                       </small>
+                    ) : (
+                      l.request > 0 && (
+                        <small className="mt-0.5 block text-[12px] text-muted-foreground tabular-nums sm:hidden">
+                          {nf1(l.request_kg)} kg
+                        </small>
+                      )
                     )}
                   </span>
-                  <span className={cn(numCls, 'text-muted-foreground')}>{l.request_kg ? nf1(l.request_kg) : '—'}</span>
+                  {arrival ? (
+                    <>
+                      <span className={cn(numCls, 'font-bold', !l.expected && 'font-normal text-faint')}>
+                        {nf0(l.expected ?? 0)}
+                      </span>
+                      <span className={cn(numCls, 'text-muted-foreground')}>{nf0(l.expected_a ?? 0)}</span>
+                    </>
+                  ) : (
+                    <span className={cn(numCls, 'text-muted-foreground')}>
+                      {l.request_kg ? nf1(l.request_kg) : '—'}
+                    </span>
+                  )}
                 </div>
               )
             })}
@@ -284,7 +325,14 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
         {plan.orders_available && <span className={cn(numCls, '!text-[15px]')}>{nf0(plan.ordered)}</span>}
         <span className={cn(numCls, '!text-[15px]')}>{plan.stock ? `−${nf0(plan.stock)}` : '0'}</span>
         <span className="text-right tabular-nums">{nf0(plan.request)}</span>
-        <span className={cn(numCls, '!text-[15px]')}>{nf1(plan.request_kg)}</span>
+        {arrival ? (
+          <>
+            <span className={cn(numCls, '!text-[15px]')}>{nf0(expectedTotal)}</span>
+            <span className={cn(numCls, '!text-[15px]')}>{nf0(expectedATotal)}</span>
+          </>
+        ) : (
+          <span className={cn(numCls, '!text-[15px]')}>{nf1(plan.request_kg)}</span>
+        )}
       </div>
     </div>
   )

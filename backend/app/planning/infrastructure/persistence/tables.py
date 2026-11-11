@@ -170,3 +170,20 @@ dispatch_stock = Table(
     CheckConstraint("units >= 0", name="units_non_negative"),
     CheckConstraint("kg >= 0", name="kg_non_negative"),
 )
+
+production = Table(
+    TABLES["production"],
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("date", Date, nullable=False),
+    Column("product_id", String(10), ForeignKey(TABLES.fk("products")), nullable=False),
+    # Aves pedidas a granja en ese rango (con decimales: el pedido se reparte en porcentajes).
+    Column("ordered", Numeric(12, 2, asdecimal=False), nullable=False),
+    Column("produced", Integer, nullable=False),
+    Column("quality_b", Integer, nullable=False),
+    Column("recorded_by", String(50), nullable=False),
+    Column("recorded_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("date", "product_id"),
+    CheckConstraint("ordered >= 0 AND produced >= 0", name="amounts_non_negative"),
+    CheckConstraint("quality_b >= 0 AND quality_b <= produced", name="quality_b_within_produced"),
+)
