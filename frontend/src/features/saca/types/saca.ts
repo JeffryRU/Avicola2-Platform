@@ -38,6 +38,7 @@ export const COLUMNS = {
   request: 'Pedir',
   expected: 'Llegará',
   expectedA: 'Calidad A',
+  expectedB: 'Calidad B',
   kg: 'Kg',
   total: 'Total',
 } as const
