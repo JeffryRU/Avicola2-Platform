@@ -8,6 +8,8 @@ import pe.avicola2.app.domain.EditingWindow
 import pe.avicola2.app.domain.ExportFormat
 import pe.avicola2.app.domain.Notifications
 import pe.avicola2.app.domain.Product
+import pe.avicola2.app.domain.ProductionDay
+import pe.avicola2.app.domain.ProductionEntry
 import pe.avicola2.app.domain.Projection
 import pe.avicola2.app.domain.Saca
 import pe.avicola2.app.domain.Seller
@@ -61,6 +63,12 @@ interface StockGateway {
     suspend fun list(from: LocalDate, to: LocalDate): List<StockDay>
     /** Registra o corrige el stock de un día (reemplaza lo anterior). */
     suspend fun register(day: LocalDate, lines: List<StockEntry>): StockDay
+}
+
+/** Producción diaria (el backend decide quién la ve y quién la registra). */
+interface ProductionGateway {
+    suspend fun list(from: LocalDate, to: LocalDate): List<ProductionDay>
+    suspend fun register(day: LocalDate, lines: List<ProductionEntry>): ProductionDay
 }
 
 /** Cuánto pedir a granja para un día. */

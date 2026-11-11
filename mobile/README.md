@@ -19,7 +19,8 @@ App de vendedores en **Kotlin Multiplatform + Compose Multiplatform**: un solo c
 - **Proyecciones:** las últimas dos semanas y la próxima. El supervisor puede filtrar por vendedor.
 - **Exportar** (componente común `ExportMenu`, el mismo menú de la web): Excel, PDF o CSV del período y el filtro de la lista. El archivo lo arma el servidor (`GET /api/projections/export?format=`), con el mismo contenido que descarga la web, y se abre el menú «Compartir» del sistema para guardarlo o mandarlo.
 - **Stock de despacho** (jefe de despacho): es su pantalla de inicio. Elige el día en una tira (hoy y los 7 anteriores), escribe unidades y kg por producto, agrupados por tamaño, y guarda; el total queda siempre a la vista. Los kg en blanco se calculan con el peso promedio. El supervisor lo ve en solo lectura.
-- **Cálculo de saca** (supervisores, pestaña «Saca»): cuántas aves pedir a granja para el día elegido, los kg, con qué datos se calculó (vendedores con proyección, stock descontado, pedidos confirmados) y el detalle por producto.
+- **Producción** (jefe de despacho, pestaña «Producción»): por día y producto, lo pedido a granja, lo que llegó y la calidad B, con el resumen del día (diferencia y % de calidad B) y los últimos registros. El supervisor la ve en solo lectura.
+- **Cálculo de saca** (supervisores, pestaña «Saca»): cuántas aves pedir a granja para el día elegido, los kg, con qué datos se calculó (vendedores con proyección, stock descontado, pedidos confirmados) y el detalle por producto, con las aves que se espera que lleguen en cada rango y cuántas en calidad A cuando hay historia de producción.
 - **Pestañas según la cuenta:** el backend envía los permisos (`permissions` en la sesión) y la app decide con ellos, no con el nombre del rol.
 - **Avisos en tiempo real** (SSE), con contador de no leídos.
 - **Perfil:** cambiar el nombre y la contraseña, ver el servidor y la versión, y buscar actualizaciones.
