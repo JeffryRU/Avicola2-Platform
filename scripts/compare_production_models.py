@@ -158,7 +158,7 @@ MODELS = {
         lambda: RandomForestRegressor(n_estimators=100, min_samples_leaf=4, random_state=0), flock_weight=True),
     "ML: gradient boosting + peso de la parvada": learned(
         lambda: HistGradientBoostingRegressor(max_iter=150, max_depth=3, learning_rate=0.05), flock_weight=True),
-    "Híbrido: suavizado + gradient boosting sobre el error": learned(
+    "Híbrido: suavizado + gradient boosting sobre el error (con peso de la parvada)": learned(
         lambda: HistGradientBoostingRegressor(max_iter=80, max_depth=2, learning_rate=0.05),
         flock_weight=True, residual_of=ewma(7)),
 }
