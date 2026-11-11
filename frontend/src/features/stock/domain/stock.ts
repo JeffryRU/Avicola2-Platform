@@ -46,7 +46,9 @@ export function draftOf(products: Product[], day?: StockDay): StockDraft {
   return Object.fromEntries(
     products.map((p) => {
       const line = saved.get(p.id)
-      return [p.id, { units: line ? String(line.units) : '', kg: line ? String(line.kg) : '' }]
+      // Un cero guardado se muestra vacío: la celda en blanco ya se lee como 0.
+      const text = (n: number | undefined) => (n ? String(n) : '')
+      return [p.id, { units: text(line?.units), kg: text(line?.kg) }]
     }),
   )
 }

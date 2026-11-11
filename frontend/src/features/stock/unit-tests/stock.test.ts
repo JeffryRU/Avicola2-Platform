@@ -54,7 +54,10 @@ describe('stock de despacho', () => {
   it('carga en el formulario lo ya registrado', () => {
     const day = stockDaySchema.parse({
       date: '2026-11-10',
-      lines: [{ product_id: 'P0001', units: 5, kg: 4.9 }],
+      lines: [
+        { product_id: 'P0001', units: 5, kg: 4.9 },
+        { product_id: 'P0006', units: 0, kg: 0 },
+      ],
       total_units: 5,
       total_kg: 4.9,
       recorded_by: 'despacho',
