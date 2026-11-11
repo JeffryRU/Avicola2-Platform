@@ -38,6 +38,10 @@ class Permission(StrEnum):
     MANAGE_STOCK = "manage_stock"
     # Ver el cálculo de saca: cuánto pedir a granja por día.
     VIEW_SACA = "view_saca"
+    # Ver la producción diaria (lo pedido a granja y lo que llegó, por rango).
+    VIEW_PRODUCTION = "view_production"
+    # Registrar o corregir la producción diaria.
+    MANAGE_PRODUCTION = "manage_production"
 
 
 _SUPERVISION = frozenset(
@@ -46,18 +50,31 @@ _SUPERVISION = frozenset(
         Permission.MANAGE_EDITING,
         Permission.MANAGE_ACCOUNTS,
         Permission.VIEW_SACA,
+        Permission.VIEW_PRODUCTION,
     }
 )
 
 ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
     SELLER: frozenset(),
-    DISPATCH_CHIEF: frozenset({Permission.VIEW_STOCK, Permission.MANAGE_STOCK}),
+    DISPATCH_CHIEF: frozenset(
+        {
+            Permission.VIEW_STOCK,
+            Permission.MANAGE_STOCK,
+            Permission.VIEW_PRODUCTION,
+            Permission.MANAGE_PRODUCTION,
+        }
+    ),
     # El supervisor consulta el stock (lo necesita para la saca) pero no lo registra.
     SUPERVISOR: _SUPERVISION | {Permission.VIEW_STOCK},
     # El supervisor general crea jefes de despacho, así que tiene también sus permisos
     # (nadie gestiona un rol con más permisos que el suyo).
     GENERAL_SUPERVISOR: _SUPERVISION
-    | {Permission.CHANGE_ROLES, Permission.VIEW_STOCK, Permission.MANAGE_STOCK},
+    | {
+        Permission.CHANGE_ROLES,
+        Permission.VIEW_STOCK,
+        Permission.MANAGE_STOCK,
+        Permission.MANAGE_PRODUCTION,
+    },
 }
 
 # Cuentas que cada rol crea y gestiona: el supervisor, solo vendedores; el supervisor general,

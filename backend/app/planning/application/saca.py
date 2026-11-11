@@ -1,10 +1,12 @@
 """Caso de uso del cálculo de saca: junta proyecciones, pedidos confirmados y stock."""
 
 from collections import Counter
-from datetime import date
+from dataclasses import replace
+from datetime import date, timedelta
 
 from app.planning.application.ports import (
     ConfirmedOrdersSource,
+    ProductionRepository,
     ProductRepository,
     ProjectionRepository,
     SellerRepository,
@@ -13,7 +15,8 @@ from app.planning.application.ports import (
 from app.planning.domain.catalog import Catalog
 from app.planning.domain.models import CONFIRMED, Seller
 from app.planning.domain.permissions import Permission, require
-from app.planning.domain.saca import SacaPlan, build_plan, stock_window
+from app.planning.domain.production import LOOKBACK, estimate_arrival
+from app.planning.domain.saca import SacaPlan, build_plan, product_group, stock_window
 
 
 class CalculateSaca:
@@ -25,9 +28,12 @@ class CalculateSaca:
         orders: ConfirmedOrdersSource,
         sellers: SellerRepository,
         yield_factor: float,
+        production: ProductionRepository | None = None,
     ):
         self.products, self.projections, self.stock = products, projections, stock
         self.orders, self.sellers, self.yield_factor = orders, sellers, yield_factor
+        # Historia de producción para estimar en qué rango llegará lo pedido.
+        self.production = production
 
     def __call__(self, viewer: Seller, day: date) -> SacaPlan:
         require(viewer.role, Permission.VIEW_SACA, "No tienes permiso para ver el cálculo de saca.")
@@ -42,7 +48,7 @@ class CalculateSaca:
         # El stock más reciente anterior al día (find devuelve del más reciente al más antiguo).
         recent = self.stock.find(*stock_window(day))
         latest = recent[0] if recent else None
-        return build_plan(
+        plan = build_plan(
             day,
             products,
             dict(projected),
@@ -54,3 +60,9 @@ class CalculateSaca:
             orders_available=self.orders.available,
             yield_factor=self.yield_factor,
         )
+        if self.production is None:
+            return plan
+        # Solo con días anteriores al de la saca: lo de ese día aún no se conoce.
+        history = self.production.find(day - LOOKBACK, day - timedelta(days=1))
+        groups = {p.id: product_group(p) for p in products}
+        return replace(plan, arrival=estimate_arrival(history, groups, plan.request_by_group()))

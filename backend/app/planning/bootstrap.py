@@ -14,6 +14,7 @@ from app.planning.application import accounts as acc
 from app.planning.application import editing as ed
 from app.planning.application import export as ex
 from app.planning.application import notifications as nt
+from app.planning.application import production as pr
 from app.planning.application import saca as sc
 from app.planning.application import stock as st
 from app.planning.application import use_cases as uc
@@ -28,6 +29,7 @@ from app.planning.infrastructure.persistence.editing import (
 )
 from app.planning.infrastructure.persistence.history import SqlChangeLog
 from app.planning.infrastructure.persistence.notifications import SqlNotificationRepository
+from app.planning.infrastructure.persistence.production import SqlProductionRepository
 from app.planning.infrastructure.persistence.repositories import (
     SqlProductRepository,
     SqlProjectionRepository,
@@ -81,6 +83,8 @@ class PlanningUseCases:
     register_stock: st.RegisterStock
     list_stock: st.ListStock
     calculate_saca: sc.CalculateSaca
+    register_production: pr.RegisterProduction
+    list_production: pr.ListProduction
 
 
 def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
@@ -98,6 +102,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     unlocks = SqlUnlockRepository(session)
     history = SqlChangeLog(session)
     stock = SqlStockRepository(session)
+    production = SqlProductionRepository(session)
     sales = SimulatedSalesSource(projections, clock)
     editing = ed.EditingSettings(
         SqlSettingsRepository(session),
@@ -163,6 +168,14 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         register_stock=st.RegisterStock(products, stock, clock),
         list_stock=st.ListStock(stock),
         calculate_saca=sc.CalculateSaca(
-            products, projections, stock, NoConfirmedOrders(), sellers, settings.yield_factor
+            products,
+            projections,
+            stock,
+            NoConfirmedOrders(),
+            sellers,
+            settings.yield_factor,
+            production,
         ),
+        register_production=pr.RegisterProduction(products, production, clock),
+        list_production=pr.ListProduction(production),
     )

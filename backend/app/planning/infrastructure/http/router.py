@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.planning.application.accounts import Session as AuthSession
+from app.planning.application.production import ProductionEntry
 from app.planning.application.stock import StockEntry
 from app.planning.application.use_cases import DayUnits
 from app.planning.bootstrap import PlanningUseCases, build_use_cases
@@ -28,6 +29,7 @@ from app.planning.domain.permissions import (
     manageable_roles,
     permissions_of,
 )
+from app.planning.domain.production import DailyProduction
 from app.planning.domain.stock import DailyStock
 from app.planning.infrastructure.exporters import WRITERS, ExportFormat
 from app.planning.infrastructure.http import schemas as s
@@ -107,6 +109,11 @@ admin = APIRouter(
 )
 editing_admin = APIRouter(
     prefix="/api/admin", tags=["admin"], dependencies=[requires(Permission.MANAGE_EDITING)]
+)
+production = APIRouter(
+    prefix="/api/production",
+    tags=["production"],
+    dependencies=[requires(Permission.VIEW_PRODUCTION)],
 )
 saca = APIRouter(prefix="/api/saca", tags=["saca"], dependencies=[requires(Permission.VIEW_SACA)])
 stock = APIRouter(
@@ -586,6 +593,7 @@ def calculate_saca(
     """Cuánto pedir a granja para el día: max(proyección, pedidos confirmados) − stock."""
     plan = use_cases.calculate_saca(viewer, day)
     totals = ("projected", "ordered", "demand", "stock", "request", "request_kg", "live_kg")
+    arrival = plan.arrival
     return s.SacaOut(
         date=plan.date,
         lines=[
@@ -597,6 +605,8 @@ def calculate_saca(
                 stock=line.stock,
                 request=line.request,
                 request_kg=line.request_kg,
+                expected=arrival.expected.get(line.product.id, 0) if arrival else None,
+                expected_a=arrival.expected_a.get(line.product.id, 0) if arrival else None,
             )
             for line in plan.lines
         ],
@@ -606,4 +616,56 @@ def calculate_saca(
         sellers_registered=plan.sellers_registered,
         sellers_total=plan.sellers_total,
         orders_available=plan.orders_available,
+        forecast=s.SacaForecastOut(
+            method="exponential_smoothing",
+            days=arrival.days,
+            date_from=arrival.date_from,
+            date_to=arrival.date_to,
+        )
+        if arrival
+        else None,
     )
+
+
+# --- Producción diaria --------------------------------------------------------------------
+
+
+def _production_out(day: DailyProduction) -> s.ProductionDayOut:
+    return s.ProductionDayOut(
+        date=day.date,
+        lines=[
+            s.ProductionLineOut(
+                product_id=line.product_id,
+                ordered=line.ordered,
+                produced=line.produced,
+                quality_a=line.quality_a,
+                quality_b=line.quality_b,
+            )
+            for line in day.lines
+        ],
+        ordered=day.ordered,
+        produced=day.produced,
+        quality_b=day.quality_b,
+        recorded_by=day.recorded_by,
+        recorded_at=day.recorded_at,
+    )
+
+
+@production.get("")
+def list_production(
+    use_cases: UseCases, viewer: CurrentSeller, date_from: DateFrom, date_to: DateTo
+) -> list[s.ProductionDayOut]:
+    """Producción registrada por día (solo los días con registro), del más reciente primero."""
+    return [_production_out(d) for d in use_cases.list_production(viewer, date_from, date_to)]
+
+
+@production.put("/{day}", dependencies=[requires(Permission.MANAGE_PRODUCTION)])
+def register_production(
+    use_cases: UseCases, actor: CurrentSeller, day: date, body: s.ProductionIn
+) -> s.ProductionDayOut:
+    """El jefe de despacho registra (o corrige) lo pedido a granja y lo que llegó, por producto."""
+    entries = [
+        ProductionEntry(line.product_id, line.ordered, line.produced, line.quality_b)
+        for line in body.lines
+    ]
+    return _production_out(use_cases.register_production(actor, day, entries))

@@ -20,6 +20,7 @@ export const paths = {
   history: '/historial',
   stock: '/stock',
   saca: '/saca',
+  production: '/produccion',
 } as const
 
 export const DASHBOARDS = [

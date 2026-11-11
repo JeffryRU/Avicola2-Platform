@@ -34,4 +34,6 @@ export const PERMISSIONS = [
   'view_stock',
   'manage_stock',
   'view_saca',
+  'view_production',
+  'manage_production',
 ] as const

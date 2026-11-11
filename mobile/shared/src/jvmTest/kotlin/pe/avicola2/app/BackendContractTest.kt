@@ -139,7 +139,7 @@ class BackendContractTest {
         val chief = Session(url).apply { session.login("despacho", "demo1234") }
         val account = chief.session.account!!
         assertTrue(account.stockOnly && account.canManageStock)
-        assertEquals(listOf("view_stock", "manage_stock"), account.permissions)
+        assertTrue(account.permissions.containsAll(listOf("view_stock", "manage_stock")))
 
         val today = pe.avicola2.app.domain.today()
         val product = chief.planning.catalog().first()

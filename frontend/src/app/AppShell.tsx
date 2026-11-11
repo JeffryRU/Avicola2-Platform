@@ -6,6 +6,7 @@ import {
   Box,
   ChevronDown,
   ClipboardList,
+  Factory,
   History,
   Home,
   LockOpen,
@@ -114,6 +115,7 @@ function Sidebar() {
         </div>
         <nav className="grid gap-0.5" aria-label="Principal">
           <SideItem to={paths.home} end icon={<PackageCheck />} label="Stock de despacho" />
+          {can(session, 'view_production') && <SideItem to={paths.production} icon={<Factory />} label="Producción" />}
           {bell}
         </nav>
         {footer}
@@ -178,6 +180,7 @@ function Sidebar() {
           <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
         )}
         {can(session, 'view_saca') && <SideItem to={paths.saca} icon={<Bird />} label="Cálculo de saca" />}
+        {can(session, 'view_production') && <SideItem to={paths.production} icon={<Factory />} label="Producción" />}
         {can(session, 'view_stock') && <SideItem to={paths.stock} icon={<PackageCheck />} label="Stock de despacho" />}
         <SideItem to={paths.history} icon={<History />} label="Historial" />
         <SideItem to={paths.products} icon={<Box />} label="Productos" />
@@ -204,6 +207,7 @@ const BOTTOM_SUPERVISOR = [
 
 const BOTTOM_DISPATCH = [
   { to: paths.home, icon: PackageCheck, label: 'Stock', end: true },
+  { to: paths.production, icon: Factory, label: 'Producción', end: false },
   { to: paths.notifications, icon: Bell, label: 'Avisos', end: false },
   { to: paths.profile, icon: User, label: 'Perfil', end: false },
 ]

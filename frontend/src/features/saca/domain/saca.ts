@@ -11,6 +11,9 @@ export const sacaLineSchema = z.object({
   stock: z.number().int(),
   request: z.number().int(),
   request_kg: z.number(),
+  // Aves que se espera que lleguen en este rango y cuántas en calidad A (null: sin historia).
+  expected: z.number().int().nullish(),
+  expected_a: z.number().int().nullish(),
 })
 export type SacaLine = z.infer<typeof sacaLineSchema>
 
@@ -29,6 +32,10 @@ export const sacaSchema = z.object({
   sellers_registered: z.number().int(),
   sellers_total: z.number().int(),
   orders_available: z.boolean(),
+  // Con qué se estimó la llegada por rango (null: falta historia de producción).
+  forecast: z
+    .object({ method: z.string(), days: z.number().int(), date_from: isoDateSchema, date_to: isoDateSchema })
+    .nullish(),
 })
 export type Saca = z.infer<typeof sacaSchema>
 

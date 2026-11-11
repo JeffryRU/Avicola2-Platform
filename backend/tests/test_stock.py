@@ -48,7 +48,12 @@ def _range(days_back: int = 7) -> dict:
 
 
 def test_dispatch_chief_permissions() -> None:
-    assert permissions_of(DISPATCH_CHIEF) == {Permission.VIEW_STOCK, Permission.MANAGE_STOCK}
+    assert permissions_of(DISPATCH_CHIEF) == {
+        Permission.VIEW_STOCK,
+        Permission.MANAGE_STOCK,
+        Permission.VIEW_PRODUCTION,
+        Permission.MANAGE_PRODUCTION,
+    }
     assert manageable_roles(DISPATCH_CHIEF) == ()
     assert not can(SELLER, Permission.VIEW_STOCK)
     assert can(SUPERVISOR, Permission.VIEW_STOCK) and not can(SUPERVISOR, Permission.MANAGE_STOCK)
@@ -57,10 +62,15 @@ def test_dispatch_chief_permissions() -> None:
     assert DISPATCH_CHIEF not in manageable_roles(SUPERVISOR)
 
 
-def test_dispatch_chief_logs_in_with_only_stock_permissions(client) -> None:
+def test_dispatch_chief_logs_in_with_only_dispatch_permissions(client) -> None:
     session = _login(client, "despacho")
     assert session["seller"]["role"] == "dispatch_chief"
-    assert session["permissions"] == ["view_stock", "manage_stock"]
+    assert session["permissions"] == [
+        "view_stock",
+        "manage_stock",
+        "view_production",
+        "manage_production",
+    ]
     assert session["manageable_roles"] == []
 
 
