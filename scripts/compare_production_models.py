@@ -150,12 +150,12 @@ MODELS = {
     "Mediana diaria, últimos 28 días": median_ratio(28),
     "ML: regresión Ridge": learned(lambda: Ridge(alpha=1.0)),
     "ML: árbol de decisión": learned(lambda: DecisionTreeRegressor(max_depth=4, min_samples_leaf=8, random_state=0)),
-    "ML: random forest": learned(lambda: RandomForestRegressor(n_estimators=100, min_samples_leaf=4, random_state=0, n_jobs=-1)),
-    "ML: extra trees": learned(lambda: ExtraTreesRegressor(n_estimators=100, min_samples_leaf=4, random_state=0, n_jobs=-1)),
+    "ML: random forest": learned(lambda: RandomForestRegressor(n_estimators=100, min_samples_leaf=4, random_state=0)),
+    "ML: extra trees": learned(lambda: ExtraTreesRegressor(n_estimators=100, min_samples_leaf=4, random_state=0)),
     "ML: gradient boosting": learned(lambda: HistGradientBoostingRegressor(max_iter=150, max_depth=3, learning_rate=0.05)),
     "ML: vecinos cercanos (k=10)": learned(lambda: KNeighborsRegressor(n_neighbors=10, weights="distance")),
     "ML: random forest + peso de la parvada": learned(
-        lambda: RandomForestRegressor(n_estimators=100, min_samples_leaf=4, random_state=0, n_jobs=-1), flock_weight=True),
+        lambda: RandomForestRegressor(n_estimators=100, min_samples_leaf=4, random_state=0), flock_weight=True),
     "ML: gradient boosting + peso de la parvada": learned(
         lambda: HistGradientBoostingRegressor(max_iter=150, max_depth=3, learning_rate=0.05), flock_weight=True),
     "Híbrido: suavizado + gradient boosting sobre el error": learned(
