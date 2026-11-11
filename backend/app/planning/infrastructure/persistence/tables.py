@@ -187,3 +187,44 @@ production = Table(
     CheckConstraint("ordered >= 0 AND produced >= 0", name="amounts_non_negative"),
     CheckConstraint("quality_b >= 0 AND quality_b <= produced", name="quality_b_within_produced"),
 )
+
+# Historia del negocio, tal como sale de ARIS y de las tiendas (`cli historia`). Solo lectura
+# para la app: sirve de base a los pedidos confirmados y a la predicción de la demanda.
+dispatch_orders = Table(
+    TABLES["dispatch_orders"],
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("order_number", Integer, nullable=False),
+    Column("customer", String(200), nullable=False),
+    Column("material_code", String(30)),
+    Column("material", String(200), nullable=False),
+    Column("ordered_kg", Numeric(12, 2, asdecimal=False), nullable=False),
+    Column("dispatched_kg", Numeric(12, 2, asdecimal=False), nullable=False),
+    Column("ordered_units", Numeric(12, 2, asdecimal=False), nullable=False),
+    Column("dispatched_units", Numeric(12, 2, asdecimal=False), nullable=False),
+    Column("zone", String(60)),
+    Column("registered_on", Date, nullable=False),
+    Column("delivery_date", Date, nullable=False),
+    Column("seller", String(60)),
+    Index(None, "delivery_date", "material_code"),
+)
+
+store_sales = Table(
+    TABLES["store_sales"],
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    # Identificador de la línea en el sistema de tiendas: el export la repite y aquí va una vez.
+    Column("source_line_id", Integer, nullable=False, unique=True),
+    Column("document", String(30), nullable=False),
+    Column("document_type", String(20), nullable=False),
+    Column("grouping", String(30)),
+    Column("date", Date, nullable=False),
+    Column("store_code", String(20), nullable=False),
+    Column("store", String(120), nullable=False),
+    Column("material_code", String(30), nullable=False),
+    Column("material", String(200), nullable=False),
+    Column("quantity", Numeric(14, 3, asdecimal=False), nullable=False),
+    Column("unit", String(10)),
+    Column("unit_price", Numeric(12, 4, asdecimal=False), nullable=False),
+    Index(None, "date", "material_code"),
+)
