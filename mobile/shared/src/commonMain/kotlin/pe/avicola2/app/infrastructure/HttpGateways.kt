@@ -101,13 +101,13 @@ class HttpStockGateway(private val api: ApiClient) : StockGateway {
 }
 
 class HttpSacaGateway(private val api: ApiClient) : SacaGateway {
-    override suspend fun plan(day: LocalDate): Saca = api.get("/saca", mapOf("date" to day))
+    override suspend fun plan(day: LocalDate, method: String): Saca = api.get("/saca", mapOf("date" to day, "method" to method))
 }
 
 class HttpProductionGateway(private val api: ApiClient) : ProductionGateway {
     override suspend fun list(from: LocalDate, to: LocalDate): List<ProductionDay> =
         api.get("/production", mapOf("date_from" to from, "date_to" to to))
 
-    override suspend fun register(day: LocalDate, lines: List<ProductionEntry>): ProductionDay =
-        api.put("/production/$day", ProductionRequest(lines))
+    override suspend fun register(day: LocalDate, lines: List<ProductionEntry>, weights: Map<String, Double>): ProductionDay =
+        api.put("/production/$day", ProductionRequest(lines, weights))
 }
