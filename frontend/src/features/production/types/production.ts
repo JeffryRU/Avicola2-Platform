@@ -27,5 +27,10 @@ export const HISTORY_DAYS = 30
 export const FIELD_LABEL: Record<Field, string> = { ordered: 'Pedido', produced: 'Producido', quality_b: 'Calidad B' }
 export const FIELD_SHORT: Record<Field, string> = { ordered: 'Pedido', produced: 'Llegó', quality_b: 'Cal. B' }
 export const PRODUCT_LABEL = 'Producto'
+export const DEVIATION_LABEL = 'Desviación'
+export const DEVIATION_HINT = 'Desviación = lo que llegó menos lo pedido, en cada rango.'
+export const WEIGHTS_TITLE = 'Peso promedio de la parvada (kg)'
+export const WEIGHTS_HINT = 'Peso vivo promedio de cada tipo. Es opcional; ayuda al pronóstico de llegada.'
+export const weightError = (groups: string[]) => `El peso promedio de ${groups.join(', ')} debe estar entre 0,5 y 6 kg.`
 
 export const qualityError = (names: string[]) => `La calidad B no puede superar lo producido en ${names.join(', ')}.`

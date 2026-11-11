@@ -9,7 +9,7 @@ La app móvil no usa cookies: pide el token con `POST /api/auth/token` y lo env�
 
 from dataclasses import asdict
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Cookie, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
@@ -30,7 +30,6 @@ from app.planning.domain.permissions import (
     permissions_of,
 )
 from app.planning.domain.production import (
-    HALF_LIFE_DAYS,
     MIN_HISTORY_DAYS,
     DailyProduction,
     overall_error,
@@ -593,10 +592,14 @@ def register_stock(
 
 @saca.get("")
 def calculate_saca(
-    use_cases: UseCases, viewer: CurrentSeller, day: Annotated[date, Query(alias="date")]
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    day: Annotated[date, Query(alias="date")],
+    method: Annotated[Literal["max", "sum"], Query()] = "max",
 ) -> s.SacaOut:
-    """Cuánto pedir a granja para el día: max(proyección, pedidos confirmados) − stock."""
-    plan = use_cases.calculate_saca(viewer, day)
+    """Cuánto pedir a granja para el día. `method`: «max» = el mayor entre proyección y pedidos
+    confirmados, menos stock (recomendada); «sum» = proyección + pedidos − stock."""
+    plan = use_cases.calculate_saca(viewer, day, method)
     totals = ("projected", "ordered", "demand", "stock", "request", "request_kg", "live_kg")
     arrival = plan.arrival
     return s.SacaOut(
@@ -617,12 +620,13 @@ def calculate_saca(
         ],
         **{name: getattr(plan, name) for name in totals},
         yield_factor=plan.yield_factor,
+        method=plan.method,
         stock_date=plan.stock_date,
         sellers_registered=plan.sellers_registered,
         sellers_total=plan.sellers_total,
         orders_available=plan.orders_available,
         forecast=s.SacaForecastOut(
-            method="exponential_smoothing",
+            method=arrival.model,
             days=arrival.days,
             date_from=arrival.date_from,
             date_to=arrival.date_to,
@@ -651,6 +655,7 @@ def _production_out(day: DailyProduction) -> s.ProductionDayOut:
         ordered=day.ordered,
         produced=day.produced,
         quality_b=day.quality_b,
+        weights=day.weights,
         recorded_by=day.recorded_by,
         recorded_at=day.recorded_at,
     )
@@ -664,16 +669,32 @@ def list_production(
     return [_production_out(d) for d in use_cases.list_production(viewer, date_from, date_to)]
 
 
+def _second(pair: tuple[str, float]) -> float:
+    return pair[1]
+
+
 @production.get("/forecast")
-def forecast_arrival(use_cases: UseCases, viewer: CurrentSeller) -> s.ArrivalForecastOut:
-    """El modelo de llegada por rango, listo para proyectar, y su acierto en los últimos días."""
-    forecast = use_cases.forecast_arrival(viewer)
-    rates, checks = forecast.rates, forecast.checks
+def forecast_arrival(
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    weight: Annotated[list[float] | None, Query(max_length=10)] = None,
+) -> s.ArrivalForecastOut:
+    """El modelo de llegada por rango, listo para proyectar, y su acierto en los últimos días.
+
+    `weight` (repetido, en el orden de `groups`): peso promedio esperado de la parvada de cada
+    tipo; 0 o ausente usa el último anotado."""
+    forecast = use_cases.forecast_arrival(viewer, weight)
+    fitted = forecast.fitted
+    rates, checks = (fitted.rates, fitted.checks) if fitted else (None, [])
     products = [p.id for _, items in forecast.groups for p in items]
     return s.ArrivalForecastOut(
         available=rates is not None,
-        method="exponential_smoothing",
-        half_life_days=HALF_LIFE_DAYS,
+        method=fitted.model if fitted else "",
+        candidates=[
+            s.ForecastCandidateOut(name=name, error=error)
+            for name, error in sorted((fitted.candidates if fitted else {}).items(), key=_second)
+        ],
+        weights_used=fitted.weights if fitted else {},
         min_days=MIN_HISTORY_DAYS,
         days=rates.days if rates else 0,
         date_from=rates.date_from if rates else None,
@@ -682,6 +703,7 @@ def forecast_arrival(use_cases: UseCases, viewer: CurrentSeller) -> s.ArrivalFor
             s.ForecastGroupOut(
                 name=name,
                 last_ordered=forecast.last_request.get(name, 0.0),
+                last_weight=forecast.last_weights.get(name),
                 products=[
                     s.ForecastProductOut(
                         product_id=p.id,
@@ -727,4 +749,4 @@ def register_production(
         ProductionEntry(line.product_id, line.ordered, line.produced, line.quality_b)
         for line in body.lines
     ]
-    return _production_out(use_cases.register_production(actor, day, entries))
+    return _production_out(use_cases.register_production(actor, day, entries, body.weights))

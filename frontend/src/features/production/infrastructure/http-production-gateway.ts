@@ -14,8 +14,12 @@ export class HttpProductionGateway implements ProductionGateway {
   list = (from: IsoDate, to: IsoDate) =>
     this.http.get('/production', z.array(productionDaySchema), { date_from: from, date_to: to })
 
-  forecast = () => this.http.get('/production/forecast', arrivalForecastSchema)
+  forecast = (weights: number[] = []) =>
+    this.http.get(
+      `/production/forecast${weights.length ? `?${weights.map((kg) => `weight=${String(kg)}`).join('&')}` : ''}`,
+      arrivalForecastSchema,
+    )
 
-  register = (day: IsoDate, lines: ProductionEntry[]) =>
-    this.http.put(`/production/${day}`, { lines }, productionDaySchema)
+  register = (day: IsoDate, lines: ProductionEntry[], weights: Record<string, number>) =>
+    this.http.put(`/production/${day}`, { lines, weights }, productionDaySchema)
 }

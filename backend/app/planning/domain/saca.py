@@ -1,12 +1,14 @@
 """Cálculo de saca: cuánto pedir a granja para un día (Python puro).
 
-Regla (ver docs/assumptions.md): por producto,
+Dos formas de calcular (ver docs/assumptions.md), por producto y nunca menos de 0:
 
-    pedir = max(proyección, pedidos confirmados) − stock de despacho      (nunca menos de 0)
+    mayor:  pedir = max(proyección, pedidos confirmados) − stock de despacho     (recomendada)
+    suma:   pedir = proyección + pedidos confirmados − stock de despacho         (la del negocio)
 
-- La proyección ya estima lo que se va a pedir: sumarla a los pedidos contaría lo mismo dos veces.
-  Se toma el mayor: si los pedidos superan lo proyectado mandan los pedidos; si aún no llegaron,
-  manda la proyección.
+- «Mayor»: la proyección ya estima lo que se va a pedir; sumarla a los pedidos contaría lo mismo
+  dos veces. Si los pedidos superan lo proyectado mandan los pedidos; si no, la proyección.
+- «Suma»: la regla tal como la planteó el negocio. Sirve si la proyección es lo que falta por
+  pedir además de lo ya confirmado.
 - El stock es lo que quedó en despacho: lo último registrado antes del día, si es reciente.
 """
 
@@ -19,6 +21,9 @@ from app.planning.domain.production import ArrivalEstimate
 # El stock de hace más días ya no representa lo que hay en despacho: no se descuenta.
 STOCK_MAX_AGE_DAYS = 3
 
+METHOD_MAX, METHOD_SUM = "max", "sum"
+METHODS = (METHOD_MAX, METHOD_SUM)
+
 
 @dataclass(frozen=True)
 class SacaLine:
@@ -26,9 +31,12 @@ class SacaLine:
     projected: int
     ordered: int
     stock: int
+    method: str = METHOD_MAX
 
     @property
     def demand(self) -> int:
+        if self.method == METHOD_SUM:
+            return self.projected + self.ordered
         return max(self.projected, self.ordered)
 
     @property
@@ -54,6 +62,7 @@ class SacaPlan:
     # ¿Hay una fuente de pedidos confirmados conectada? (hoy no: ARIS aún no se integra)
     orders_available: bool
     yield_factor: float
+    method: str = METHOD_MAX
     # Qué se espera que llegue por producto si se pide esto (None: aún no hay historia suficiente).
     arrival: ArrivalEstimate | None = None
 
@@ -114,10 +123,11 @@ def build_plan(
     projected: dict[str, int],
     ordered: dict[str, int],
     stock: dict[str, int],
+    method: str = METHOD_MAX,
     **context,
 ) -> SacaPlan:
     lines = tuple(
-        SacaLine(p, projected.get(p.id, 0), ordered.get(p.id, 0), stock.get(p.id, 0))
+        SacaLine(p, projected.get(p.id, 0), ordered.get(p.id, 0), stock.get(p.id, 0), method)
         for p in products
     )
-    return SacaPlan(day, lines, **context)
+    return SacaPlan(day, lines, method=method, **context)

@@ -63,3 +63,5 @@ El modelo implementado, validado sobre los datos importados con el mismo procedi
 ## Alcance
 
 No predice la demanda de los clientes. Eso depende de los pedidos de ARIS y de la equivalencia entre sus materiales y el catálogo.
+
+> Actualización: el [ADR 0013](0013-modelo-de-llegada-que-se-ajusta-solo.md) reemplaza la vida media fija por un modelo que se elige solo y registra el peso de la parvada.

@@ -26,6 +26,7 @@ tables:
   projection_changes: np_projection_changes
   dispatch_stock: np_dispatch_stock
   production: np_production
+  production_weights: np_production_weights
   # Historia del negocio (cargada desde los CSV de ARIS y de las tiendas)
   dispatch_orders: np_dispatch_orders
   store_sales: np_store_sales

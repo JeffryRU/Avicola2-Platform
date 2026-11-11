@@ -188,6 +188,18 @@ production = Table(
     CheckConstraint("quality_b >= 0 AND quality_b <= produced", name="quality_b_within_produced"),
 )
 
+# Peso vivo promedio (kg) de la parvada de cada tipo en un día de producción.
+production_weights = Table(
+    TABLES["production_weights"],
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("date", Date, nullable=False),
+    Column("group", String(60), nullable=False),
+    Column("avg_kg", Numeric(6, 3, asdecimal=False), nullable=False),
+    UniqueConstraint("date", "group"),
+    CheckConstraint("avg_kg > 0", name="avg_kg_positive"),
+)
+
 # Historia del negocio, tal como sale de ARIS y de las tiendas (`cli historia`). Solo lectura
 # para la app: sirve de base a los pedidos confirmados y a la predicción de la demanda.
 dispatch_orders = Table(

@@ -5,6 +5,6 @@ import type { ProductionDay, ProductionEntry } from '@/features/production/domai
 /** Producción diaria (el backend decide quién la ve y quién la registra). */
 export interface ProductionGateway {
   list(from: IsoDate, to: IsoDate): Promise<ProductionDay[]>
-  forecast(): Promise<ArrivalForecast>
-  register(day: IsoDate, lines: ProductionEntry[]): Promise<ProductionDay>
+  forecast(weights?: number[]): Promise<ArrivalForecast>
+  register(day: IsoDate, lines: ProductionEntry[], weights: Record<string, number>): Promise<ProductionDay>
 }

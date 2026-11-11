@@ -23,7 +23,9 @@ import {
   EXPECTED_LABEL,
   FORECAST_SUBTITLE,
   FORECAST_TITLE,
-  METHOD_TEXT,
+  MODEL_NOTE,
+  MODEL_TITLE,
+  MODEL_WEIGHT_NOTE,
   NO_HISTORY_TITLE,
   QUALITY_A_LABEL,
   QUALITY_B_LABEL,
@@ -32,8 +34,19 @@ import {
   RESET_LABEL,
   RESULT_TITLE,
   TOTAL_LABEL,
+  WEIGHTS_HINT,
+  WEIGHTS_TITLE,
+  WEIGHTS_UNUSED,
   noHistoryBody,
 } from '@/features/production/types/forecast'
+import {
+  cleanKg,
+  invalidWeights,
+  parseKg,
+  weightDraftOf,
+  type WeightDraft,
+} from '@/features/production/domain/production'
+import { modelLabel } from '@/features/saca/types/saca'
 import { useArrivalForecast } from '@/features/production/ui/hooks'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
@@ -54,8 +67,20 @@ const pct0 = (share: number) => `${nf0(share * 100)}\u00a0%`
 /** Pronóstico de llegada: lo que se pida a granja de cada tipo, repartido por rango según el modelo. */
 export function ForecastPage() {
   const { catalog } = useCatalog()
-  const query = useArrivalForecast()
+  // Pesos de la parvada: `edited` es lo que se escribe; `applied`, lo ya enviado al modelo.
+  const [edited, setEdited] = useState<WeightDraft | null>(null)
+  const [applied, setApplied] = useState<number[]>([])
+  const query = useArrivalForecast(applied)
   const forecast = query.data
+  const groupNames = (forecast?.groups ?? []).map((g) => g.name)
+  const weights =
+    edited ??
+    weightDraftOf(groupNames, Object.fromEntries((forecast?.groups ?? []).map((g) => [g.name, g.last_weight ?? 0])))
+  const applyWeights = () => {
+    if (invalidWeights(weights).length) return
+    const next = groupNames.map((g) => parseKg(weights[g] ?? '') ?? 0)
+    setApplied(next.some((kg) => kg > 0) ? next : [])
+  }
   const names = new Map((catalog?.products ?? []).map((p) => [p.id, p.name]))
   return (
     <div>
@@ -66,14 +91,32 @@ export function ForecastPage() {
             <EmptyState title={NO_HISTORY_TITLE}>{noHistoryBody(forecast.min_days)}</EmptyState>
           </Section>
         ) : (
-          <Projector forecast={forecast} name={(id) => names.get(id) ?? id} />
+          <Projector
+            forecast={forecast}
+            name={(id) => names.get(id) ?? id}
+            weights={weights}
+            onWeight={(group, raw) => setEdited({ ...weights, [group]: raw })}
+            onApplyWeights={applyWeights}
+          />
         )}
       </PageBody>
     </div>
   )
 }
 
-function Projector({ forecast, name }: { forecast: ArrivalForecast; name: (id: string) => string }) {
+function Projector({
+  forecast,
+  name,
+  weights,
+  onWeight,
+  onApplyWeights,
+}: {
+  forecast: ArrivalForecast
+  name: (id: string) => string
+  weights: WeightDraft
+  onWeight: (group: string, raw: string) => void
+  onApplyWeights: () => void
+}) {
   const [initial] = useState<RequestDraft>(() => requestDraftOf(forecast.groups))
   const [draft, setDraft] = useState<RequestDraft>(initial)
   const groups = project(forecast.groups, draft)
@@ -112,6 +155,32 @@ function Projector({ forecast, name }: { forecast: ArrivalForecast; name: (id: s
             ))}
           </div>
           <p className="px-4 pb-4 text-[13px] text-muted-foreground dsk:px-5">{REQUEST_HINT}</p>
+        </Section>
+
+        <Section title={WEIGHTS_TITLE}>
+          <div className="grid gap-3 px-4 pt-1 pb-2 sm:grid-cols-3 dsk:px-5">
+            {forecast.groups.map((g) => (
+              <label key={g.name} className="block min-w-0">
+                <span className="mb-1 block text-[13px] font-semibold text-ink-2">{g.name}</span>
+                <input
+                  inputMode="decimal"
+                  placeholder="—"
+                  value={weights[g.name] ?? ''}
+                  onChange={(e) => {
+                    const clean = cleanKg(e.target.value)
+                    if (clean !== null) onWeight(g.name, clean)
+                  }}
+                  onBlur={onApplyWeights}
+                  onKeyDown={(e) => e.key === 'Enter' && onApplyWeights()}
+                  className={inputCls}
+                />
+              </label>
+            ))}
+          </div>
+          <p className="px-4 pb-4 text-[13px] text-muted-foreground dsk:px-5">
+            {WEIGHTS_HINT}
+            {Object.keys(forecast.weights_used).length === 0 && <span className="mt-1 block">{WEIGHTS_UNUSED}</span>}
+          </p>
         </Section>
 
         <Section title={RESULT_TITLE}>
@@ -208,7 +277,29 @@ function Projector({ forecast, name }: { forecast: ArrivalForecast; name: (id: s
               )}
               .
             </p>
-            <p className="mt-2 text-muted-foreground">{METHOD_TEXT(forecast.half_life_days)}</p>
+          </div>
+        </Section>
+        <Section title={MODEL_TITLE}>
+          <div className="px-4 pt-1 pb-4 dsk:px-5">
+            <b className="block text-[15px]">{modelLabel(forecast.method)}</b>
+            <ul className="mt-2.5 grid gap-1.5">
+              {forecast.candidates.map((c) => (
+                <li
+                  key={c.name}
+                  className={cn(
+                    'flex items-baseline gap-2 rounded-[8px] px-2.5 py-1.5 text-[13px]',
+                    c.name === forecast.method ? 'bg-secondary font-bold' : 'text-muted-foreground',
+                  )}
+                >
+                  <span className="min-w-0 flex-1">{modelLabel(c.name)}</span>
+                  <span className="tabular-nums">{pct0(c.error)}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-[12.5px] text-muted-foreground">{MODEL_NOTE}</p>
+            {!forecast.candidates.some((c) => c.name === 'hybrid_weight') && (
+              <p className="mt-1.5 text-[12.5px] text-muted-foreground">{MODEL_WEIGHT_NOTE}</p>
+            )}
           </div>
         </Section>
       </aside>
@@ -279,7 +370,7 @@ function Accuracy({ accuracy }: { accuracy: AccuracyData }) {
 
 function Check({ accuracy, name }: { accuracy: AccuracyData; name: (id: string) => string }) {
   const cols =
-    'grid grid-cols-[minmax(0,1fr)_repeat(3,4.5rem)] items-center gap-x-2 sm:grid-cols-[minmax(0,1fr)_repeat(3,6rem)]'
+    'grid grid-cols-[minmax(0,1fr)_repeat(4,3.6rem)] items-center gap-x-1.5 sm:grid-cols-[minmax(0,1fr)_repeat(4,6rem)] sm:gap-x-2'
   return (
     <Section title={`${CHECK_TITLE} · últimos ${accuracy.days} días`}>
       <div className="px-3 pt-1 pb-4 dsk:px-4">
@@ -288,6 +379,9 @@ function Check({ accuracy, name }: { accuracy: AccuracyData; name: (id: string) 
           <span className="text-right">{CHECK_COLUMNS.ordered}</span>
           <span className="text-right">{CHECK_COLUMNS.expected}</span>
           <span className="text-right">{CHECK_COLUMNS.produced}</span>
+          <span className="truncate text-right" title={CHECK_COLUMNS.deviation}>
+            {CHECK_COLUMNS.deviation}
+          </span>
         </div>
         {accuracy.by_product.map((p) => (
           <div key={p.product_id} className={cn(cols, 'border-b border-muted px-3 py-2.5 text-[15px] last:border-0')}>
@@ -295,6 +389,10 @@ function Check({ accuracy, name }: { accuracy: AccuracyData; name: (id: string) 
             <span className={cn('text-right tabular-nums', !p.ordered && 'text-faint')}>{nf0(p.ordered)}</span>
             <span className="text-right tabular-nums">{nf0(p.expected)}</span>
             <b className="text-right tabular-nums">{nf0(p.produced)}</b>
+            <span className={cn('text-right tabular-nums', p.produced < p.ordered && 'text-warn')}>
+              {p.produced > p.ordered ? '+' : ''}
+              {nf0(p.produced - p.ordered)}
+            </span>
           </div>
         ))}
       </div>

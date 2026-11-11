@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from app.core.config import get_settings
 from app.main import app
 from app.planning.domain.models import Product
-from app.planning.domain.saca import build_plan, stock_window
+from app.planning.domain.saca import METHOD_SUM, build_plan, stock_window
 from app.planning.infrastructure import cli
 from app.planning.infrastructure.clock import ZoneClock
 from app.shared.infrastructure.database.metadata import metadata
@@ -35,6 +35,14 @@ def test_orders_do_not_add_to_the_projection() -> None:
     plan = build_plan(DAY, [B1, B6], {"P1": 100, "P6": 50}, {"P1": 100, "P6": 80}, {}, **CONTEXT)
     assert [line.demand for line in plan.lines] == [100, 80]
     assert plan.request == 180
+
+
+def test_the_business_rule_adds_orders_to_the_projection() -> None:
+    plan = build_plan(
+        DAY, [B1, B6], {"P1": 100, "P6": 50}, {"P1": 100}, {"P6": 20}, METHOD_SUM, **CONTEXT
+    )
+    assert [line.demand for line in plan.lines] == [200, 50]
+    assert plan.method == "sum" and plan.request == 230  # 200 + (50 − 20 de stock)
 
 
 def test_stock_is_subtracted_and_never_goes_negative() -> None:
@@ -106,7 +114,8 @@ def test_saca_adds_the_team_and_subtracts_the_latest_stock(client) -> None:
     assert plan["live_kg"] == round(120 / plan["yield_factor"], 2)
     assert plan["stock_date"] == str(TODAY)
     assert (plan["sellers_registered"], plan["sellers_total"]) == (2, 7)
-    assert plan["orders_available"] is False  # aún no hay fuente de pedidos
+    assert plan["orders_available"] is False  # no hay pedidos cargados para ese día
+    assert plan["method"] == "max"
 
 
 def test_saca_without_recent_stock_or_projections(client) -> None:
@@ -123,3 +132,40 @@ def test_only_supervisors_see_the_saca(client) -> None:
     assert client.get("/api/saca", params={"date": str(TOMORROW)}).status_code == 200
     client.cookies.clear()
     assert client.get("/api/saca", params={"date": str(TOMORROW)}).status_code == 401
+
+
+def test_loaded_orders_enter_the_saca_with_either_method(client) -> None:
+    from sqlalchemy import insert
+
+    from app.planning.infrastructure.persistence.tables import dispatch_orders
+
+    row = {
+        "order_number": 1,
+        "customer": "Cliente",
+        "material_code": "X",
+        "material": "POLLO ENTERO BRASA MEDIANO (1.60-1.69)",
+        "ordered_kg": 320,  # 200 unidades de Brasa 6 (1,6 kg)
+        "dispatched_kg": 0,
+        "ordered_units": 0,
+        "dispatched_units": 0,
+        "zone": None,
+        "registered_on": TODAY,
+        "delivery_date": TOMORROW,
+        "seller": None,
+    }
+    with SessionLocal() as session:
+        session.execute(
+            insert(dispatch_orders), [row, {**row, "material": "BRASA MARINADO TT (-)"}]
+        )
+        session.commit()
+    _login(client, "rnavarro")
+    body = {"category": "BRASA", "days": [{"date": str(TOMORROW), "units": {"P0006": 150}}]}
+    assert client.post("/api/projections", json=body).status_code == 201
+
+    _login(client, "supervisor")
+    plan = _saca(client, TOMORROW)
+    assert plan["orders_available"] is True and plan["ordered"] == 200
+    assert plan["request"] == 200  # manda lo mayor: 200 pedidas contra 150 proyectadas
+    r = client.get("/api/saca", params={"date": str(TOMORROW), "method": "sum"})
+    assert r.json()["method"] == "sum" and r.json()["request"] == 350
+    assert client.get("/api/saca", params={"date": str(TOMORROW), "method": "x"}).status_code == 422

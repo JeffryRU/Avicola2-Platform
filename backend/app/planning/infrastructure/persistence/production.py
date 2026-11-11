@@ -7,7 +7,7 @@ from sqlalchemy import delete, insert, select
 from sqlalchemy.orm import Session
 
 from app.planning.domain.production import DailyProduction, ProductionLine
-from app.planning.infrastructure.persistence.tables import production
+from app.planning.infrastructure.persistence.tables import production, production_weights
 
 
 class SqlProductionRepository:
@@ -21,6 +21,12 @@ class SqlProductionRepository:
             .order_by(production.c.date.desc(), production.c.product_id)
         )
         rows = self.session.execute(query).mappings().all()
+        weights: dict[date, dict[str, float]] = {}
+        found = self.session.execute(
+            select(production_weights).where(production_weights.c.date.between(date_from, date_to))
+        ).mappings()
+        for row in found:
+            weights.setdefault(row["date"], {})[row["group"]] = row["avg_kg"]
         days = []
         for day, group in groupby(rows, key=lambda r: r["date"]):
             items = list(group)
@@ -29,7 +35,13 @@ class SqlProductionRepository:
                 for r in items
             )
             days.append(
-                DailyProduction(day, lines, items[0]["recorded_by"], items[0]["recorded_at"])
+                DailyProduction(
+                    day,
+                    lines,
+                    items[0]["recorded_by"],
+                    items[0]["recorded_at"],
+                    weights.get(day, {}),
+                )
             )
         return days
 
@@ -40,6 +52,17 @@ class SqlProductionRepository:
     def write(self, production_day: DailyProduction) -> None:
         """Sin confirmar la transacción: la importación de un Excel guarda muchos días juntos."""
         self.session.execute(delete(production).where(production.c.date == production_day.date))
+        self.session.execute(
+            delete(production_weights).where(production_weights.c.date == production_day.date)
+        )
+        if production_day.weights:
+            self.session.execute(
+                insert(production_weights),
+                [
+                    {"date": production_day.date, "group": group, "avg_kg": kg}
+                    for group, kg in production_day.weights.items()
+                ],
+            )
         self.session.execute(
             insert(production),
             [

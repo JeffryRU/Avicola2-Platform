@@ -7,7 +7,17 @@ import { nf0, nf1 } from '@/shared/domain/format'
 import { bySubcategory } from '@/features/catalog/domain/catalog'
 import type { Product } from '@/features/catalog/domain/schemas'
 import { useCatalog } from '@/features/catalog/ui/hooks'
-import { missingSellers, sacaDays, type Saca, type SacaLine } from '@/features/saca/domain/saca'
+import {
+  SACA_METHODS,
+  missingSellers,
+  sacaDays,
+  sacaMethodSchema,
+  storeMethod,
+  storedMethod,
+  type Saca,
+  type SacaLine,
+  type SacaMethod,
+} from '@/features/saca/domain/saca'
 import {
   ARRIVAL_HINT,
   BIRDS_LABEL,
@@ -16,6 +26,8 @@ import {
   DAY_LABEL,
   FORMULA,
   HERO_LABEL,
+  METHOD_LABEL,
+  METHOD_OPTION,
   KG_LABEL,
   LIVE_LABEL,
   NO_ARRIVAL,
@@ -33,6 +45,7 @@ import {
   arrivalNote,
   coverageText,
   missingNote,
+  modelLabel,
 } from '@/features/saca/types/saca'
 import { DayStrip } from '@/shared/ui/components/day-strip'
 import { EmptyState, Note } from '@/shared/ui/components/feedback'
@@ -45,7 +58,12 @@ export function SacaPage() {
   const { catalog } = useCatalog()
   const ref = today()
   const [day, setDay] = useState<IsoDate>(addDays(ref, 1))
-  const query = useQuery({ queryKey: ['saca', day], queryFn: () => saca.plan(day) })
+  const [method, setMethod] = useState<SacaMethod>(() => storedMethod(globalThis.localStorage))
+  const query = useQuery({ queryKey: ['saca', day, method], queryFn: () => saca.plan(day, method) })
+  const chooseMethod = (next: SacaMethod) => {
+    storeMethod(globalThis.localStorage, next)
+    setMethod(next)
+  }
   const plan = query.data
 
   return (
@@ -59,6 +77,22 @@ export function SacaPage() {
           label={DAY_LABEL}
           caption={(d) => (d === ref ? TODAY_LABEL : d === addDays(ref, 1) ? TOMORROW_LABEL : undefined)}
         />
+        <label className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <span className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
+            {METHOD_LABEL}
+          </span>
+          <select
+            value={method}
+            onChange={(e) => chooseMethod(sacaMethodSchema.parse(e.target.value))}
+            className="h-11 max-w-full min-w-0 flex-1 rounded-[10px] border-[1.5px] border-border bg-white px-3 text-[14.5px] font-semibold outline-none focus:border-primary focus:ring-4 focus:ring-primary-ring sm:flex-none"
+          >
+            {SACA_METHODS.map((m) => (
+              <option key={m} value={m}>
+                {METHOD_OPTION[m]}
+              </option>
+            ))}
+          </select>
+        </label>
         {query.isError && (
           <Note tone="bad" icon={<AlertCircle />}>
             <div>{query.error.message}</div>
@@ -198,10 +232,11 @@ function Sources({ plan }: { plan: Saca }) {
               ? arrivalNote(plan.forecast.days, dShort(plan.forecast.date_from), dShort(plan.forecast.date_to))
               : NO_ARRIVAL}
           </small>
+          {plan.forecast && <small className={small}>Modelo en uso: {modelLabel(plan.forecast.method)}.</small>}
         </SourceRow>
       </ul>
       <p className="border-t border-muted px-4 py-3 text-[12.5px] text-muted-foreground dsk:px-5">
-        {FORMULA}
+        {FORMULA[plan.method]}
         {plan.forecast && <span className="mt-1.5 block">{ARRIVAL_HINT}</span>}
       </p>
     </Section>

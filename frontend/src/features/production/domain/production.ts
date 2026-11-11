@@ -18,6 +18,8 @@ export const productionDaySchema = z.object({
   ordered: z.number(),
   produced: z.number().int(),
   quality_b: z.number().int(),
+  // Peso vivo promedio (kg) de la parvada por tipo; solo los que se anotaron.
+  weights: z.record(z.string(), z.number()).default({}),
   recorded_by: z.string(),
   recorded_at: z.string(),
 })
@@ -78,3 +80,40 @@ export function deviation(ordered: number, produced: number) {
   const birds = produced - ordered
   return { birds, share: ordered ? birds / ordered : 0 }
 }
+
+/** Peso promedio de la parvada por tipo, como lo escribe la persona (texto; vacío = sin dato). */
+export type WeightDraft = Record<string, string>
+export const MIN_FLOCK_KG = 0.5
+export const MAX_FLOCK_KG = 6
+
+export const weightDraftOf = (groups: string[], weights: Record<string, number> = {}): WeightDraft =>
+  Object.fromEntries(groups.map((g) => [g, weights[g] ? String(weights[g]) : '']))
+
+/** Acepta coma o punto decimal. null si no es un número. */
+export function parseKg(raw: string): number | null {
+  const text = raw.trim().replace(',', '.')
+  if (!/^\d+(\.\d+)?$/.test(text)) return null
+  return Number(text)
+}
+
+/** Solo los tipos con peso escrito. */
+export function toWeights(draft: WeightDraft): Record<string, number> {
+  const entries = Object.entries(draft).flatMap(([group, raw]) => {
+    const kg = parseKg(raw)
+    return kg ? [[group, kg] as const] : []
+  })
+  return Object.fromEntries(entries)
+}
+
+/** Tipos cuyo peso escrito no es válido (no es número o está fuera de rango). */
+export const invalidWeights = (draft: WeightDraft) =>
+  Object.entries(draft)
+    .filter(([, raw]) => {
+      if (!raw.trim()) return false
+      const kg = parseKg(raw)
+      return kg === null || kg < MIN_FLOCK_KG || kg > MAX_FLOCK_KG
+    })
+    .map(([group]) => group)
+
+/** Solo dígitos y un separador decimal, como máximo 3 decimales. */
+export const cleanKg = (raw: string) => /^\d{0,1}([.,]\d{0,3})?$/.exec(raw.trim())?.[0] ?? null

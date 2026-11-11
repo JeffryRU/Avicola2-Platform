@@ -334,12 +334,13 @@ class SacaOut(BaseModel):
     request_kg: float
     live_kg: float = Field(description="Kg vivos estimados (kg de producto entre el rendimiento).")
     yield_factor: float
+    method: str = Field(description="Forma de cálculo usada: max o sum.")
     stock_date: date | None = Field(
         description="Día del stock descontado; null si no hay reciente."
     )
     sellers_registered: int
     sellers_total: int
-    orders_available: bool = Field(description="False: aún no hay fuente de pedidos confirmados.")
+    orders_available: bool = Field(description="False: no hay pedidos cargados para ese día.")
     forecast: SacaForecastOut | None = Field(
         description="Estimación de llegada por rango; null si falta historia de producción."
     )
@@ -357,6 +358,11 @@ class ProductionLineIn(BaseModel):
 
 class ProductionIn(BaseModel):
     lines: list[ProductionLineIn] = Field(min_length=1, max_length=200)
+    weights: dict[str, float] = Field(
+        default_factory=dict,
+        max_length=20,
+        description="Peso vivo promedio (kg) de la parvada por tipo, p. ej. {'Brasa chica': 1.72}.",
+    )
 
 
 class ProductionLineOut(BaseModel):
@@ -373,6 +379,7 @@ class ProductionDayOut(BaseModel):
     ordered: float
     produced: int
     quality_b: int
+    weights: dict[str, float]
     recorded_by: str
     recorded_at: datetime
 
@@ -386,6 +393,7 @@ class ForecastProductOut(BaseModel):
 class ForecastGroupOut(BaseModel):
     name: str
     last_ordered: float = Field(description="Lo último que se pidió a granja de este tipo.")
+    last_weight: float | None = Field(description="Último peso promedio anotado (kg).")
     products: list[ForecastProductOut]
 
 
@@ -412,10 +420,20 @@ class ForecastAccuracyOut(BaseModel):
     by_product: list[ForecastProductCheckOut]
 
 
+class ForecastCandidateOut(BaseModel):
+    name: str
+    error: float
+
+
 class ArrivalForecastOut(BaseModel):
     available: bool = Field(description="false si aún falta historia de producción.")
-    method: str
-    half_life_days: float
+    method: str = Field(description="Modelo en uso: ewma_<vida media> o hybrid_weight.")
+    candidates: list[ForecastCandidateOut] = Field(
+        description="Modelos que compitieron y su error en los últimos días."
+    )
+    weights_used: dict[str, float] = Field(
+        description="Peso de la parvada con que se estimó; vacío si el modelo no lo usa."
+    )
     min_days: int
     days: int
     date_from: date | None

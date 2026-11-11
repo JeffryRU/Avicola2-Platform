@@ -5,14 +5,17 @@ import { parseUnits } from '@/features/stock/domain/stock'
 const forecastGroupSchema = z.object({
   name: z.string(),
   last_ordered: z.number(),
+  last_weight: z.number().nullish(),
   products: z.array(z.object({ product_id: z.string(), share: z.number(), quality_a_rate: z.number() })),
 })
 export type ForecastGroup = z.infer<typeof forecastGroupSchema>
 
 export const arrivalForecastSchema = z.object({
   available: z.boolean(),
+  // Modelo en uso (lo elige solo el backend) y los que compitieron, con su error reciente.
   method: z.string(),
-  half_life_days: z.number(),
+  candidates: z.array(z.object({ name: z.string(), error: z.number() })).default([]),
+  weights_used: z.record(z.string(), z.number()).default({}),
   min_days: z.number().int(),
   days: z.number().int(),
   date_from: z.string().nullable(),

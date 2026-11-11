@@ -220,7 +220,7 @@ def test_saca_estimates_what_will_arrive_per_range(client) -> None:
     _login(client, "supervisor")
     plan = client.get("/api/saca", params={"date": str(tomorrow)}).json()
     assert plan["request"] == 500
-    assert plan["forecast"]["method"] == "exponential_smoothing" and plan["forecast"]["days"] == 20
+    assert plan["forecast"]["method"] == "ewma_7" and plan["forecast"]["days"] == 20
     by_id = {line["product_id"]: line for line in plan["lines"]}
     # Se piden 500 aves chicas (proyectadas como Brasa 1), pero llegarán como Brasa 3 y Brasa 4.
     assert (by_id["P0001"]["expected"], by_id["P0003"]["expected"]) == (0, 200)
