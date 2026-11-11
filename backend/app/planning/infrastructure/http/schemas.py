@@ -323,6 +323,19 @@ class SacaForecastOut(BaseModel):
     date_to: date
 
 
+class SacaGroupOut(BaseModel):
+    """Un tipo de pedido a granja: las sumas de sus productos y el pedido final."""
+
+    name: str
+    projected: int
+    ordered: int
+    demand: int
+    stock: int
+    need: int = Field(description="Lo que hace falta del tipo: demanda menos stock, nunca < 0.")
+    factor: float = Field(description="Parte de lo que hace falta que se pide a granja.")
+    farm_order: int
+
+
 class SacaOut(BaseModel):
     date: date
     lines: list[SacaLineOut]
@@ -334,7 +347,9 @@ class SacaOut(BaseModel):
     request_kg: float
     live_kg: float = Field(description="Kg vivos estimados (kg de producto entre el rendimiento).")
     yield_factor: float
-    method: str = Field(description="Forma de cálculo usada: max o sum.")
+    method: str = Field(description="Forma de cálculo usada: sum o max.")
+    farm_order: int = Field(description="Aves del pedido final a granja (suma de los tipos).")
+    groups: list[SacaGroupOut] = Field(description="Pedido final a granja por tipo.")
     stock_date: date | None = Field(
         description="Día del stock descontado; null si no hay reciente."
     )

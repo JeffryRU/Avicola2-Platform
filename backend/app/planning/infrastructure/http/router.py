@@ -595,10 +595,11 @@ def calculate_saca(
     use_cases: UseCases,
     viewer: CurrentSeller,
     day: Annotated[date, Query(alias="date")],
-    method: Annotated[Literal["max", "sum"], Query()] = "max",
+    method: Annotated[Literal["sum", "max"], Query()] = "sum",
 ) -> s.SacaOut:
-    """Cuánto pedir a granja para el día. `method`: «max» = el mayor entre proyección y pedidos
-    confirmados, menos stock (recomendada); «sum» = proyección + pedidos − stock."""
+    """Cuánto pedir a granja para el día. `method`: «sum» = proyección + pedidos confirmados −
+    stock (la del negocio, por defecto); «max» = el mayor entre proyección y pedidos, menos stock.
+    `groups` trae el pedido final por tipo, con su factor."""
     plan = use_cases.calculate_saca(viewer, day, method)
     totals = ("projected", "ordered", "demand", "stock", "request", "request_kg", "live_kg")
     arrival = plan.arrival
@@ -621,6 +622,20 @@ def calculate_saca(
         **{name: getattr(plan, name) for name in totals},
         yield_factor=plan.yield_factor,
         method=plan.method,
+        farm_order=plan.farm_order,
+        groups=[
+            s.SacaGroupOut(
+                name=g.name,
+                projected=g.projected,
+                ordered=g.ordered,
+                demand=g.demand,
+                stock=g.stock,
+                need=g.need,
+                factor=g.factor,
+                farm_order=g.farm_order,
+            )
+            for g in plan.groups
+        ],
         stock_date=plan.stock_date,
         sellers_registered=plan.sellers_registered,
         sellers_total=plan.sellers_total,

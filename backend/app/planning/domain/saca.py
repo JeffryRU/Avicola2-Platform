@@ -1,14 +1,16 @@
 """Cálculo de saca: cuánto pedir a granja para un día (Python puro).
 
-Dos formas de calcular (ver docs/assumptions.md), por producto y nunca menos de 0:
+Dos formas de calcular lo que hace falta (ver docs/assumptions.md), nunca menos de 0:
 
-    mayor:  pedir = max(proyección, pedidos confirmados) − stock de despacho     (recomendada)
-    suma:   pedir = proyección + pedidos confirmados − stock de despacho         (la del negocio)
+    suma:   falta = proyección + pedidos confirmados − stock de despacho      (la del negocio)
+    mayor:  falta = max(proyección, pedidos confirmados) − stock de despacho  (alternativa)
 
-- «Mayor»: la proyección ya estima lo que se va a pedir; sumarla a los pedidos contaría lo mismo
-  dos veces. Si los pedidos superan lo proyectado mandan los pedidos; si no, la proyección.
-- «Suma»: la regla tal como la planteó el negocio. Sirve si la proyección es lo que falta por
-  pedir además de lo ya confirmado.
+- «Suma»: la regla del negocio, por defecto.
+- «Mayor»: por si la proyección ya incluye lo confirmado y sumarlos lo contaría dos veces.
+
+A granja no se pide por producto sino por tipo (Brasa chica, mediana, grande). Por eso el pedido
+final se arma por tipo: se suman proyección, pedidos y stock de sus productos y lo que hace falta
+se multiplica por el factor del tipo (`SacaGroup`).
 - El stock es lo que quedó en despacho: lo último registrado antes del día, si es reciente.
 """
 
@@ -22,7 +24,8 @@ from app.planning.domain.production import ArrivalEstimate
 STOCK_MAX_AGE_DAYS = 3
 
 METHOD_MAX, METHOD_SUM = "max", "sum"
-METHODS = (METHOD_MAX, METHOD_SUM)
+METHODS = (METHOD_SUM, METHOD_MAX)
+DEFAULT_METHOD = METHOD_SUM
 
 
 @dataclass(frozen=True)
@@ -31,7 +34,7 @@ class SacaLine:
     projected: int
     ordered: int
     stock: int
-    method: str = METHOD_MAX
+    method: str = DEFAULT_METHOD
 
     @property
     def demand(self) -> int:
@@ -49,6 +52,28 @@ class SacaLine:
 
 
 @dataclass(frozen=True)
+class SacaGroup:
+    """Un tipo de pedido a granja (Brasa chica...): la suma de sus productos y su pedido final."""
+
+    name: str
+    projected: int
+    ordered: int
+    demand: int
+    stock: int
+    # Parte de lo que hace falta que se pide a granja (regla del negocio; 1 = todo).
+    factor: float
+
+    @property
+    def need(self) -> int:
+        """Lo que hace falta del tipo: el stock de un rango cubre la falta de otro del tipo."""
+        return max(0, self.demand - self.stock)
+
+    @property
+    def farm_order(self) -> int:
+        return round(self.need * self.factor)
+
+
+@dataclass(frozen=True)
 class SacaPlan:
     """Lo que hay que pedir a granja para `date`, por producto, y con qué datos se calculó."""
 
@@ -62,7 +87,9 @@ class SacaPlan:
     # ¿Hay una fuente de pedidos confirmados conectada? (hoy no: ARIS aún no se integra)
     orders_available: bool
     yield_factor: float
-    method: str = METHOD_MAX
+    method: str = DEFAULT_METHOD
+    # Factor del pedido final por tipo; los tipos que no figuran usan 1.
+    group_factors: tuple[tuple[str, float], ...] = ()
     # Qué se espera que llegue por producto si se pide esto (None: aún no hay historia suficiente).
     arrival: ArrivalEstimate | None = None
 
@@ -94,13 +121,34 @@ class SacaPlan:
     def request_kg(self) -> float:
         return round(sum(line.request_kg for line in self.lines), 2)
 
+    @property
+    def groups(self) -> tuple[SacaGroup, ...]:
+        """Por tipo, en el orden del catálogo: sus sumas y el pedido final a granja."""
+        factors = dict(self.group_factors)
+        names = list(dict.fromkeys(product_group(line.product) for line in self.lines))
+        result = []
+        for name in names:
+            lines = [line for line in self.lines if product_group(line.product) == name]
+            result.append(
+                SacaGroup(
+                    name,
+                    sum(line.projected for line in lines),
+                    sum(line.ordered for line in lines),
+                    sum(line.demand for line in lines),
+                    sum(line.stock for line in lines),
+                    factors.get(name, 1.0),
+                )
+            )
+        return tuple(result)
+
+    @property
+    def farm_order(self) -> int:
+        """Aves del pedido final a granja: la suma de los tipos, ya con su factor."""
+        return sum(group.farm_order for group in self.groups)
+
     def request_by_group(self) -> dict[str, float]:
-        """Lo que se pide de cada tipo (Brasa chica...): a granja se pide por tipo, no por rango."""
-        totals: dict[str, float] = {}
-        for line in self.lines:
-            group = product_group(line.product)
-            totals[group] = totals.get(group, 0.0) + line.request
-        return totals
+        """Lo que se pide a granja de cada tipo (el pedido final, con su factor)."""
+        return {group.name: float(group.farm_order) for group in self.groups}
 
     @property
     def live_kg(self) -> float:
@@ -123,7 +171,7 @@ def build_plan(
     projected: dict[str, int],
     ordered: dict[str, int],
     stock: dict[str, int],
-    method: str = METHOD_MAX,
+    method: str = DEFAULT_METHOD,
     **context,
 ) -> SacaPlan:
     lines = tuple(

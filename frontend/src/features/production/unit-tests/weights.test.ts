@@ -30,18 +30,18 @@ describe('peso promedio de la parvada', () => {
 })
 
 describe('forma de cálculo de la saca', () => {
-  it('recuerda la elegida y vuelve a la recomendada si no hay nada válido', () => {
+  it('recuerda la elegida y vuelve a la del negocio si no hay nada válido', () => {
     const data = new Map<string, string>()
     const storage = {
       getItem: (k: string) => data.get(k) ?? null,
       setItem: (k: string, v: string) => void data.set(k, v),
     }
-    expect(storedMethod(storage)).toBe('max')
-    storeMethod(storage, 'sum')
     expect(storedMethod(storage)).toBe('sum')
-    data.set('saca.method', 'otra')
+    storeMethod(storage, 'max')
     expect(storedMethod(storage)).toBe('max')
-    expect(storedMethod(undefined)).toBe('max')
+    data.set('saca.method', 'otra')
+    expect(storedMethod(storage)).toBe('sum')
+    expect(storedMethod(undefined)).toBe('sum')
   })
 
   it('nombra el modelo de llegada en uso', () => {

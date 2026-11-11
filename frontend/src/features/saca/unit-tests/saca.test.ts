@@ -19,6 +19,11 @@ const plan = sacaSchema.parse({
   sellers_registered: 2,
   sellers_total: 7,
   orders_available: false,
+  farm_order: 96,
+  groups: [
+    { name: 'Brasa chica', projected: 150, ordered: 0, demand: 150, stock: 30, need: 120, factor: 0.8, farm_order: 96 },
+    { name: 'Brasa mediana', projected: 40, ordered: 0, demand: 40, stock: 60, need: 0, factor: 0.7, farm_order: 0 },
+  ],
 })
 
 describe('cálculo de saca', () => {
@@ -27,6 +32,12 @@ describe('cálculo de saca', () => {
     expect(days).toHaveLength(9)
     expect(days[0]).toBe('2026-11-09')
     expect(days.at(-1)).toBe('2026-11-17')
+  })
+
+  it('usa la suma como forma de cálculo de partida y trae el pedido final por tipo', () => {
+    expect(plan.method).toBe('sum')
+    expect(plan.groups.map((g) => g.farm_order)).toEqual([96, 0])
+    expect(plan.farm_order).toBe(96)
   })
 
   it('cuenta los vendedores que aún no registraron', () => {

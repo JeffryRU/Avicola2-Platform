@@ -184,6 +184,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             settings.yield_factor,
             production,
             arrival_model,
+            settings.saca_group_factors,
         ),
         register_production=pr.RegisterProduction(products, production, clock),
         list_production=pr.ListProduction(production),

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from app.core.config import get_settings
 from app.main import app
 from app.planning.domain.models import Product
-from app.planning.domain.saca import METHOD_SUM, build_plan, stock_window
+from app.planning.domain.saca import METHOD_MAX, METHOD_SUM, build_plan, stock_window
 from app.planning.infrastructure import cli
 from app.planning.infrastructure.clock import ZoneClock
 from app.shared.infrastructure.database.metadata import metadata
@@ -31,8 +31,10 @@ CONTEXT = {
 
 
 def test_orders_do_not_add_to_the_projection() -> None:
-    """Lo proyectado y lo pedido son la misma demanda: se toma el mayor, no la suma."""
-    plan = build_plan(DAY, [B1, B6], {"P1": 100, "P6": 50}, {"P1": 100, "P6": 80}, {}, **CONTEXT)
+    """Con la forma «mayor», lo proyectado y lo pedido no se suman: se toma el más grande."""
+    plan = build_plan(
+        DAY, [B1, B6], {"P1": 100, "P6": 50}, {"P1": 100, "P6": 80}, {}, METHOD_MAX, **CONTEXT
+    )
     assert [line.demand for line in plan.lines] == [100, 80]
     assert plan.request == 180
 
@@ -43,6 +45,34 @@ def test_the_business_rule_adds_orders_to_the_projection() -> None:
     )
     assert [line.demand for line in plan.lines] == [200, 50]
     assert plan.method == "sum" and plan.request == 230  # 200 + (50 − 20 de stock)
+
+
+def test_farm_order_is_by_type_with_its_factor() -> None:
+    b2 = Product("P2", "BRASA", "Brasa 2", 1.2, subcategory="Brasa chica")
+    b1 = Product("P1", "BRASA", "Brasa 1", 1.0, subcategory="Brasa chica")
+    b8 = Product("P8", "BRASA", "Brasa 8", 1.8, subcategory="Brasa grande")
+    plan = build_plan(
+        DAY,
+        [b1, b2, b8],
+        {"P1": 100, "P2": 50, "P8": 40},
+        {"P1": 30},
+        {"P2": 80},
+        METHOD_SUM,
+        **CONTEXT,
+        group_factors=(("Brasa chica", 0.8),),
+    )
+    chica, grande = plan.groups
+    # Chica: 150 proyectadas + 30 pedidas − 80 de stock = 100; a granja, el 80 %.
+    assert (chica.projected, chica.ordered, chica.stock, chica.need) == (150, 30, 80, 100)
+    assert chica.farm_order == 80
+    # El stock de Brasa 2 sobra para ese rango (30 de más) y cubre parte de lo que falta de Brasa 1.
+    assert [line.request for line in plan.lines[:2]] == [130, 0]
+    # Un tipo sin factor configurado se pide completo.
+    assert (grande.factor, grande.farm_order) == (1.0, 40)
+    assert plan.farm_order == 120 and plan.request_by_group() == {
+        "Brasa chica": 80.0,
+        "Brasa grande": 40.0,
+    }
 
 
 def test_stock_is_subtracted_and_never_goes_negative() -> None:
@@ -115,7 +145,13 @@ def test_saca_adds_the_team_and_subtracts_the_latest_stock(client) -> None:
     assert plan["stock_date"] == str(TODAY)
     assert (plan["sellers_registered"], plan["sellers_total"]) == (2, 7)
     assert plan["orders_available"] is False  # no hay pedidos cargados para ese día
-    assert plan["method"] == "max"
+    assert plan["method"] == "sum"  # la regla del negocio es la de partida
+    groups = {g["name"]: g for g in plan["groups"]}
+    # A granja se pide por tipo: de lo que hace falta de brasa chica, el 80 %.
+    assert groups["Brasa chica"]["need"] == 120 and groups["Brasa chica"]["factor"] == 0.8
+    assert groups["Brasa chica"]["farm_order"] == 96
+    assert groups["Brasa mediana"]["need"] == 0  # 40 proyectadas, 60 en stock
+    assert plan["farm_order"] == 96
 
 
 def test_saca_without_recent_stock_or_projections(client) -> None:
@@ -165,7 +201,9 @@ def test_loaded_orders_enter_the_saca_with_either_method(client) -> None:
     _login(client, "supervisor")
     plan = _saca(client, TOMORROW)
     assert plan["orders_available"] is True and plan["ordered"] == 200
-    assert plan["request"] == 200  # manda lo mayor: 200 pedidas contra 150 proyectadas
-    r = client.get("/api/saca", params={"date": str(TOMORROW), "method": "sum"})
-    assert r.json()["method"] == "sum" and r.json()["request"] == 350
+    assert plan["request"] == 350  # regla del negocio: 150 proyectadas + 200 pedidas
+    mediana = next(g for g in plan["groups"] if g["name"] == "Brasa mediana")
+    assert (mediana["need"], mediana["factor"], mediana["farm_order"]) == (350, 0.7, 245)
+    r = client.get("/api/saca", params={"date": str(TOMORROW), "method": "max"})
+    assert r.json()["method"] == "max" and r.json()["request"] == 200  # manda lo mayor
     assert client.get("/api/saca", params={"date": str(TOMORROW), "method": "x"}).status_code == 422
