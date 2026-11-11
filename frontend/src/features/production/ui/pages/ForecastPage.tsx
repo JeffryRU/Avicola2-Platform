@@ -26,6 +26,7 @@ import {
   METHOD_TEXT,
   NO_HISTORY_TITLE,
   QUALITY_A_LABEL,
+  QUALITY_B_LABEL,
   REQUEST_HINT,
   REQUEST_TITLE,
   RESET_LABEL,
@@ -41,10 +42,14 @@ import { cn } from '@/shared/ui/lib/utils'
 const splitCls = 'grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_340px]'
 const inputCls =
   'h-12 w-full min-w-0 rounded-[10px] border-[1.5px] border-border bg-white px-3 text-[17px] font-bold tabular-nums outline-none transition-colors placeholder:text-faint focus:border-primary focus:ring-4 focus:ring-primary-ring'
-const rowCls =
-  'grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem] items-center gap-x-3 sm:grid-cols-[minmax(0,1fr)_6rem_6rem]'
+const rowCls = 'grid grid-cols-3 items-center gap-x-3 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_repeat(3,5.5rem)]'
+const COLUMNS = [
+  { key: 'expected', label: EXPECTED_LABEL },
+  { key: 'expectedA', label: QUALITY_A_LABEL },
+  { key: 'expectedB', label: QUALITY_B_LABEL },
+] as const
 const headCls = 'text-[12px] font-bold tracking-[0.04em] text-muted-foreground uppercase'
-const pct0 = (share: number) => `${nf0(share * 100)} %`
+const pct0 = (share: number) => `${nf0(share * 100)}\u00a0%`
 
 /** Pronóstico de llegada: lo que se pida a granja de cada tipo, repartido por rango según el modelo. */
 export function ForecastPage() {
@@ -111,10 +116,16 @@ function Projector({ forecast, name }: { forecast: ArrivalForecast; name: (id: s
 
         <Section title={RESULT_TITLE}>
           <div className="px-3 pt-1 pb-4 dsk:px-4">
-            <div className={cn(rowCls, headCls, 'px-3 pb-1.5')}>
-              <span />
-              <span className="text-right">{EXPECTED_LABEL}</span>
-              <span className="text-right">{QUALITY_A_LABEL}</span>
+            {/* En angosto cada cifra lleva su etiqueta encima; la cabecera solo va en ancho. */}
+            <div className="hidden sm:block">
+              <div className={cn(rowCls, headCls, 'px-3 pb-1.5')}>
+                <span />
+                {COLUMNS.map((c) => (
+                  <span key={c.key} className="text-right">
+                    {c.label}
+                  </span>
+                ))}
+              </div>
             </div>
             <div className="grid gap-3">
               {groups.map((g) => (
@@ -127,18 +138,28 @@ function Projector({ forecast, name }: { forecast: ArrivalForecast; name: (id: s
                   </div>
                   {g.lines.map((l) => (
                     <div key={l.product_id} className={cn(rowCls, 'border-b border-muted px-3 py-2.5 last:border-0')}>
-                      <span className="min-w-0">
+                      <span className="col-span-3 min-w-0 sm:col-span-1">
                         <b className={cn('block truncate text-[15px]', !l.expected && 'font-semibold text-faint')}>
                           {name(l.product_id)}
                         </b>
                         <Bar value={l.expected} good={l.expectedA} max={t.largest} />
                       </span>
-                      <b className={cn('text-right text-[15px] tabular-nums', !l.expected && 'font-normal text-faint')}>
-                        {nf0(l.expected)}
-                      </b>
-                      <span className={cn('text-right text-[15px] tabular-nums', !l.expected && 'text-faint')}>
-                        {nf0(l.expectedA)}
-                      </span>
+                      {COLUMNS.map((c) => (
+                        <span key={c.key} className="min-w-0 sm:text-right">
+                          <small className="block text-[11px] font-semibold text-muted-foreground uppercase sm:hidden">
+                            {c.label}
+                          </small>
+                          <span
+                            className={cn(
+                              'text-[15px] tabular-nums',
+                              c.key === 'expected' && 'font-bold',
+                              !l[c.key] && 'font-normal text-faint',
+                            )}
+                          >
+                            {nf0(l[c.key])}
+                          </span>
+                        </span>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -167,8 +188,10 @@ function Projector({ forecast, name }: { forecast: ArrivalForecast; name: (id: s
                 <dt className="text-muted-foreground">calidad A</dt>
               </div>
               <div>
-                <dd className="text-[16px] font-extrabold tabular-nums">{pct0(1 - t.aShare)}</dd>
-                <dt className="text-muted-foreground">calidad B</dt>
+                <dd className="text-[16px] font-extrabold tabular-nums">{nf0(t.expectedB)}</dd>
+                <dt className="text-muted-foreground">
+                  calidad B <span className="whitespace-nowrap">({pct0(1 - t.aShare)})</span>
+                </dt>
               </div>
             </dl>
           </div>
