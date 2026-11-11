@@ -168,11 +168,12 @@ class StockTest {
     }
 
     @Test
-    fun sacaMethodDefaultsToTheRecommendedOne() {
-        assertEquals("max", pe.avicola2.app.domain.sacaMethodOf(null))
-        assertEquals("max", pe.avicola2.app.domain.sacaMethodOf("otra"))
-        assertEquals("sum", pe.avicola2.app.domain.sacaMethodOf("sum"))
+    fun sacaMethodDefaultsToTheBusinessRule() {
+        assertEquals("sum", pe.avicola2.app.domain.sacaMethodOf(null))
+        assertEquals("sum", pe.avicola2.app.domain.sacaMethodOf("otra"))
+        assertEquals("max", pe.avicola2.app.domain.sacaMethodOf("max"))
         assertTrue("proyección + pedidos" in pe.avicola2.app.domain.sacaFormula("sum"))
+        assertTrue("el mayor" in pe.avicola2.app.domain.sacaFormula("max"))
         assertEquals("Suavizado exponencial, vida media 3 días", pe.avicola2.app.domain.arrivalModelLabel("ewma_3"))
         assertTrue("peso de la parvada" in pe.avicola2.app.domain.arrivalModelLabel("hybrid_weight"))
     }

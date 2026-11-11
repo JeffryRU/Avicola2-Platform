@@ -188,7 +188,7 @@ private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MethodPicker(method: String, onChoose: (String) -> Unit) {
-    val options = listOf(SACA_METHOD_MAX to "Recomendada", SACA_METHOD_SUM to "Proyección + pedidos")
+    val options = listOf(SACA_METHOD_SUM to "Proyección + pedidos", SACA_METHOD_MAX to "El mayor de los dos")
     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) {
         Text("FORMA DE CÁLCULO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(top = 4.dp)) {
@@ -210,18 +210,37 @@ private fun Hero(plan: Saca) {
     Surface(color = scheme.primary, contentColor = scheme.onPrimary, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp)) {
             Text(
-                "PEDIR A GRANJA · ${plan.date.short().uppercase()}",
+                "PEDIDO FINAL A GRANJA · ${plan.date.short().uppercase()}",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = scheme.onPrimary.copy(alpha = 0.8f),
             )
             Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.Bottom) {
-                Text(formatNumber(plan.request.toDouble()), style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold)
+                Text(formatNumber((plan.farmOrder ?: plan.request).toDouble()), style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold)
                 Text("aves", style = MaterialTheme.typography.titleMedium, color = scheme.onPrimary.copy(alpha = 0.85f), modifier = Modifier.padding(start = 8.dp, bottom = 10.dp))
             }
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                HeroStat(formatNumber(plan.request.toDouble()), "hacen falta")
                 HeroStat(formatNumber(plan.requestKg, 1), "kg de producto")
-                HeroStat(formatNumber(plan.liveKg, 1), "kg vivos · rend. ${formatNumber(plan.yieldFactor * 100)} %")
+                HeroStat(formatNumber(plan.liveKg, 1), "kg vivos")
+            }
+            if (plan.groups.isNotEmpty()) {
+                Surface(color = scheme.onPrimary.copy(alpha = 0.12f), contentColor = scheme.onPrimary, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) {
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        plan.groups.forEach { g ->
+                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(g.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                Text(
+                                    "${formatNumber(g.need.toDouble())} × ${formatNumber(g.factor, 2)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = scheme.onPrimary.copy(alpha = 0.85f),
+                                    modifier = Modifier.padding(end = 12.dp),
+                                )
+                                Text(formatNumber(g.farmOrder.toDouble()), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -345,7 +364,7 @@ private fun ByProduct(data: SacaData) {
         val max = plan.lines.maxOfOrNull { it.request }?.coerceAtLeast(1) ?: 1
         data.products.groupBy { it.subcategory }.forEach { (group, items) ->
             val request = items.sumOf { lines[it.id]?.request ?: 0 }
-            GroupHeader(group ?: "Otros", "${formatNumber(request.toDouble())} a pedir", Modifier.fillMaxWidth().padding(top = 8.dp))
+            GroupHeader(group ?: "Otros", "${formatNumber(request.toDouble())} hacen falta", Modifier.fillMaxWidth().padding(top = 8.dp))
             items.forEach { p -> lines[p.id]?.let { ProductLine(p, it, max) } }
         }
         Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {

@@ -2,8 +2,9 @@ import { z } from 'zod'
 import { addDays, type IsoDate } from '@/shared/domain/dates'
 import { isoDateSchema } from '@/shared/domain/schemas'
 
-/** Forma de cálculo: «max» = el mayor entre proyección y pedidos; «sum» = proyección + pedidos. */
-export const SACA_METHODS = ['max', 'sum'] as const
+/** Forma de cálculo: «sum» = proyección + pedidos (la del negocio); «max» = el mayor de los dos. */
+export const SACA_METHODS = ['sum', 'max'] as const
+export const DEFAULT_METHOD = 'sum'
 export const sacaMethodSchema = z.enum(SACA_METHODS)
 export type SacaMethod = z.infer<typeof sacaMethodSchema>
 
@@ -11,7 +12,7 @@ const METHOD_KEY = 'saca.method'
 /** La forma elegida se recuerda en este equipo. */
 export function storedMethod(storage: Pick<Storage, 'getItem'> | undefined): SacaMethod {
   const parsed = sacaMethodSchema.safeParse(storage?.getItem(METHOD_KEY))
-  return parsed.success ? parsed.data : 'max'
+  return parsed.success ? parsed.data : DEFAULT_METHOD
 }
 export const storeMethod = (storage: Pick<Storage, 'setItem'> | undefined, method: SacaMethod) =>
   storage?.setItem(METHOD_KEY, method)
@@ -31,6 +32,18 @@ export const sacaLineSchema = z.object({
 })
 export type SacaLine = z.infer<typeof sacaLineSchema>
 
+export const sacaGroupSchema = z.object({
+  name: z.string(),
+  projected: z.number().int(),
+  ordered: z.number().int(),
+  demand: z.number().int(),
+  stock: z.number().int(),
+  need: z.number().int(),
+  factor: z.number(),
+  farm_order: z.number().int(),
+})
+export type SacaGroup = z.infer<typeof sacaGroupSchema>
+
 export const sacaSchema = z.object({
   date: isoDateSchema,
   lines: z.array(sacaLineSchema),
@@ -42,7 +55,10 @@ export const sacaSchema = z.object({
   request_kg: z.number(),
   live_kg: z.number(),
   yield_factor: z.number(),
-  method: sacaMethodSchema.default('max'),
+  method: sacaMethodSchema.default(DEFAULT_METHOD),
+  // Pedido final a granja: por tipo, lo que hace falta por su factor.
+  farm_order: z.number().int(),
+  groups: z.array(sacaGroupSchema),
   stock_date: isoDateSchema.nullable(),
   sellers_registered: z.number().int(),
   sellers_total: z.number().int(),

@@ -11,7 +11,7 @@ import pe.avicola2.app.domain.Product
 import pe.avicola2.app.domain.ProductionDay
 import pe.avicola2.app.domain.ProductionEntry
 import pe.avicola2.app.domain.Projection
-import pe.avicola2.app.domain.SACA_METHOD_MAX
+import pe.avicola2.app.domain.SACA_METHOD_DEFAULT
 import pe.avicola2.app.domain.Saca
 import pe.avicola2.app.domain.Seller
 import pe.avicola2.app.domain.StockDay
@@ -74,7 +74,7 @@ interface ProductionGateway {
 
 /** Cuánto pedir a granja para un día. */
 interface SacaGateway {
-    suspend fun plan(day: LocalDate, method: String = SACA_METHOD_MAX): Saca
+    suspend fun plan(day: LocalDate, method: String = SACA_METHOD_DEFAULT): Saca
 }
 
 /** Entrega un archivo generado al sistema para guardarlo o mandarlo (menú «Compartir»). */

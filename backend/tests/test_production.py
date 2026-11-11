@@ -223,8 +223,10 @@ def test_saca_estimates_what_will_arrive_per_range(client) -> None:
     assert plan["forecast"]["method"] == "ewma_7" and plan["forecast"]["days"] == 20
     by_id = {line["product_id"]: line for line in plan["lines"]}
     # Se piden 500 aves chicas (proyectadas como Brasa 1), pero llegarán como Brasa 3 y Brasa 4.
-    assert (by_id["P0001"]["expected"], by_id["P0003"]["expected"]) == (0, 200)
-    assert (by_id["P0004"]["expected"], by_id["P0004"]["expected_a"]) == (300, 225)
+    # A granja van 400 (el 80 % de las 500 que hacen falta de brasa chica).
+    assert plan["farm_order"] == 400
+    assert (by_id["P0001"]["expected"], by_id["P0003"]["expected"]) == (0, 160)
+    assert (by_id["P0004"]["expected"], by_id["P0004"]["expected_a"]) == (240, 180)
     assert by_id["P0006"]["expected"] == 0  # mediana: no se pidió nada
 
 

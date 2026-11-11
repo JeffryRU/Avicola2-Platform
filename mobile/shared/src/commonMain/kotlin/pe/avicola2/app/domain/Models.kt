@@ -221,15 +221,18 @@ data class StockRequest(val lines: List<StockEntry>)
 
 // --- Cálculo de saca -----------------------------------------------------------------------
 
-/** Formas de cálculo: el mayor entre proyección y pedidos (recomendada) o su suma (la del negocio). */
+/** Formas de cálculo: proyección + pedidos (la del negocio, por defecto) o el mayor de los dos. */
 const val SACA_METHOD_MAX = "max"
 const val SACA_METHOD_SUM = "sum"
 
-fun sacaMethodOf(stored: String?): String = if (stored == SACA_METHOD_SUM) SACA_METHOD_SUM else SACA_METHOD_MAX
+const val SACA_METHOD_DEFAULT = SACA_METHOD_SUM
+
+fun sacaMethodOf(stored: String?): String = if (stored == SACA_METHOD_MAX) SACA_METHOD_MAX else SACA_METHOD_DEFAULT
 
 fun sacaFormula(method: String): String =
-    if (method == SACA_METHOD_SUM) "Pedir = proyección + pedidos confirmados − stock. Nunca menos de 0."
-    else "Pedir = el mayor entre proyección y pedidos confirmados, menos el stock. Nunca menos de 0."
+    (if (method == SACA_METHOD_MAX) "Hace falta = el mayor entre proyección y pedidos confirmados, menos el stock."
+    else "Hace falta = proyección + pedidos confirmados − stock.") +
+        " Nunca menos de 0. A granja se pide por tipo: lo que hace falta de cada uno por su factor."
 
 /** Nombre legible del modelo de llegada en uso (lo elige solo el backend). */
 fun arrivalModelLabel(method: String): String {
@@ -261,6 +264,15 @@ data class SacaForecast(
     @SerialName("date_to") val dateTo: LocalDate,
 )
 
+/** Un tipo de pedido a granja (Brasa chica...): lo que hace falta y el pedido final con su factor. */
+@Serializable
+data class SacaGroup(
+    val name: String,
+    val need: Int,
+    val factor: Double,
+    @SerialName("farm_order") val farmOrder: Int,
+)
+
 /** Cuánto pedir a granja para un día y con qué datos se calculó (lo resuelve el backend). */
 @Serializable
 data class Saca(
@@ -279,8 +291,11 @@ data class Saca(
     @SerialName("sellers_total") val sellersTotal: Int,
     @SerialName("orders_available") val ordersAvailable: Boolean,
     val forecast: SacaForecast? = null,
-    /** Forma de cálculo usada: «max» o «sum». */
-    val method: String = SACA_METHOD_MAX,
+    /** Forma de cálculo usada: «sum» o «max». */
+    val method: String = SACA_METHOD_DEFAULT,
+    /** Pedido final a granja: por tipo, lo que hace falta por su factor (null: backend anterior). */
+    @SerialName("farm_order") val farmOrder: Int? = null,
+    val groups: List<SacaGroup> = emptyList(),
 ) {
     val missingSellers: Int get() = (sellersTotal - sellersRegistered).coerceAtLeast(0)
 }

@@ -87,6 +87,11 @@ class Settings(BaseSettings):
     # Conversión de kg de producto a saca (pollo vivo). Valores de referencia por validar.
     yield_factor: float = Field(0.75, gt=0, le=1)  # kg de producto por kg vivo
     avg_live_weight_kg: float = Field(2.6, gt=0)  # peso vivo promedio por ave
+    # Pedido final a granja por tipo: lo que hace falta de cada tipo se multiplica por su factor
+    # (regla del negocio). Los tipos que no figuran usan 1. Se cambia con SACA_GROUP_FACTORS (JSON).
+    saca_group_factors: dict[str, float] = Field(
+        default_factory=lambda: {"Brasa chica": 0.8, "Brasa mediana": 0.7}
+    )
 
     @field_validator("auth_cookie_secure", mode="before")
     @classmethod

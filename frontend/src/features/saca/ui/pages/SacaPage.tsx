@@ -24,6 +24,8 @@ import {
   BY_PRODUCT_TITLE,
   COLUMNS,
   DAY_LABEL,
+  FARM_COLUMNS,
+  FARM_ORDER_HINT,
   FORMULA,
   HERO_LABEL,
   METHOD_LABEL,
@@ -45,6 +47,7 @@ import {
   arrivalNote,
   coverageText,
   missingNote,
+  NEED_LABEL,
   modelLabel,
 } from '@/features/saca/types/saca'
 import { DayStrip } from '@/shared/ui/components/day-strip'
@@ -77,14 +80,14 @@ export function SacaPage() {
           label={DAY_LABEL}
           caption={(d) => (d === ref ? TODAY_LABEL : d === addDays(ref, 1) ? TOMORROW_LABEL : undefined)}
         />
-        <label className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <label className="mb-4 flex flex-col gap-x-3 gap-y-1.5 sm:flex-row sm:items-center">
           <span className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
             {METHOD_LABEL}
           </span>
           <select
             value={method}
             onChange={(e) => chooseMethod(sacaMethodSchema.parse(e.target.value))}
-            className="h-11 max-w-full min-w-0 flex-1 rounded-[10px] border-[1.5px] border-border bg-white px-3 text-[14.5px] font-semibold outline-none focus:border-primary focus:ring-4 focus:ring-primary-ring sm:flex-none"
+            className="h-11 max-w-full min-w-0 rounded-[10px] border-[1.5px] border-border bg-white px-3 text-[14.5px] font-semibold outline-none focus:border-primary focus:ring-4 focus:ring-primary-ring"
           >
             {SACA_METHODS.map((m) => (
               <option key={m} value={m}>
@@ -128,11 +131,15 @@ function Hero({ plan }: { plan: Saca }) {
       <div className="mt-2 flex flex-wrap items-end gap-x-8 gap-y-4">
         <p className="flex items-baseline gap-2">
           <b className="text-[52px] leading-none font-extrabold tracking-[-0.04em] tabular-nums dsk:text-[64px]">
-            {nf0(plan.request)}
+            {nf0(plan.farm_order)}
           </b>
           <span className="text-[17px] font-semibold text-white/85">{BIRDS_LABEL}</span>
         </p>
-        <dl className="flex gap-6 pb-1.5">
+        <dl className="flex flex-wrap gap-x-6 gap-y-2 pb-1.5">
+          <div>
+            <dd className="text-[20px] leading-tight font-extrabold tabular-nums">{nf0(plan.request)}</dd>
+            <dt className="text-[12.5px] text-white/80">{NEED_LABEL}</dt>
+          </div>
           <div>
             <dd className="text-[20px] leading-tight font-extrabold tabular-nums">{nf1(plan.request_kg)}</dd>
             <dt className="text-[12.5px] text-white/80">{KG_LABEL}</dt>
@@ -145,9 +152,46 @@ function Hero({ plan }: { plan: Saca }) {
           </div>
         </dl>
       </div>
+      {plan.groups.length > 0 && (
+        <div className="mt-4 rounded-[14px] bg-white/12 px-3.5 py-3">
+          {/* Ancho: tabla. Angosto: el tipo a la izquierda y la cuenta a la derecha. */}
+          <div className="hidden sm:block">
+            <div className={cn(farmCols, 'pb-1 text-[11.5px] font-bold tracking-[0.04em] text-white/75 uppercase')}>
+              <span>{FARM_COLUMNS.type}</span>
+              <span className="text-right">{FARM_COLUMNS.need}</span>
+              <span className="text-right">{FARM_COLUMNS.factor}</span>
+              <span className="text-right">{FARM_COLUMNS.order}</span>
+            </div>
+          </div>
+          {plan.groups.map((g) => (
+            <div
+              key={g.name}
+              className="border-t border-white/15 py-1.5 text-[15px] first:border-t-0 sm:first:border-t"
+            >
+              <div className={cn(farmCols, 'hidden sm:grid')}>
+                <b className="truncate">{g.name}</b>
+                <span className="text-right tabular-nums">{nf0(g.need)}</span>
+                <span className="text-right text-white/85 tabular-nums">× {nf2(g.factor)}</span>
+                <b className="text-right text-[17px] tabular-nums">{nf0(g.farm_order)}</b>
+              </div>
+              <div className="flex items-baseline gap-2 sm:hidden">
+                <b className="min-w-0 flex-1 truncate">{g.name}</b>
+                <span className="text-[13px] whitespace-nowrap text-white/85 tabular-nums">
+                  {nf0(g.need)} × {nf2(g.factor)}
+                </span>
+                <b className="min-w-[2.5rem] text-right text-[17px] tabular-nums">{nf0(g.farm_order)}</b>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
+
+const farmCols =
+  'grid grid-cols-[minmax(0,1fr)_5rem_3.6rem_4.6rem] items-baseline gap-x-2 sm:grid-cols-[minmax(0,1fr)_7rem_5rem_7rem]'
+const nf2 = (n: number) => n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 type Tone = 'ok' | 'warn' | 'off'
 const toneCls: Record<Tone, string> = {
@@ -237,6 +281,7 @@ function Sources({ plan }: { plan: Saca }) {
       </ul>
       <p className="border-t border-muted px-4 py-3 text-[12.5px] text-muted-foreground dsk:px-5">
         {FORMULA[plan.method]}
+        <span className="mt-1.5 block">{FARM_ORDER_HINT}</span>
         {plan.forecast && <span className="mt-1.5 block">{ARRIVAL_HINT}</span>}
       </p>
     </Section>
@@ -293,7 +338,7 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
             <div className="flex items-baseline gap-3 rounded-[10px] bg-muted/70 px-3 py-2">
               <b className="min-w-0 flex-1 text-[13px] tracking-[0.02em] text-ink-2 uppercase">{g.name ?? 'Otros'}</b>
               <span className="text-[13px] text-muted-foreground tabular-nums">
-                <b className="text-foreground">{nf0(sum(g.products, (l) => l.request))}</b> a pedir
+                <b className="text-foreground">{nf0(sum(g.products, (l) => l.request))}</b> hacen falta
               </span>
             </div>
             {g.products.map((p) => {

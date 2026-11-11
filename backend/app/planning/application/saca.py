@@ -18,7 +18,7 @@ from app.planning.domain.models import CONFIRMED, Seller
 from app.planning.domain.permissions import Permission, require
 from app.planning.domain.production import LOOKBACK, estimate_from
 from app.planning.domain.saca import (
-    METHOD_MAX,
+    DEFAULT_METHOD,
     METHODS,
     SacaPlan,
     build_plan,
@@ -39,13 +39,15 @@ class CalculateSaca:
         yield_factor: float,
         production: ProductionRepository | None = None,
         model: ArrivalModel | None = None,
+        group_factors: dict[str, float] | None = None,
     ):
         self.products, self.projections, self.stock = products, projections, stock
         self.orders, self.sellers, self.yield_factor = orders, sellers, yield_factor
         # Historia de producción para estimar en qué rango llegará lo pedido.
         self.production, self.model = production, model
+        self.group_factors = tuple((group_factors or {}).items())
 
-    def __call__(self, viewer: Seller, day: date, method: str = METHOD_MAX) -> SacaPlan:
+    def __call__(self, viewer: Seller, day: date, method: str = DEFAULT_METHOD) -> SacaPlan:
         require(viewer.role, Permission.VIEW_SACA, "No tienes permiso para ver el cálculo de saca.")
         if method not in METHODS:
             raise DomainError("Forma de cálculo desconocida.")
@@ -67,6 +69,7 @@ class CalculateSaca:
             self.orders.units(day),
             {line.product_id: line.units for line in latest.lines} if latest else {},
             method=method,
+            group_factors=self.group_factors,
             stock_date=latest.date if latest else None,
             sellers_registered=len(registered),
             sellers_total=len(team),
