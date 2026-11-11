@@ -4,7 +4,7 @@ La registra el jefe de despacho. Con esa historia se estima en qué rango llegar
 (`estimate_arrival`): se pide casi todo en un rango por tipo, pero las aves llegan repartidas.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
 from app.shared.domain.errors import DomainError
@@ -13,15 +13,17 @@ from app.shared.domain.errors import DomainError
 PRODUCTION_BACK_DAYS = 7
 MAX_BIRDS = 1_000_000
 
-# Modelo de llegada: suavizado exponencial sobre los días con registro. Fue el mejor de 13 en la
-# validación hacia adelante con datos reales (ADR 0011): 28,8 % de error por rango contra 79,9 %
-# de suponer que llega lo pedido. Con vida media de 2 a 7 días el resultado es casi igual.
+# Modelo de llegada base: suavizado exponencial sobre los días con registro (ADR 0011): 28,8 % de
+# error por rango contra 79,9 % de suponer que llega lo pedido. La vida media de partida es 7; el
+# modelo en uso la ajusta solo y puede pasar a uno con el peso de la parvada (ADR 0013).
 HALF_LIFE_DAYS = 7.0
+# Peso vivo promedio de la parvada (kg) que se acepta al registrar.
+MIN_FLOCK_KG, MAX_FLOCK_KG = 0.5, 6.0
 # Días con registro que se usan (más atrás, el peso ya es despreciable) y mínimo para estimar.
 HISTORY_DAYS = 60
 MIN_HISTORY_DAYS = 14
 # Cuánto calendario se consulta para reunir esa historia.
-LOOKBACK = timedelta(days=120)
+LOOKBACK = timedelta(days=365)
 
 
 @dataclass(frozen=True)
@@ -43,6 +45,8 @@ class DailyProduction:
     lines: tuple[ProductionLine, ...]
     recorded_by: str
     recorded_at: datetime
+    # Peso vivo promedio (kg) de la parvada de cada tipo (Brasa chica...); solo los que se anotaron.
+    weights: dict[str, float] = field(default_factory=dict)
 
     @property
     def ordered(self) -> float:
@@ -77,6 +81,8 @@ class ArrivalEstimate:
     days: int
     date_from: date
     date_to: date
+    # Modelo con el que se estimó (lo elige el modelo que se ajusta solo).
+    model: str = "ewma_7"
 
 
 @dataclass(frozen=True)
@@ -97,23 +103,26 @@ class ArrivalRates:
         return round(birds), round(birds * (1 - self.b_rate.get(product_id, 0.0)))
 
 
-def _usable(history: list[DailyProduction]) -> list[DailyProduction]:
+def usable_days(history: list[DailyProduction]) -> list[DailyProduction]:
+    """Días que sirven de historia (con pedido y producción), del más antiguo al más reciente."""
     return sorted((d for d in history if d.ordered > 0 and d.produced > 0), key=lambda d: d.date)
 
 
-def arrival_rates(history: list[DailyProduction], group_of: dict[str, str]) -> ArrivalRates | None:
+def arrival_rates(
+    history: list[DailyProduction], group_of: dict[str, str], half_life: float = HALF_LIFE_DAYS
+) -> ArrivalRates | None:
     """Ajusta el modelo con la historia: por producto, aves que llegaron de ese rango por cada
     ave pedida de su tipo, con más peso en los días recientes. `group_of` dice a qué tipo
     pertenece cada producto. Devuelve None si no hay historia suficiente.
     """
-    usable = _usable(history)[-HISTORY_DAYS:]
+    usable = usable_days(history)[-HISTORY_DAYS:]
     if len(usable) < MIN_HISTORY_DAYS:
         return None
     arrived: dict[str, float] = {}
     second: dict[str, float] = {}
     asked: dict[str, float] = {}
     for age, day in enumerate(reversed(usable)):
-        weight = 0.5 ** (age / HALF_LIFE_DAYS)
+        weight = 0.5 ** (age / half_life)
         for line in day.lines:
             group = group_of.get(line.product_id)
             if group is None:
@@ -132,15 +141,10 @@ def arrival_rates(history: list[DailyProduction], group_of: dict[str, str]) -> A
     return ArrivalRates(share, b_rate, len(usable), usable[0].date, usable[-1].date)
 
 
-def estimate_arrival(
-    history: list[DailyProduction],
-    group_of: dict[str, str],
-    request_by_group: dict[str, float],
-) -> ArrivalEstimate | None:
-    """Reparte lo que se va a pedir de cada tipo entre sus rangos, según la historia reciente."""
-    rates = arrival_rates(history, group_of)
-    if rates is None:
-        return None
+def estimate_from(
+    rates: ArrivalRates, group_of: dict[str, str], request_by_group: dict[str, float]
+) -> ArrivalEstimate:
+    """Reparte lo que se va a pedir de cada tipo entre sus rangos con un modelo ya ajustado."""
     expected: dict[str, int] = {}
     expected_a: dict[str, int] = {}
     for product, group in group_of.items():
@@ -148,6 +152,16 @@ def estimate_arrival(
             product, request_by_group.get(group, 0.0)
         )
     return ArrivalEstimate(expected, expected_a, rates.days, rates.date_from, rates.date_to)
+
+
+def estimate_arrival(
+    history: list[DailyProduction],
+    group_of: dict[str, str],
+    request_by_group: dict[str, float],
+) -> ArrivalEstimate | None:
+    """Lo mismo con el suavizado exponencial base. None si no hay historia suficiente."""
+    rates = arrival_rates(history, group_of)
+    return estimate_from(rates, group_of, request_by_group) if rates else None
 
 
 # Días recientes en los que se comprueba el modelo contra lo que de verdad llegó.
@@ -181,27 +195,31 @@ class ArrivalCheck:
 
 def check_arrival(history: list[DailyProduction], group_of: dict[str, str]) -> list[ArrivalCheck]:
     """Repite la estimación para cada uno de los últimos días usando solo los anteriores."""
-    usable = _usable(history)
+    usable = usable_days(history)
     checks = []
     for index in range(max(MIN_HISTORY_DAYS, len(usable) - CHECK_DAYS), len(usable)):
         rates = arrival_rates(usable[:index], group_of)
         if rates is None:
             continue
-        day = usable[index]
-        lines = [line for line in day.lines if line.product_id in group_of]
-        asked: dict[str, float] = {}
-        for line in lines:
-            group = group_of[line.product_id]
-            asked[group] = asked.get(group, 0.0) + line.ordered
-        checks.append(
-            ArrivalCheck(
-                day.date,
-                {line.product_id: line.ordered for line in lines},
-                {p: rates.expect(p, asked.get(g, 0.0))[0] for p, g in group_of.items()},
-                dict.fromkeys(group_of, 0) | {line.product_id: line.produced for line in lines},
-            )
-        )
+        checks.append(check_day(usable[index], group_of, rates.share))
     return checks
+
+
+def check_day(
+    day: DailyProduction, group_of: dict[str, str], share: dict[str, float]
+) -> ArrivalCheck:
+    """Compara un día ya ocurrido con lo que daría ese reparto (`share`) sobre lo que se pidió."""
+    lines = [line for line in day.lines if line.product_id in group_of]
+    asked: dict[str, float] = {}
+    for line in lines:
+        group = group_of[line.product_id]
+        asked[group] = asked.get(group, 0.0) + line.ordered
+    return ArrivalCheck(
+        day.date,
+        {line.product_id: line.ordered for line in lines},
+        {p: round(asked.get(g, 0.0) * share.get(p, 0.0)) for p, g in group_of.items()},
+        dict.fromkeys(group_of, 0) | {line.product_id: line.produced for line in lines},
+    )
 
 
 def overall_error(checks: list[ArrivalCheck], *, naive: bool = False) -> float:
@@ -209,3 +227,25 @@ def overall_error(checks: list[ArrivalCheck], *, naive: bool = False) -> float:
     total = sum(sum(c.produced.values()) for c in checks)
     missed = sum((c.naive_error if naive else c.error) * sum(c.produced.values()) for c in checks)
     return missed / total if total else 0.0
+
+
+@dataclass(frozen=True)
+class FittedArrival:
+    """El modelo de llegada elegido con la historia de hoy y cómo se llegó a él."""
+
+    rates: ArrivalRates
+    # Modelo en uso (p. ej. «ewma_7», «hybrid_weight») y los que compitieron con su error reciente.
+    model: str
+    candidates: dict[str, float]
+    # Lo que ese modelo habría dicho en los últimos días, contra lo que llegó.
+    checks: list[ArrivalCheck]
+    # Pesos de la parvada con los que se estimó (vacío: no se usaron).
+    weights: dict[str, float]
+
+
+def latest_weights(history: list[DailyProduction]) -> dict[str, float]:
+    """El último peso anotado de cada tipo: a falta de otro dato, se supone que sigue igual."""
+    weights: dict[str, float] = {}
+    for day in sorted(history, key=lambda d: d.date):
+        weights.update(day.weights)
+    return weights

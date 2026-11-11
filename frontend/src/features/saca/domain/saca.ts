@@ -2,6 +2,20 @@ import { z } from 'zod'
 import { addDays, type IsoDate } from '@/shared/domain/dates'
 import { isoDateSchema } from '@/shared/domain/schemas'
 
+/** Forma de cálculo: «max» = el mayor entre proyección y pedidos; «sum» = proyección + pedidos. */
+export const SACA_METHODS = ['max', 'sum'] as const
+export const sacaMethodSchema = z.enum(SACA_METHODS)
+export type SacaMethod = z.infer<typeof sacaMethodSchema>
+
+const METHOD_KEY = 'saca.method'
+/** La forma elegida se recuerda en este equipo. */
+export function storedMethod(storage: Pick<Storage, 'getItem'> | undefined): SacaMethod {
+  const parsed = sacaMethodSchema.safeParse(storage?.getItem(METHOD_KEY))
+  return parsed.success ? parsed.data : 'max'
+}
+export const storeMethod = (storage: Pick<Storage, 'setItem'> | undefined, method: SacaMethod) =>
+  storage?.setItem(METHOD_KEY, method)
+
 /** Cálculo de saca de un día: lo resuelve el backend; aquí solo se valida y se describe. */
 export const sacaLineSchema = z.object({
   product_id: z.string(),
@@ -28,6 +42,7 @@ export const sacaSchema = z.object({
   request_kg: z.number(),
   live_kg: z.number(),
   yield_factor: z.number(),
+  method: sacaMethodSchema.default('max'),
   stock_date: isoDateSchema.nullable(),
   sellers_registered: z.number().int(),
   sellers_total: z.number().int(),

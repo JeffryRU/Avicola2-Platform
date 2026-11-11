@@ -13,7 +13,7 @@ from app.planning.domain.history import ProjectionChange
 from app.planning.domain.models import DailyUnits, Product, Projection, Seller, SellerAccount
 from app.planning.domain.notifications import Event, Notification
 from app.planning.domain.orders import OrderLine
-from app.planning.domain.production import DailyProduction
+from app.planning.domain.production import DailyProduction, FittedArrival
 from app.planning.domain.stock import DailyStock
 
 
@@ -111,6 +111,20 @@ class DemandForecaster(Protocol):
     name: str
 
     def suggest(self, seller: str, category: str, dates: list[date]) -> list[DailyUnits]: ...
+
+
+class ArrivalModel(Protocol):
+    """Modelo de llegada por rango: se elige y se ajusta con la historia de producción."""
+
+    def fit(
+        self,
+        history: list[DailyProduction],
+        group_of: dict[str, str],
+        weights: dict[str, float] | None = None,
+        target: date | None = None,
+    ) -> FittedArrival | None:
+        """None si falta historia. `weights`: peso de la parvada del día a estimar, por tipo."""
+        ...
 
 
 class OrderHistory(Protocol):

@@ -27,6 +27,7 @@ def test_expected_tables() -> None:
         "np_projection_changes",
         "np_dispatch_stock",
         "np_production",
+        "np_production_weights",
         "np_dispatch_orders",
         "np_store_sales",
     }

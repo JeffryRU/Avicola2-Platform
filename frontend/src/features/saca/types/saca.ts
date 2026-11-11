@@ -1,4 +1,6 @@
 /** Textos del cálculo de saca (única fuente). */
+import type { SacaMethod } from '@/features/saca/domain/saca'
+
 export const SACA_TITLE = 'Cálculo de saca'
 export const SACA_SUBTITLE = 'Cuánto pedir a granja cada día, por producto.'
 export const DAY_LABEL = 'Día de la saca'
@@ -11,7 +13,15 @@ export const LIVE_LABEL = 'kg vivos estimados'
 export const BY_PRODUCT_TITLE = 'Por producto'
 export const NOTHING_TITLE = 'Nada que pedir todavía'
 export const NOTHING_BODY = 'Nadie registró proyecciones para este día.'
-export const FORMULA = 'Pedir = el mayor entre proyección y pedidos confirmados, menos el stock. Nunca menos de 0.'
+export const METHOD_LABEL = 'Forma de cálculo'
+export const METHOD_OPTION: Record<SacaMethod, string> = {
+  max: 'Recomendada: el mayor entre proyección y pedidos',
+  sum: 'Del negocio: proyección + pedidos',
+}
+export const FORMULA: Record<SacaMethod, string> = {
+  max: 'Pedir = el mayor entre proyección y pedidos confirmados, menos el stock. Nunca menos de 0. Evita contar dos veces lo que ya está proyectado y pedido.',
+  sum: 'Pedir = proyección + pedidos confirmados − stock. Nunca menos de 0. Úsala si la proyección es lo que falta por pedir además de lo ya confirmado.',
+}
 
 /** Panel "Con qué datos se calculó". */
 export const SOURCES_TITLE = 'Con qué datos se calculó'
@@ -26,9 +36,15 @@ export const ARRIVAL_HINT =
   'A granja se pide por tipo y las aves llegan repartidas entre rangos. «Llegará» reparte lo pedido según la producción reciente (pesan más los últimos días).'
 export const arrivalNote = (days: number, from: string, to: string) =>
   `Con ${String(days)} días de producción, del ${from} al ${to}.`
+/** Nombre legible del modelo de llegada en uso (lo elige solo el backend). */
+export function modelLabel(method: string): string {
+  if (method === 'hybrid_weight') return 'Suavizado + árboles con el peso de la parvada'
+  const halfLife = /^ewma_(\d+(?:\.\d+)?)$/.exec(method)?.[1]
+  return halfLife ? `Suavizado exponencial, vida media ${halfLife} días` : method
+}
 export const NO_STOCK = 'Sin registro en los 3 días anteriores: no se descuenta nada.'
-export const NO_ORDERS = 'Sin conectar (ARIS aún no se integra): se usan solo las proyecciones.'
-export const ORDERS_OK = 'Conectados.'
+export const NO_ORDERS = 'No hay pedidos de ARIS cargados para este día: se usan solo las proyecciones.'
+export const ORDERS_OK = 'Pedidos de ARIS cargados para este día (pollo entero para brasa).'
 
 export const COLUMNS = {
   product: 'Producto',

@@ -13,7 +13,12 @@ import { useCatalog } from '@/features/catalog/ui/hooks'
 import { dateOf } from '@/features/editing/domain/editing'
 import {
   FIELDS,
+  cleanKg,
   deviation,
+  invalidWeights,
+  toWeights,
+  weightDraftOf,
+  type WeightDraft,
   draftOf,
   invalidQuality,
   toEntries,
@@ -24,6 +29,8 @@ import {
 } from '@/features/production/domain/production'
 import {
   DAY_LABEL,
+  DEVIATION_HINT,
+  DEVIATION_LABEL,
   FIELD_LABEL,
   FIELD_SHORT,
   HINT,
@@ -46,8 +53,11 @@ import {
   SUMMARY_TITLE,
   TODAY_LABEL,
   UPDATE_LABEL,
+  WEIGHTS_HINT,
+  WEIGHTS_TITLE,
   YESTERDAY_LABEL,
   qualityError,
+  weightError,
 } from '@/features/production/types/production'
 import { FORECAST_NAV_LABEL } from '@/features/production/types/forecast'
 import { useProduction, useRegisterProduction } from '@/features/production/ui/hooks'
@@ -61,7 +71,7 @@ import { cn } from '@/shared/ui/lib/utils'
 const FORM_ID = 'production-form'
 /** Angosto: el nombre arriba y las tres cifras debajo. Ancho: todo en una fila. */
 const rowCls =
-  'grid grid-cols-3 items-center gap-x-2 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_repeat(3,6.5rem)] sm:gap-x-3'
+  'grid grid-cols-3 items-center gap-x-2 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_repeat(3,6.5rem)_5rem] sm:gap-x-3'
 const nameCls = 'col-span-3 min-w-0 sm:col-span-1'
 const cellCls =
   'h-11 w-full min-w-0 rounded-[10px] border-[1.5px] border-border bg-white px-2 text-center text-[15px] tabular-nums outline-none transition-colors placeholder:text-faint focus:border-primary focus:ring-4 focus:ring-primary-ring'
@@ -168,8 +178,19 @@ function ColumnHead() {
             {FIELD_LABEL[f]}
           </span>
         ))}
+        <span className="text-right">{DEVIATION_LABEL}</span>
       </div>
     </div>
+  )
+}
+
+/** Lo que llegó menos lo pedido, con signo. */
+function Deviation({ value }: { value: number }) {
+  return (
+    <span className={cn(value < 0 && 'text-warn', !value && 'text-faint')}>
+      {value > 0 ? '+' : ''}
+      {nf0(value)}
+    </span>
   )
 }
 
@@ -207,7 +228,12 @@ function Rows({
             />
             {g.products.map((p) => (
               <div key={p.id} className={cn(rowCls, 'border-b border-muted px-3 py-2.5 last:border-0')}>
-                <b className={cn(nameCls, 'truncate text-[15px]')}>{p.name}</b>
+                <span className={cn(nameCls, 'flex items-baseline gap-2')}>
+                  <b className="min-w-0 flex-1 truncate text-[15px]">{p.name}</b>
+                  <small className="text-[12.5px] text-muted-foreground tabular-nums sm:hidden">
+                    desv. <Deviation value={read(p.id, 'produced') - read(p.id, 'ordered')} />
+                  </small>
+                </span>
                 {FIELDS.map((f) => (
                   <span key={f} className="min-w-0">
                     <small className="mb-0.5 block text-center text-[11px] font-semibold text-muted-foreground uppercase sm:hidden">
@@ -228,6 +254,9 @@ function Rows({
                     )}
                   </span>
                 ))}
+                <span className="hidden text-right text-[14.5px] tabular-nums sm:block">
+                  <Deviation value={read(p.id, 'produced') - read(p.id, 'ordered')} />
+                </span>
               </div>
             ))}
           </div>
@@ -294,6 +323,14 @@ function Summary({
           <p className="mt-3 border-t border-muted pt-3 text-[13px] text-muted-foreground">
             Registró <b className="text-foreground">{record.recorded_by}</b> · {dShort(dateOf(record.recorded_at))},{' '}
             {formatTime(hhmm(record.recorded_at))}
+          </p>
+        )}
+        {record && Object.keys(record.weights).length > 0 && (
+          <p className="mt-2 text-[13px] text-muted-foreground">
+            Peso promedio:{' '}
+            {Object.entries(record.weights)
+              .map(([group, kg]) => `${group} ${String(kg)} kg`)
+              .join(' · ')}
           </p>
         )}
         {note && <p className="mt-2 text-[13px] text-muted-foreground">{note}</p>}
@@ -365,8 +402,12 @@ function Editor({
   const [initial] = useState<ProductionDraft>(() => draftOf(products, record))
   const [draft, setDraft] = useState<ProductionDraft>(initial)
   const [error, setError] = useState<string | null>(null)
+  const groups = bySubcategory(products).flatMap((g) => (g.name ? [g.name] : []))
+  const [initialWeights] = useState<WeightDraft>(() => weightDraftOf(groups, record?.weights))
+  const [weights, setWeights] = useState<WeightDraft>(initialWeights)
   const t = totals(products, draft)
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial)
+  const dirty =
+    JSON.stringify(draft) !== JSON.stringify(initial) || JSON.stringify(weights) !== JSON.stringify(initialWeights)
   const read = (id: string, field: Field) => parseUnits(draft[id]?.[field] ?? '') ?? 0
   const set = (id: string, field: Field, value: string) =>
     setDraft((d) => ({ ...d, [id]: { ...(d[id] ?? { ordered: '', produced: '', quality_b: '' }), [field]: value } }))
@@ -378,9 +419,14 @@ function Editor({
       setError(qualityError(bad.map((p) => p.name)))
       return
     }
+    const badWeights = invalidWeights(weights)
+    if (badWeights.length) {
+      setError(weightError(badWeights))
+      return
+    }
     setError(null)
     register.mutate(
-      { day, lines: toEntries(products, draft) },
+      { day, lines: toEntries(products, draft), weights: toWeights(weights) },
       { onSuccess: () => toast.success(SAVED_MESSAGE), onError: (err) => setError(err.message) },
     )
   }
@@ -415,7 +461,33 @@ function Editor({
                 />
               )}
             />
-            <p className="px-6 pb-4 text-[13px] text-muted-foreground dsk:px-7">{HINT}</p>
+            <p className="px-6 pb-3 text-[13px] text-muted-foreground dsk:px-7">
+              {HINT} {DEVIATION_HINT}
+            </p>
+            {groups.length > 0 && (
+              <fieldset className="mx-3 mb-4 rounded-[12px] border border-muted px-3 pt-2 pb-3 dsk:mx-4">
+                <legend className="px-1 text-[13px] font-bold text-ink-2">{WEIGHTS_TITLE}</legend>
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  {groups.map((g) => (
+                    <label key={g} className="block min-w-0">
+                      <span className="mb-1 block truncate text-[12.5px] font-semibold text-muted-foreground">{g}</span>
+                      <input
+                        inputMode="decimal"
+                        placeholder="—"
+                        aria-label={`Peso promedio de ${g}`}
+                        value={weights[g] ?? ''}
+                        onChange={(e) => {
+                          const clean = cleanKg(e.target.value)
+                          if (clean !== null) setWeights((w) => ({ ...w, [g]: clean }))
+                        }}
+                        className={cellCls}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-[12.5px] text-muted-foreground">{WEIGHTS_HINT}</p>
+              </fieldset>
+            )}
           </form>
         </Section>
         <aside className={asideCls}>

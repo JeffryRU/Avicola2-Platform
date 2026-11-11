@@ -5,6 +5,7 @@ from dataclasses import replace
 from datetime import date, timedelta
 
 from app.planning.application.ports import (
+    ArrivalModel,
     ConfirmedOrdersSource,
     ProductionRepository,
     ProductRepository,
@@ -15,8 +16,16 @@ from app.planning.application.ports import (
 from app.planning.domain.catalog import Catalog
 from app.planning.domain.models import CONFIRMED, Seller
 from app.planning.domain.permissions import Permission, require
-from app.planning.domain.production import LOOKBACK, estimate_arrival
-from app.planning.domain.saca import SacaPlan, build_plan, product_group, stock_window
+from app.planning.domain.production import LOOKBACK, estimate_from
+from app.planning.domain.saca import (
+    METHOD_MAX,
+    METHODS,
+    SacaPlan,
+    build_plan,
+    product_group,
+    stock_window,
+)
+from app.shared.domain.errors import DomainError
 
 
 class CalculateSaca:
@@ -29,14 +38,17 @@ class CalculateSaca:
         sellers: SellerRepository,
         yield_factor: float,
         production: ProductionRepository | None = None,
+        model: ArrivalModel | None = None,
     ):
         self.products, self.projections, self.stock = products, projections, stock
         self.orders, self.sellers, self.yield_factor = orders, sellers, yield_factor
         # Historia de producción para estimar en qué rango llegará lo pedido.
-        self.production = production
+        self.production, self.model = production, model
 
-    def __call__(self, viewer: Seller, day: date) -> SacaPlan:
+    def __call__(self, viewer: Seller, day: date, method: str = METHOD_MAX) -> SacaPlan:
         require(viewer.role, Permission.VIEW_SACA, "No tienes permiso para ver el cálculo de saca.")
+        if method not in METHODS:
+            raise DomainError("Forma de cálculo desconocida.")
         products = Catalog(self.products.list_active()).products
         team = {s.username for s in self.sellers.list_active() if s.is_seller}
         projected: Counter[str] = Counter()
@@ -54,15 +66,20 @@ class CalculateSaca:
             dict(projected),
             self.orders.units(day),
             {line.product_id: line.units for line in latest.lines} if latest else {},
+            method=method,
             stock_date=latest.date if latest else None,
             sellers_registered=len(registered),
             sellers_total=len(team),
             orders_available=self.orders.available,
             yield_factor=self.yield_factor,
         )
-        if self.production is None:
+        if self.production is None or self.model is None:
             return plan
         # Solo con días anteriores al de la saca: lo de ese día aún no se conoce.
         history = self.production.find(day - LOOKBACK, day - timedelta(days=1))
         groups = {p.id: product_group(p) for p in products}
-        return replace(plan, arrival=estimate_arrival(history, groups, plan.request_by_group()))
+        fitted = self.model.fit(history, groups, target=day)
+        if fitted is None:
+            return plan
+        arrival = estimate_from(fitted.rates, groups, plan.request_by_group())
+        return replace(plan, arrival=replace(arrival, model=fitted.model))

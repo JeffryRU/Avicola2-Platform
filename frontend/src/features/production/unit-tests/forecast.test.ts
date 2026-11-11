@@ -45,8 +45,7 @@ describe('pronóstico de llegada', () => {
   it('acepta la respuesta sin historia suficiente', () => {
     const parsed = arrivalForecastSchema.parse({
       available: false,
-      method: 'exponential_smoothing',
-      half_life_days: 7,
+      method: '',
       min_days: 14,
       days: 0,
       date_from: null,

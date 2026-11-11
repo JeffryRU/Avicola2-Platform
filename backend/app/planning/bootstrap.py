@@ -19,10 +19,11 @@ from app.planning.application import saca as sc
 from app.planning.application import stock as st
 from app.planning.application import use_cases as uc
 from app.planning.domain.accounts import LockoutPolicy
+from app.planning.infrastructure.arrival_model import AdaptiveArrivalModel
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.events import event_bus
 from app.planning.infrastructure.forecast import OrderHistoryForecaster, WeekdayAverageForecaster
-from app.planning.infrastructure.orders import NoConfirmedOrders
+from app.planning.infrastructure.orders import LoadedOrders
 from app.planning.infrastructure.persistence.editing import (
     SqlSettingsRepository,
     SqlUnlockRepository,
@@ -99,6 +100,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     lockout = LockoutPolicy(settings.login_max_attempts, settings.login_lock_minutes)
     notifications = SqlNotificationRepository(session)
     notifier = nt.Notifier(notifications, event_bus, clock)
+    arrival_model = AdaptiveArrivalModel()
     forecaster = OrderHistoryForecaster(
         SqlOrderHistory(session),
         products,
@@ -177,12 +179,13 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             products,
             projections,
             stock,
-            NoConfirmedOrders(),
+            LoadedOrders(session, products),
             sellers,
             settings.yield_factor,
             production,
+            arrival_model,
         ),
         register_production=pr.RegisterProduction(products, production, clock),
         list_production=pr.ListProduction(production),
-        forecast_arrival=pr.ForecastArrival(products, production, clock),
+        forecast_arrival=pr.ForecastArrival(products, production, clock, arrival_model),
     )
