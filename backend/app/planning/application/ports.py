@@ -12,6 +12,7 @@ from app.planning.domain.editing import EditUnlock
 from app.planning.domain.history import ProjectionChange
 from app.planning.domain.models import DailyUnits, Product, Projection, Seller, SellerAccount
 from app.planning.domain.notifications import Event, Notification
+from app.planning.domain.orders import OrderLine
 from app.planning.domain.production import DailyProduction
 from app.planning.domain.stock import DailyStock
 
@@ -110,6 +111,12 @@ class DemandForecaster(Protocol):
     name: str
 
     def suggest(self, seller: str, category: str, dates: list[date]) -> list[DailyUnits]: ...
+
+
+class OrderHistory(Protocol):
+    """Pedidos reales de un vendedor (historia cargada de ARIS)."""
+
+    def lines(self, seller: str, before: date) -> list[OrderLine]: ...
 
 
 class PasswordHasher(Protocol):

@@ -21,7 +21,7 @@ from app.planning.application import use_cases as uc
 from app.planning.domain.accounts import LockoutPolicy
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.events import event_bus
-from app.planning.infrastructure.forecast import WeekdayAverageForecaster
+from app.planning.infrastructure.forecast import OrderHistoryForecaster, WeekdayAverageForecaster
 from app.planning.infrastructure.orders import NoConfirmedOrders
 from app.planning.infrastructure.persistence.editing import (
     SqlSettingsRepository,
@@ -29,6 +29,7 @@ from app.planning.infrastructure.persistence.editing import (
 )
 from app.planning.infrastructure.persistence.history import SqlChangeLog
 from app.planning.infrastructure.persistence.notifications import SqlNotificationRepository
+from app.planning.infrastructure.persistence.order_history import SqlOrderHistory
 from app.planning.infrastructure.persistence.production import SqlProductionRepository
 from app.planning.infrastructure.persistence.repositories import (
     SqlProductRepository,
@@ -98,7 +99,11 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     lockout = LockoutPolicy(settings.login_max_attempts, settings.login_lock_minutes)
     notifications = SqlNotificationRepository(session)
     notifier = nt.Notifier(notifications, event_bus, clock)
-    forecaster = WeekdayAverageForecaster(projections, settings.planning_suggestion_weeks)
+    forecaster = OrderHistoryForecaster(
+        SqlOrderHistory(session),
+        products,
+        WeekdayAverageForecaster(projections, settings.planning_suggestion_weeks),
+    )
     schema = physical_schema(settings.database_url, APP_SCHEMA, settings.db_schema)
     unlocks = SqlUnlockRepository(session)
     history = SqlChangeLog(session)
