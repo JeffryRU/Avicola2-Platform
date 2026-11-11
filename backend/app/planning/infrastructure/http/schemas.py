@@ -336,6 +336,18 @@ class SacaGroupOut(BaseModel):
     farm_order: int
 
 
+class SacaFactorsIn(BaseModel):
+    factors: dict[str, float] = Field(
+        min_length=1,
+        max_length=20,
+        description="Factor por tipo, p. ej. {'Brasa chica': 0.8}. Lo que falte queda en 1.",
+    )
+
+
+class SacaFactorsOut(BaseModel):
+    factors: dict[str, float]
+
+
 class SacaOut(BaseModel):
     date: date
     lines: list[SacaLineOut]

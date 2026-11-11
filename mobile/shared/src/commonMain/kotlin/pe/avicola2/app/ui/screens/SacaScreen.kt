@@ -15,9 +15,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -65,6 +72,7 @@ import pe.avicola2.app.domain.sacaMethodOf
 import pe.avicola2.app.domain.Saca
 import pe.avicola2.app.domain.SacaLine
 import pe.avicola2.app.domain.formatKg
+import pe.avicola2.app.domain.parseSacaFactors
 import pe.avicola2.app.domain.formatNumber
 import pe.avicola2.app.domain.plusDays
 import pe.avicola2.app.domain.sacaDays
@@ -115,6 +123,48 @@ class SacaViewModel(private val c: AppContainer) : ViewModel() {
         load()
     }
 
+    /** Edición de factores (supervisores): null = cerrada. */
+    var factorDraft by mutableStateOf<Map<String, String>?>(null)
+        private set
+    var factorError by mutableStateOf<String?>(null)
+        private set
+    var savingFactors by mutableStateOf(false)
+        private set
+
+    fun editFactors(plan: Saca) {
+        factorError = null
+        factorDraft = plan.groups.associate { it.name to it.factor.toString() }
+    }
+
+    fun setFactor(name: String, raw: String) {
+        factorDraft = factorDraft?.plus(name to raw.filter { it.isDigit() || it == '.' || it == ',' }.take(5))
+    }
+
+    fun closeFactors() {
+        factorDraft = null
+    }
+
+    fun saveFactors() {
+        val factors = factorDraft?.let(::parseSacaFactors)
+        if (factors == null) {
+            factorError = "Escribe un número entre 0 y 2 en cada tipo (por ejemplo 0,80)."
+            return
+        }
+        factorError = null
+        savingFactors = true
+        viewModelScope.launch {
+            try {
+                c.saca.setFactors(factors)
+                factorDraft = null
+                load()
+            } catch (e: Exception) {
+                factorError = e.userMessage()
+            } finally {
+                savingFactors = false
+            }
+        }
+    }
+
     fun load() {
         val current = _state.value
         if (current is Load.Ready) _state.value = current.copy(refreshing = true)
@@ -150,11 +200,12 @@ fun SacaScreen(container: AppContainer, account: Account, onOpenStock: () -> Uni
                 modifier = Modifier.padding(top = 4.dp, bottom = 10.dp),
             )
             MethodPicker(vm.method, vm::choose)
+            vm.factorDraft?.let { FactorsDialog(vm, it) }
             when (val s = state) {
                 Load.Loading -> Loading()
                 is Load.Failed -> ErrorState(s.message, onRetry = vm::load)
                 is Load.Ready -> PullToRefreshBox(isRefreshing = s.refreshing, onRefresh = vm::load) {
-                    SacaContent(s.value, onOpenStock.takeIf { account.canViewStock })
+                    SacaContent(s.value, onOpenStock.takeIf { account.canViewStock }, onEditFactors = { vm.editFactors(s.value.plan) }.takeIf { account.canEditSacaFactors })
                 }
             }
         }
@@ -162,7 +213,7 @@ fun SacaScreen(container: AppContainer, account: Account, onOpenStock: () -> Uni
 }
 
 @Composable
-private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?) {
+private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?, onEditFactors: (() -> Unit)?) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 840.dp
         Row(Modifier.fillMaxSize()) {
@@ -171,7 +222,7 @@ private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?) {
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                item(key = "hero") { Hero(data.plan) }
+                item(key = "hero") { Hero(data.plan, onEditFactors) }
                 if (!wide) item(key = "sources") { Sources(data.plan, onOpenStock) }
                 item(key = "products") { ByProduct(data) }
             }
@@ -203,9 +254,40 @@ private fun MethodPicker(method: String, onChoose: (String) -> Unit) {
     }
 }
 
+/** Supervisores: por cuánto se multiplica lo que hace falta de cada tipo. */
+@Composable
+private fun FactorsDialog(vm: SacaViewModel, draft: Map<String, String>) {
+    AlertDialog(
+        onDismissRequest = vm::closeFactors,
+        title = { Text("Factor por tipo") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Lo que hace falta de cada tipo se multiplica por este número para el pedido a granja.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                draft.forEach { (name, value) ->
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = { vm.setFactor(name, it) },
+                        label = { Text(name) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                vm.factorError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            }
+        },
+        confirmButton = { TextButton(onClick = vm::saveFactors, enabled = !vm.savingFactors) { Text("Guardar") } },
+        dismissButton = { TextButton(onClick = vm::closeFactors) { Text("Cancelar") } },
+    )
+}
+
 /** El número que importa, grande; lo demás, al lado. */
 @Composable
-private fun Hero(plan: Saca) {
+private fun Hero(plan: Saca, onEditFactors: (() -> Unit)?) {
     val scheme = MaterialTheme.colorScheme
     Surface(color = scheme.primary, contentColor = scheme.onPrimary, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp)) {
@@ -227,6 +309,14 @@ private fun Hero(plan: Saca) {
             if (plan.groups.isNotEmpty()) {
                 Surface(color = scheme.onPrimary.copy(alpha = 0.12f), contentColor = scheme.onPrimary, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) {
                     Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        if (onEditFactors != null) {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("POR TIPO", style = MaterialTheme.typography.labelSmall, color = scheme.onPrimary.copy(alpha = 0.8f), modifier = Modifier.weight(1f))
+                                IconButton(onClick = onEditFactors, modifier = Modifier.size(36.dp)) {
+                                    Icon(Icons.Filled.Edit, "Cambiar por cuánto se multiplica", modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
                         plan.groups.forEach { g ->
                             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(g.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))

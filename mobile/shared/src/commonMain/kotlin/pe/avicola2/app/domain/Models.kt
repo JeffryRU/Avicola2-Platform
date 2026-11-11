@@ -42,6 +42,9 @@ data class Account(
     val canViewStock: Boolean get() = can("view_stock", "dispatch_chief", "supervisor", "general_supervisor")
     val canManageStock: Boolean get() = can("manage_stock", "dispatch_chief", "general_supervisor")
     val canViewSaca: Boolean get() = can("view_saca", "supervisor", "general_supervisor")
+
+    /** Supervisores: pueden cambiar por cuánto se multiplica el pedido de cada tipo. */
+    val canEditSacaFactors: Boolean get() = can("manage_editing", "supervisor", "general_supervisor")
     val canViewProduction: Boolean
         get() = can("view_production", "dispatch_chief", "supervisor", "general_supervisor")
     val canManageProduction: Boolean get() = can("manage_production", "dispatch_chief", "general_supervisor")
@@ -272,6 +275,24 @@ data class SacaGroup(
     val factor: Double,
     @SerialName("farm_order") val farmOrder: Int,
 )
+
+@Serializable
+data class SacaFactors(val factors: Map<String, Double>)
+
+const val MAX_SACA_FACTOR = 2.0
+
+/** Factores escritos por el supervisor (texto) → números; null si alguno no es válido. */
+fun parseSacaFactors(draft: Map<String, String>): Map<String, Double>? {
+    val out = mutableMapOf<String, Double>()
+    for ((name, raw) in draft) {
+        val text = raw.trim().replace(',', '.')
+        if (!Regex("""\d+(\.\d+)?""").matches(text)) return null
+        val value = text.toDouble()
+        if (value > MAX_SACA_FACTOR) return null
+        out[name] = value
+    }
+    return out
+}
 
 /** Cuánto pedir a granja para un día y con qué datos se calculó (lo resuelve el backend). */
 @Serializable

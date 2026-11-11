@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { missingSellers, sacaDays, sacaSchema } from '@/features/saca/domain/saca'
+import { missingSellers, parseFactors, sacaDays, sacaSchema } from '@/features/saca/domain/saca'
 
 const plan = sacaSchema.parse({
   date: '2026-11-11',
@@ -42,5 +42,15 @@ describe('cálculo de saca', () => {
 
   it('cuenta los vendedores que aún no registraron', () => {
     expect(missingSellers(plan)).toBe(5)
+  })
+
+  it('lee los factores escritos con coma o punto y rechaza los que no sirven', () => {
+    expect(parseFactors({ 'Brasa chica': '0,8', 'Brasa grande': '1' })).toEqual({
+      'Brasa chica': 0.8,
+      'Brasa grande': 1,
+    })
+    expect(parseFactors({ 'Brasa chica': '' })).toBeNull()
+    expect(parseFactors({ 'Brasa chica': 'abc' })).toBeNull()
+    expect(parseFactors({ 'Brasa chica': '2.5' })).toBeNull()
   })
 })

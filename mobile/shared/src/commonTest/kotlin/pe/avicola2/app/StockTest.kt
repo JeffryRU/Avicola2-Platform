@@ -177,4 +177,11 @@ class StockTest {
         assertEquals("Suavizado exponencial, vida media 3 días", pe.avicola2.app.domain.arrivalModelLabel("ewma_3"))
         assertTrue("peso de la parvada" in pe.avicola2.app.domain.arrivalModelLabel("hybrid_weight"))
     }
+
+    @Test
+    fun sacaFactorsAcceptCommaOrDotAndRejectTheRest() {
+        assertEquals(mapOf("Brasa chica" to 0.8, "Brasa grande" to 1.0), pe.avicola2.app.domain.parseSacaFactors(mapOf("Brasa chica" to "0,8", "Brasa grande" to "1")))
+        assertEquals(null, pe.avicola2.app.domain.parseSacaFactors(mapOf("Brasa chica" to "")))
+        assertEquals(null, pe.avicola2.app.domain.parseSacaFactors(mapOf("Brasa chica" to "2.5")))
+    }
 }
