@@ -327,7 +327,8 @@ private fun ProductLine(product: Product, line: SacaLine, max: Int) {
             Text(product.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             line.expected?.let { expected ->
                 Text(
-                    "Llegarán ${formatNumber(expected.toDouble())}" + (line.expectedA?.let { " · ${formatNumber(it.toDouble())} en calidad A" } ?: ""),
+                    "Llegarán ${formatNumber(expected.toDouble())}" +
+                        (line.expectedA?.let { a -> " · A ${formatNumber(a.toDouble())} · B ${formatNumber((expected - a).coerceAtLeast(0).toDouble())}" } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     color = if (expected > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,

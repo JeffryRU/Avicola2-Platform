@@ -211,14 +211,16 @@ function Sources({ plan }: { plan: Saca }) {
 /** Angosto: producto y lo que hay que pedir. Ancho: todas las columnas del cálculo. */
 const colsCls = (orders: boolean, arrival: boolean) =>
   cn('grid items-center gap-x-3 grid-cols-[minmax(0,1fr)_5.5rem]', COLS[`${orders ? 3 : 2}-${arrival ? 2 : 1}`])
-// Producto · proyección (· pedidos) · stock · pedir · (llegará · calidad A |) kg
+// Producto · proyección (· pedidos) · stock · pedir · (llegará · calidad A · calidad B |) kg
 const COLS: Record<string, string> = {
   '2-1': 'sm:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,0.7fr))_minmax(0,1fr)_minmax(0,0.7fr)]',
   '3-1': 'sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,0.7fr))_minmax(0,1fr)_minmax(0,0.7fr)]',
-  '2-2': 'sm:grid-cols-[minmax(0,1.4fr)_repeat(2,minmax(0,0.7fr))_minmax(0,0.9fr)_repeat(2,minmax(0,0.7fr))]',
-  '3-2': 'sm:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,0.7fr))_minmax(0,0.9fr)_repeat(2,minmax(0,0.7fr))]',
+  '2-2': 'sm:grid-cols-[minmax(0,1.3fr)_repeat(2,minmax(0,0.7fr))_minmax(0,0.9fr)_repeat(3,minmax(0,0.7fr))]',
+  '3-2': 'sm:grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,0.7fr))_minmax(0,0.9fr)_repeat(3,minmax(0,0.7fr))]',
 }
 const numCls = 'hidden text-right text-[14px] tabular-nums sm:block'
+/** Aves que se espera que lleguen en calidad B: las que llegan menos las de calidad A. */
+const qualityB = (l: SacaLine) => Math.max(0, (l.expected ?? 0) - (l.expected_a ?? 0))
 
 function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
   const lines = new Map(plan.lines.map((l) => [l.product_id, l]))
@@ -244,6 +246,7 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
           <>
             <span className="hidden text-right sm:block">{COLUMNS.expected}</span>
             <span className="hidden text-right sm:block">{COLUMNS.expectedA}</span>
+            <span className="hidden text-right sm:block">{COLUMNS.expectedB}</span>
           </>
         ) : (
           <span className="hidden text-right sm:block">{COLUMNS.kg}</span>
@@ -292,6 +295,7 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
                     {arrival ? (
                       <small className="mt-0.5 block text-[12px] text-muted-foreground tabular-nums sm:hidden">
                         llegarán {nf0(l.expected ?? 0)}
+                        {qualityB(l) > 0 && <span className="block">{nf0(qualityB(l))} en B</span>}
                       </small>
                     ) : (
                       l.request > 0 && (
@@ -307,6 +311,9 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
                         {nf0(l.expected ?? 0)}
                       </span>
                       <span className={cn(numCls, 'text-muted-foreground')}>{nf0(l.expected_a ?? 0)}</span>
+                      <span className={cn(numCls, 'text-muted-foreground', !qualityB(l) && 'text-faint')}>
+                        {nf0(qualityB(l))}
+                      </span>
                     </>
                   ) : (
                     <span className={cn(numCls, 'text-muted-foreground')}>
@@ -329,6 +336,7 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
           <>
             <span className={cn(numCls, '!text-[15px]')}>{nf0(expectedTotal)}</span>
             <span className={cn(numCls, '!text-[15px]')}>{nf0(expectedATotal)}</span>
+            <span className={cn(numCls, '!text-[15px]')}>{nf0(expectedTotal - expectedATotal)}</span>
           </>
         ) : (
           <span className={cn(numCls, '!text-[15px]')}>{nf1(plan.request_kg)}</span>
