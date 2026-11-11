@@ -29,7 +29,12 @@ from app.planning.domain.permissions import (
     manageable_roles,
     permissions_of,
 )
-from app.planning.domain.production import DailyProduction
+from app.planning.domain.production import (
+    HALF_LIFE_DAYS,
+    MIN_HISTORY_DAYS,
+    DailyProduction,
+    overall_error,
+)
 from app.planning.domain.stock import DailyStock
 from app.planning.infrastructure.exporters import WRITERS, ExportFormat
 from app.planning.infrastructure.http import schemas as s
@@ -657,6 +662,60 @@ def list_production(
 ) -> list[s.ProductionDayOut]:
     """Producción registrada por día (solo los días con registro), del más reciente primero."""
     return [_production_out(d) for d in use_cases.list_production(viewer, date_from, date_to)]
+
+
+@production.get("/forecast")
+def forecast_arrival(use_cases: UseCases, viewer: CurrentSeller) -> s.ArrivalForecastOut:
+    """El modelo de llegada por rango, listo para proyectar, y su acierto en los últimos días."""
+    forecast = use_cases.forecast_arrival(viewer)
+    rates, checks = forecast.rates, forecast.checks
+    products = [p.id for _, items in forecast.groups for p in items]
+    return s.ArrivalForecastOut(
+        available=rates is not None,
+        method="exponential_smoothing",
+        half_life_days=HALF_LIFE_DAYS,
+        min_days=MIN_HISTORY_DAYS,
+        days=rates.days if rates else 0,
+        date_from=rates.date_from if rates else None,
+        date_to=rates.date_to if rates else None,
+        groups=[
+            s.ForecastGroupOut(
+                name=name,
+                last_ordered=forecast.last_request.get(name, 0.0),
+                products=[
+                    s.ForecastProductOut(
+                        product_id=p.id,
+                        share=round(rates.share.get(p.id, 0.0), 6) if rates else 0.0,
+                        quality_a_rate=round(1 - rates.b_rate.get(p.id, 0.0), 6) if rates else 1.0,
+                    )
+                    for p in items
+                ],
+            )
+            for name, items in forecast.groups
+        ],
+        accuracy=s.ForecastAccuracyOut(
+            days=len(checks),
+            error=round(overall_error(checks), 4),
+            naive_error=round(overall_error(checks, naive=True), 4),
+            by_day=[
+                s.ForecastCheckOut(
+                    date=c.date, error=round(c.error, 4), naive_error=round(c.naive_error, 4)
+                )
+                for c in checks
+            ],
+            by_product=[
+                s.ForecastProductCheckOut(
+                    product_id=p,
+                    ordered=round(sum(c.ordered.get(p, 0.0) for c in checks), 2),
+                    expected=sum(c.expected.get(p, 0) for c in checks),
+                    produced=sum(c.produced.get(p, 0) for c in checks),
+                )
+                for p in products
+            ],
+        )
+        if checks
+        else None,
+    )
 
 
 @production.put("/{day}", dependencies=[requires(Permission.MANAGE_PRODUCTION)])

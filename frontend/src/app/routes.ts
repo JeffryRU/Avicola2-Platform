@@ -21,6 +21,7 @@ export const paths = {
   stock: '/stock',
   saca: '/saca',
   production: '/produccion',
+  forecast: '/pronostico',
 } as const
 
 export const DASHBOARDS = [

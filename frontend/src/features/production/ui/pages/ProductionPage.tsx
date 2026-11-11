@@ -1,5 +1,6 @@
 import { useState, type SyntheticEvent } from 'react'
-import { Check, Loader2, Save } from 'lucide-react'
+import { Check, Loader2, Save, TrendingUp } from 'lucide-react'
+import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { addDays, dDowLong, dShort, formatTime, hhmm, today, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
@@ -48,6 +49,7 @@ import {
   YESTERDAY_LABEL,
   qualityError,
 } from '@/features/production/types/production'
+import { FORECAST_NAV_LABEL } from '@/features/production/types/forecast'
 import { useProduction, useRegisterProduction } from '@/features/production/ui/hooks'
 import { editableDays, isEditableDay, parseUnits } from '@/features/stock/domain/stock'
 import { DayStrip } from '@/shared/ui/components/day-strip'
@@ -89,6 +91,14 @@ export function ProductionPage() {
   const products = catalog?.products ?? []
   const strip = editableDays(ref).includes(day) ? editableDays(ref) : [...editableDays(ref), day]
   const editable = canManage && isEditableDay(day, ref)
+  const forecastLink = (
+    <Link
+      to={paths.forecast}
+      className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-secondary px-3 text-[13.5px] font-bold text-primary"
+    >
+      <TrendingUp className="size-4" /> {FORECAST_NAV_LABEL}
+    </Link>
+  )
   const history = <History days={days} selected={day} onSelect={setDay} pending={query.isPending} />
 
   return (
@@ -97,6 +107,8 @@ export function ProductionPage() {
         title={PRODUCTION_TITLE}
         subtitle={canManage ? PRODUCTION_SUBTITLE_MANAGE : PRODUCTION_SUBTITLE_VIEW}
         back={paths.home}
+        actions={forecastLink}
+        mobileActions={forecastLink}
       />
       <PageBody>
         <DayStrip
