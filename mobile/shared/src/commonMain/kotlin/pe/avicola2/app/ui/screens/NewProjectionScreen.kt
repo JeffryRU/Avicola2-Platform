@@ -81,6 +81,11 @@ import pe.avicola2.app.ui.components.Centered
 import pe.avicola2.app.ui.components.ChoiceChip
 import pe.avicola2.app.ui.components.ErrorState
 import pe.avicola2.app.ui.components.Loading
+import pe.avicola2.app.domain.Projection
+import pe.avicola2.app.domain.copyPreviousSheets
+import pe.avicola2.app.domain.newSheetsLabel
+import pe.avicola2.app.domain.previousSheets
+import pe.avicola2.app.ui.theme.Warning
 import pe.avicola2.app.ui.userMessage
 
 data class ProjectionSetup(val catalog: Catalog, val openDays: List<EditingDay>, val sellers: List<Seller>)
@@ -93,6 +98,9 @@ class NewProjectionViewModel(private val c: AppContainer, private val account: A
     var dates by mutableStateOf(setOfNotNull(start))
     var onBehalf by mutableStateOf<String?>(null)
     var units by mutableStateOf<Map<LocalDate, Units>>(emptyMap())
+        private set
+    /** Hoja vigente de los días elegidos que ya tenían proyección: la que se envíe la reemplaza. */
+    var previous by mutableStateOf<Map<LocalDate, Projection>>(emptyMap())
         private set
     var activeDay by mutableStateOf(0)
     var busy by mutableStateOf(false)
@@ -132,7 +140,8 @@ class NewProjectionViewModel(private val c: AppContainer, private val account: A
         dates = if (date in dates) dates - date else if (dates.size < PlanningService.MAX_DAYS) dates + date else dates
     }
 
-    /** Paso 2: trae lo ya registrado de esos días para editarlo en vez de empezar de cero. */
+    /** Paso 2: cada día abre una hoja nueva en blanco. Si ya tenía proyección, se guarda como
+     *  hoja anterior (para avisar y poder copiarla), pero no se precarga. */
     fun next() {
         if (category.isBlank() || dates.isEmpty()) {
             message = "Elige la categoría y al menos un día."
@@ -146,13 +155,13 @@ class NewProjectionViewModel(private val c: AppContainer, private val account: A
         viewModelScope.launch {
             try {
                 val seller = onBehalf ?: account.seller.username
-                val existing = c.planningGateway.projections(sortedDates.first(), sortedDates.last(), seller)
-                    .filter { it.confirmed && it.category == category && it.date in dates }
-                units = sortedDates.associateWith { d -> existing.firstOrNull { it.date == d }?.units ?: units[d].orEmpty() }
+                previous = previousSheets(c.planningGateway.projections(sortedDates.first(), sortedDates.last(), seller), category, dates)
+                units = sortedDates.associateWith { units[it].orEmpty() }
                 activeDay = 0
                 step = 1
             } catch (e: Exception) {
                 // Sin señal igual se puede registrar: queda en la cola del celular.
+                previous = emptyMap()
                 units = sortedDates.associateWith { units[it].orEmpty() }
                 step = 1
                 if (e !is pe.avicola2.app.application.ApiError || !e.isNetwork) message = e.userMessage()
@@ -165,6 +174,10 @@ class NewProjectionViewModel(private val c: AppContainer, private val account: A
     fun set(date: LocalDate, product: String, value: Int) {
         val v = value.coerceIn(0, PlanningService.MAX_UNITS)
         units = units + (date to (units[date].orEmpty() + (product to v)))
+    }
+
+    fun copyPrevious() {
+        units = copyPreviousSheets(units, previous)
     }
 
     fun copyToAll(from: LocalDate) {
@@ -361,6 +374,7 @@ private fun UnitsStep(vm: NewProjectionViewModel, catalog: Catalog) {
         vm.suggestionNote?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
         }
+        if (vm.previous.isNotEmpty()) NewSheetNotice(newSheetsLabel(vm.previous), onCopy = vm::copyPrevious)
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
             catalog.grouped(vm.category).forEach { (group, products) ->
                 if (group != null) {
@@ -396,6 +410,27 @@ private fun UnitsStep(vm: NewProjectionViewModel, catalog: Catalog) {
                     if (vm.busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp) else Text("Enviar proyección")
                 }
             }
+        }
+    }
+}
+
+/** Aviso de hoja nueva: qué número es y que reemplaza a la anterior. */
+@Composable
+private fun NewSheetNotice(label: String, onCopy: () -> Unit) {
+    Surface(
+        color = Warning.copy(alpha = 0.14f),
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Column(Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 2.dp)) {
+            Text("Hoja nueva", fontWeight = FontWeight.SemiBold)
+            Text(
+                "$label. Reemplaza a la anterior al enviarla; no se suman.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(end = 8.dp),
+            )
+            TextButton(onClick = onCopy, contentPadding = PaddingValues(horizontal = 0.dp)) { Text("Copiar la hoja anterior") }
         }
     }
 }

@@ -14,7 +14,7 @@ App de vendedores en **Kotlin Multiplatform + Compose Multiplatform**: un solo c
   1. Categoría y días (hasta 7); el supervisor elige además el vendedor.
   2. Cantidades por producto, con botones − / + o escribiendo el número.
   - "Sugerir cantidades" usa el pronóstico del servidor y "Copiar a todos los días" repite las del día abierto.
-  - Si ya había algo registrado, se carga para editarlo.
+  - Si el día ya tenía proyección, se abre una **hoja nueva en blanco** (INS-06): avisa qué número de hoja es y que reemplaza a la anterior; «Copiar la hoja anterior» trae los valores previos.
 - **Sin señal:** el envío queda en el celular y se manda solo al volver la conexión, sin duplicarse (el `submission_id` lo genera la app). Si el servidor lo rechaza, se puede reintentar o descartar.
 - **Proyecciones:** las últimas dos semanas y la próxima. El supervisor puede filtrar por vendedor.
 - **Exportar** (componente común `ExportMenu`, el mismo menú de la web): Excel, PDF o CSV del período y el filtro de la lista. El archivo lo arma el servidor (`GET /api/projections/export?format=`), con el mismo contenido que descarga la web, y se abre el menú «Compartir» del sistema para guardarlo o mandarlo.

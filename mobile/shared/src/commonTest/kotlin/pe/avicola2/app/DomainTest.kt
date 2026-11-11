@@ -61,3 +61,28 @@ class DomainTest {
         assertFalse(UpdateService.isNewer("0.9", "1.0.0"))
     }
 }
+
+class SheetsTest {
+    private val day = LocalDate(2026, 11, 11)
+    private fun projection(date: LocalDate, units: Map<String, Int>, sheet: Int = 1, category: String = "BRASA") =
+        pe.avicola2.app.domain.Projection("id-$date", "s", "ana", date, category, "confirmed", units.values.sum(), 0.0, "2026-11-10T12:00:00Z", units, sheet)
+
+    @Test
+    fun theNewSheetIsTheNextOneAndOnlyForTheSameCategory() {
+        val existing = listOf(projection(day, mapOf("b1" to 10), sheet = 2), projection(LocalDate(2026, 11, 12), mapOf("e1" to 3), category = "Entero"))
+        val previous = pe.avicola2.app.domain.previousSheets(existing, "BRASA", listOf(day, LocalDate(2026, 11, 12)))
+        assertEquals(setOf(day), previous.keys)
+        assertEquals("mié 11 nov: hoja 3", pe.avicola2.app.domain.newSheetsLabel(previous))
+    }
+
+    @Test
+    fun copyingThePreviousSheetDoesNotOverwriteWhatWasTyped() {
+        val next = LocalDate(2026, 11, 12)
+        val previous = mapOf(day to projection(day, mapOf("b1" to 10, "b2" to 0)), next to projection(next, mapOf("b1" to 4)))
+        val typed = mapOf(day to emptyMap(), next to mapOf("b1" to 7))
+        assertEquals(
+            mapOf(day to mapOf("b1" to 10), next to mapOf("b1" to 7)),
+            pe.avicola2.app.domain.copyPreviousSheets(typed, previous),
+        )
+    }
+}
