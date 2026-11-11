@@ -23,6 +23,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -54,6 +57,11 @@ import pe.avicola2.app.application.ServerEvent
 import pe.avicola2.app.domain.Account
 import pe.avicola2.app.domain.Catalog
 import pe.avicola2.app.domain.Product
+import pe.avicola2.app.domain.SACA_METHOD_MAX
+import pe.avicola2.app.domain.SACA_METHOD_SUM
+import pe.avicola2.app.domain.arrivalModelLabel
+import pe.avicola2.app.domain.sacaFormula
+import pe.avicola2.app.domain.sacaMethodOf
 import pe.avicola2.app.domain.Saca
 import pe.avicola2.app.domain.SacaLine
 import pe.avicola2.app.domain.formatKg
@@ -72,6 +80,8 @@ import pe.avicola2.app.ui.theme.Success
 import pe.avicola2.app.ui.theme.Warning
 import pe.avicola2.app.ui.userMessage
 
+private const val METHOD_KEY = "saca.method"
+
 data class SacaData(val products: List<Product>, val plan: Saca)
 
 class SacaViewModel(private val c: AppContainer) : ViewModel() {
@@ -81,6 +91,17 @@ class SacaViewModel(private val c: AppContainer) : ViewModel() {
     /** Por defecto, mañana: la saca se decide el día anterior. */
     var day by mutableStateOf(today().plusDays(1))
         private set
+
+    /** Forma de cálculo; se recuerda en el equipo. */
+    var method by mutableStateOf(sacaMethodOf(c.prefs.getString(METHOD_KEY)))
+        private set
+
+    fun choose(next: String) {
+        if (next == method) return
+        method = next
+        c.prefs.putString(METHOD_KEY, next)
+        load()
+    }
 
     init {
         load()
@@ -97,15 +118,15 @@ class SacaViewModel(private val c: AppContainer) : ViewModel() {
     fun load() {
         val current = _state.value
         if (current is Load.Ready) _state.value = current.copy(refreshing = true)
-        val asked = day
+        val asked = day to method
         viewModelScope.launch {
             try {
                 val catalog = async { Catalog(c.planningGateway.catalog()) }
-                val plan = c.saca.plan(asked)
+                val plan = c.saca.plan(asked.first, asked.second)
                 // Si cambió de día mientras llegaba la respuesta, se descarta.
-                if (asked == day) _state.value = Load.Ready(SacaData(catalog.await().products, plan))
+                if (asked == day to method) _state.value = Load.Ready(SacaData(catalog.await().products, plan))
             } catch (e: Exception) {
-                if (asked == day) _state.value = Load.Failed(e.userMessage())
+                if (asked == day to method) _state.value = Load.Failed(e.userMessage())
             }
         }
     }
@@ -128,6 +149,7 @@ fun SacaScreen(container: AppContainer, account: Account, onOpenStock: () -> Uni
                 caption = { if (it == ref) "Hoy" else if (it == ref.plusDays(1)) "Mañana" else null },
                 modifier = Modifier.padding(top = 4.dp, bottom = 10.dp),
             )
+            MethodPicker(vm.method, vm::choose)
             when (val s = state) {
                 Load.Loading -> Loading()
                 is Load.Failed -> ErrorState(s.message, onRetry = vm::load)
@@ -157,6 +179,25 @@ private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?) {
                 LazyColumn(Modifier.width(360.dp), contentPadding = PaddingValues(end = 16.dp, bottom = 16.dp)) {
                     item(key = "sources") { Sources(data.plan, onOpenStock) }
                 }
+            }
+        }
+    }
+}
+
+/** Forma de cálculo: la recomendada (el mayor) o la del negocio (la suma). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MethodPicker(method: String, onChoose: (String) -> Unit) {
+    val options = listOf(SACA_METHOD_MAX to "Recomendada", SACA_METHOD_SUM to "Proyección + pedidos")
+    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) {
+        Text("FORMA DE CÁLCULO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            options.forEachIndexed { index, (value, label) ->
+                SegmentedButton(
+                    selected = method == value,
+                    onClick = { onChoose(value) },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
     }
@@ -240,18 +281,18 @@ private fun Sources(plan: Saca, onOpenStock: (() -> Unit)?) {
             ok = if (plan.ordersAvailable) true else null,
             label = "Pedidos confirmados",
             value = if (plan.ordersAvailable) "${formatNumber(plan.ordered.toDouble())} unid." else null,
-            note = if (plan.ordersAvailable) "Conectados." else "Sin conectar (ARIS aún no se integra): se usan solo las proyecciones.",
+            note = if (plan.ordersAvailable) "Pedidos de ARIS cargados para este día." else "No hay pedidos de ARIS cargados para este día: se usan solo las proyecciones.",
         )
         HorizontalDivider()
         SourceRow(
             ok = if (plan.forecast != null) true else null,
             label = "Llegada estimada por rango",
             value = null,
-            note = plan.forecast?.let { "Con ${it.days} días de producción, del ${it.dateFrom.short()} al ${it.dateTo.short()}." }
+            note = plan.forecast?.let { "Con ${it.days} días de producción, del ${it.dateFrom.short()} al ${it.dateTo.short()}. Modelo en uso: ${arrivalModelLabel(it.method)}." }
                 ?: "Sin historia de producción suficiente (mínimo 14 días registrados).",
         )
         Text(
-            "Pedir = el mayor entre proyección y pedidos confirmados, menos el stock. Nunca menos de 0.",
+            sacaFormula(plan.method),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 10.dp),

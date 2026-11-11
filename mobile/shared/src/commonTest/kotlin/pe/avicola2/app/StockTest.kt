@@ -147,4 +147,33 @@ class StockTest {
             pe.avicola2.app.domain.productionDraftOf(products, day),
         )
     }
+
+    @Test
+    fun flockWeightsAcceptCommaOrDotAndSkipBlanks() {
+        assertEquals(mapOf("Brasa chica" to "1.72", "Brasa grande" to ""), pe.avicola2.app.domain.flockWeightDraftOf(listOf("Brasa chica", "Brasa grande"), mapOf("Brasa chica" to 1.72)))
+        assertEquals(2.33, pe.avicola2.app.domain.parseFlockKg("2,33"))
+        assertEquals(null, pe.avicola2.app.domain.parseFlockKg("abc"))
+        assertEquals(mapOf("a" to 1.72, "c" to 2.45), pe.avicola2.app.domain.flockWeights(mapOf("a" to "1,72", "b" to "", "c" to "2.45")))
+        assertEquals(listOf("a", "b"), pe.avicola2.app.domain.invalidFlockWeights(mapOf("a" to "0.2", "b" to "9", "c" to "2.4", "d" to "")))
+        assertEquals("2.345", pe.avicola2.app.domain.cleanFlockKg("2.345"))
+        assertEquals(null, pe.avicola2.app.domain.cleanFlockKg("12"))
+        assertEquals(null, pe.avicola2.app.domain.cleanFlockKg("2.3456"))
+    }
+
+    @Test
+    fun deviationIsWhatArrivedMinusWhatWasOrdered() {
+        assertEquals("+1 668", pe.avicola2.app.domain.deviationText(0, 1668))
+        assertEquals("-2 876", pe.avicola2.app.domain.deviationText(4050, 1174))
+        assertEquals("0", pe.avicola2.app.domain.deviationText(10, 10))
+    }
+
+    @Test
+    fun sacaMethodDefaultsToTheRecommendedOne() {
+        assertEquals("max", pe.avicola2.app.domain.sacaMethodOf(null))
+        assertEquals("max", pe.avicola2.app.domain.sacaMethodOf("otra"))
+        assertEquals("sum", pe.avicola2.app.domain.sacaMethodOf("sum"))
+        assertTrue("proyección + pedidos" in pe.avicola2.app.domain.sacaFormula("sum"))
+        assertEquals("Suavizado exponencial, vida media 3 días", pe.avicola2.app.domain.arrivalModelLabel("ewma_3"))
+        assertTrue("peso de la parvada" in pe.avicola2.app.domain.arrivalModelLabel("hybrid_weight"))
+    }
 }

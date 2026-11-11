@@ -11,6 +11,7 @@ import pe.avicola2.app.domain.Product
 import pe.avicola2.app.domain.ProductionDay
 import pe.avicola2.app.domain.ProductionEntry
 import pe.avicola2.app.domain.Projection
+import pe.avicola2.app.domain.SACA_METHOD_MAX
 import pe.avicola2.app.domain.Saca
 import pe.avicola2.app.domain.Seller
 import pe.avicola2.app.domain.StockDay
@@ -68,12 +69,12 @@ interface StockGateway {
 /** Producción diaria (el backend decide quién la ve y quién la registra). */
 interface ProductionGateway {
     suspend fun list(from: LocalDate, to: LocalDate): List<ProductionDay>
-    suspend fun register(day: LocalDate, lines: List<ProductionEntry>): ProductionDay
+    suspend fun register(day: LocalDate, lines: List<ProductionEntry>, weights: Map<String, Double> = emptyMap()): ProductionDay
 }
 
 /** Cuánto pedir a granja para un día. */
 interface SacaGateway {
-    suspend fun plan(day: LocalDate): Saca
+    suspend fun plan(day: LocalDate, method: String = SACA_METHOD_MAX): Saca
 }
 
 /** Entrega un archivo generado al sistema para guardarlo o mandarlo (menú «Compartir»). */

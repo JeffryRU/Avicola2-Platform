@@ -221,6 +221,23 @@ data class StockRequest(val lines: List<StockEntry>)
 
 // --- Cálculo de saca -----------------------------------------------------------------------
 
+/** Formas de cálculo: el mayor entre proyección y pedidos (recomendada) o su suma (la del negocio). */
+const val SACA_METHOD_MAX = "max"
+const val SACA_METHOD_SUM = "sum"
+
+fun sacaMethodOf(stored: String?): String = if (stored == SACA_METHOD_SUM) SACA_METHOD_SUM else SACA_METHOD_MAX
+
+fun sacaFormula(method: String): String =
+    if (method == SACA_METHOD_SUM) "Pedir = proyección + pedidos confirmados − stock. Nunca menos de 0."
+    else "Pedir = el mayor entre proyección y pedidos confirmados, menos el stock. Nunca menos de 0."
+
+/** Nombre legible del modelo de llegada en uso (lo elige solo el backend). */
+fun arrivalModelLabel(method: String): String {
+    if (method == "hybrid_weight") return "Suavizado + árboles con el peso de la parvada"
+    val halfLife = method.removePrefix("ewma_")
+    return if (method.startsWith("ewma_") && halfLife.toDoubleOrNull() != null) "Suavizado exponencial, vida media $halfLife días" else method
+}
+
 @Serializable
 data class SacaLine(
     @SerialName("product_id") val productId: String,
@@ -262,6 +279,8 @@ data class Saca(
     @SerialName("sellers_total") val sellersTotal: Int,
     @SerialName("orders_available") val ordersAvailable: Boolean,
     val forecast: SacaForecast? = null,
+    /** Forma de cálculo usada: «max» o «sum». */
+    val method: String = SACA_METHOD_MAX,
 ) {
     val missingSellers: Int get() = (sellersTotal - sellersRegistered).coerceAtLeast(0)
 }
@@ -287,6 +306,8 @@ data class ProductionDay(
     @SerialName("quality_b") val qualityB: Int,
     @SerialName("recorded_by") val recordedBy: String,
     @SerialName("recorded_at") val recordedAt: String,
+    /** Peso vivo promedio (kg) de la parvada por tipo; solo los que se anotaron. */
+    val weights: Map<String, Double> = emptyMap(),
 )
 
 @Serializable
@@ -298,4 +319,4 @@ data class ProductionEntry(
 )
 
 @Serializable
-data class ProductionRequest(val lines: List<ProductionEntry>)
+data class ProductionRequest(val lines: List<ProductionEntry>, val weights: Map<String, Double> = emptyMap())

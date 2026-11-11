@@ -59,6 +59,12 @@ import kotlinx.datetime.LocalDate
 import pe.avicola2.app.AppContainer
 import pe.avicola2.app.domain.Account
 import pe.avicola2.app.domain.Catalog
+import pe.avicola2.app.domain.FlockWeightDraft
+import pe.avicola2.app.domain.cleanFlockKg
+import pe.avicola2.app.domain.deviationText
+import pe.avicola2.app.domain.flockWeightDraftOf
+import pe.avicola2.app.domain.flockWeights
+import pe.avicola2.app.domain.invalidFlockWeights
 import pe.avicola2.app.domain.Product
 import pe.avicola2.app.domain.ProductionCell
 import pe.avicola2.app.domain.ProductionDay
@@ -100,13 +106,20 @@ class ProductionViewModel(private val c: AppContainer) : ViewModel() {
     var draft by mutableStateOf<ProductionDraft>(emptyMap())
         private set
     private var saved: ProductionDraft = emptyMap()
+
+    /** Peso promedio de la parvada por tipo (texto). */
+    var weights by mutableStateOf<FlockWeightDraft>(emptyMap())
+        private set
+    private var savedWeights: FlockWeightDraft = emptyMap()
     var busy by mutableStateOf(false)
         private set
     var error by mutableStateOf<String?>(null)
         private set
     var message by mutableStateOf<String?>(null)
 
-    val dirty: Boolean get() = draft != saved
+    val dirty: Boolean get() = draft != saved || weights != savedWeights
+
+    val groups: List<String> get() = data?.products.orEmpty().mapNotNull { it.subcategory }.distinct()
 
     init {
         load()
@@ -139,7 +152,13 @@ class ProductionViewModel(private val c: AppContainer) : ViewModel() {
     private fun reset() {
         saved = productionDraftOf(data?.products.orEmpty(), record())
         draft = saved
+        savedWeights = flockWeightDraftOf(groups, record()?.weights.orEmpty())
+        weights = savedWeights
         error = null
+    }
+
+    fun setWeight(group: String, raw: String) {
+        cleanFlockKg(raw)?.let { weights = weights + (group to it) }
     }
 
     fun set(product: String, cell: ProductionCell) {
@@ -153,11 +172,16 @@ class ProductionViewModel(private val c: AppContainer) : ViewModel() {
             error = "La calidad B no puede superar lo producido en ${bad.joinToString { it.name }}."
             return
         }
+        val badWeights = invalidFlockWeights(weights)
+        if (badWeights.isNotEmpty()) {
+            error = "El peso promedio de ${badWeights.joinToString()} debe estar entre 0,5 y 6 kg."
+            return
+        }
         error = null
         busy = true
         viewModelScope.launch {
             try {
-                val stored = c.production.register(day, productionEntries(products, draft))
+                val stored = c.production.register(day, productionEntries(products, draft), flockWeights(weights))
                 val days = (data?.days.orEmpty().filter { it.date != stored.date } + stored).sortedByDescending { it.date }
                 _state.value = Load.Ready(ProductionData(products, days))
                 reset()
@@ -372,7 +396,19 @@ private fun Rows(vm: ProductionViewModel, products: List<Product>, record: Produ
         items.forEach { p ->
             val cell = cellOf(p)
             Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Text(p.name, fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(p.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    val diff = num(cell.produced) - num(cell.ordered)
+                    Text(
+                        "desv. ${deviationText(num(cell.ordered), num(cell.produced))}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = when {
+                            diff < 0 -> Warning
+                            diff == 0 -> MaterialTheme.colorScheme.outline
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Field("Pedido", cell.ordered, editable, Modifier.weight(1f)) { vm.set(p.id, cell.copy(ordered = it)) }
                     Field("Llegó", cell.produced, editable, Modifier.weight(1f), bold = true) { vm.set(p.id, cell.copy(produced = it)) }
@@ -381,14 +417,54 @@ private fun Rows(vm: ProductionViewModel, products: List<Product>, record: Produ
             }
         }
     }
+    FlockWeights(vm, record, editable)
     if (editable) {
         Text(
-            "Calidad A se calcula sola: producido menos calidad B. Lo que dejes en blanco cuenta como 0.",
+            "Calidad A se calcula sola: producido menos calidad B. Lo que dejes en blanco cuenta como 0. Desviación = lo que llegó menos lo pedido.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),
         )
     }
+}
+
+/** Peso vivo promedio de la parvada por tipo: opcional; ayuda al pronóstico de llegada. */
+@Composable
+private fun FlockWeights(vm: ProductionViewModel, record: ProductionDay?, editable: Boolean) {
+    val groups = vm.groups
+    val saved = record?.weights.orEmpty()
+    if (groups.isEmpty() || (!editable && saved.isEmpty())) return
+    HorizontalDivider(Modifier.padding(top = 8.dp, bottom = 10.dp))
+    Text("Peso promedio de la parvada (kg)", style = MaterialTheme.typography.titleSmall)
+    if (!editable) {
+        Text(
+            saved.entries.joinToString(" · ") { (group, kg) -> "$group ${formatNumber(kg, 2)}" },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        return
+    }
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        groups.forEach { group ->
+            OutlinedTextField(
+                value = vm.weights[group].orEmpty(),
+                onValueChange = { vm.setWeight(group, it) },
+                label = { Text(group.removePrefix("Brasa ").replaceFirstChar { it.uppercase() }, maxLines = 1) },
+                placeholder = { Text("—", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.outline) },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = TextAlign.Center),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+    Text(
+        "Opcional. Peso vivo promedio de cada tipo.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 4.dp),
+    )
 }
 
 @Composable
