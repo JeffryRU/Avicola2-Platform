@@ -42,6 +42,7 @@ export interface ProjectedLine {
   product_id: string
   expected: number
   expectedA: number
+  expectedB: number
 }
 export interface ProjectedGroup {
   name: string
@@ -55,8 +56,9 @@ export function project(groups: ForecastGroup[], draft: RequestDraft): Projected
   return groups.map((g) => {
     const requested = parseUnits(draft[g.name] ?? '') ?? 0
     const lines = g.products.map((p) => {
-      const birds = requested * p.share
-      return { product_id: p.product_id, expected: Math.round(birds), expectedA: Math.round(birds * p.quality_a_rate) }
+      const expected = Math.round(requested * p.share)
+      const expectedA = Math.round(requested * p.share * p.quality_a_rate)
+      return { product_id: p.product_id, expected, expectedA, expectedB: expected - expectedA }
     })
     return { name: g.name, requested, expected: lines.reduce((s, l) => s + l.expected, 0), lines }
   })
@@ -70,6 +72,7 @@ export function projectionTotals(groups: ProjectedGroup[]) {
     requested: groups.reduce((s, g) => s + g.requested, 0),
     expected,
     expectedA,
+    expectedB: expected - expectedA,
     aShare: expected ? expectedA / expected : 0,
     largest: Math.max(0, ...lines.map((l) => l.expected)),
   }

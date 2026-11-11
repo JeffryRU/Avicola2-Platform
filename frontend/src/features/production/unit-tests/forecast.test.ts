@@ -28,14 +28,15 @@ describe('pronóstico de llegada', () => {
     const projected = project(groups, { 'Brasa chica': '2000', 'Brasa mediana': '' })
     expect(projected[0]).toMatchObject({ requested: 2000, expected: 2000 })
     expect(projected[0]?.lines).toEqual([
-      { product_id: 'P0003', expected: 800, expectedA: 800 },
-      { product_id: 'P0004', expected: 1200, expectedA: 900 },
+      { product_id: 'P0003', expected: 800, expectedA: 800, expectedB: 0 },
+      { product_id: 'P0004', expected: 1200, expectedA: 900, expectedB: 300 },
     ])
     expect(projected[1]).toMatchObject({ requested: 0, expected: 0 })
     expect(projectionTotals(projected)).toEqual({
       requested: 2000,
       expected: 2000,
       expectedA: 1700,
+      expectedB: 300,
       aShare: 0.85,
       largest: 1200,
     })
