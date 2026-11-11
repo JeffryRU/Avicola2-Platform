@@ -94,6 +94,8 @@ class StockTest {
         fun account(role: String, vararg permissions: String) = Account(Seller("u", "U", null, role), false, permissions.toList())
         val chief = account("dispatch_chief", "view_stock", "manage_stock")
         assertTrue(chief.stockOnly && chief.canManageStock && !chief.canViewSaca)
+        assertFalse(chief.canManageProduction) // el backend no se lo dio en esta sesión
+        assertTrue(account("dispatch_chief").canManageProduction) // sin permisos guardados: por rol
         assertEquals("Jefe de despacho", chief.seller.roleLabel)
         assertFalse(chief.seller.isSupervisor)
 
@@ -106,5 +108,43 @@ class StockTest {
         // Cuenta guardada antes de existir los permisos: se deduce del rol.
         assertTrue(account("dispatch_chief").stockOnly)
         assertTrue(account("general_supervisor").canManageStock)
+    }
+
+    @Test
+    fun productionTotalsAndValidation() {
+        val draft = mapOf(
+            "P0001" to pe.avicola2.app.domain.ProductionCell("4050", "1174", "120"),
+            "P0006" to pe.avicola2.app.domain.ProductionCell("", "1668", "400"),
+        )
+        val totals = pe.avicola2.app.domain.productionTotals(products, draft)
+        assertEquals(Triple(4050, 2842, 520), Triple(totals.ordered, totals.produced, totals.qualityB))
+        assertEquals(-1208, totals.difference)
+        assertEquals(520.0 / 2842, totals.qualityBShare, 1e-9)
+        assertEquals(
+            listOf(
+                pe.avicola2.app.domain.ProductionEntry("P0001", 4050.0, 1174, 120),
+                pe.avicola2.app.domain.ProductionEntry("P0006", 0.0, 1668, 400),
+            ),
+            pe.avicola2.app.domain.productionEntries(products, draft),
+        )
+        assertTrue(pe.avicola2.app.domain.invalidProductionQuality(products, draft).isEmpty())
+        val bad = draft + ("P0006" to pe.avicola2.app.domain.ProductionCell("", "10", "11"))
+        assertEquals(listOf("Brasa 6"), pe.avicola2.app.domain.invalidProductionQuality(products, bad).map { it.name })
+    }
+
+    @Test
+    fun productionDraftShowsSavedZerosAsBlank() {
+        val day = pe.avicola2.app.domain.ProductionDay(
+            today,
+            listOf(pe.avicola2.app.domain.ProductionLine("P0001", 4050.0, 1174, 1174, 0)),
+            4050.0, 1174, 0, "despacho", "2026-11-10T23:30:00Z",
+        )
+        assertEquals(
+            mapOf(
+                "P0001" to pe.avicola2.app.domain.ProductionCell("4050", "1174", ""),
+                "P0006" to pe.avicola2.app.domain.ProductionCell(),
+            ),
+            pe.avicola2.app.domain.productionDraftOf(products, day),
+        )
     }
 }

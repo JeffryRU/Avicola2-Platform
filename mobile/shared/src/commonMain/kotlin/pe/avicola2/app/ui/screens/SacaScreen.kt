@@ -242,6 +242,14 @@ private fun Sources(plan: Saca, onOpenStock: (() -> Unit)?) {
             value = if (plan.ordersAvailable) "${formatNumber(plan.ordered.toDouble())} unid." else null,
             note = if (plan.ordersAvailable) "Conectados." else "Sin conectar (ARIS aún no se integra): se usan solo las proyecciones.",
         )
+        HorizontalDivider()
+        SourceRow(
+            ok = if (plan.forecast != null) true else null,
+            label = "Llegada estimada por rango",
+            value = null,
+            note = plan.forecast?.let { "Con ${it.days} días de producción, del ${it.dateFrom.short()} al ${it.dateTo.short()}." }
+                ?: "Sin historia de producción suficiente (mínimo 14 días registrados).",
+        )
         Text(
             "Pedir = el mayor entre proyección y pedidos confirmados, menos el stock. Nunca menos de 0.",
             style = MaterialTheme.typography.bodySmall,
@@ -310,13 +318,21 @@ private fun ByProduct(data: SacaData) {
 
 @Composable
 private fun ProductLine(product: Product, line: SacaLine, max: Int) {
-    val idle = line.demand == 0 && line.stock == 0
+    val idle = line.demand == 0 && line.stock == 0 && (line.expected ?: 0) == 0
     Row(
         Modifier.fillMaxWidth().padding(vertical = 8.dp).alpha(if (idle) 0.45f else 1f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text(product.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            line.expected?.let { expected ->
+                Text(
+                    "Llegarán ${formatNumber(expected.toDouble())}" + (line.expectedA?.let { " · ${formatNumber(it.toDouble())} en calidad A" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (expected > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                )
+            }
             Text(
                 "${formatNumber(line.demand.toDouble())} proy." + if (line.stock > 0) " − ${formatNumber(line.stock.toDouble())} stock" else "",
                 style = MaterialTheme.typography.bodySmall,

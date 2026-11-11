@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -63,6 +64,7 @@ import pe.avicola2.app.ui.screens.NewProjectionScreen
 import pe.avicola2.app.ui.screens.NotificationsScreen
 import pe.avicola2.app.ui.screens.NotificationsViewModel
 import pe.avicola2.app.ui.screens.ProfileScreen
+import pe.avicola2.app.ui.screens.ProductionScreen
 import pe.avicola2.app.ui.screens.ProjectionsScreen
 import pe.avicola2.app.ui.screens.SacaScreen
 import pe.avicola2.app.ui.screens.StockScreen
@@ -76,6 +78,7 @@ import pe.avicola2.app.ui.theme.AppTheme
 @Serializable object ChangePasswordRoute
 @Serializable object StockRoute
 @Serializable object SacaRoute
+@Serializable object ProductionRoute
 
 private data class TopLevel(val label: String, val icon: ImageVector, val route: Any, val type: KClass<*>)
 
@@ -83,13 +86,14 @@ private val HOME = TopLevel("Inicio", Icons.Filled.Home, HomeRoute, HomeRoute::c
 private val PROJECTIONS = TopLevel("Proyecciones", Icons.AutoMirrored.Filled.List, ProjectionsRoute, ProjectionsRoute::class)
 private val SACA = TopLevel("Saca", Icons.Filled.ShoppingCart, SacaRoute, SacaRoute::class)
 private val STOCK = TopLevel("Stock", Icons.Filled.Home, StockRoute, StockRoute::class)
+private val PRODUCTION = TopLevel("Producción", Icons.Filled.DateRange, ProductionRoute, ProductionRoute::class)
 private val NOTICES = TopLevel("Avisos", Icons.Filled.Notifications, NotificationsRoute, NotificationsRoute::class)
 private val PROFILE = TopLevel("Perfil", Icons.Filled.Person, ProfileRoute, ProfileRoute::class)
 
 /** Pestañas según lo que la cuenta puede hacer (lo decide el backend, no el nombre del rol). */
 private fun topLevel(account: Account): List<TopLevel> = when {
     // Jefe de despacho: su inicio es el stock; no proyecta ni ve al equipo.
-    account.stockOnly -> listOf(STOCK, NOTICES, PROFILE)
+    account.stockOnly -> listOfNotNull(STOCK, PRODUCTION.takeIf { account.canViewProduction }, NOTICES, PROFILE)
     account.canViewSaca -> listOf(HOME, PROJECTIONS, SACA, NOTICES, PROFILE)
     else -> listOf(HOME, PROJECTIONS, NOTICES, PROFILE)
 }
@@ -235,6 +239,9 @@ private fun AppNavHost(
         composable<StockRoute> {
             // Para el jefe de despacho es el inicio (sin "Volver"); el supervisor llega desde Saca.
             StockScreen(container, account, onBack = if (account.stockOnly) null else ({ nav.popBackStack() }))
+        }
+        composable<ProductionRoute> {
+            ProductionScreen(container, account, onBack = if (account.stockOnly) null else ({ nav.popBackStack() }))
         }
         composable<SacaRoute> { SacaScreen(container, account, onOpenStock = { nav.navigate(StockRoute) }) }
         composable<HomeRoute> {

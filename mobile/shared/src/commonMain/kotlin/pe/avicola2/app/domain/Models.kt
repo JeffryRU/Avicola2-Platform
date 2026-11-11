@@ -42,6 +42,9 @@ data class Account(
     val canViewStock: Boolean get() = can("view_stock", "dispatch_chief", "supervisor", "general_supervisor")
     val canManageStock: Boolean get() = can("manage_stock", "dispatch_chief", "general_supervisor")
     val canViewSaca: Boolean get() = can("view_saca", "supervisor", "general_supervisor")
+    val canViewProduction: Boolean
+        get() = can("view_production", "dispatch_chief", "supervisor", "general_supervisor")
+    val canManageProduction: Boolean get() = can("manage_production", "dispatch_chief", "general_supervisor")
 
     /** Jefe de despacho: su app es solo el stock (no proyecta ni ve al equipo). */
     val stockOnly: Boolean get() = canViewStock && !seller.isSupervisor && seller.role != "seller"
@@ -227,6 +230,18 @@ data class SacaLine(
     val stock: Int,
     val request: Int,
     @SerialName("request_kg") val requestKg: Double,
+    /** Aves que se espera que lleguen en este rango y cuántas en calidad A (null: sin historia). */
+    val expected: Int? = null,
+    @SerialName("expected_a") val expectedA: Int? = null,
+)
+
+/** Con qué se estimó la llegada por rango. */
+@Serializable
+data class SacaForecast(
+    val method: String,
+    val days: Int,
+    @SerialName("date_from") val dateFrom: LocalDate,
+    @SerialName("date_to") val dateTo: LocalDate,
 )
 
 /** Cuánto pedir a granja para un día y con qué datos se calculó (lo resuelve el backend). */
@@ -246,6 +261,41 @@ data class Saca(
     @SerialName("sellers_registered") val sellersRegistered: Int,
     @SerialName("sellers_total") val sellersTotal: Int,
     @SerialName("orders_available") val ordersAvailable: Boolean,
+    val forecast: SacaForecast? = null,
 ) {
     val missingSellers: Int get() = (sellersTotal - sellersRegistered).coerceAtLeast(0)
 }
+
+// --- Producción diaria ---------------------------------------------------------------------
+
+@Serializable
+data class ProductionLine(
+    @SerialName("product_id") val productId: String,
+    val ordered: Double,
+    val produced: Int,
+    @SerialName("quality_a") val qualityA: Int,
+    @SerialName("quality_b") val qualityB: Int,
+)
+
+/** Lo pedido a granja y lo que llegó en un día (una línea por producto). */
+@Serializable
+data class ProductionDay(
+    val date: LocalDate,
+    val lines: List<ProductionLine>,
+    val ordered: Double,
+    val produced: Int,
+    @SerialName("quality_b") val qualityB: Int,
+    @SerialName("recorded_by") val recordedBy: String,
+    @SerialName("recorded_at") val recordedAt: String,
+)
+
+@Serializable
+data class ProductionEntry(
+    @SerialName("product_id") val productId: String,
+    val ordered: Double,
+    val produced: Int,
+    @SerialName("quality_b") val qualityB: Int,
+)
+
+@Serializable
+data class ProductionRequest(val lines: List<ProductionEntry>)

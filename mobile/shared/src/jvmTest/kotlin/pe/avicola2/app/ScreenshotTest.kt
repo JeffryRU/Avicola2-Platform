@@ -19,6 +19,7 @@ import pe.avicola2.app.ui.screens.NewProjectionScreen
 import pe.avicola2.app.ui.screens.NotificationsScreen
 import pe.avicola2.app.ui.screens.NotificationsViewModel
 import pe.avicola2.app.ui.screens.ProfileScreen
+import pe.avicola2.app.ui.screens.ProductionScreen
 import pe.avicola2.app.ui.screens.ProjectionsScreen
 import pe.avicola2.app.ui.screens.SacaScreen
 import pe.avicola2.app.ui.screens.StockScreen
@@ -122,5 +123,9 @@ class ScreenshotTest {
         shot("11b-stock-chico", 320 * 2, 568 * 2) { StockScreen(chief, chiefAccount) }
         shot("11c-stock-tablet", 1280 * 2, 800 * 2) { App(chief) }
         shot("11d-stock-oscuro", phoneW, phoneH, dark = true) { StockScreen(chief, chiefAccount) }
+        shot("12-produccion-jefe-despacho", phoneW, phoneH) { ProductionScreen(chief, chiefAccount) }
+        shot("12b-produccion-chico", 320 * 2, 568 * 2) { ProductionScreen(chief, chiefAccount) }
+        shot("12c-produccion-tablet", 1280 * 2, 800 * 2) { ProductionScreen(chief, chiefAccount) }
+        shot("12d-produccion-supervisor", phoneW, phoneH) { ProductionScreen(sup, supAccount, onBack = {}) }
     }
 }

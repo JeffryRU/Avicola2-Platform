@@ -5,6 +5,7 @@ import kotlinx.datetime.LocalDate
 import pe.avicola2.app.application.AuthGateway
 import pe.avicola2.app.application.NotificationsGateway
 import pe.avicola2.app.application.PlanningGateway
+import pe.avicola2.app.application.ProductionGateway
 import pe.avicola2.app.application.SacaGateway
 import pe.avicola2.app.application.StockGateway
 import pe.avicola2.app.domain.Account
@@ -20,6 +21,9 @@ import pe.avicola2.app.domain.MarkReadResult
 import pe.avicola2.app.domain.Notifications
 import pe.avicola2.app.domain.Product
 import pe.avicola2.app.domain.ProfileRequest
+import pe.avicola2.app.domain.ProductionDay
+import pe.avicola2.app.domain.ProductionEntry
+import pe.avicola2.app.domain.ProductionRequest
 import pe.avicola2.app.domain.Projection
 import pe.avicola2.app.domain.Saca
 import pe.avicola2.app.domain.Seller
@@ -98,4 +102,12 @@ class HttpStockGateway(private val api: ApiClient) : StockGateway {
 
 class HttpSacaGateway(private val api: ApiClient) : SacaGateway {
     override suspend fun plan(day: LocalDate): Saca = api.get("/saca", mapOf("date" to day))
+}
+
+class HttpProductionGateway(private val api: ApiClient) : ProductionGateway {
+    override suspend fun list(from: LocalDate, to: LocalDate): List<ProductionDay> =
+        api.get("/production", mapOf("date_from" to from, "date_to" to to))
+
+    override suspend fun register(day: LocalDate, lines: List<ProductionEntry>): ProductionDay =
+        api.put("/production/$day", ProductionRequest(lines))
 }
