@@ -79,7 +79,8 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
 - **Base de datos:** la elige `DATABASE_URL` (Supabase, Azure SQL, Postgres local o SQLite para demos). Para Azure SQL ver la sección correspondiente de `.env.example`.
 - **Nombres de tablas:** `backend/config/tables.yaml` (renombrar una tabla ya creada requiere una migración).
 - **Catálogo y usuarios de prueba:** `backend/config/planning_seed.yaml`. Los usuarios de prueba (`general` como supervisor general, `supervisor`, `despacho` como jefe de despacho y los 7 vendedores de la tabla maestra, contraseña `demo1234`) solo se crean con `APP_ENV=local`.
-- **Comandos** (`cd backend`): `uv run python -m app.planning.infrastructure.cli init | produccion <archivo.xlsx> | seed | show [n] | clear --yes | supervisor <usuario> "<nombre>" [--general] | rol <usuario> <rol>`.
+- **Comandos** (`cd backend`): `uv run python -m app.planning.infrastructure.cli init | historia [carpeta] | produccion <archivo.xlsx> | seed | show [n] | clear --yes | supervisor <usuario> "<nombre>" [--general] | rol <usuario> <rol>`.
+- **Datos reales:** copia `DESPACHO.csv`, `VENTAS.csv` y el Excel de producción en `data/inbox/` (no se versiona) y ejecuta `cli historia`. Carga el catálogo, los pedidos de despacho (`np_dispatch_orders`), las ventas en tienda (`np_store_sales`) y la producción (`np_production`); cada ejecución reemplaza lo anterior.
 - **Cuentas y seguridad** ([ADR 0005](docs/adr/0005-seguridad-de-sesion-y-cuentas.md)):
   - La sesión va en una cookie HttpOnly. El token no aparece en las respuestas ni en el almacenamiento del navegador.
   - El **supervisor** crea las cuentas de los vendedores y restablece las contraseñas olvidadas desde la pantalla **Usuarios**: entrega una contraseña temporal que el vendedor cambia al entrar.

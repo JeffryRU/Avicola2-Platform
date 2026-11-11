@@ -14,6 +14,11 @@
     uv run python -m app.planning.infrastructure.cli produccion <archivo.xlsx>
                         carga la historia de producción (hoja DB_CALIDA_B: pedido, producción y
                         calidad B por rango); reemplaza los días que ya estuvieran cargados
+    uv run python -m app.planning.infrastructure.cli historia [carpeta]
+                        carga todos los datos reales que encuentre en la carpeta (por defecto
+                        data/inbox, que no se versiona): DESPACHO*.csv (pedidos de ARIS),
+                        VENTAS*.csv (ventas en tienda) y el Excel con la hoja DB_CALIDA_B
+                        (producción). Antes ejecuta `init`. Reemplaza lo ya cargado
     uv run python -m app.planning.infrastructure.cli seed         3 semanas de ejemplo
     uv run python -m app.planning.infrastructure.cli show [n]     resumen y últimas n
     uv run python -m app.planning.infrastructure.cli clear --yes  borra las proyecciones
@@ -28,6 +33,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
 import yaml
+from openpyxl import load_workbook
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
@@ -43,6 +49,7 @@ from app.planning.domain.permissions import (
     SUPERVISOR,
 )
 from app.planning.infrastructure.clock import ZoneClock
+from app.planning.infrastructure.history_import import load_dispatch_orders, load_store_sales
 from app.planning.infrastructure.persistence.notifications import SqlNotificationRepository
 from app.planning.infrastructure.persistence.production import SqlProductionRepository
 from app.planning.infrastructure.persistence.repositories import (
@@ -56,7 +63,7 @@ from app.planning.infrastructure.persistence.tables import (
     projections,
     sellers,
 )
-from app.planning.infrastructure.production_import import read_production
+from app.planning.infrastructure.production_import import SHEET, read_production
 from app.planning.infrastructure.security import RandomTemporaryPasswords, ScryptPasswordHasher
 from app.shared.infrastructure.database.session import SessionLocal
 from app.shared.infrastructure.logging.setup import configure_from_settings
@@ -309,6 +316,64 @@ def import_production(session: Session, settings: Settings, path: Path) -> int:
     return 0
 
 
+def _find(folder: Path, prefix: str, suffix: str) -> Path | None:
+    """El archivo más reciente de la carpeta con ese prefijo y extensión (sin mirar mayúsculas)."""
+    matches = [
+        f
+        for f in folder.iterdir()
+        if f.is_file()
+        and f.name.lower().startswith(prefix.lower())
+        and f.suffix.lower() == suffix
+        and not f.name.startswith("~$")
+    ]
+    return max(matches, key=lambda f: f.stat().st_mtime, default=None)
+
+
+def _production_workbook(folder: Path) -> Path | None:
+    for path in sorted(folder.glob("*.xlsx"), key=lambda f: f.stat().st_mtime, reverse=True):
+        if path.name.startswith("~$"):
+            continue
+        workbook = load_workbook(path, read_only=True)
+        found = SHEET in workbook.sheetnames
+        workbook.close()
+        if found:
+            return path
+    return None
+
+
+def load_history(session: Session, settings: Settings, folder: Path) -> int:
+    """Llena la base con los datos reales de la carpeta: catálogo, pedidos, ventas y producción."""
+    if not folder.is_dir():
+        print(f"No existe la carpeta {folder}.")
+        return 1
+    init(session, settings)
+    found = 0
+    loaders = (
+        ("DESPACHO", "pedidos de despacho", load_dispatch_orders),
+        ("VENTAS", "ventas en tienda", load_store_sales),
+    )
+    for prefix, label, load in loaders:
+        path = _find(folder, prefix, ".csv")
+        if path is None:
+            print(f"--: no hay {prefix}*.csv; {label} sin cambios.")
+            continue
+        loaded, skipped = load(session, path)
+        session.commit()
+        found += 1
+        print(f"OK: {loaded} líneas de {label} ({path.name}); {skipped} filas descartadas.")
+    workbook = _production_workbook(folder)
+    if workbook is None:
+        print(f"--: no hay un Excel con la hoja {SHEET}; producción sin cambios.")
+    else:
+        found += 1
+        if import_production(session, settings, workbook):
+            return 1
+    if not found:
+        print(f"No se encontró ningún archivo para cargar en {folder}.")
+        return 1
+    return 0
+
+
 def show(session: Session, limit: int) -> None:
     n, units, kg = session.execute(
         select(
@@ -367,6 +432,11 @@ def main(argv: list[str]) -> int:
             return set_role(session, argv[1].strip().lower(), argv[2].strip())
         elif cmd == "produccion" and len(argv) == 2:
             return import_production(session, settings, Path(argv[1]))
+        elif cmd == "historia" and len(argv) <= 2:
+            folder = (
+                Path(argv[1]) if len(argv) == 2 else settings.config_dir.parents[1] / "data/inbox"
+            )
+            return load_history(session, settings, folder)
         elif cmd == "show":
             show(session, int(argv[1]) if len(argv) > 1 else 20)
         elif cmd == "clear" and "--yes" in argv:
