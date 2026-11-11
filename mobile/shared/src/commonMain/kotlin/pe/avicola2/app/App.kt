@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -63,6 +64,8 @@ import pe.avicola2.app.ui.screens.NotificationsScreen
 import pe.avicola2.app.ui.screens.NotificationsViewModel
 import pe.avicola2.app.ui.screens.ProfileScreen
 import pe.avicola2.app.ui.screens.ProjectionsScreen
+import pe.avicola2.app.ui.screens.SacaScreen
+import pe.avicola2.app.ui.screens.StockScreen
 import pe.avicola2.app.ui.theme.AppTheme
 
 @Serializable object HomeRoute
@@ -71,15 +74,25 @@ import pe.avicola2.app.ui.theme.AppTheme
 @Serializable object ProfileRoute
 @Serializable data class NewProjectionRoute(val start: String? = null)
 @Serializable object ChangePasswordRoute
+@Serializable object StockRoute
+@Serializable object SacaRoute
 
 private data class TopLevel(val label: String, val icon: ImageVector, val route: Any, val type: KClass<*>)
 
-private val TOP_LEVEL = listOf(
-    TopLevel("Inicio", Icons.Filled.Home, HomeRoute, HomeRoute::class),
-    TopLevel("Proyecciones", Icons.AutoMirrored.Filled.List, ProjectionsRoute, ProjectionsRoute::class),
-    TopLevel("Avisos", Icons.Filled.Notifications, NotificationsRoute, NotificationsRoute::class),
-    TopLevel("Perfil", Icons.Filled.Person, ProfileRoute, ProfileRoute::class),
-)
+private val HOME = TopLevel("Inicio", Icons.Filled.Home, HomeRoute, HomeRoute::class)
+private val PROJECTIONS = TopLevel("Proyecciones", Icons.AutoMirrored.Filled.List, ProjectionsRoute, ProjectionsRoute::class)
+private val SACA = TopLevel("Saca", Icons.Filled.ShoppingCart, SacaRoute, SacaRoute::class)
+private val STOCK = TopLevel("Stock", Icons.Filled.Home, StockRoute, StockRoute::class)
+private val NOTICES = TopLevel("Avisos", Icons.Filled.Notifications, NotificationsRoute, NotificationsRoute::class)
+private val PROFILE = TopLevel("Perfil", Icons.Filled.Person, ProfileRoute, ProfileRoute::class)
+
+/** Pestañas según lo que la cuenta puede hacer (lo decide el backend, no el nombre del rol). */
+private fun topLevel(account: Account): List<TopLevel> = when {
+    // Jefe de despacho: su inicio es el stock; no proyecta ni ve al equipo.
+    account.stockOnly -> listOf(STOCK, NOTICES, PROFILE)
+    account.canViewSaca -> listOf(HOME, PROJECTIONS, SACA, NOTICES, PROFILE)
+    else -> listOf(HOME, PROJECTIONS, NOTICES, PROFILE)
+}
 
 /** Punto de entrada común (Android e iOS). */
 @Composable
@@ -132,7 +145,8 @@ private fun MainShell(container: AppContainer, account: Account) {
 
     val backStack by nav.currentBackStackEntryAsState()
     val destination = backStack?.destination
-    val showNav = TOP_LEVEL.any { t -> destination?.hasRoute(t.type) == true }
+    val tabs = remember(account) { topLevel(account) }
+    val showNav = tabs.any { t -> destination?.hasRoute(t.type) == true }
 
     fun go(route: Any) = nav.navigate(route) {
         popUpTo(nav.graph.findStartDestination().id) { saveState = true }
@@ -147,7 +161,7 @@ private fun MainShell(container: AppContainer, account: Account) {
             bottomBar = {
                 if (showNav && !wide) {
                     NavigationBar {
-                        TOP_LEVEL.forEach { t ->
+                        tabs.forEach { t ->
                             NavigationBarItem(
                                 selected = destination?.hasRoute(t.type) == true,
                                 onClick = { go(t.route) },
@@ -162,7 +176,7 @@ private fun MainShell(container: AppContainer, account: Account) {
             Row(Modifier.fillMaxSize().padding(inner).consumeWindowInsets(inner)) {
                 if (showNav && wide) {
                     NavigationRail {
-                        TOP_LEVEL.forEach { t ->
+                        tabs.forEach { t ->
                             NavigationRailItem(
                                 selected = destination?.hasRoute(t.type) == true,
                                 onClick = { go(t.route) },
@@ -216,7 +230,13 @@ private fun AppNavHost(
     notifications: NotificationsViewModel,
     onUpdate: (AppRelease) -> Unit,
 ) {
-    NavHost(nav, startDestination = HomeRoute) {
+    val start: Any = if (account.stockOnly) StockRoute else HomeRoute
+    NavHost(nav, startDestination = start) {
+        composable<StockRoute> {
+            // Para el jefe de despacho es el inicio (sin "Volver"); el supervisor llega desde Saca.
+            StockScreen(container, account, onBack = if (account.stockOnly) null else ({ nav.popBackStack() }))
+        }
+        composable<SacaRoute> { SacaScreen(container, account, onOpenStock = { nav.navigate(StockRoute) }) }
         composable<HomeRoute> {
             HomeScreen(
                 container,

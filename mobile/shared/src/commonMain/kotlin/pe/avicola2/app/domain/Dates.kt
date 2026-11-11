@@ -28,6 +28,13 @@ private val MONTHS = listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ag
 /** "lun 5 nov" */
 fun LocalDate.short(): String = "${WEEKDAYS.getValue(dayOfWeek)} $day ${MONTHS[month.ordinal]}"
 
+/** "mié" */
+fun LocalDate.weekdayShort(): String = WEEKDAYS.getValue(dayOfWeek)
+
+/** "11/11" */
+fun LocalDate.dayMonth(): String =
+    "${day.toString().padStart(2, '0')}/${(month.ordinal + 1).toString().padStart(2, '0')}"
+
 /** "Hoy", "Mañana" o "lun 5 nov". */
 fun LocalDate.relative(ref: LocalDate = today()): String = when (this) {
     ref -> "Hoy"

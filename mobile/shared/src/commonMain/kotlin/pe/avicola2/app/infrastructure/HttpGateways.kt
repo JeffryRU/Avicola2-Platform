@@ -5,6 +5,8 @@ import kotlinx.datetime.LocalDate
 import pe.avicola2.app.application.AuthGateway
 import pe.avicola2.app.application.NotificationsGateway
 import pe.avicola2.app.application.PlanningGateway
+import pe.avicola2.app.application.SacaGateway
+import pe.avicola2.app.application.StockGateway
 import pe.avicola2.app.domain.Account
 import pe.avicola2.app.domain.ChangePasswordRequest
 import pe.avicola2.app.domain.DailyUnits
@@ -19,7 +21,11 @@ import pe.avicola2.app.domain.Notifications
 import pe.avicola2.app.domain.Product
 import pe.avicola2.app.domain.ProfileRequest
 import pe.avicola2.app.domain.Projection
+import pe.avicola2.app.domain.Saca
 import pe.avicola2.app.domain.Seller
+import pe.avicola2.app.domain.StockDay
+import pe.avicola2.app.domain.StockEntry
+import pe.avicola2.app.domain.StockRequest
 import pe.avicola2.app.domain.SubmissionRequest
 import pe.avicola2.app.domain.SubmissionResult
 import pe.avicola2.app.domain.Suggestion
@@ -80,4 +86,16 @@ class HttpNotificationsGateway(private val api: ApiClient) : NotificationsGatewa
 
     override suspend fun markRead(ids: List<Int>?): Int =
         api.post<MarkReadResult, MarkRead>("/notifications/read", MarkRead(ids)).updated
+}
+
+class HttpStockGateway(private val api: ApiClient) : StockGateway {
+    override suspend fun list(from: LocalDate, to: LocalDate): List<StockDay> =
+        api.get("/stock", mapOf("date_from" to from, "date_to" to to))
+
+    override suspend fun register(day: LocalDate, lines: List<StockEntry>): StockDay =
+        api.put("/stock/$day", StockRequest(lines))
+}
+
+class HttpSacaGateway(private val api: ApiClient) : SacaGateway {
+    override suspend fun plan(day: LocalDate): Saca = api.get("/saca", mapOf("date" to day))
 }

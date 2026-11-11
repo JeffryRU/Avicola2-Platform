@@ -27,7 +27,7 @@
 
 **Actualización (2026-11-11):** permiso `view_saca` (cálculo de saca) para supervisor y supervisor general.
 
-**Actualización (2026-11-10):** se agregó el rol `dispatch_chief` (jefe de despacho) con los permisos `view_stock` y `manage_stock`. No proyecta, no ve al equipo y no aparece como vendedor. El supervisor general tiene `manage_stock` porque nadie gestiona un rol con más permisos que el suyo. En la web, el jefe de despacho entra directo a **Stock de despacho**; la app móvil aún no tiene esa pantalla.
+**Actualización (2026-11-10):** se agregó el rol `dispatch_chief` (jefe de despacho) con los permisos `view_stock` y `manage_stock`. No proyecta, no ve al equipo y no aparece como vendedor. El supervisor general tiene `manage_stock` porque nadie gestiona un rol con más permisos que el suyo. En la web y en la app móvil, el jefe de despacho entra directo a **Stock de despacho**. La app móvil ya lee `permissions` de la sesión para decidir las pestañas (antes trataba como supervisor a todo rol que no fuera vendedor).
 
 - Los casos de uso preguntan por un permiso (`seller.can(Permission.X)`), nunca por el nombre del rol. "¿Es vendedor del equipo?" se pregunta con `is_seller`.
 - Un rol desconocido no tiene permisos: nunca se abre por defecto. Gestionar una cuenta con un rol desconocido da 403, no 500.

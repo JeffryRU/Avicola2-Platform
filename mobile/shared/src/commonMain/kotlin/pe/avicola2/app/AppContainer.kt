@@ -14,6 +14,8 @@ import pe.avicola2.app.application.ApiError
 import pe.avicola2.app.application.FileSharer
 import pe.avicola2.app.application.KeyValueStore
 import pe.avicola2.app.application.PlanningService
+import pe.avicola2.app.application.SacaGateway
+import pe.avicola2.app.application.StockGateway
 import pe.avicola2.app.application.ServerEvent
 import pe.avicola2.app.application.SessionService
 import pe.avicola2.app.application.SubmissionQueue
@@ -24,6 +26,8 @@ import pe.avicola2.app.infrastructure.GithubReleaseSource
 import pe.avicola2.app.infrastructure.HttpAuthGateway
 import pe.avicola2.app.infrastructure.HttpNotificationsGateway
 import pe.avicola2.app.infrastructure.HttpPlanningGateway
+import pe.avicola2.app.infrastructure.HttpSacaGateway
+import pe.avicola2.app.infrastructure.HttpStockGateway
 import pe.avicola2.app.infrastructure.SettingsStore
 import pe.avicola2.app.infrastructure.SseEventStream
 
@@ -70,6 +74,8 @@ class AppContainer(
 
     val planningGateway = HttpPlanningGateway(api)
     val notifications = HttpNotificationsGateway(api)
+    val stock: StockGateway = HttpStockGateway(api)
+    val saca: SacaGateway = HttpSacaGateway(api)
     val events = SseEventStream(api)
     val updates = UpdateService(GithubReleaseSource(api, BuildConfig.GITHUB_REPO), BuildConfig.VERSION_NAME)
 
