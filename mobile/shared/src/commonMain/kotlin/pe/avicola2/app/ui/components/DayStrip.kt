@@ -96,7 +96,7 @@ fun DayStrip(
 /** Cabecera de grupo (Brasa chica...) con su subtotal a la derecha. */
 @Composable
 fun GroupHeader(name: String, trailing: String, modifier: Modifier = Modifier) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.small, modifier = modifier) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.small, modifier = modifier) {
         androidx.compose.foundation.layout.Row(
             Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
