@@ -14,13 +14,14 @@ data class Seller(
     val zone: String? = null,
     val role: String,
 ) {
-    /** Vista de supervisión: todo rol que no es vendedor (supervisor y supervisor general).
-     *  Qué puede hacer cada uno lo decide el backend (domain/permissions.py). */
-    val isSupervisor: Boolean get() = role != "seller"
+    /** Vista de supervisión: supervisor y supervisor general. Qué puede hacer cada uno lo
+     *  decide el backend (domain/permissions.py) y llega en `Account.permissions`. */
+    val isSupervisor: Boolean get() = role == "supervisor" || role == "general_supervisor"
 
     val roleLabel: String
         get() = when (role) {
             "seller" -> "Vendedor"
+            "dispatch_chief" -> "Jefe de despacho"
             "supervisor" -> "Supervisor"
             "general_supervisor" -> "Supervisor general"
             else -> role
@@ -31,7 +32,20 @@ data class Seller(
 data class Account(
     val seller: Seller,
     @SerialName("must_change_password") val mustChangePassword: Boolean,
-)
+    /** Permisos resueltos por el backend. Una cuenta guardada antes de existir llega sin ellos:
+     *  hasta que /auth/me la refresca, se deduce del rol. */
+    val permissions: List<String> = emptyList(),
+) {
+    private fun can(permission: String, vararg roles: String): Boolean =
+        if (permissions.isNotEmpty()) permission in permissions else seller.role in roles
+
+    val canViewStock: Boolean get() = can("view_stock", "dispatch_chief", "supervisor", "general_supervisor")
+    val canManageStock: Boolean get() = can("manage_stock", "dispatch_chief", "general_supervisor")
+    val canViewSaca: Boolean get() = can("view_saca", "supervisor", "general_supervisor")
+
+    /** Jefe de despacho: su app es solo el stock (no proyecta ni ve al equipo). */
+    val stockOnly: Boolean get() = canViewStock && !seller.isSupervisor && seller.role != "seller"
+}
 
 @Serializable
 data class TokenResponse(
@@ -39,8 +53,9 @@ data class TokenResponse(
     @SerialName("must_change_password") val mustChangePassword: Boolean,
     val token: String,
     @SerialName("expires_in") val expiresIn: Long,
+    val permissions: List<String> = emptyList(),
 ) {
-    val account: Account get() = Account(seller, mustChangePassword)
+    val account: Account get() = Account(seller, mustChangePassword, permissions)
 }
 
 @Serializable
@@ -175,3 +190,60 @@ data class ChangePasswordRequest(
 
 @Serializable
 data class ProfileRequest(val name: String)
+
+// --- Stock de despacho ---------------------------------------------------------------------
+
+@Serializable
+data class StockLine(@SerialName("product_id") val productId: String, val units: Int, val kg: Double)
+
+/** Stock registrado de un día (una línea por producto). */
+@Serializable
+data class StockDay(
+    val date: LocalDate,
+    val lines: List<StockLine>,
+    @SerialName("total_units") val totalUnits: Int,
+    @SerialName("total_kg") val totalKg: Double,
+    @SerialName("recorded_by") val recordedBy: String,
+    @SerialName("recorded_at") val recordedAt: String,
+)
+
+/** Lo que se envía por producto: sin kg, el backend usa el peso promedio. */
+@Serializable
+data class StockEntry(@SerialName("product_id") val productId: String, val units: Int, val kg: Double? = null)
+
+@Serializable
+data class StockRequest(val lines: List<StockEntry>)
+
+// --- Cálculo de saca -----------------------------------------------------------------------
+
+@Serializable
+data class SacaLine(
+    @SerialName("product_id") val productId: String,
+    val projected: Int,
+    val ordered: Int,
+    val demand: Int,
+    val stock: Int,
+    val request: Int,
+    @SerialName("request_kg") val requestKg: Double,
+)
+
+/** Cuánto pedir a granja para un día y con qué datos se calculó (lo resuelve el backend). */
+@Serializable
+data class Saca(
+    val date: LocalDate,
+    val lines: List<SacaLine>,
+    val projected: Int,
+    val ordered: Int,
+    val demand: Int,
+    val stock: Int,
+    val request: Int,
+    @SerialName("request_kg") val requestKg: Double,
+    @SerialName("live_kg") val liveKg: Double,
+    @SerialName("yield_factor") val yieldFactor: Double,
+    @SerialName("stock_date") val stockDate: LocalDate? = null,
+    @SerialName("sellers_registered") val sellersRegistered: Int,
+    @SerialName("sellers_total") val sellersTotal: Int,
+    @SerialName("orders_available") val ordersAvailable: Boolean,
+) {
+    val missingSellers: Int get() = (sellersTotal - sellersRegistered).coerceAtLeast(0)
+}

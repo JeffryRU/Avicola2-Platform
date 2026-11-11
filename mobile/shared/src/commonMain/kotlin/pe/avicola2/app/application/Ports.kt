@@ -9,7 +9,10 @@ import pe.avicola2.app.domain.ExportFormat
 import pe.avicola2.app.domain.Notifications
 import pe.avicola2.app.domain.Product
 import pe.avicola2.app.domain.Projection
+import pe.avicola2.app.domain.Saca
 import pe.avicola2.app.domain.Seller
+import pe.avicola2.app.domain.StockDay
+import pe.avicola2.app.domain.StockEntry
 import pe.avicola2.app.domain.SubmissionRequest
 import pe.avicola2.app.domain.SubmissionResult
 import pe.avicola2.app.domain.Suggestion
@@ -50,6 +53,19 @@ interface PlanningGateway {
     suspend fun revokeEditing(username: String): List<Unlock>
     /** Proyecciones del período en Excel, PDF o CSV (el vendedor, lo suyo; el supervisor, todos o uno). */
     suspend fun exportProjections(from: LocalDate, to: LocalDate, seller: String? = null, format: ExportFormat = ExportFormat.Excel): ByteArray
+}
+
+/** Stock de despacho (el backend decide quién lo ve y quién lo registra). */
+interface StockGateway {
+    /** Días con registro en el rango, del más reciente al más antiguo. */
+    suspend fun list(from: LocalDate, to: LocalDate): List<StockDay>
+    /** Registra o corrige el stock de un día (reemplaza lo anterior). */
+    suspend fun register(day: LocalDate, lines: List<StockEntry>): StockDay
+}
+
+/** Cuánto pedir a granja para un día. */
+interface SacaGateway {
+    suspend fun plan(day: LocalDate): Saca
 }
 
 /** Entrega un archivo generado al sistema para guardarlo o mandarlo (menú «Compartir»). */

@@ -20,6 +20,8 @@ import pe.avicola2.app.ui.screens.NotificationsScreen
 import pe.avicola2.app.ui.screens.NotificationsViewModel
 import pe.avicola2.app.ui.screens.ProfileScreen
 import pe.avicola2.app.ui.screens.ProjectionsScreen
+import pe.avicola2.app.ui.screens.SacaScreen
+import pe.avicola2.app.ui.screens.StockScreen
 import pe.avicola2.app.ui.theme.AppTheme
 import kotlin.test.Test
 
@@ -111,5 +113,14 @@ class ScreenshotTest {
         val (sup, _) = container("supervisor")
         shot("07-supervisor-tablet", 1280 * 2, 800 * 2) { App(sup) }
         shot("08-supervisor-celular", phoneW, phoneH) { App(sup) }
+        val (_, supAccount) = container("supervisor")
+        shot("09-saca-celular", phoneW, phoneH) { SacaScreen(sup, supAccount, onOpenStock = {}) }
+        shot("09b-saca-tablet", 1280 * 2, 800 * 2) { SacaScreen(sup, supAccount, onOpenStock = {}) }
+        shot("10-stock-supervisor", phoneW, phoneH) { StockScreen(sup, supAccount, onBack = {}) }
+        val (chief, chiefAccount) = container("despacho")
+        shot("11-stock-jefe-despacho", phoneW, phoneH) { App(chief) }
+        shot("11b-stock-chico", 320 * 2, 568 * 2) { StockScreen(chief, chiefAccount) }
+        shot("11c-stock-tablet", 1280 * 2, 800 * 2) { App(chief) }
+        shot("11d-stock-oscuro", phoneW, phoneH, dark = true) { StockScreen(chief, chiefAccount) }
     }
 }

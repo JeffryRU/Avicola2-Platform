@@ -16,10 +16,14 @@ import pe.avicola2.app.application.SubmitOutcome
 import pe.avicola2.app.domain.ExportFormat
 import pe.avicola2.app.domain.Catalog
 import pe.avicola2.app.domain.DayUnits
+import pe.avicola2.app.domain.StockEntry
+import pe.avicola2.app.domain.plusDays
 import pe.avicola2.app.infrastructure.ApiClient
 import pe.avicola2.app.infrastructure.HttpAuthGateway
 import pe.avicola2.app.infrastructure.HttpNotificationsGateway
 import pe.avicola2.app.infrastructure.HttpPlanningGateway
+import pe.avicola2.app.infrastructure.HttpSacaGateway
+import pe.avicola2.app.infrastructure.HttpStockGateway
 import pe.avicola2.app.infrastructure.SseEventStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -127,6 +131,36 @@ class BackendContractTest {
         }
         val inbox = HttpNotificationsGateway(supervisor.api).list()
         assertTrue(inbox.items.any { it.kind == "projection_submitted" })
+    }
+
+    @Test
+    fun dispatchChiefRegistersStockAndSupervisorSeesItInTheSaca() = runBlocking<Unit> {
+        if (url == null) return@runBlocking println("AVICOLA_E2E_URL no definido: se omite")
+        val chief = Session(url).apply { session.login("despacho", "demo1234") }
+        val account = chief.session.account!!
+        assertTrue(account.stockOnly && account.canManageStock)
+        assertEquals(listOf("view_stock", "manage_stock"), account.permissions)
+
+        val today = pe.avicola2.app.domain.today()
+        val product = chief.planning.catalog().first()
+        val stock = HttpStockGateway(chief.api)
+        val saved = stock.register(today, listOf(StockEntry(product.id, 12)))
+        assertEquals(12, saved.totalUnits)
+        assertEquals(product.kgPerUnit * 12, saved.totalKg, 0.01) // sin kg: peso promedio
+        assertEquals("despacho", saved.recordedBy)
+        assertTrue(stock.list(today, today).any { it.date == today })
+        // No puede registrar el stock de mañana ni ver la saca.
+        assertFailsWith<ApiError> { stock.register(today.plusDays(1), listOf(StockEntry(product.id, 1))) }
+        assertEquals(403, assertFailsWith<ApiError> { HttpSacaGateway(chief.api).plan(today) }.status)
+
+        val supervisor = Session(url).apply { session.login("supervisor", "demo1234") }
+        assertTrue(supervisor.session.account!!.canViewSaca)
+        val plan = HttpSacaGateway(supervisor.api).plan(today.plusDays(1))
+        assertEquals(today, plan.stockDate)
+        assertEquals(plan.lines.sumOf { it.request }, plan.request)
+        // El supervisor consulta el stock pero no lo registra.
+        assertTrue(HttpStockGateway(supervisor.api).list(today, today).isNotEmpty())
+        assertEquals(403, assertFailsWith<ApiError> { HttpStockGateway(supervisor.api).register(today, listOf(StockEntry(product.id, 1))) }.status)
     }
 
     @Test
