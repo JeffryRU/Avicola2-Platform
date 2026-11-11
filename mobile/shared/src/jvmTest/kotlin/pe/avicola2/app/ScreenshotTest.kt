@@ -102,7 +102,7 @@ class ScreenshotTest {
         shot("02-inicio-vendedor", phoneW, phoneH) { App(seller) }
         shot("03-registrar", phoneW, phoneH) { NewProjectionScreen(seller, sellerAccount, null, onClose = {}) }
         // Elige también "sáb" y continúa al paso de cantidades.
-        shot("03b-registrar-cantidades", phoneW, phoneH, taps = listOf(Offset(316f, 416f), Offset(393f, 660f))) {
+        shot("03b-registrar-cantidades", phoneW, phoneH, taps = listOf(Offset(386f, 416f), Offset(393f, 755f))) {
             NewProjectionScreen(seller, sellerAccount, null, onClose = {})
         }
         shot("04-mis-proyecciones", phoneW, phoneH) { ProjectionsScreen(seller, sellerAccount) }

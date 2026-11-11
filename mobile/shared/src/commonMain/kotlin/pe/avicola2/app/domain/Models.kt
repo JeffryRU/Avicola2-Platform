@@ -80,6 +80,8 @@ data class Projection(
     @SerialName("total_kg") val totalKg: Double,
     @SerialName("submitted_at") val submittedAt: String,
     val units: Units,
+    /** Hoja de registro vigente: 1 la primera; cada registro nuevo abre otra que la reemplaza. */
+    val sheet: Int = 1,
 ) {
     val confirmed: Boolean get() = status == CONFIRMED
 
