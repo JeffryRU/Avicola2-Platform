@@ -562,11 +562,31 @@ def revoke_editing(use_cases: UseCases, actor: ActiveAccount, username: str) -> 
 def _stock_out(day: DailyStock) -> s.StockDayOut:
     return s.StockDayOut(
         date=day.date,
-        lines=[s.StockLineOut(**asdict(line)) for line in day.lines],
+        lines=[
+            s.StockLineOut(
+                product_id=line.product_id,
+                units=line.units,
+                kg=line.kg,
+                location=line.location,
+                lot_date=line.lot_date or day.date,
+            )
+            for line in day.lines
+        ],
         total_units=day.total_units,
         total_kg=day.total_kg,
         recorded_by=day.recorded_by,
         recorded_at=day.recorded_at,
+    )
+
+
+@stock.get("/options")
+def stock_options(use_cases: UseCases, viewer: CurrentSeller) -> s.StockOptionsOut:
+    """Artículos (con calidad B) y ubicaciones para armar el formulario de stock."""
+    options = use_cases.stock_options(viewer)
+    return s.StockOptionsOut(
+        items=[s.ProductOut(**asdict(p)) for p in options.items],
+        locations=options.locations,
+        lot_days=options.lot_days,
     )
 
 
@@ -582,9 +602,10 @@ def list_stock(
 def register_stock(
     use_cases: UseCases, actor: CurrentSeller, day: date, body: s.StockIn
 ) -> s.StockDayOut:
-    """El jefe de despacho registra (o corrige) el stock del día: unidades y kg por producto."""
-    entries = [StockEntry(line.product_id, line.units, line.kg) for line in body.lines]
-    return _stock_out(use_cases.register_stock(actor, day, entries))
+    """El jefe de despacho registra (o corrige) el stock del día en una ubicación: unidades por
+    producto y lote. Reemplaza lo de esa ubicación; las demás no se tocan."""
+    entries = [StockEntry(line.product_id, line.units, line.lot_date) for line in body.lines]
+    return _stock_out(use_cases.register_stock(actor, day, entries, body.location))
 
 
 # --- Cálculo de saca ----------------------------------------------------------------------
@@ -623,6 +644,9 @@ def calculate_saca(
         yield_factor=plan.yield_factor,
         method=plan.method,
         farm_order=plan.farm_order,
+        stock_b=plan.stock_b,
+        stock_old=plan.stock_old,
+        stock_lot_days=plan.stock_lot_days,
         groups=[
             s.SacaGroupOut(
                 name=g.name,
@@ -630,6 +654,7 @@ def calculate_saca(
                 ordered=g.ordered,
                 demand=g.demand,
                 stock=g.stock,
+                stock_b=g.stock_b,
                 need=g.need,
                 factor=g.factor,
                 farm_order=g.farm_order,

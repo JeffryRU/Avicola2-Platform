@@ -56,7 +56,8 @@ def test_endpoints_require_session(client) -> None:
 def test_seller_sees_only_himself(client) -> None:
     _login(client)
     catalog = client.get("/api/catalog").json()
-    assert {p["category"] for p in catalog} == {"BRASA"}
+    assert {p["category"] for p in catalog} == {"BRASA", "Pollo de mercado"}
+    assert {p["quality"] for p in catalog} == {"A"}  # la calidad B solo existe en el stock
     assert [s["username"] for s in client.get("/api/sellers").json()] == ["rnavarro"]
 
 

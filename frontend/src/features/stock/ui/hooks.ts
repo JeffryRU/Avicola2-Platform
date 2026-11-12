@@ -10,11 +10,21 @@ export function useStock(from: IsoDate, to: IsoDate) {
   return useQuery({ queryKey: [...stockKeys.all, from, to], queryFn: () => stock.list(from, to) })
 }
 
+export function useStockOptions() {
+  const { stock } = useContainer()
+  return useQuery({ queryKey: [...stockKeys.all, 'options'], queryFn: () => stock.options(), staleTime: 10 * 60_000 })
+}
+
 export function useRegisterStock() {
   const { stock } = useContainer()
   const client = useQueryClient()
   return useMutation({
-    mutationFn: ({ day, lines }: { day: IsoDate; lines: StockEntry[] }) => stock.register(day, lines),
-    onSuccess: () => void client.invalidateQueries({ queryKey: stockKeys.all }),
+    mutationFn: ({ day, location, lines }: { day: IsoDate; location: string; lines: StockEntry[] }) =>
+      stock.register(day, location, lines),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: stockKeys.all })
+      // La saca descuenta este stock.
+      void client.invalidateQueries({ queryKey: ['saca'] })
+    },
   })
 }

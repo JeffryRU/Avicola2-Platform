@@ -58,6 +58,8 @@ import {
   missingNote,
   NEED_LABEL,
   modelLabel,
+  stockBNote,
+  stockOldNote,
 } from '@/features/saca/types/saca'
 import { DayStrip } from '@/shared/ui/components/day-strip'
 import { EmptyState, Note } from '@/shared/ui/components/feedback'
@@ -250,7 +252,7 @@ function FarmOrder({ plan }: { plan: Saca }) {
           onClick={start}
           aria-label={EDIT_FACTORS_LABEL}
           title={EDIT_FACTORS_LABEL}
-          className="absolute -top-3 right-2 grid size-8 place-items-center rounded-full bg-white text-primary shadow-card"
+          className="absolute -top-4 -right-2 grid size-8 place-items-center rounded-full bg-white text-primary shadow-card"
         >
           <Pencil className="size-4" />
         </button>
@@ -358,6 +360,10 @@ function Sources({ plan }: { plan: Saca }) {
           value={plan.stock_date ? `${nf0(plan.stock)} unid.` : undefined}
         >
           <small className={small}>{plan.stock_date ? `Registro del ${dShort(plan.stock_date)}.` : NO_STOCK}</small>
+          {plan.stock_b > 0 && <small className={small}>{stockBNote(plan.stock_b)}</small>}
+          {plan.stock_old > 0 && (
+            <small className={small}>{stockOldNote(plan.stock_old, plan.stock_lot_days ?? 3)}</small>
+          )}
         </SourceRow>
         <SourceRow
           tone={plan.orders_available ? 'ok' : 'off'}

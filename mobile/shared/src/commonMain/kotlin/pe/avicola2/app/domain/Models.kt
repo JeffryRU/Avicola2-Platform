@@ -72,6 +72,8 @@ data class Product(
     @SerialName("kg_per_unit") val kgPerUnit: Double,
     @SerialName("sort_order") val sortOrder: Int,
     val subcategory: String? = null,
+    /** «A» o «B». La calidad B solo aparece en el stock de despacho. */
+    val quality: String = "A",
 )
 
 @Serializable
@@ -202,9 +204,16 @@ data class ProfileRequest(val name: String)
 // --- Stock de despacho ---------------------------------------------------------------------
 
 @Serializable
-data class StockLine(@SerialName("product_id") val productId: String, val units: Int, val kg: Double)
+data class StockLine(
+    @SerialName("product_id") val productId: String,
+    val units: Int,
+    val kg: Double,
+    val location: String = "General",
+    /** Fecha de beneficio del lote. */
+    @SerialName("lot_date") val lotDate: LocalDate? = null,
+)
 
-/** Stock registrado de un día (una línea por producto). */
+/** Stock registrado de un día (una línea por producto, lote y ubicación). */
 @Serializable
 data class StockDay(
     val date: LocalDate,
@@ -215,12 +224,25 @@ data class StockDay(
     @SerialName("recorded_at") val recordedAt: String,
 )
 
-/** Lo que se envía por producto: sin kg, el backend usa el peso promedio. */
+/** Lo que se envía: unidades de un producto en un lote (los kg los calcula el backend). */
 @Serializable
-data class StockEntry(@SerialName("product_id") val productId: String, val units: Int, val kg: Double? = null)
+data class StockEntry(
+    @SerialName("product_id") val productId: String,
+    val units: Int,
+    @SerialName("lot_date") val lotDate: LocalDate? = null,
+)
 
 @Serializable
-data class StockRequest(val lines: List<StockEntry>)
+data class StockRequest(val lines: List<StockEntry>, val location: String? = null)
+
+/** Con qué se arma el formulario: artículos (incluye calidad B) y ubicaciones. */
+@Serializable
+data class StockOptions(
+    val items: List<Product>,
+    val locations: List<String>,
+    /** Antigüedad máxima (días) de los lotes que descuenta la saca. */
+    @SerialName("lot_days") val lotDays: Int = 3,
+)
 
 // --- Cálculo de saca -----------------------------------------------------------------------
 

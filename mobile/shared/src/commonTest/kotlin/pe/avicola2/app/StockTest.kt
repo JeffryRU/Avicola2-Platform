@@ -4,15 +4,13 @@ import kotlinx.datetime.LocalDate
 import pe.avicola2.app.domain.Account
 import pe.avicola2.app.domain.Product
 import pe.avicola2.app.domain.Seller
-import pe.avicola2.app.domain.StockCell
 import pe.avicola2.app.domain.StockDay
 import pe.avicola2.app.domain.StockEntry
 import pe.avicola2.app.domain.StockLine
+import pe.avicola2.app.domain.linesAt
 import pe.avicola2.app.domain.dayMonth
 import pe.avicola2.app.domain.editableStockDays
-import pe.avicola2.app.domain.hasInvalidStockKg
 import pe.avicola2.app.domain.isEditableStockDay
-import pe.avicola2.app.domain.parseStockKg
 import pe.avicola2.app.domain.parseStockUnits
 import pe.avicola2.app.domain.sacaDays
 import pe.avicola2.app.domain.stockDraftOf
@@ -50,43 +48,52 @@ class StockTest {
     }
 
     @Test
-    fun readsUnitsAndKgAsTyped() {
+    fun readsUnitsAsTyped() {
         assertEquals(1250, parseStockUnits("1.250"))
         assertNull(parseStockUnits(""))
-        assertEquals(118.4, parseStockKg("118,4"))
-        assertEquals(64.25, parseStockKg("64.25"))
-        assertNull(parseStockKg(""))
-        assertNull(parseStockKg("12.345"))
-        assertNull(parseStockKg("1.2.3"))
-        assertTrue(hasInvalidStockKg(mapOf("P0001" to StockCell("1", "1.234"))))
-        assertFalse(hasInvalidStockKg(mapOf("P0001" to StockCell("1", ""))))
+    }
+
+    private val yesterday = LocalDate(2026, 11, 9)
+    private val chicaB = Product("P0101", "BRASA", "Brasa chica B", 1.3, 20, "Brasa chica", "B")
+    private val stockDay = StockDay(
+        today,
+        listOf(
+            StockLine("P0001", 100, 100.0, "Trujillo", today),
+            StockLine("P0001", 30, 30.0, "Trujillo", yesterday),
+            StockLine("P0101", 40, 52.0, "Trujillo", today),
+            StockLine("P0006", 0, 0.0, "Trujillo", today),
+            StockLine("P0001", 5, 5.0, "Piura", today),
+        ),
+        175, 187.0, "despacho", "2026-11-10T23:30:00Z",
+    )
+
+    @Test
+    fun stockIsKeptByLocationAndLot() {
+        val items = products + chicaB
+        val draft = stockDraftOf(stockDay.linesAt("Trujillo"), today)
+        // Un cero guardado se muestra vacío; cada lote es una celda aparte.
+        assertEquals(mapOf("P0001|2026-11-10" to "100", "P0001|2026-11-09" to "30", "P0101|2026-11-10" to "40"), draft)
+        assertEquals(30, pe.avicola2.app.domain.stockUnitsAt(draft, "P0001", yesterday))
+        val totals = stockTotals(items, draft)
+        assertEquals(170, totals.units)
+        assertEquals(182.0, totals.kg)
+        assertEquals(130 to 40, totals.unitsA to totals.unitsB)
+        assertEquals(listOf("Trujillo", "Chiclayo", "Piura"), pe.avicola2.app.domain.stockLocations(listOf("Trujillo", "Chiclayo"), listOf(stockDay)))
+        assertEquals(1, stockDay.linesAt("Piura").size)
     }
 
     @Test
-    fun withoutKgUsesTheAverageWeightAndBlankCountsAsZero() {
-        val draft = mapOf("P0001" to StockCell("120", "118,4"), "P0006" to StockCell("40", ""))
-        val totals = stockTotals(products, draft)
-        assertEquals(160, totals.units)
-        assertEquals(182.4, totals.kg)
-        assertEquals(
-            listOf(StockEntry("P0001", 120, 118.4), StockEntry("P0006", 40, null)),
-            stockEntries(products, draft),
-        )
-        assertEquals(
-            listOf(StockEntry("P0001", 0, null), StockEntry("P0006", 0, null)),
-            stockEntries(products, stockDraftOf(products, null)),
-        )
+    fun sendsOnlyCellsWithUnitsOrAZeroToLeaveARecord() {
+        val draft = mapOf("P0001|2026-11-09" to "100", "P0006|2026-11-10" to "")
+        assertEquals(listOf(StockEntry("P0001", 100, yesterday)), stockEntries(products, draft, today))
+        assertEquals(listOf(StockEntry("P0001", 0, today)), stockEntries(products, emptyMap(), today))
     }
 
     @Test
-    fun loadsWhatWasRegisteredAndShowsSavedZerosAsBlank() {
-        val day = StockDay(today, listOf(StockLine("P0001", 5, 4.9), StockLine("P0006", 0, 0.0)), 5, 4.9, "despacho", "2026-11-10T23:30:00Z")
-        assertEquals(
-            mapOf("P0001" to StockCell("5", "4.9"), "P0006" to StockCell("", "")),
-            stockDraftOf(products, day),
-        )
-        // Un kg entero se muestra sin ".0".
-        assertEquals("64", stockDraftOf(products, day.copy(lines = listOf(StockLine("P0006", 40, 64.0))))["P0006"]?.kg)
+    fun offersRecentLotsAndThoseThatAlreadyHaveUnits() {
+        val old = LocalDate(2026, 11, 2)
+        val lots = pe.avicola2.app.domain.stockLots(today, listOf(StockLine("P0001", 9, 9.0, "Trujillo", old)), back = 2)
+        assertEquals(listOf(today, yesterday, LocalDate(2026, 11, 8), old), lots)
     }
 
     @Test

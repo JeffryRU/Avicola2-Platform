@@ -15,12 +15,12 @@ fun isEditableStockDay(day: LocalDate, ref: LocalDate = today()): Boolean = day 
 /** Días que se consultan para la saca: desde ayer hasta una semana adelante. */
 fun sacaDays(ref: LocalDate = today()): List<LocalDate> = (-1..7).map { ref.plusDays(it) }
 
-/** Lo que la persona escribe en una fila (texto, para no pelear con el teclado). */
-data class StockCell(val units: String = "", val kg: String = "")
+/** Lo escrito en el formulario: «producto|lote» → unidades (texto, para no pelear con el teclado). */
+typealias StockDraft = Map<String, String>
 
-typealias StockDraft = Map<String, StockCell>
+fun stockKey(productId: String, lot: LocalDate): String = "$productId|$lot"
 
-data class StockTotals(val units: Int, val kg: Double)
+data class StockTotals(val units: Int, val kg: Double, val unitsA: Int = units, val unitsB: Int = 0)
 
 private fun round2(value: Double): Double = round(value * 100) / 100
 
@@ -28,48 +28,54 @@ private fun round2(value: Double): Double = round(value * 100) / 100
 fun parseStockUnits(raw: String): Int? =
     raw.filter { it.isDigit() }.take(7).toIntOrNull()?.coerceAtMost(MAX_UNITS)
 
-/** Kg con hasta dos decimales; acepta coma o punto. Vacío o inválido = sin dato. */
-fun parseStockKg(raw: String): Double? {
-    val text = raw.trim().replace(',', '.')
-    val parts = text.split('.')
-    val valid = text.isNotEmpty() && parts.size <= 2 && parts[0].length in 1..8 &&
-        parts.all { part -> part.all { it.isDigit() } } && (parts.getOrNull(1)?.length ?: 0) <= 2
-    return if (valid) text.toDoubleOrNull() else null
-}
+/** Tipo de un artículo: su tamaño (Brasa chica…) o, si no tiene, su categoría. */
+val Product.stockType: String get() = subcategory ?: category
 
-/** Borrador a partir de lo ya registrado. Un cero guardado se muestra vacío. */
-fun stockDraftOf(products: List<Product>, day: StockDay?): StockDraft {
-    val saved = day?.lines.orEmpty().associateBy { it.productId }
-    return products.associate { p ->
-        val line = saved[p.id]
-        p.id to StockCell(
-            units = line?.units?.takeIf { it > 0 }?.toString().orEmpty(),
-            kg = line?.kg?.takeIf { it > 0 }?.let(::kgText).orEmpty(),
-        )
+/** Líneas del día en una ubicación. */
+fun StockDay?.linesAt(location: String): List<StockLine> = this?.lines.orEmpty().filter { it.location == location }
+
+/** Ubicaciones a ofrecer: las configuradas y cualquiera que ya tenga stock registrado. */
+fun stockLocations(configured: List<String>, days: List<StockDay>): List<String> =
+    (configured + days.flatMap { d -> d.lines.map { it.location } }).distinct()
+
+/** Lotes que se ofrecen para un día: el propio día y los anteriores, más los que ya tienen cantidades. */
+fun stockLots(day: LocalDate, lines: List<StockLine>, back: Int = 4): List<LocalDate> =
+    ((0..back).map { day.plusDays(-it) } + lines.filter { it.units > 0 }.mapNotNull { it.lotDate }).distinct().sortedDescending()
+
+/** Borrador a partir de lo registrado en una ubicación. Un cero guardado se muestra vacío. */
+fun stockDraftOf(lines: List<StockLine>, day: LocalDate): StockDraft =
+    lines.filter { it.units > 0 }
+        .groupBy { stockKey(it.productId, it.lotDate ?: day) }
+        .mapValues { (_, same) -> same.sumOf { it.units }.toString() }
+
+fun stockUnitsAt(draft: StockDraft, productId: String, lot: LocalDate): Int =
+    parseStockUnits(draft[stockKey(productId, lot)].orEmpty()) ?: 0
+
+fun Product.stockKg(units: Int): Double = round2(units * kgPerUnit)
+
+/** Totales de lo escrito (todos los lotes), con calidad A y B por separado. */
+fun stockTotals(items: List<Product>, draft: StockDraft): StockTotals {
+    val byId = items.associateBy { it.id }
+    var units = 0
+    var kg = 0.0
+    var b = 0
+    draft.forEach { (key, raw) ->
+        val product = byId[key.substringBefore('|')] ?: return@forEach
+        val n = parseStockUnits(raw) ?: 0
+        units += n
+        kg += n * product.kgPerUnit
+        if (product.quality == "B") b += n
     }
+    return StockTotals(units, round2(kg), units - b, b)
 }
 
-/** "118.4" o "64" (sin ceros de más), como se escribe en la celda. */
-private fun kgText(kg: Double): String {
-    val text = round2(kg).toString()
-    return if (text.endsWith(".0")) text.dropLast(2) else text
-}
-
-/** Kg de una fila: lo escrito o, si falta, unidades por el peso promedio. */
-fun Product.stockKg(cell: StockCell?): Double =
-    parseStockKg(cell?.kg.orEmpty()) ?: round2((parseStockUnits(cell?.units.orEmpty()) ?: 0) * kgPerUnit)
-
-fun stockTotals(products: List<Product>, draft: StockDraft): StockTotals = StockTotals(
-    units = products.sumOf { parseStockUnits(draft[it.id]?.units.orEmpty()) ?: 0 },
-    kg = round2(products.sumOf { it.stockKg(draft[it.id]) }),
-)
-
-/** ¿Hay algún kg escrito que no sea un número válido? */
-fun hasInvalidStockKg(draft: StockDraft): Boolean =
-    draft.values.any { it.kg.isNotBlank() && parseStockKg(it.kg) == null }
-
-/** Una línea por producto del catálogo: lo que queda en blanco se registra como 0. */
-fun stockEntries(products: List<Product>, draft: StockDraft): List<StockEntry> = products.map { p ->
-    val cell = draft[p.id]
-    StockEntry(p.id, parseStockUnits(cell?.units.orEmpty()) ?: 0, parseStockKg(cell?.kg.orEmpty()))
+/** Lo que se guarda: una línea por celda con cantidad. Sin ninguna, un cero para dejar constancia. */
+fun stockEntries(items: List<Product>, draft: StockDraft, day: LocalDate): List<StockEntry> {
+    val ids = items.map { it.id }.toSet()
+    val entries = draft.mapNotNull { (key, raw) ->
+        val units = parseStockUnits(raw) ?: 0
+        val productId = key.substringBefore('|')
+        if (units > 0 && productId in ids) StockEntry(productId, units, LocalDate.parse(key.substringAfter('|'))) else null
+    }
+    return entries.ifEmpty { items.take(1).map { StockEntry(it.id, 0, day) } }
 }

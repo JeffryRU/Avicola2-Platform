@@ -234,7 +234,12 @@ def test_forecast_page_data(client) -> None:
     _login(client, "despacho")
     empty = client.get("/api/production/forecast").json()
     assert empty["available"] is False and empty["accuracy"] is None
-    assert [g["name"] for g in empty["groups"]] == ["Brasa chica", "Brasa mediana", "Brasa grande"]
+    assert [g["name"] for g in empty["groups"]] == [
+        "Brasa chica",
+        "Brasa mediana",
+        "Brasa grande",
+        "Pollo de mercado",
+    ]
 
     with SessionLocal() as session:
         from app.planning.infrastructure.persistence.production import SqlProductionRepository

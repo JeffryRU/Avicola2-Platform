@@ -116,3 +116,4 @@ Apple no permite instalar una app descargada sin firmarla con una cuenta de desa
 - **Para probar la app nativa:** instala el `.ipa` con [Sideloadly](https://sideloadly.io/) o AltStore y un Apple ID gratuito. Requiere conectar el iPhone a una PC, y la app caduca a los 7 días.
 - **Con la cuenta de pago:** firmar en el CI y distribuir por TestFlight. El código no cambia.
 - **Producción:** además de pedido, llegó y calidad B, cada producto muestra su desviación (lo que llegó menos lo pedido) y al final del formulario se anota, si se quiere, el peso vivo promedio de la parvada por tipo.
+- **Stock por lote:** el jefe de despacho elige la ubicación (se recuerda en el equipo) y el lote (fecha de beneficio) y escribe las unidades de cada artículo, incluidos los de calidad B y el pollo de mercado; los kg se calculan. Los lotes que ya no descuentan de la saca se marcan como «no descuenta».

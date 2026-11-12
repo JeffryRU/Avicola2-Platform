@@ -12,5 +12,7 @@ export const productSchema = z.object({
   kg_per_unit: z.number().positive(),
   sort_order: z.number().int(),
   subcategory: z.string().nullish(),
+  // «A» o «B». La calidad B solo aparece en el stock de despacho.
+  quality: z.string().optional(),
 })
 export type Product = z.infer<typeof productSchema>

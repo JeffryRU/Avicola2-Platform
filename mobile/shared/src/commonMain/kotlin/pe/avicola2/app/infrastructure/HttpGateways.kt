@@ -30,6 +30,7 @@ import pe.avicola2.app.domain.SacaFactors
 import pe.avicola2.app.domain.Seller
 import pe.avicola2.app.domain.StockDay
 import pe.avicola2.app.domain.StockEntry
+import pe.avicola2.app.domain.StockOptions
 import pe.avicola2.app.domain.StockRequest
 import pe.avicola2.app.domain.SubmissionRequest
 import pe.avicola2.app.domain.SubmissionResult
@@ -97,8 +98,10 @@ class HttpStockGateway(private val api: ApiClient) : StockGateway {
     override suspend fun list(from: LocalDate, to: LocalDate): List<StockDay> =
         api.get("/stock", mapOf("date_from" to from, "date_to" to to))
 
-    override suspend fun register(day: LocalDate, lines: List<StockEntry>): StockDay =
-        api.put("/stock/$day", StockRequest(lines))
+    override suspend fun options(): StockOptions = api.get("/stock/options")
+
+    override suspend fun register(day: LocalDate, location: String, lines: List<StockEntry>): StockDay =
+        api.put("/stock/$day", StockRequest(lines, location))
 }
 
 class HttpSacaGateway(private val api: ApiClient) : SacaGateway {

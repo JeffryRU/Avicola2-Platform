@@ -103,6 +103,7 @@ def init(session: Session, settings: Settings) -> None:
                 "kg_per_unit": item["kg_per_unit"],
                 "sort_order": order,
                 "is_active": True,
+                "quality": item.get("quality", "A"),
             }
             exists = session.scalar(select(products.c.id).where(products.c.id == item["id"]))
             if exists:

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { HttpClient } from '@/shared/application/ports'
 import type { IsoDate } from '@/shared/domain/dates'
 import type { StockGateway } from '@/features/stock/application/ports'
-import { stockDaySchema, type StockEntry } from '@/features/stock/domain/stock'
+import { stockDaySchema, stockOptionsSchema, type StockEntry } from '@/features/stock/domain/stock'
 
 export class HttpStockGateway implements StockGateway {
   private readonly http: HttpClient
@@ -13,5 +13,8 @@ export class HttpStockGateway implements StockGateway {
   list = (from: IsoDate, to: IsoDate) =>
     this.http.get('/stock', z.array(stockDaySchema), { date_from: from, date_to: to })
 
-  register = (day: IsoDate, lines: StockEntry[]) => this.http.put(`/stock/${day}`, { lines }, stockDaySchema)
+  options = () => this.http.get('/stock/options', stockOptionsSchema)
+
+  register = (day: IsoDate, location: string, lines: StockEntry[]) =>
+    this.http.put(`/stock/${day}`, { location, lines }, stockDaySchema)
 }

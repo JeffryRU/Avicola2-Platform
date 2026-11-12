@@ -98,12 +98,15 @@ class CalculateSaca:
         production: ProductionRepository | None = None,
         model: ArrivalModel | None = None,
         factors: "SacaFactors | None" = None,
+        stock_lot_days: int | None = None,
     ):
         self.products, self.projections, self.stock = products, projections, stock
         self.orders, self.sellers, self.yield_factor = orders, sellers, yield_factor
         # Historia de producción para estimar en qué rango llegará lo pedido.
         self.production, self.model = production, model
         self.factors = factors
+        # Antigüedad máxima (días) de los lotes de stock que se descuentan; None = todos.
+        self.stock_lot_days = stock_lot_days
 
     def __call__(self, viewer: Seller, day: date, method: str = DEFAULT_METHOD) -> SacaPlan:
         require(viewer.role, Permission.VIEW_SACA, "No tienes permiso para ver el cálculo de saca.")
@@ -120,15 +123,24 @@ class CalculateSaca:
         # El stock más reciente anterior al día (find devuelve del más reciente al más antiguo).
         recent = self.stock.find(*stock_window(day))
         latest = recent[0] if recent else None
+        # Solo cuentan los lotes recientes; la calidad B se descuenta por tipo.
+        fresh = latest.units_by_product(self.stock_lot_days) if latest else {}
+        quality_b: Counter[str] = Counter()
+        for item in self.products.list_stock_items():
+            if item.quality != "A" and fresh.get(item.id):
+                quality_b[product_group(item)] += fresh[item.id]
         plan = build_plan(
             day,
             products,
             dict(projected),
             self.orders.units(day),
-            {line.product_id: line.units for line in latest.lines} if latest else {},
+            fresh,
             method=method,
             group_factors=tuple(self.factors.get().items()) if self.factors else (),
             stock_date=latest.date if latest else None,
+            stock_b_by_group=tuple(quality_b.items()),
+            stock_old=(latest.total_units - sum(fresh.values())) if latest else 0,
+            stock_lot_days=self.stock_lot_days,
             sellers_registered=len(registered),
             sellers_total=len(team),
             orders_available=self.orders.available,

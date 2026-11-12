@@ -62,6 +62,8 @@ class SacaGroup:
     stock: int
     # Parte de lo que hace falta que se pide a granja (regla del negocio; 1 = todo).
     factor: float
+    # De ese stock, cuánto es calidad B (se cuenta por tipo, no por producto).
+    stock_b: int = 0
 
     @property
     def need(self) -> int:
@@ -90,6 +92,12 @@ class SacaPlan:
     method: str = DEFAULT_METHOD
     # Factor del pedido final por tipo; los tipos que no figuran usan 1.
     group_factors: tuple[tuple[str, float], ...] = ()
+    # Stock de calidad B por tipo: descuenta del tipo, no de un producto.
+    stock_b_by_group: tuple[tuple[str, int], ...] = ()
+    # Unidades en lotes demasiado antiguos, que no se descuentan (se trozan).
+    stock_old: int = 0
+    # Antigüedad máxima de los lotes que sí cuentan (días).
+    stock_lot_days: int | None = None
     # Qué se espera que llegue por producto si se pide esto (None: aún no hay historia suficiente).
     arrival: ArrivalEstimate | None = None
 
@@ -125,6 +133,7 @@ class SacaPlan:
     def groups(self) -> tuple[SacaGroup, ...]:
         """Por tipo, en el orden del catálogo: sus sumas y el pedido final a granja."""
         factors = dict(self.group_factors)
+        quality_b = dict(self.stock_b_by_group)
         names = list(dict.fromkeys(product_group(line.product) for line in self.lines))
         result = []
         for name in names:
@@ -135,11 +144,16 @@ class SacaPlan:
                     sum(line.projected for line in lines),
                     sum(line.ordered for line in lines),
                     sum(line.demand for line in lines),
-                    sum(line.stock for line in lines),
+                    sum(line.stock for line in lines) + quality_b.get(name, 0),
                     factors.get(name, 1.0),
+                    quality_b.get(name, 0),
                 )
             )
         return tuple(result)
+
+    @property
+    def stock_b(self) -> int:
+        return sum(units for _, units in self.stock_b_by_group)
 
     @property
     def farm_order(self) -> int:

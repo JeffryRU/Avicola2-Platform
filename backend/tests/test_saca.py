@@ -127,7 +127,7 @@ def test_saca_adds_the_team_and_subtracts_the_latest_stock(client) -> None:
     _login(client, "supervisor")
     plan = _saca(client)
     by_id = {line["product_id"]: line for line in plan["lines"]}
-    assert len(plan["lines"]) == 10  # todo el catálogo, también lo que no se pide
+    assert len(plan["lines"]) == 12  # todo el catálogo, también lo que no se pide
     assert by_id["P0001"] == {
         "product_id": "P0001",
         "projected": 150,
@@ -227,6 +227,7 @@ def test_supervisors_change_the_factor_of_each_type(client) -> None:
         "Brasa chica": 0.9,
         "Brasa mediana": 1.0,
         "Brasa grande": 0.5,
+        "Pollo de mercado": 1.0,
     }
     plan = _saca(client, TOMORROW)
     assert plan["farm_order"] == 90
@@ -235,3 +236,41 @@ def test_supervisors_change_the_factor_of_each_type(client) -> None:
     for bad in ({"Brasa enorme": 1}, {"Brasa chica": -0.1}, {"Brasa chica": 3}, {}):
         r = client.put("/api/saca/factors", json={"factors": bad})
         assert r.status_code in (400, 422), bad
+
+
+def test_saca_counts_only_recent_lots_and_quality_b_by_type(client) -> None:
+    _login(client, "rnavarro")
+    units = {"P0001": 300, "P0011": 50}
+    for category, picked in (("BRASA", {"P0001": 300}), ("Pollo de mercado", {"P0011": 50})):
+        body = {"category": category, "days": [{"date": str(TOMORROW), "units": picked}]}
+        assert client.post("/api/projections", json=body).status_code == 201, category
+    _login(client, "despacho")
+    lots = {
+        "lines": [
+            {"product_id": "P0001", "units": 60, "lot_date": str(TODAY)},
+            {"product_id": "P0001", "units": 20, "lot_date": str(TODAY - timedelta(days=3))},
+            {"product_id": "P0001", "units": 500, "lot_date": str(TODAY - timedelta(days=4))},
+            {"product_id": "P0101", "units": 40, "lot_date": str(TODAY)},  # Brasa chica B
+            {"product_id": "P0011", "units": 10, "lot_date": str(TODAY)},
+        ]
+    }
+    assert client.put(f"/api/stock/{TODAY}", json=lots).status_code == 200
+
+    _login(client, "supervisor")
+    plan = _saca(client, TOMORROW)
+    by_id = {line["product_id"]: line for line in plan["lines"]}
+    # Brasa 1: cuentan los lotes de hoy y de hace 3 días (80); el de hace 4 no (se troza).
+    assert by_id["P0001"]["stock"] == 80 and plan["stock_old"] == 500
+    assert plan["stock_lot_days"] == 3 and plan["stock_b"] == 40
+    groups = {g["name"]: g for g in plan["groups"]}
+    # La calidad B descuenta del tipo: 300 − 80 − 40 = 180 hacen falta; a granja, el 80 %.
+    chica = groups["Brasa chica"]
+    assert (chica["stock"], chica["stock_b"], chica["need"], chica["farm_order"]) == (
+        120,
+        40,
+        180,
+        144,
+    )
+    # El pollo de mercado es un tipo más, sin factor: 50 − 10.
+    assert groups["Pollo de mercado"]["farm_order"] == 40
+    assert plan["farm_order"] == 184 and units["P0011"] == 50

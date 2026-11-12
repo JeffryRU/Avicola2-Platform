@@ -83,12 +83,13 @@ def test_register_and_view_daily_stock(client) -> None:
     day = r.json()
     assert day["date"] == str(TODAY) and day["recorded_by"] == "despacho"
     assert day["total_units"] == 160
-    # P0006 sin kg: 40 unidades por 1,6 kg de peso promedio.
+    # Los kg se calculan con el peso promedio; sin lote ni ubicación: el día y la primera.
+    lot = {"location": "Trujillo", "lot_date": str(TODAY)}
     assert day["lines"] == [
-        {"product_id": "P0001", "units": 120, "kg": 118.4},
-        {"product_id": "P0006", "units": 40, "kg": 64.0},
+        {"product_id": "P0001", "units": 120, "kg": 120.0, **lot},
+        {"product_id": "P0006", "units": 40, "kg": 64.0, **lot},
     ]
-    assert day["total_kg"] == 182.4
+    assert day["total_kg"] == 184.0
 
     yesterday = TODAY - timedelta(days=1)
     one = {"lines": [{"product_id": "P0002", "units": 5}]}
@@ -168,3 +169,47 @@ def test_only_the_general_supervisor_creates_dispatch_chiefs(client) -> None:
     assert client.post("/api/admin/accounts", json=new).status_code == 403
     _login(client, "general")
     assert client.post("/api/admin/accounts", json=new).status_code == 201
+
+
+def test_stock_by_lot_and_location(client) -> None:
+    _login(client, "despacho")
+    options = client.get("/api/stock/options").json()
+    assert options["locations"][:2] == ["Trujillo", "Piura"] and options["lot_days"] == 3
+    names = {i["id"]: (i["name"], i["quality"]) for i in options["items"]}
+    assert names["P0101"] == ("Brasa chica B", "B")
+    assert names["P0011"] == ("Pollo entero con menudencia", "A")
+
+    yesterday, old = TODAY - timedelta(days=1), TODAY - timedelta(days=5)
+    trujillo = {
+        "location": "Trujillo",
+        "lines": [
+            {"product_id": "P0001", "units": 100, "lot_date": str(TODAY)},
+            {"product_id": "P0001", "units": 30, "lot_date": str(yesterday)},
+            {"product_id": "P0101", "units": 40, "lot_date": str(old)},  # calidad B, lote viejo
+            {"product_id": "P0011", "units": 7, "lot_date": str(TODAY)},  # pollo de mercado
+        ],
+    }
+    assert client.put(f"/api/stock/{TODAY}", json=trujillo).status_code == 200
+    piura = {"location": "Piura", "lines": [{"product_id": "P0001", "units": 5}]}
+    day = client.put(f"/api/stock/{TODAY}", json=piura).json()
+    # Guardar Piura no toca Trujillo: el día trae las dos ubicaciones.
+    assert day["total_units"] == 182
+    assert {(line["location"], line["lot_date"]) for line in day["lines"]} == {
+        ("Trujillo", str(TODAY)),
+        ("Trujillo", str(yesterday)),
+        ("Trujillo", str(old)),
+        ("Piura", str(TODAY)),
+    }
+    # Volver a guardar una ubicación reemplaza solo esa.
+    piura["lines"][0]["units"] = 9
+    assert client.put(f"/api/stock/{TODAY}", json=piura).json()["total_units"] == 186
+
+    bad_lines = (
+        [{"product_id": "P0001", "units": 1, "lot_date": str(TODAY + timedelta(days=1))}],
+        [{"product_id": "P0001", "units": 1, "lot_date": str(TODAY - timedelta(days=30))}],
+        [{"product_id": "P0001", "units": 1}, {"product_id": "P0001", "units": 2}],
+    )
+    for lines in bad_lines:
+        assert client.put(f"/api/stock/{TODAY}", json={"lines": lines}).status_code == 422
+    other = {"location": "Marte", "lines": [{"product_id": "P0001", "units": 1}]}
+    assert client.put(f"/api/stock/{TODAY}", json=other).status_code == 422

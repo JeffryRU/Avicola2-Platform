@@ -22,6 +22,11 @@ class SqlProductRepository:
         self.session = session
 
     def list_active(self) -> list[Product]:
+        """Lo que se proyecta y se pide: productos activos de calidad A."""
+        return [p for p in self.list_stock_items() if p.quality == "A"]
+
+    def list_stock_items(self) -> list[Product]:
+        """Todo lo que se cuenta en el stock: los de calidad A y también los de calidad B."""
         rows = self.session.execute(
             select(products).where(products.c.is_active.is_(True))
         ).mappings()
@@ -33,6 +38,7 @@ class SqlProductRepository:
                 float(r["kg_per_unit"]),
                 r["sort_order"],
                 r["subcategory"],
+                r["quality"],
             )
             for r in rows
         ]
