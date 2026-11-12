@@ -1,4 +1,4 @@
-"""Cálculo de saca: max(proyección, pedidos confirmados) − stock, por producto."""
+"""Cálculo de saca: stock − pedidos de mañana + proyección de pasado mañana + plus, por tipo."""
 
 from datetime import date, timedelta
 
@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from app.core.config import get_settings
 from app.main import app
 from app.planning.domain.models import Product
-from app.planning.domain.saca import METHOD_MAX, METHOD_SUM, build_plan, stock_window
+from app.planning.domain.saca import build_plan, orders_day, projection_day, stock_window
 from app.planning.infrastructure import cli
 from app.planning.infrastructure.clock import ZoneClock
 from app.shared.infrastructure.database.metadata import metadata
@@ -16,9 +16,11 @@ from app.shared.infrastructure.database.session import SessionLocal, engine
 
 TODAY = ZoneClock(get_settings().tz).today()
 TOMORROW = TODAY + timedelta(days=1)
+AFTER_TOMORROW = TODAY + timedelta(days=2)
 DAY = date(2026, 11, 12)
-B1 = Product("P1", "BRASA", "Brasa 1", 1.0)
-B6 = Product("P6", "BRASA", "Brasa 6", 1.6)
+CHICA_1 = Product("P1", "BRASA", "Brasa 1", 1.0, subcategory="Brasa chica")
+CHICA_2 = Product("P2", "BRASA", "Brasa 2", 1.2, subcategory="Brasa chica")
+GRANDE = Product("P8", "BRASA", "Brasa 8", 1.8, subcategory="Brasa grande")
 CONTEXT = {
     "stock_date": None,
     "sellers_registered": 1,
@@ -26,64 +28,73 @@ CONTEXT = {
     "orders_available": True,
     "yield_factor": 0.8,
 }
+NO_PLUS = {
+    "Brasa chica": 0,
+    "Brasa mediana": 0,
+    "Brasa grande": 0,
+    "Pollo de mercado": 0,
+}
 
 # --- Dominio ----------------------------------------------------------------------------
 
 
-def test_orders_do_not_add_to_the_projection() -> None:
-    """Con la forma «mayor», lo proyectado y lo pedido no se suman: se toma el más grande."""
-    plan = build_plan(
-        DAY, [B1, B6], {"P1": 100, "P6": 50}, {"P1": 100, "P6": 80}, {}, METHOD_MAX, **CONTEXT
-    )
-    assert [line.demand for line in plan.lines] == [100, 80]
-    assert plan.request == 180
-
-
-def test_the_business_rule_adds_orders_to_the_projection() -> None:
-    plan = build_plan(
-        DAY, [B1, B6], {"P1": 100, "P6": 50}, {"P1": 100}, {"P6": 20}, METHOD_SUM, **CONTEXT
-    )
-    assert [line.demand for line in plan.lines] == [200, 50]
-    assert plan.method == "sum" and plan.request == 230  # 200 + (50 − 20 de stock)
-
-
-def test_farm_order_is_by_type_with_its_factor() -> None:
-    b2 = Product("P2", "BRASA", "Brasa 2", 1.2, subcategory="Brasa chica")
-    b1 = Product("P1", "BRASA", "Brasa 1", 1.0, subcategory="Brasa chica")
-    b8 = Product("P8", "BRASA", "Brasa 8", 1.8, subcategory="Brasa grande")
+def test_saca_is_stock_minus_orders_plus_projection_plus_plus() -> None:
     plan = build_plan(
         DAY,
-        [b1, b2, b8],
-        {"P1": 100, "P2": 50, "P8": 40},
-        {"P1": 30},
-        {"P2": 80},
-        METHOD_SUM,
+        [CHICA_1, CHICA_2, GRANDE],
+        projected={"P1": 100, "P2": 50, "P8": 40},
+        ordered={"P1": 30},
+        stock={"P2": 80},
         **CONTEXT,
-        group_factors=(("Brasa chica", 0.8),),
+        group_plus=(("Brasa chica", 4000), ("Brasa grande", 1500)),
     )
     chica, grande = plan.groups
-    # Chica: 150 proyectadas + 30 pedidas − 80 de stock = 100; a granja, el 80 %.
-    assert (chica.projected, chica.ordered, chica.stock, chica.need) == (150, 30, 80, 100)
-    assert chica.farm_order == 80
-    # El stock de Brasa 2 sobra para ese rango (30 de más) y cubre parte de lo que falta de Brasa 1.
-    assert [line.request for line in plan.lines[:2]] == [130, 0]
-    # Un tipo sin factor configurado se pide completo.
-    assert (grande.factor, grande.farm_order) == (1.0, 40)
-    assert plan.farm_order == 120 and plan.request_by_group() == {
-        "Brasa chica": 80.0,
-        "Brasa grande": 40.0,
-    }
+    # Chica: 80 de stock − 30 pedidos + 150 proyectadas = 200; + 4000 de plus.
+    assert (chica.stock, chica.ordered, chica.projected, chica.plus) == (80, 30, 150, 4000)
+    assert (chica.balance, chica.farm_order) == (200, 4200)
+    # Grande: 0 − 0 + 40 + 1500.
+    assert grande.farm_order == 1540
+    assert plan.farm_order == 5740 and plan.plus == 5500
+    assert plan.request_by_group() == {"Brasa chica": 4200.0, "Brasa grande": 1540.0}
 
 
-def test_stock_is_subtracted_and_never_goes_negative() -> None:
-    plan = build_plan(DAY, [B1, B6], {"P1": 100, "P6": 50}, {}, {"P1": 30, "P6": 70}, **CONTEXT)
-    assert [line.request for line in plan.lines] == [70, 0]  # sobra stock de P6: no se pide
-    assert plan.request == 70 and plan.request_kg == 70.0
-    assert plan.live_kg == 87.5  # 70 kg de producto / 0,8 de rendimiento
+def test_more_stock_gives_a_bigger_saca() -> None:
+    """La regla es literal: el stock se suma (no se descuenta)."""
+    low = build_plan(DAY, [CHICA_1], {"P1": 100}, {}, {"P1": 10}, **CONTEXT)
+    high = build_plan(DAY, [CHICA_1], {"P1": 100}, {}, {"P1": 90}, **CONTEXT)
+    assert (low.farm_order, high.farm_order) == (110, 190)
 
 
-def test_stock_window_is_the_previous_days() -> None:
-    assert stock_window(DAY) == (date(2026, 11, 9), date(2026, 11, 11))
+def test_saca_never_goes_negative() -> None:
+    plan = build_plan(DAY, [CHICA_1], {"P1": 10}, {"P1": 500}, {"P1": 20}, **CONTEXT)
+    line, group = plan.lines[0], plan.groups[0]
+    assert (line.balance, line.request) == (-470, 0)
+    assert (group.balance, group.farm_order) == (-470, 0)
+    # El plus se suma antes de cortar en 0.
+    with_plus = build_plan(
+        DAY,
+        [CHICA_1],
+        {"P1": 10},
+        {"P1": 500},
+        {"P1": 20},
+        **CONTEXT,
+        group_plus=(("Brasa chica", 4000),),
+    )
+    assert with_plus.farm_order == 3530
+
+
+def test_per_product_lines_and_kg_leave_the_plus_out() -> None:
+    plan = build_plan(DAY, [CHICA_1, CHICA_2], {"P1": 100}, {"P2": 10}, {"P1": 30}, **CONTEXT)
+    assert [line.request for line in plan.lines] == [130, 0]
+    assert plan.request == 130 and plan.request_kg == 130.0
+    assert plan.live_kg == 162.5  # 130 kg de producto / 0,8 de rendimiento
+
+
+def test_dates_are_relative_to_the_day_of_the_calculation() -> None:
+    assert orders_day(DAY) == date(2026, 11, 13)
+    assert projection_day(DAY) == date(2026, 11, 14)
+    # El stock: hasta el mismo día, de los últimos 3 días.
+    assert stock_window(DAY) == (date(2026, 11, 10), DAY)
 
 
 # --- API --------------------------------------------------------------------------------
@@ -105,72 +116,24 @@ def _login(client, username) -> None:
     assert r.status_code == 200, r.text
 
 
-def _project(client, username: str, units: dict[str, int]) -> None:
+def _project(client, username: str, units: dict[str, int], day=AFTER_TOMORROW) -> None:
     _login(client, username)
-    body = {"category": "BRASA", "days": [{"date": str(TOMORROW), "units": units}]}
+    body = {"category": "BRASA", "days": [{"date": str(day), "units": units}]}
     assert client.post("/api/projections", json=body).status_code == 201
 
 
-def _saca(client, day=TOMORROW) -> dict:
+def _saca(client, day=TODAY) -> dict:
     r = client.get("/api/saca", params={"date": str(day)})
     assert r.status_code == 200, r.text
     return r.json()
 
 
-def test_saca_adds_the_team_and_subtracts_the_latest_stock(client) -> None:
-    _project(client, "rnavarro", {"P0001": 100, "P0006": 40})
-    _project(client, "hdias", {"P0001": 50})
-    _login(client, "despacho")
-    lines = [{"product_id": "P0001", "units": 30}, {"product_id": "P0006", "units": 60}]
-    assert client.put(f"/api/stock/{TODAY}", json={"lines": lines}).status_code == 200
-
-    _login(client, "supervisor")
-    plan = _saca(client)
-    by_id = {line["product_id"]: line for line in plan["lines"]}
-    assert len(plan["lines"]) == 12  # todo el catálogo, también lo que no se pide
-    assert by_id["P0001"] == {
-        "product_id": "P0001",
-        "projected": 150,
-        "ordered": 0,
-        "demand": 150,
-        "stock": 30,
-        "request": 120,
-        "request_kg": 120.0,
-        "expected": None,  # sin historia de producción todavía
-        "expected_a": None,
-    }
-    assert by_id["P0006"]["request"] == 0  # 40 proyectadas, 60 en stock
-    assert plan["projected"] == 190 and plan["stock"] == 90 and plan["request"] == 120
-    assert plan["live_kg"] == round(120 / plan["yield_factor"], 2)
-    assert plan["stock_date"] == str(TODAY)
-    assert (plan["sellers_registered"], plan["sellers_total"]) == (2, 7)
-    assert plan["orders_available"] is False  # no hay pedidos cargados para ese día
-    assert plan["method"] == "sum"  # la regla del negocio es la de partida
-    groups = {g["name"]: g for g in plan["groups"]}
-    # A granja se pide por tipo: de lo que hace falta de brasa chica, el 80 %.
-    assert groups["Brasa chica"]["need"] == 120 and groups["Brasa chica"]["factor"] == 0.8
-    assert groups["Brasa chica"]["farm_order"] == 96
-    assert groups["Brasa mediana"]["need"] == 0  # 40 proyectadas, 60 en stock
-    assert plan["farm_order"] == 96
+def _set_plus(client, plus: dict[str, int]) -> None:
+    r = client.put("/api/saca/plus", json={"plus": plus})
+    assert r.status_code == 200, r.text
 
 
-def test_saca_without_recent_stock_or_projections(client) -> None:
-    _login(client, "supervisor")
-    plan = _saca(client, TODAY + timedelta(days=5))
-    assert plan["stock_date"] is None and plan["request"] == 0 and plan["sellers_registered"] == 0
-
-
-def test_only_supervisors_see_the_saca(client) -> None:
-    for username in ("rnavarro", "despacho"):
-        _login(client, username)
-        assert client.get("/api/saca", params={"date": str(TOMORROW)}).status_code == 403
-    _login(client, "general")
-    assert client.get("/api/saca", params={"date": str(TOMORROW)}).status_code == 200
-    client.cookies.clear()
-    assert client.get("/api/saca", params={"date": str(TOMORROW)}).status_code == 401
-
-
-def test_loaded_orders_enter_the_saca_with_either_method(client) -> None:
+def _insert_order(units_brasa_6: int, delivery: date) -> None:
     from sqlalchemy import insert
 
     from app.planning.infrastructure.persistence.tables import dispatch_orders
@@ -180,69 +143,124 @@ def test_loaded_orders_enter_the_saca_with_either_method(client) -> None:
         "customer": "Cliente",
         "material_code": "X",
         "material": "POLLO ENTERO BRASA MEDIANO (1.60-1.69)",
-        "ordered_kg": 320,  # 200 unidades de Brasa 6 (1,6 kg)
+        "ordered_kg": units_brasa_6 * 1.6,
         "dispatched_kg": 0,
         "ordered_units": 0,
         "dispatched_units": 0,
         "zone": None,
         "registered_on": TODAY,
-        "delivery_date": TOMORROW,
+        "delivery_date": delivery,
         "seller": None,
     }
     with SessionLocal() as session:
-        session.execute(
-            insert(dispatch_orders), [row, {**row, "material": "BRASA MARINADO TT (-)"}]
-        )
+        session.execute(insert(dispatch_orders), [row])
         session.commit()
-    _login(client, "rnavarro")
-    body = {"category": "BRASA", "days": [{"date": str(TOMORROW), "units": {"P0006": 150}}]}
-    assert client.post("/api/projections", json=body).status_code == 201
-
-    _login(client, "supervisor")
-    plan = _saca(client, TOMORROW)
-    assert plan["orders_available"] is True and plan["ordered"] == 200
-    assert plan["request"] == 350  # regla del negocio: 150 proyectadas + 200 pedidas
-    mediana = next(g for g in plan["groups"] if g["name"] == "Brasa mediana")
-    assert (mediana["need"], mediana["factor"], mediana["farm_order"]) == (350, 0.7, 245)
-    r = client.get("/api/saca", params={"date": str(TOMORROW), "method": "max"})
-    assert r.json()["method"] == "max" and r.json()["request"] == 200  # manda lo mayor
-    assert client.get("/api/saca", params={"date": str(TOMORROW), "method": "x"}).status_code == 422
 
 
-def test_supervisors_change_the_factor_of_each_type(client) -> None:
-    _login(client, "rnavarro")
-    body = {"category": "BRASA", "days": [{"date": str(TOMORROW), "units": {"P0001": 100}}]}
-    assert client.post("/api/projections", json=body).status_code == 201
-    change = {"factors": {"Brasa chica": 0.9, "Brasa grande": 0.5}}
-    assert client.put("/api/saca/factors", json=change).status_code == 403  # un vendedor no
+def test_saca_uses_todays_stock_tomorrows_orders_and_the_projection_after(client) -> None:
+    _project(client, "rnavarro", {"P0001": 100, "P0006": 40})
+    _project(client, "hdias", {"P0001": 50})
+    _project(client, "hdias", {"P0001": 999}, day=TOMORROW)  # otro día: no cuenta
+    _insert_order(200, TOMORROW)  # 200 de Brasa 6 para mañana
+    _insert_order(777, AFTER_TOMORROW)  # para pasado mañana: no cuenta
     _login(client, "despacho")
-    assert client.put("/api/saca/factors", json=change).status_code == 403
+    lines = [{"product_id": "P0001", "units": 30}, {"product_id": "P0006", "units": 60}]
+    assert client.put(f"/api/stock/{TODAY}", json={"lines": lines}).status_code == 200
 
     _login(client, "supervisor")
-    assert _saca(client, TOMORROW)["farm_order"] == 80  # de partida, chica × 0,80
-    saved = client.put("/api/saca/factors", json=change)
-    assert saved.status_code == 200, saved.text
-    # Lo que no se indicó (mediana) queda en 1: se pide completo.
-    assert saved.json()["factors"] == {
-        "Brasa chica": 0.9,
-        "Brasa mediana": 1.0,
-        "Brasa grande": 0.5,
-        "Pollo de mercado": 1.0,
+    _set_plus(client, {**NO_PLUS, "Brasa chica": 4000, "Brasa mediana": 1500})
+    plan = _saca(client)
+    assert (plan["date"], plan["orders_date"], plan["projection_date"]) == (
+        str(TODAY),
+        str(TOMORROW),
+        str(AFTER_TOMORROW),
+    )
+    by_id = {line["product_id"]: line for line in plan["lines"]}
+    assert len(plan["lines"]) == 12  # todo el catálogo
+    assert by_id["P0001"] == {
+        "product_id": "P0001",
+        "projected": 150,
+        "ordered": 0,
+        "demand": 180,  # 30 − 0 + 150
+        "stock": 30,
+        "request": 180,
+        "request_kg": 180.0,
+        "expected": None,  # sin historia de producción todavía
+        "expected_a": None,
     }
-    plan = _saca(client, TOMORROW)
-    assert plan["farm_order"] == 90
-    assert {g["name"]: g["factor"] for g in plan["groups"]}["Brasa grande"] == 0.5
+    assert by_id["P0006"]["demand"] == -100  # 60 − 200 + 40
+    assert plan["stock_date"] == str(TODAY)
+    assert (plan["sellers_registered"], plan["sellers_total"]) == (2, 7)
+    assert plan["orders_available"] is True and plan["ordered"] == 200
+    assert plan["method"] == "stock_orders_projection_plus"
+    groups = {g["name"]: g for g in plan["groups"]}
+    chica, mediana = groups["Brasa chica"], groups["Brasa mediana"]
+    assert (chica["balance"], chica["plus"], chica["farm_order"]) == (180, 4000, 4180)
+    # Mediana: 60 − 200 + 40 = −100; + 1500 de plus = 1400.
+    assert (mediana["balance"], mediana["farm_order"]) == (-100, 1400)
+    # Campos de compatibilidad (app móvil).
+    assert (chica["need"], chica["factor"], chica["demand"]) == (4180, 1.0, 180)
+    assert plan["plus"] == 5500 and plan["farm_order"] == 5580
 
-    for bad in ({"Brasa enorme": 1}, {"Brasa chica": -0.1}, {"Brasa chica": 3}, {}):
-        r = client.put("/api/saca/factors", json={"factors": bad})
+
+def test_default_plus_is_the_business_rule(client) -> None:
+    _login(client, "supervisor")
+    plan = _saca(client, TODAY + timedelta(days=20))
+    plus = {g["name"]: g["plus"] for g in plan["groups"]}
+    assert plus == {
+        "Brasa chica": 4000,
+        "Brasa mediana": 1500,
+        "Brasa grande": 1500,
+        "Pollo de mercado": 4000,
+    }
+    # Sin stock, pedidos ni proyección: solo el plus.
+    assert plan["stock_date"] is None and plan["sellers_registered"] == 0
+    assert plan["farm_order"] == 11000
+
+
+def test_only_supervisors_see_the_saca(client) -> None:
+    for username in ("rnavarro", "despacho"):
+        _login(client, username)
+        assert client.get("/api/saca", params={"date": str(TODAY)}).status_code == 403
+    _login(client, "general")
+    assert client.get("/api/saca", params={"date": str(TODAY)}).status_code == 200
+    client.cookies.clear()
+    assert client.get("/api/saca", params={"date": str(TODAY)}).status_code == 401
+
+
+def test_supervisors_change_the_plus_of_each_type(client) -> None:
+    change = {"plus": {"Brasa chica": 100, "Brasa grande": 50}}
+    _login(client, "rnavarro")
+    assert client.put("/api/saca/plus", json=change).status_code == 403  # un vendedor no
+    _login(client, "despacho")
+    assert client.put("/api/saca/plus", json=change).status_code == 403
+
+    _login(client, "supervisor")
+    saved = client.put("/api/saca/plus", json=change)
+    assert saved.status_code == 200, saved.text
+    # Lo que no se indicó queda en 0: sin plus.
+    assert saved.json()["plus"] == {
+        "Brasa chica": 100,
+        "Brasa mediana": 0,
+        "Brasa grande": 50,
+        "Pollo de mercado": 0,
+    }
+    assert _saca(client)["farm_order"] == 150
+
+    for bad in ({"Brasa enorme": 1}, {"Brasa chica": -1}, {"Brasa chica": 100_001}, {}):
+        r = client.put("/api/saca/plus", json={"plus": bad})
         assert r.status_code in (400, 422), bad
+    # La ruta vieja de factores ya no existe.
+    assert client.put("/api/saca/factors", json={"factors": {"Brasa chica": 1}}).status_code in (
+        404,
+        405,
+    )
 
 
 def test_saca_counts_only_recent_lots_and_quality_b_by_type(client) -> None:
     _login(client, "rnavarro")
-    units = {"P0001": 300, "P0011": 50}
     for category, picked in (("BRASA", {"P0001": 300}), ("Pollo de mercado", {"P0011": 50})):
-        body = {"category": category, "days": [{"date": str(TOMORROW), "units": picked}]}
+        body = {"category": category, "days": [{"date": str(AFTER_TOMORROW), "units": picked}]}
         assert client.post("/api/projections", json=body).status_code == 201, category
     _login(client, "despacho")
     lots = {
@@ -257,20 +275,16 @@ def test_saca_counts_only_recent_lots_and_quality_b_by_type(client) -> None:
     assert client.put(f"/api/stock/{TODAY}", json=lots).status_code == 200
 
     _login(client, "supervisor")
-    plan = _saca(client, TOMORROW)
+    _set_plus(client, NO_PLUS)
+    plan = _saca(client)
     by_id = {line["product_id"]: line for line in plan["lines"]}
     # Brasa 1: cuentan los lotes de hoy y de hace 3 días (80); el de hace 4 no (se troza).
     assert by_id["P0001"]["stock"] == 80 and plan["stock_old"] == 500
     assert plan["stock_lot_days"] == 3 and plan["stock_b"] == 40
     groups = {g["name"]: g for g in plan["groups"]}
-    # La calidad B descuenta del tipo: 300 − 80 − 40 = 180 hacen falta; a granja, el 80 %.
+    # La calidad B se suma al stock del tipo: 80 + 40 − 0 + 300 = 420.
     chica = groups["Brasa chica"]
-    assert (chica["stock"], chica["stock_b"], chica["need"], chica["farm_order"]) == (
-        120,
-        40,
-        180,
-        144,
-    )
-    # El pollo de mercado es un tipo más, sin factor: 50 − 10.
-    assert groups["Pollo de mercado"]["farm_order"] == 40
-    assert plan["farm_order"] == 184 and units["P0011"] == 50
+    assert (chica["stock"], chica["stock_b"], chica["farm_order"]) == (120, 40, 420)
+    # El pollo de mercado es un tipo más: 10 − 0 + 50.
+    assert groups["Pollo de mercado"]["farm_order"] == 60
+    assert plan["farm_order"] == 480

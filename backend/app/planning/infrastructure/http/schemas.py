@@ -1,7 +1,7 @@
 """Contratos JSON de la API de planificación (adaptador de entrada)."""
 
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -325,9 +325,11 @@ class SacaLineOut(BaseModel):
     product_id: str
     projected: int
     ordered: int
-    demand: int = Field(description="El mayor entre lo proyectado y los pedidos confirmados.")
+    demand: int = Field(
+        description="stock − pedidos + proyección del producto, sin plus (puede ser negativo)."
+    )
     stock: int
-    request: int = Field(description="Unidades (aves) a pedir a granja: demanda menos stock.")
+    request: int = Field(description="Lo de `demand`, nunca menos de 0 (sin plus).")
     request_kg: float
     expected: int | None = Field(
         description="Aves que se espera que lleguen en este rango (null: sin historia suficiente)."
@@ -345,43 +347,51 @@ class SacaForecastOut(BaseModel):
 
 
 class SacaGroupOut(BaseModel):
-    """Un tipo de pedido a granja: las sumas de sus productos y el pedido final."""
+    """Un tipo de pedido a granja: stock − pedidos + proyección + plus = pedido final."""
 
     name: str
-    projected: int
-    ordered: int
-    demand: int
     stock: int
     stock_b: int = Field(description="De ese stock, cuánto es calidad B.")
-    need: int = Field(description="Lo que hace falta del tipo: demanda menos stock, nunca < 0.")
-    factor: float = Field(description="Parte de lo que hace falta que se pide a granja.")
-    farm_order: int
+    ordered: int = Field(description="Pedidos de mañana.")
+    projected: int = Field(description="Proyección de pasado mañana.")
+    plus: int = Field(description="Aves extra fijas del tipo.")
+    balance: int = Field(description="stock − pedidos + proyección, antes del plus.")
+    farm_order: int = Field(description="balance + plus, nunca menos de 0.")
+    # Compatibilidad con clientes anteriores (app móvil): ya no hay factor ni «falta».
+    demand: int = Field(description="Igual a `balance` (compatibilidad).")
+    need: int = Field(description="Igual a `farm_order` (compatibilidad).")
+    factor: float = Field(1.0, description="Siempre 1 (compatibilidad; reemplazado por plus).")
 
 
-class SacaFactorsIn(BaseModel):
-    factors: dict[str, float] = Field(
+class SacaPlusIn(BaseModel):
+    plus: dict[str, Annotated[int, Field(ge=0, le=100_000)]] = Field(
         min_length=1,
         max_length=20,
-        description="Factor por tipo, p. ej. {'Brasa chica': 0.8}. Lo que falte queda en 1.",
+        description="Aves extra por tipo, p. ej. {'Brasa chica': 4000}. Lo que falte queda en 0.",
     )
 
 
-class SacaFactorsOut(BaseModel):
-    factors: dict[str, float]
+class SacaPlusOut(BaseModel):
+    plus: dict[str, int]
 
 
 class SacaOut(BaseModel):
+    """Saca calculada el día `date` (hoy)."""
+
     date: date
+    orders_date: date = Field(description="Día de los pedidos que se restan (mañana).")
+    projection_date: date = Field(description="Día de la proyección que se suma (pasado mañana).")
     lines: list[SacaLineOut]
     projected: int
     ordered: int
-    demand: int
+    demand: int = Field(description="stock − pedidos + proyección, sin plus.")
     stock: int
+    plus: int = Field(description="Suma del plus de los tipos.")
     request: int
     request_kg: float
     live_kg: float = Field(description="Kg vivos estimados (kg de producto entre el rendimiento).")
     yield_factor: float
-    method: str = Field(description="Forma de cálculo usada: sum o max.")
+    method: str = Field(description="Forma de cálculo: stock − pedidos + proyección + plus.")
     farm_order: int = Field(description="Aves del pedido final a granja (suma de los tipos).")
     stock_b: int = Field(description="Stock de calidad B descontado (por tipo).")
     stock_old: int = Field(description="Stock en lotes antiguos, que no se descuenta.")
@@ -392,7 +402,7 @@ class SacaOut(BaseModel):
     )
     sellers_registered: int
     sellers_total: int
-    orders_available: bool = Field(description="False: no hay pedidos cargados para ese día.")
+    orders_available: bool = Field(description="False: no hay pedidos cargados para mañana.")
     forecast: SacaForecastOut | None = Field(
         description="Estimación de llegada por rango; null si falta historia de producción."
     )

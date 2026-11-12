@@ -1,9 +1,7 @@
 /** Textos del cálculo de saca (única fuente). */
-import type { SacaMethod } from '@/features/saca/domain/saca'
-
 export const SACA_TITLE = 'Cálculo de saca'
 export const SACA_SUBTITLE = 'Cuánto pedir a granja cada día, por producto.'
-export const DAY_LABEL = 'Día de la saca'
+export const DAY_LABEL = 'Día del cálculo'
 export const TODAY_LABEL = 'Hoy'
 export const TOMORROW_LABEL = 'Mañana'
 export const HERO_LABEL = 'Pedido final a granja'
@@ -12,32 +10,37 @@ export const KG_LABEL = 'kg de producto'
 export const LIVE_LABEL = 'kg vivos estimados'
 export const BY_PRODUCT_TITLE = 'Por producto'
 export const NOTHING_TITLE = 'Nada que pedir todavía'
-export const NOTHING_BODY = 'Nadie registró proyecciones para este día.'
-export const METHOD_LABEL = 'Forma de cálculo'
-export const METHOD_OPTION: Record<SacaMethod, string> = {
-  sum: 'Suma: proyección + pedidos − stock',
-  max: 'El mayor entre proyección y pedidos, menos stock',
-}
-export const FORMULA: Record<SacaMethod, string> = {
-  sum: 'Hace falta = proyección + pedidos confirmados − stock. Nunca menos de 0.',
-  max: 'Hace falta = el mayor entre proyección y pedidos confirmados, menos el stock. Nunca menos de 0.',
-}
+export const NOTHING_BODY = 'No hay stock, pedidos de mañana, proyecciones de pasado mañana ni plus para este cálculo.'
+export const FORMULA =
+  'Pedir a granja = stock − pedidos de mañana + proyección de pasado mañana + plus. Nunca menos de 0.'
 export const FARM_ORDER_HINT =
-  'A granja se pide por tipo: se suman proyección, pedidos y stock de sus productos, y lo que hace falta se multiplica por el factor del tipo.'
-export const FARM_COLUMNS = { type: 'Tipo', need: 'Hace falta', factor: 'Factor', order: 'Pedir' } as const
-export const EDIT_FACTORS_LABEL = 'Cambiar por cuánto se multiplica'
-export const FACTORS_SAVED = 'Factores guardados.'
-export const FACTORS_INVALID = 'Escribe un número entre 0 y 2 en cada tipo (por ejemplo 0,80).'
-export const SAVE_FACTORS = 'Guardar'
+  'A granja se pide por tipo: se suman el stock, los pedidos y la proyección de sus productos, y se agrega el plus del tipo. Aunque no haya proyecciones, el plus solo ya puede pedir aves.'
+export const stockAt = (d: string) => `Stock al ${d}`
+export const NO_STOCK_DATE = 'Sin stock registrado'
+export const ordersOf = (d: string) => `Pedidos del ${d}`
+export const projectionOf = (d: string) => `Proyección del ${d}`
+export const FARM_COLUMNS = {
+  type: 'Tipo',
+  stock: 'Stock',
+  ordered: '− Pedidos (mañana)',
+  projected: '+ Proyección (pasado mañana)',
+  plus: '+ Plus',
+  order: '= Pedir a granja',
+} as const
+export const EDIT_PLUS_LABEL = 'Cambiar el plus de cada tipo'
+export const PLUS_SAVED = 'Plus guardado.'
+export const PLUS_INVALID = 'Escribe un número entero entre 0 y 100 000 en cada tipo (por ejemplo 4000).'
+export const SAVE_PLUS = 'Guardar'
 export const CANCEL = 'Cancelar'
-export const NEED_LABEL = 'aves hacen falta'
+export const NEED_LABEL = 'aves según los productos'
+export const groupStockBNote = (n: number) => `incl. ${n.toLocaleString('es-PE')} en B`
 
 /** Panel "Con qué datos se calculó". */
 export const SOURCES_TITLE = 'Con qué datos se calculó'
 export const SOURCE = {
-  projections: 'Proyecciones',
-  stock: 'Stock de despacho',
-  orders: 'Pedidos confirmados',
+  projections: 'Proyecciones de pasado mañana',
+  stock: 'Stock de despacho (hasta hoy)',
+  orders: 'Pedidos de mañana',
   arrival: 'Llegada estimada por rango',
 } as const
 export const NO_ARRIVAL = 'Sin historia de producción suficiente (mínimo 14 días registrados).'
@@ -51,19 +54,20 @@ export function modelLabel(method: string): string {
   const halfLife = /^ewma_(\d+(?:\.\d+)?)$/.exec(method)?.[1]
   return halfLife ? `Suavizado exponencial, vida media ${halfLife} días` : method
 }
-export const stockBNote = (n: number) => `Además, ${n.toLocaleString('es-PE')} de calidad B, que descuentan de su tipo.`
+export const stockBNote = (n: number) =>
+  `Además, ${n.toLocaleString('es-PE')} de calidad B, que se suman al stock de su tipo.`
 export const stockOldNote = (n: number, days: number) =>
-  `No se descuentan ${n.toLocaleString('es-PE')} unid. de lotes de más de ${String(days)} días (se trozan).`
-export const NO_STOCK = 'Sin registro en los 3 días anteriores: no se descuenta nada.'
-export const NO_ORDERS = 'No hay pedidos de ARIS cargados para este día: se usan solo las proyecciones.'
-export const ORDERS_OK = 'Pedidos de ARIS cargados para este día (pollo entero para brasa).'
+  `No se cuentan ${n.toLocaleString('es-PE')} unid. de lotes de más de ${String(days)} días (se trozan).`
+export const NO_STOCK = 'Sin registro de stock entre anteayer y hoy: se toma como 0.'
+export const NO_ORDERS = 'No hay pedidos de ARIS cargados para mañana: se toman como 0.'
+export const ORDERS_OK = 'Pedidos de ARIS cargados para mañana (pollo entero para brasa).'
 
 export const COLUMNS = {
   product: 'Producto',
-  projected: 'Proyección',
-  ordered: 'Pedidos',
   stock: 'Stock',
-  request: 'Hace falta',
+  ordered: 'Pedidos',
+  projected: 'Proyección',
+  request: 'Resultado',
   expected: 'Llegará',
   expectedA: 'Calidad A',
   expectedB: 'Calidad B',
@@ -75,4 +79,6 @@ export const coverageText = (registered: number, total: number) =>
   `${String(registered)} de ${String(total)} ${total === 1 ? 'vendedor' : 'vendedores'}`
 
 export const missingNote = (n: number) =>
-  n === 1 ? 'Falta 1 vendedor: el pedido puede quedar corto.' : `Faltan ${String(n)}: el pedido puede quedar corto.`
+  n === 1
+    ? 'Falta 1 vendedor: la proyección puede quedar corta.'
+    : `Faltan ${String(n)}: la proyección puede quedar corta.`

@@ -199,9 +199,9 @@ def test_who_sees_and_who_registers_production(client) -> None:
 
 
 def test_saca_estimates_what_will_arrive_per_range(client) -> None:
-    tomorrow = TODAY + timedelta(days=1)
+    arrives = TODAY + timedelta(days=2)  # la proyección que se suma es la de pasado mañana
     _login(client, "supervisor")
-    plan = client.get("/api/saca", params={"date": str(tomorrow)}).json()
+    plan = client.get("/api/saca", params={"date": str(TODAY)}).json()
     assert plan["forecast"] is None and plan["lines"][0]["expected"] is None  # aún sin historia
 
     # 20 días de historia: lo pedido en chica (todo como Brasa 3) llega 40 % Brasa 3 y 60 % Brasa 4.
@@ -214,19 +214,21 @@ def test_saca_estimates_what_will_arrive_per_range(client) -> None:
             repo.write(DailyProduction(TODAY - timedelta(days=back), lines, "importacion", AT))
         session.commit()
     _login(client, "rnavarro")
-    body = {"category": "BRASA", "days": [{"date": str(tomorrow), "units": {"P0001": 500}}]}
+    body = {"category": "BRASA", "days": [{"date": str(arrives), "units": {"P0001": 500}}]}
     assert client.post("/api/projections", json=body).status_code == 201
 
     _login(client, "supervisor")
-    plan = client.get("/api/saca", params={"date": str(tomorrow)}).json()
+    zero = {"Brasa chica": 0, "Brasa mediana": 0, "Brasa grande": 0, "Pollo de mercado": 0}
+    assert client.put("/api/saca/plus", json={"plus": zero}).status_code == 200
+    plan = client.get("/api/saca", params={"date": str(TODAY)}).json()
     assert plan["request"] == 500
     assert plan["forecast"]["method"] == "ewma_7" and plan["forecast"]["days"] == 20
     by_id = {line["product_id"]: line for line in plan["lines"]}
     # Se piden 500 aves chicas (proyectadas como Brasa 1), pero llegarán como Brasa 3 y Brasa 4.
-    # A granja van 400 (el 80 % de las 500 que hacen falta de brasa chica).
-    assert plan["farm_order"] == 400
-    assert (by_id["P0001"]["expected"], by_id["P0003"]["expected"]) == (0, 160)
-    assert (by_id["P0004"]["expected"], by_id["P0004"]["expected_a"]) == (240, 180)
+    # A granja van 500 (sin stock, pedidos ni plus).
+    assert plan["farm_order"] == 500
+    assert (by_id["P0001"]["expected"], by_id["P0003"]["expected"]) == (0, 200)
+    assert (by_id["P0004"]["expected"], by_id["P0004"]["expected_a"]) == (300, 225)
     assert by_id["P0006"]["expected"] == 0  # mediana: no se pidió nada
 
 

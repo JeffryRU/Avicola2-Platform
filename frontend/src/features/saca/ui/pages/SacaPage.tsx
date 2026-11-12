@@ -8,19 +8,8 @@ import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { bySubcategory } from '@/features/catalog/domain/catalog'
 import type { Product } from '@/features/catalog/domain/schemas'
 import { useCatalog } from '@/features/catalog/ui/hooks'
-import { useSacaPlan, useSetSacaFactors } from '@/features/saca/ui/hooks'
-import {
-  SACA_METHODS,
-  missingSellers,
-  parseFactors,
-  sacaDays,
-  sacaMethodSchema,
-  storeMethod,
-  storedMethod,
-  type Saca,
-  type SacaLine,
-  type SacaMethod,
-} from '@/features/saca/domain/saca'
+import { useSacaPlan, useSetSacaPlus } from '@/features/saca/ui/hooks'
+import { missingSellers, parsePlus, sacaDays, type Saca, type SacaLine } from '@/features/saca/domain/saca'
 import {
   ARRIVAL_HINT,
   BIRDS_LABEL,
@@ -28,35 +17,38 @@ import {
   CANCEL,
   COLUMNS,
   DAY_LABEL,
-  EDIT_FACTORS_LABEL,
-  FACTORS_INVALID,
-  FACTORS_SAVED,
+  EDIT_PLUS_LABEL,
   FARM_COLUMNS,
   FARM_ORDER_HINT,
   FORMULA,
   HERO_LABEL,
-  METHOD_LABEL,
-  METHOD_OPTION,
   KG_LABEL,
   LIVE_LABEL,
+  NEED_LABEL,
   NO_ARRIVAL,
   NO_ORDERS,
   NO_STOCK,
+  NO_STOCK_DATE,
   NOTHING_BODY,
   NOTHING_TITLE,
   ORDERS_OK,
+  PLUS_INVALID,
+  PLUS_SAVED,
   SACA_SUBTITLE,
   SACA_TITLE,
-  SAVE_FACTORS,
+  SAVE_PLUS,
   SOURCE,
   SOURCES_TITLE,
   TODAY_LABEL,
   TOMORROW_LABEL,
   arrivalNote,
   coverageText,
+  groupStockBNote,
   missingNote,
-  NEED_LABEL,
   modelLabel,
+  ordersOf,
+  projectionOf,
+  stockAt,
   stockBNote,
   stockOldNote,
 } from '@/features/saca/types/saca'
@@ -69,13 +61,8 @@ import { cn } from '@/shared/ui/lib/utils'
 export function SacaPage() {
   const { catalog } = useCatalog()
   const ref = today()
-  const [day, setDay] = useState<IsoDate>(addDays(ref, 1))
-  const [method, setMethod] = useState<SacaMethod>(() => storedMethod(globalThis.localStorage))
-  const query = useSacaPlan(day, method)
-  const chooseMethod = (next: SacaMethod) => {
-    storeMethod(globalThis.localStorage, next)
-    setMethod(next)
-  }
+  const [day, setDay] = useState<IsoDate>(ref)
+  const query = useSacaPlan(day)
   const plan = query.data
 
   return (
@@ -89,22 +76,6 @@ export function SacaPage() {
           label={DAY_LABEL}
           caption={(d) => (d === ref ? TODAY_LABEL : d === addDays(ref, 1) ? TOMORROW_LABEL : undefined)}
         />
-        <label className="mb-4 flex flex-col gap-x-3 gap-y-1.5 sm:flex-row sm:items-center">
-          <span className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
-            {METHOD_LABEL}
-          </span>
-          <select
-            value={method}
-            onChange={(e) => chooseMethod(sacaMethodSchema.parse(e.target.value))}
-            className="h-11 max-w-full min-w-0 rounded-[10px] border-[1.5px] border-border bg-white px-3 text-[14.5px] font-semibold outline-none focus:border-primary focus:ring-4 focus:ring-primary-ring"
-          >
-            {SACA_METHODS.map((m) => (
-              <option key={m} value={m}>
-                {METHOD_OPTION[m]}
-              </option>
-            ))}
-          </select>
-        </label>
         {query.isError && (
           <Note tone="bad" icon={<AlertCircle />}>
             <div>{query.error.message}</div>
@@ -117,7 +88,7 @@ export function SacaPage() {
             <Hero plan={plan} />
             <Sources plan={plan} />
             <Section title={BY_PRODUCT_TITLE} className="@4xl/main:col-start-1">
-              {plan.sellers_registered === 0 ? (
+              {isEmpty(plan) ? (
                 <EmptyState title={NOTHING_TITLE}>{NOTHING_BODY}</EmptyState>
               ) : (
                 <ByProduct plan={plan} products={catalog?.products ?? []} />
@@ -130,14 +101,32 @@ export function SacaPage() {
   )
 }
 
+/** Nada de nada: ni stock, ni pedidos, ni proyección, ni plus (el plus solo ya pide aves). */
+const isEmpty = (p: Saca) => p.stock === 0 && p.ordered === 0 && p.projected === 0 && p.farm_order === 0
+
+/** «jueves 12» */
+const dayText = (d: IsoDate) => `${dDowLong(d)} ${dShort(d).split(' ')[1] ?? ''}`
+
 /** El número que importa, grande; lo demás, al lado. */
 function Hero({ plan }: { plan: Saca }) {
+  const used = [
+    plan.stock_date ? stockAt(dayText(plan.stock_date)) : NO_STOCK_DATE,
+    ordersOf(dayText(plan.orders_date)),
+    projectionOf(dayText(plan.projection_date)),
+  ]
   return (
     <section className="rounded-[18px] bg-primary p-5 text-white shadow-card dsk:p-6">
       <p className="text-[13px] font-bold tracking-[0.05em] text-white/80 uppercase">
-        {HERO_LABEL} · {dDowLong(plan.date)} {dShort(plan.date).split(' ')[1]}
+        {HERO_LABEL} · cálculo del {dayText(plan.date)}
       </p>
-      <div className="mt-2 flex flex-wrap items-end gap-x-8 gap-y-4">
+      <ul className="mt-2 flex flex-wrap gap-1.5">
+        {used.map((u) => (
+          <li key={u} className="rounded-full bg-white/15 px-2.5 py-1 text-[12.5px] font-semibold">
+            {u}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-4">
         <p className="flex items-baseline gap-2">
           <b className="text-[52px] leading-none font-extrabold tracking-[-0.04em] tabular-nums dsk:text-[64px]">
             {nf0(plan.farm_order)}
@@ -162,128 +151,137 @@ function Hero({ plan }: { plan: Saca }) {
         </dl>
       </div>
       {plan.groups.length > 0 && <FarmOrder plan={plan} />}
+      <p className="mt-3 text-[12.5px] text-white/85">{FORMULA}</p>
     </section>
   )
 }
 
-/** Pedido final por tipo. Los supervisores cambian el factor con el lápiz. */
+/** Pedido final por tipo. Los supervisores cambian el plus con el lápiz. */
 function FarmOrder({ plan }: { plan: Saca }) {
   const session = useRequiredSession()
   const [draft, setDraft] = useState<Record<string, string> | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const save = useSetSacaFactors()
+  const save = useSetSacaPlus()
   const start = () => {
     setError(null)
-    setDraft(Object.fromEntries(plan.groups.map((g) => [g.name, String(g.factor)])))
+    setDraft(Object.fromEntries(plan.groups.map((g) => [g.name, String(g.plus)])))
   }
   const submit = (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const factors = draft && parseFactors(draft)
-    if (!factors) {
-      setError(FACTORS_INVALID)
+    const plus = draft && parsePlus(draft)
+    if (!plus) {
+      setError(PLUS_INVALID)
       return
     }
     setError(null)
-    save.mutate(factors, {
+    save.mutate(plus, {
       onSuccess: () => {
         setDraft(null)
-        toast.success(FACTORS_SAVED)
+        toast.success(PLUS_SAVED)
       },
       onError: (e) => setError(e.message),
     })
   }
-  const factorInput =
-    'h-9 w-[4.5rem] rounded-[8px] border border-white/40 bg-white/15 px-2 text-right text-[15px] font-bold text-white tabular-nums outline-none focus:border-white'
-
-  if (draft) {
-    return (
-      <form onSubmit={submit} className="mt-4 rounded-[14px] bg-white/12 px-3.5 py-3">
-        {plan.groups.map((g) => (
-          <label
-            key={g.name}
-            className="flex items-center gap-2 border-t border-white/15 py-1.5 text-[15px] first:border-t-0"
-          >
-            <b className="min-w-0 flex-1 truncate">{g.name}</b>
-            <span className="text-[13px] text-white/85 tabular-nums">{nf0(g.need)} ×</span>
-            <input
-              inputMode="decimal"
-              aria-label={`Factor de ${g.name}`}
-              value={draft[g.name] ?? ''}
-              onChange={(e) => setDraft({ ...draft, [g.name]: e.target.value.replace(/[^\d.,]/g, '').slice(0, 5) })}
-              className={factorInput}
-            />
-          </label>
-        ))}
-        {error && (
-          <p role="alert" className="pt-1 text-[13px] font-semibold text-white">
-            {error}
-          </p>
-        )}
-        <div className="mt-2 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setDraft(null)}
-            className="h-9 rounded-[8px] px-3 text-[13.5px] font-bold"
-          >
-            {CANCEL}
-          </button>
-          <button
-            type="submit"
-            disabled={save.isPending}
-            className="h-9 rounded-[8px] bg-white px-4 text-[13.5px] font-bold text-primary disabled:opacity-60"
-          >
-            {SAVE_FACTORS}
-          </button>
-        </div>
-      </form>
+  const plusCell = (name: string, value: number) =>
+    draft ? (
+      <input
+        inputMode="numeric"
+        aria-label={`Plus de ${name}`}
+        value={draft[name] ?? ''}
+        onChange={(e) => setDraft({ ...draft, [name]: e.target.value.replace(/[^\d., ]/g, '').slice(0, 8) })}
+        className="h-8 w-full min-w-0 rounded-[8px] border border-white/40 bg-white/15 px-2 text-right text-[14.5px] font-bold text-white tabular-nums outline-none focus:border-white"
+      />
+    ) : (
+      <span className="text-right tabular-nums">+{nf0(value)}</span>
     )
-  }
+
   return (
-    <div className="relative mt-4 rounded-[14px] bg-white/12 px-3.5 py-3">
-      {can(session, 'manage_editing') && (
+    <form onSubmit={submit} className="relative mt-4 rounded-[14px] bg-white/12 px-3.5 py-3">
+      {!draft && can(session, 'manage_editing') && (
         <button
           type="button"
           onClick={start}
-          aria-label={EDIT_FACTORS_LABEL}
-          title={EDIT_FACTORS_LABEL}
+          aria-label={EDIT_PLUS_LABEL}
+          title={EDIT_PLUS_LABEL}
           className="absolute -top-4 -right-2 grid size-8 place-items-center rounded-full bg-white text-primary shadow-card"
         >
           <Pencil className="size-4" />
         </button>
       )}
-      {/* Ancho: tabla. Angosto: el tipo a la izquierda y la cuenta a la derecha. */}
-      <div className="hidden sm:block">
-        <div className={cn(farmCols, 'pb-1 text-[11.5px] font-bold tracking-[0.04em] text-white/75 uppercase')}>
-          <span>{FARM_COLUMNS.type}</span>
-          <span className="text-right">{FARM_COLUMNS.need}</span>
-          <span className="text-right">{FARM_COLUMNS.factor}</span>
-          <span className="text-right">{FARM_COLUMNS.order}</span>
-        </div>
+      {/* Ancho: tabla en el orden de la fórmula. Angosto: el tipo, la cuenta debajo y lo que se pide. */}
+      <div
+        className={cn(
+          farmCols,
+          'hidden pb-1 text-[11.5px] font-bold tracking-[0.04em] text-white/75 uppercase sm:grid',
+        )}
+      >
+        <span>{FARM_COLUMNS.type}</span>
+        <span className="text-right">{FARM_COLUMNS.stock}</span>
+        <span className="text-right">{FARM_COLUMNS.ordered}</span>
+        <span className="text-right">{FARM_COLUMNS.projected}</span>
+        <span className="text-right">{FARM_COLUMNS.plus}</span>
+        <span className="text-right">{FARM_COLUMNS.order}</span>
       </div>
       {plan.groups.map((g) => (
         <div key={g.name} className="border-t border-white/15 py-1.5 text-[15px] first:border-t-0 sm:first:border-t">
           <div className={cn(farmCols, 'hidden sm:grid')}>
             <b className="truncate">{g.name}</b>
-            <span className="text-right tabular-nums">{nf0(g.need)}</span>
-            <span className="text-right text-white/85 tabular-nums">× {nf2(g.factor)}</span>
+            <span className="text-right tabular-nums">
+              {nf0(g.stock)}
+              {g.stock_b > 0 && (
+                <small className="block text-[11.5px] text-white/75">{groupStockBNote(g.stock_b)}</small>
+              )}
+            </span>
+            <span className="text-right tabular-nums">−{nf0(g.ordered)}</span>
+            <span className="text-right tabular-nums">+{nf0(g.projected)}</span>
+            {plusCell(g.name, g.plus)}
             <b className="text-right text-[17px] tabular-nums">{nf0(g.farm_order)}</b>
           </div>
-          <div className="flex items-baseline gap-2 sm:hidden">
-            <b className="min-w-0 flex-1 truncate">{g.name}</b>
-            <span className="text-[13px] whitespace-nowrap text-white/85 tabular-nums">
-              {nf0(g.need)} × {nf2(g.factor)}
-            </span>
-            <b className="min-w-[2.5rem] text-right text-[17px] tabular-nums">{nf0(g.farm_order)}</b>
+          <div className="sm:hidden">
+            <div className="flex items-baseline gap-2">
+              <b className="min-w-0 flex-1 truncate">{g.name}</b>
+              <b className="min-w-[2.5rem] text-right text-[17px] tabular-nums">{nf0(g.farm_order)}</b>
+            </div>
+            <div className="flex items-center gap-2 text-[12.5px] text-white/85 tabular-nums">
+              <span className="min-w-0 flex-1">
+                {nf0(g.stock)} − {nf0(g.ordered)} + {nf0(g.projected)} {draft ? '+' : `+ ${nf0(g.plus)}`}
+                {g.stock_b > 0 && ` · ${groupStockBNote(g.stock_b)}`}
+              </span>
+              {draft && <span className="w-24">{plusCell(g.name, g.plus)}</span>}
+            </div>
           </div>
         </div>
       ))}
-    </div>
+      {draft && (
+        <>
+          {error && (
+            <p role="alert" className="pt-1 text-[13px] font-semibold text-white">
+              {error}
+            </p>
+          )}
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDraft(null)}
+              className="h-9 rounded-[8px] px-3 text-[13.5px] font-bold"
+            >
+              {CANCEL}
+            </button>
+            <button
+              type="submit"
+              disabled={save.isPending}
+              className="h-9 rounded-[8px] bg-white px-4 text-[13.5px] font-bold text-primary disabled:opacity-60"
+            >
+              {SAVE_PLUS}
+            </button>
+          </div>
+        </>
+      )}
+    </form>
   )
 }
 
-const farmCols =
-  'grid grid-cols-[minmax(0,1fr)_5rem_3.6rem_4.6rem] items-baseline gap-x-2 sm:grid-cols-[minmax(0,1fr)_7rem_5rem_7rem]'
-const nf2 = (n: number) => n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const farmCols = 'grid items-baseline gap-x-2 grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,5.5rem))_minmax(0,6.5rem)]'
 
 type Tone = 'ok' | 'warn' | 'off'
 const toneCls: Record<Tone, string> = {
@@ -330,7 +328,7 @@ function Sources({ plan }: { plan: Saca }) {
       <ul className="px-4 pb-4 dsk:px-5">
         <SourceRow
           tone={missing ? 'warn' : 'ok'}
-          label={SOURCE.projections}
+          label={`${SOURCE.projections} (${dayText(plan.projection_date)})`}
           value={coverageText(plan.sellers_registered, plan.sellers_total)}
         >
           <div
@@ -353,7 +351,7 @@ function Sources({ plan }: { plan: Saca }) {
           label={SOURCE.stock}
           value={plan.stock_date ? `${nf0(plan.stock)} unid.` : undefined}
         >
-          <small className={small}>{plan.stock_date ? `Registro del ${dShort(plan.stock_date)}.` : NO_STOCK}</small>
+          <small className={small}>{plan.stock_date ? `Registro del ${dayText(plan.stock_date)}.` : NO_STOCK}</small>
           {plan.stock_b > 0 && <small className={small}>{stockBNote(plan.stock_b)}</small>}
           {plan.stock_old > 0 && (
             <small className={small}>{stockOldNote(plan.stock_old, plan.stock_lot_days ?? 3)}</small>
@@ -361,7 +359,7 @@ function Sources({ plan }: { plan: Saca }) {
         </SourceRow>
         <SourceRow
           tone={plan.orders_available ? 'ok' : 'off'}
-          label={SOURCE.orders}
+          label={`${SOURCE.orders} (${dayText(plan.orders_date)})`}
           value={plan.orders_available ? `${nf0(plan.ordered)} unid.` : undefined}
         >
           <small className={small}>{plan.orders_available ? ORDERS_OK : NO_ORDERS}</small>
@@ -376,7 +374,7 @@ function Sources({ plan }: { plan: Saca }) {
         </SourceRow>
       </ul>
       <p className="border-t border-muted px-4 py-3 text-[12.5px] text-muted-foreground dsk:px-5">
-        {FORMULA[plan.method]}
+        {FORMULA}
         <span className="mt-1.5 block">{FARM_ORDER_HINT}</span>
         {plan.forecast && <span className="mt-1.5 block">{ARRIVAL_HINT}</span>}
       </p>
@@ -384,16 +382,14 @@ function Sources({ plan }: { plan: Saca }) {
   )
 }
 
-/** Angosto: producto y lo que hay que pedir. Ancho: todas las columnas del cálculo. */
-const colsCls = (orders: boolean, arrival: boolean) =>
-  cn('grid items-center gap-x-3 grid-cols-[minmax(0,1fr)_5.5rem]', COLS[`${orders ? 3 : 2}-${arrival ? 2 : 1}`])
-// Producto · proyección (· pedidos) · stock · pedir · (llegará · calidad A · calidad B |) kg
-const COLS: Record<string, string> = {
-  '2-1': 'sm:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,0.7fr))_minmax(0,1fr)_minmax(0,0.7fr)]',
-  '3-1': 'sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,0.7fr))_minmax(0,1fr)_minmax(0,0.7fr)]',
-  '2-2': 'sm:grid-cols-[minmax(0,1.3fr)_repeat(2,minmax(0,0.7fr))_minmax(0,0.9fr)_repeat(3,minmax(0,0.7fr))]',
-  '3-2': 'sm:grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,0.7fr))_minmax(0,0.9fr)_repeat(3,minmax(0,0.7fr))]',
-}
+/** Angosto: producto y el resultado. Ancho: todas las columnas, en el orden de la fórmula. */
+const colsCls = (arrival: boolean) =>
+  cn(
+    'grid items-center gap-x-3 grid-cols-[minmax(0,1fr)_5.5rem]',
+    arrival
+      ? 'sm:grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,0.7fr))_minmax(0,0.9fr)_repeat(3,minmax(0,0.7fr))]'
+      : 'sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,0.7fr))_minmax(0,1fr)_minmax(0,0.7fr)]',
+  )
 const numCls = 'hidden text-right text-[14px] tabular-nums sm:block'
 /** Aves que se espera que lleguen en calidad B: las que llegan menos las de calidad A. */
 const qualityB = (l: SacaLine) => Math.max(0, (l.expected ?? 0) - (l.expected_a ?? 0))
@@ -402,7 +398,7 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
   const lines = new Map(plan.lines.map((l) => [l.product_id, l]))
   const max = Math.max(1, ...plan.lines.map((l) => l.request))
   const arrival = !!plan.forecast
-  const cols = colsCls(plan.orders_available, arrival)
+  const cols = colsCls(arrival)
   const expectedTotal = plan.lines.reduce((s, l) => s + (l.expected ?? 0), 0)
   const expectedATotal = plan.lines.reduce((s, l) => s + (l.expected_a ?? 0), 0)
   const sum = (ps: Product[], pick: (l: SacaLine) => number) =>
@@ -414,9 +410,9 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
     <div className="px-3 pt-2 pb-4 dsk:px-4">
       <div className={cn(cols, 'px-3 pb-1.5 text-[12px] font-bold tracking-[0.04em] text-muted-foreground uppercase')}>
         <span>{COLUMNS.product}</span>
-        <span className="hidden text-right sm:block">{COLUMNS.projected}</span>
-        {plan.orders_available && <span className="hidden text-right sm:block">{COLUMNS.ordered}</span>}
         <span className="hidden text-right sm:block">{COLUMNS.stock}</span>
+        <span className="hidden text-right sm:block">{COLUMNS.ordered}</span>
+        <span className="hidden text-right sm:block">{COLUMNS.projected}</span>
         <span className="text-right">{COLUMNS.request}</span>
         {arrival ? (
           <>
@@ -434,13 +430,13 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
             <div className="flex items-baseline gap-3 rounded-[10px] bg-muted/70 px-3 py-2">
               <b className="min-w-0 flex-1 text-[13px] tracking-[0.02em] text-ink-2 uppercase">{g.name ?? 'Otros'}</b>
               <span className="text-[13px] text-muted-foreground tabular-nums">
-                <b className="text-foreground">{nf0(sum(g.products, (l) => l.request))}</b> hacen falta
+                <b className="text-foreground">{nf0(sum(g.products, (l) => l.request))}</b> en total
               </span>
             </div>
             {g.products.map((p) => {
               const l = lines.get(p.id)
               if (!l) return null
-              const idle = l.demand === 0 && l.stock === 0 && !l.expected
+              const idle = l.stock === 0 && l.ordered === 0 && l.projected === 0 && !l.expected
               return (
                 <div
                   key={p.id}
@@ -450,14 +446,12 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
                     <b className="block truncate text-[15px]">{p.name}</b>
                     {/* En angosto, el desglose va bajo el nombre en vez de en columnas. */}
                     <small className="block text-[12.5px] text-muted-foreground tabular-nums sm:hidden">
-                      {nf0(l.demand)} proy.{l.stock > 0 ? ` − ${nf0(l.stock)} stock` : ''}
+                      {nf0(l.stock)} stock − {nf0(l.ordered)} ped. + {nf0(l.projected)} proy.
                     </small>
                   </span>
-                  <span className={numCls}>{nf0(l.projected)}</span>
-                  {plan.orders_available && <span className={numCls}>{nf0(l.ordered)}</span>}
-                  <span className={cn(numCls, l.stock > l.demand && 'font-semibold text-warn')}>
-                    {l.stock ? `−${nf0(l.stock)}` : '0'}
-                  </span>
+                  <span className={numCls}>{nf0(l.stock)}</span>
+                  <span className={numCls}>{l.ordered ? `−${nf0(l.ordered)}` : '0'}</span>
+                  <span className={numCls}>{l.projected ? `+${nf0(l.projected)}` : '0'}</span>
                   <span className="text-right">
                     <b className={cn('block text-[16px] tabular-nums', l.request ? 'text-primary' : 'text-faint')}>
                       {nf0(l.request)}
@@ -504,9 +498,9 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
       </div>
       <div className={cn(cols, 'mt-3 rounded-[12px] bg-secondary px-3 py-3 text-[15px] font-extrabold')}>
         <span>{COLUMNS.total}</span>
-        <span className={cn(numCls, '!text-[15px]')}>{nf0(plan.projected)}</span>
-        {plan.orders_available && <span className={cn(numCls, '!text-[15px]')}>{nf0(plan.ordered)}</span>}
-        <span className={cn(numCls, '!text-[15px]')}>{plan.stock ? `−${nf0(plan.stock)}` : '0'}</span>
+        <span className={cn(numCls, '!text-[15px]')}>{nf0(plan.stock)}</span>
+        <span className={cn(numCls, '!text-[15px]')}>{plan.ordered ? `−${nf0(plan.ordered)}` : '0'}</span>
+        <span className={cn(numCls, '!text-[15px]')}>{plan.projected ? `+${nf0(plan.projected)}` : '0'}</span>
         <span className="text-right tabular-nums">{nf0(plan.request)}</span>
         {arrival ? (
           <>

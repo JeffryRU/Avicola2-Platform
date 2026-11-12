@@ -63,10 +63,10 @@ export const endpoints = {
   },
 
   saca: {
-    /** GET ?date&method → plan de saca del día por producto y por tipo. */
+    /** GET ?date → saca calculada ese día: stock − pedidos de mañana + proyección de pasado mañana + plus. */
     plan: '/saca',
-    /** PUT {factors} → factores por tipo guardados. */
-    factors: '/saca/factors',
+    /** PUT {plus} → plus (aves extra) por tipo guardado. */
+    plus: '/saca/plus',
   },
 
   stock: {

@@ -11,7 +11,6 @@ import pe.avicola2.app.domain.Product
 import pe.avicola2.app.domain.ProductionDay
 import pe.avicola2.app.domain.ProductionEntry
 import pe.avicola2.app.domain.Projection
-import pe.avicola2.app.domain.SACA_METHOD_DEFAULT
 import pe.avicola2.app.domain.Saca
 import pe.avicola2.app.domain.Seller
 import pe.avicola2.app.domain.StockDay
@@ -78,10 +77,11 @@ interface ProductionGateway {
 
 /** Cuánto pedir a granja para un día. */
 interface SacaGateway {
-    suspend fun plan(day: LocalDate, method: String = SACA_METHOD_DEFAULT): Saca
+    /** `day`: día del cálculo (hoy); resta los pedidos de mañana y suma la proyección de pasado mañana. */
+    suspend fun plan(day: LocalDate): Saca
 
-    /** Solo supervisores: por cuánto se multiplica lo que hace falta de cada tipo. */
-    suspend fun setFactors(factors: Map<String, Double>): Map<String, Double>
+    /** Solo supervisores: aves extra (plus) de cada tipo. */
+    suspend fun setPlus(plus: Map<String, Int>): Map<String, Int>
 }
 
 /** Entrega un archivo generado al sistema para guardarlo o mandarlo (menú «Compartir»). */

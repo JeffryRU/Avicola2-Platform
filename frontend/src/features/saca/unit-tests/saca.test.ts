@@ -1,56 +1,80 @@
 import { describe, expect, it } from 'vitest'
-import { missingSellers, parseFactors, sacaDays, sacaSchema } from '@/features/saca/domain/saca'
+import { SACA_METHOD, missingSellers, parsePlus, sacaDays, sacaSchema } from '@/features/saca/domain/saca'
 
 const plan = sacaSchema.parse({
-  date: '2026-11-11',
+  date: '2026-11-12',
+  orders_date: '2026-11-13',
+  projection_date: '2026-11-14',
+  method: 'stock_orders_projection_plus',
+  plus: 5500,
   lines: [
-    { product_id: 'P0001', projected: 150, ordered: 0, demand: 150, stock: 30, request: 120, request_kg: 120 },
-    { product_id: 'P0006', projected: 40, ordered: 0, demand: 40, stock: 60, request: 0, request_kg: 0 },
+    { product_id: 'P0001', projected: 150, ordered: 40, demand: 140, stock: 30, request: 140, request_kg: 140 },
+    { product_id: 'P0006', projected: 0, ordered: 100, demand: -40, stock: 60, request: 0, request_kg: 0 },
   ],
-  projected: 190,
-  ordered: 0,
-  demand: 190,
+  projected: 150,
+  ordered: 140,
+  demand: 100,
   stock: 90,
-  request: 120,
-  request_kg: 120,
-  live_kg: 160,
+  request: 140,
+  request_kg: 140,
+  live_kg: 186,
   yield_factor: 0.75,
-  stock_date: '2026-11-10',
+  stock_date: '2026-11-12',
+  stock_b: 10,
   sellers_registered: 2,
   sellers_total: 7,
-  orders_available: false,
-  farm_order: 96,
+  orders_available: true,
+  farm_order: 5600,
   groups: [
-    { name: 'Brasa chica', projected: 150, ordered: 0, demand: 150, stock: 30, need: 120, factor: 0.8, farm_order: 96 },
-    { name: 'Brasa mediana', projected: 40, ordered: 0, demand: 40, stock: 60, need: 0, factor: 0.7, farm_order: 0 },
+    {
+      name: 'Brasa chica',
+      stock: 30,
+      stock_b: 10,
+      ordered: 40,
+      projected: 150,
+      plus: 4000,
+      balance: 140,
+      farm_order: 4140,
+    },
+    { name: 'Brasa mediana', stock: 60, ordered: 100, projected: 0, plus: 1500, balance: -40, farm_order: 1460 },
   ],
 })
 
 describe('cálculo de saca', () => {
-  it('ofrece desde ayer hasta una semana adelante', () => {
-    const days = sacaDays('2026-11-10')
+  it('ofrece desde ayer hasta una semana adelante, empezando por hoy en la segunda posición', () => {
+    const days = sacaDays('2026-11-12')
     expect(days).toHaveLength(9)
-    expect(days[0]).toBe('2026-11-09')
-    expect(days.at(-1)).toBe('2026-11-17')
+    expect(days[0]).toBe('2026-11-11')
+    expect(days[1]).toBe('2026-11-12')
+    expect(days.at(-1)).toBe('2026-11-19')
   })
 
-  it('usa la suma como forma de cálculo de partida y trae el pedido final por tipo', () => {
-    expect(plan.method).toBe('sum')
-    expect(plan.groups.map((g) => g.farm_order)).toEqual([96, 0])
-    expect(plan.farm_order).toBe(96)
+  it('lee las fechas usadas, el plus y el pedido final por tipo', () => {
+    expect(plan.method).toBe(SACA_METHOD)
+    expect(plan.orders_date).toBe('2026-11-13')
+    expect(plan.projection_date).toBe('2026-11-14')
+    expect(plan.plus).toBe(5500)
+    expect(plan.groups.map((g) => [g.balance, g.plus, g.farm_order])).toEqual([
+      [140, 4000, 4140],
+      [-40, 1500, 1460],
+    ])
+    expect(plan.groups[1]?.stock_b).toBe(0)
+    expect(plan.lines[1]?.demand).toBe(-40)
   })
 
   it('cuenta los vendedores que aún no registraron', () => {
     expect(missingSellers(plan)).toBe(5)
   })
 
-  it('lee los factores escritos con coma o punto y rechaza los que no sirven', () => {
-    expect(parseFactors({ 'Brasa chica': '0,8', 'Brasa grande': '1' })).toEqual({
-      'Brasa chica': 0.8,
-      'Brasa grande': 1,
-    })
-    expect(parseFactors({ 'Brasa chica': '' })).toBeNull()
-    expect(parseFactors({ 'Brasa chica': 'abc' })).toBeNull()
-    expect(parseFactors({ 'Brasa chica': '2.5' })).toBeNull()
+  it('lee el plus con o sin separador de miles y rechaza lo que no sirve', () => {
+    expect(
+      parsePlus({ 'Brasa chica': '4,000', 'Brasa mediana': '1500', 'Brasa grande': '1 500', Mercado: '0' }),
+    ).toEqual({ 'Brasa chica': 4000, 'Brasa mediana': 1500, 'Brasa grande': 1500, Mercado: 0 })
+    expect(parsePlus({ 'Brasa chica': '100.000' })).toEqual({ 'Brasa chica': 100000 })
+    expect(parsePlus({ 'Brasa chica': '' })).toBeNull()
+    expect(parsePlus({ 'Brasa chica': '-5' })).toBeNull()
+    expect(parsePlus({ 'Brasa chica': '4.5' })).toBeNull()
+    expect(parsePlus({ 'Brasa chica': 'abc' })).toBeNull()
+    expect(parsePlus({ 'Brasa chica': '100001' })).toBeNull()
   })
 })

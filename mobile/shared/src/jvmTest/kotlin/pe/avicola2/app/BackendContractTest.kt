@@ -161,8 +161,12 @@ class BackendContractTest {
 
         val supervisor = Session(url).apply { session.login("supervisor", "demo1234") }
         assertTrue(supervisor.session.account!!.canViewSaca)
-        val plan = HttpSacaGateway(supervisor.api).plan(today.plusDays(1))
+        val plan = HttpSacaGateway(supervisor.api).plan(today)
         assertEquals(today, plan.stockDate)
+        assertEquals(today.plusDays(1), plan.ordersDate)
+        assertEquals(today.plusDays(2), plan.projectionDate)
+        assertEquals("stock_orders_projection_plus", plan.method)
+        plan.groups.forEach { assertEquals((it.stock - it.ordered + it.projected + it.plus).coerceAtLeast(0), it.farmOrder) }
         assertEquals(plan.lines.sumOf { it.request }, plan.request)
         // El supervisor consulta el stock pero no lo registra.
         assertTrue(HttpStockGateway(supervisor.api).list(today, today).isNotEmpty())

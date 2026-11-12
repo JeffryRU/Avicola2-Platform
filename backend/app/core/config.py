@@ -103,8 +103,6 @@ class Settings(BaseSettings):
     # Conversión de kg de producto a saca (pollo vivo). Valores de referencia por validar.
     yield_factor: float = Field(0.75, gt=0, le=1)  # kg de producto por kg vivo
     avg_live_weight_kg: float = Field(2.6, gt=0)  # peso vivo promedio por ave
-    # Pedido final a granja por tipo: lo que hace falta de cada tipo se multiplica por su factor
-    # (regla del negocio). Los tipos que no figuran usan 1. Se cambia con SACA_GROUP_FACTORS (JSON).
     # Ubicaciones donde se cuenta el stock de despacho (STOCK_LOCATIONS, JSON). SUPUESTO: las
     # zonas con más pedidos; falta la lista real del negocio.
     stock_locations: list[str] = Field(
@@ -112,8 +110,16 @@ class Settings(BaseSettings):
     )
     # Para la saca solo cuenta el stock de lotes de hasta estos días (lo más antiguo se troza).
     saca_stock_lot_days: int = Field(3, ge=0, le=30)
-    saca_group_factors: dict[str, float] = Field(
-        default_factory=lambda: {"Brasa chica": 0.8, "Brasa mediana": 0.7}
+    # Plus de la saca: aves extra por tipo que se suman al pedido a granja (regla del negocio).
+    # Se cambia con SACA_GROUP_PLUS (JSON) o, desde la app, un supervisor.
+    # «Carne» del negocio = el tipo «Pollo de mercado» del catálogo (SUPUESTO, docs/assumptions).
+    saca_group_plus: dict[str, int] = Field(
+        default_factory=lambda: {
+            "Brasa chica": 4000,
+            "Brasa mediana": 1500,
+            "Brasa grande": 1500,
+            "Pollo de mercado": 4000,
+        }
     )
 
     @field_validator("auth_cookie_secure", mode="before")

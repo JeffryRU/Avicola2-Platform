@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { cleanKg, invalidWeights, parseKg, toWeights, weightDraftOf } from '@/features/production/domain/production'
-import { storeMethod, storedMethod } from '@/features/saca/domain/saca'
 import { modelLabel } from '@/features/saca/types/saca'
 
 describe('peso promedio de la parvada', () => {
@@ -29,21 +28,7 @@ describe('peso promedio de la parvada', () => {
   })
 })
 
-describe('forma de cálculo de la saca', () => {
-  it('recuerda la elegida y vuelve a la del negocio si no hay nada válido', () => {
-    const data = new Map<string, string>()
-    const storage = {
-      getItem: (k: string) => data.get(k) ?? null,
-      setItem: (k: string, v: string) => void data.set(k, v),
-    }
-    expect(storedMethod(storage)).toBe('sum')
-    storeMethod(storage, 'max')
-    expect(storedMethod(storage)).toBe('max')
-    data.set('saca.method', 'otra')
-    expect(storedMethod(storage)).toBe('sum')
-    expect(storedMethod(undefined)).toBe('sum')
-  })
-
+describe('modelo de llegada de la saca', () => {
   it('nombra el modelo de llegada en uso', () => {
     expect(modelLabel('ewma_3')).toBe('Suavizado exponencial, vida media 3 días')
     expect(modelLabel('hybrid_weight')).toContain('peso de la parvada')

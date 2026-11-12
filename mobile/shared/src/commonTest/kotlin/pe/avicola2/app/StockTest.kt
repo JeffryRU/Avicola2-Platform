@@ -175,20 +175,49 @@ class StockTest {
     }
 
     @Test
-    fun sacaMethodDefaultsToTheBusinessRule() {
-        assertEquals("sum", pe.avicola2.app.domain.sacaMethodOf(null))
-        assertEquals("sum", pe.avicola2.app.domain.sacaMethodOf("otra"))
-        assertEquals("max", pe.avicola2.app.domain.sacaMethodOf("max"))
-        assertTrue("proyección + pedidos" in pe.avicola2.app.domain.sacaFormula("sum"))
-        assertTrue("el mayor" in pe.avicola2.app.domain.sacaFormula("max"))
+    fun sacaFormulaFollowsTheBusinessOrder() {
+        assertEquals(
+            "Pedir a granja = stock − pedidos de mañana + proyección de pasado mañana + plus. Nunca menos de 0.",
+            pe.avicola2.app.domain.sacaFormula(),
+        )
         assertEquals("Suavizado exponencial, vida media 3 días", pe.avicola2.app.domain.arrivalModelLabel("ewma_3"))
         assertTrue("peso de la parvada" in pe.avicola2.app.domain.arrivalModelLabel("hybrid_weight"))
     }
 
     @Test
-    fun sacaFactorsAcceptCommaOrDotAndRejectTheRest() {
-        assertEquals(mapOf("Brasa chica" to 0.8, "Brasa grande" to 1.0), pe.avicola2.app.domain.parseSacaFactors(mapOf("Brasa chica" to "0,8", "Brasa grande" to "1")))
-        assertEquals(null, pe.avicola2.app.domain.parseSacaFactors(mapOf("Brasa chica" to "")))
-        assertEquals(null, pe.avicola2.app.domain.parseSacaFactors(mapOf("Brasa chica" to "2.5")))
+    fun sacaPlusAcceptsThousandSeparatorsAndRejectsTheRest() {
+        val parse = { d: Map<String, String> -> pe.avicola2.app.domain.parseSacaPlus(d) }
+        assertEquals(
+            mapOf("a" to 4000, "b" to 4000, "c" to 4000, "d" to 4000, "e" to 0, "f" to 100_000),
+            parse(mapOf("a" to "4000", "b" to "4,000", "c" to "4 000", "d" to " 4.000 ", "e" to "0", "f" to "100000")),
+        )
+        for (bad in listOf("", "  ", "-5", "2.5", "2,50", "4,0000", "1e3", "abc", "100001")) {
+            assertEquals(null, parse(mapOf("Brasa chica" to bad)), bad)
+        }
+    }
+
+    @Test
+    fun sacaDecodesTheStockOrdersProjectionPlusPayload() {
+        val json = pe.avicola2.app.infrastructure.ApiJson
+        val plan = json.decodeFromString<pe.avicola2.app.domain.Saca>(
+            """
+            {"date":"2026-11-12","orders_date":"2026-11-13","projection_date":"2026-11-14",
+             "lines":[{"product_id":"p1","projected":300,"ordered":800,"demand":-100,"stock":400,"request":0,"request_kg":0.0,"expected":null,"expected_a":null}],
+             "projected":300,"ordered":800,"demand":-100,"stock":400,"plus":4000,"request":0,"request_kg":0.0,
+             "live_kg":0.0,"yield_factor":0.8,"method":"stock_orders_projection_plus","farm_order":3900,
+             "stock_b":50,"stock_old":0,"stock_lot_days":3,"stock_date":"2026-11-12",
+             "sellers_registered":2,"sellers_total":3,"orders_available":true,"forecast":null,
+             "groups":[{"name":"Brasa chica","stock":400,"stock_b":50,"ordered":800,"projected":300,"plus":4000,
+                        "balance":-100,"farm_order":3900,"demand":-100,"need":3900,"factor":1.0}]}
+            """,
+        )
+        assertEquals(LocalDate(2026, 11, 13), plan.ordersDate)
+        assertEquals(LocalDate(2026, 11, 14), plan.projectionDate)
+        assertEquals(4000, plan.plus)
+        assertEquals("stock_orders_projection_plus", plan.method)
+        assertEquals(-100, plan.lines.single().demand)
+        val g = plan.groups.single()
+        assertEquals(listOf(400, 50, 800, 300, 4000, -100, 3900), listOf(g.stock, g.stockB, g.ordered, g.projected, g.plus, g.balance, g.farmOrder))
+        assertEquals(g.stock - g.ordered + g.projected + g.plus, g.farmOrder)
     }
 }

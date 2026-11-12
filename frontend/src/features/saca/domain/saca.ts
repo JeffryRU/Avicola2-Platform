@@ -2,20 +2,7 @@ import { z } from 'zod'
 import { addDays, type IsoDate } from '@/shared/domain/dates'
 import { isoDateSchema } from '@/shared/domain/schemas'
 
-/** Forma de cálculo: «sum» = proyección + pedidos (la del negocio); «max» = el mayor de los dos. */
-export const SACA_METHODS = ['sum', 'max'] as const
-export const DEFAULT_METHOD = 'sum'
-export const sacaMethodSchema = z.enum(SACA_METHODS)
-export type SacaMethod = z.infer<typeof sacaMethodSchema>
-
-const METHOD_KEY = 'saca.method'
-/** La forma elegida se recuerda en este equipo. */
-export function storedMethod(storage: Pick<Storage, 'getItem'> | undefined): SacaMethod {
-  const parsed = sacaMethodSchema.safeParse(storage?.getItem(METHOD_KEY))
-  return parsed.success ? parsed.data : DEFAULT_METHOD
-}
-export const storeMethod = (storage: Pick<Storage, 'setItem'> | undefined, method: SacaMethod) =>
-  storage?.setItem(METHOD_KEY, method)
+export const SACA_METHOD = 'stock_orders_projection_plus'
 
 /** Cálculo de saca de un día: lo resuelve el backend; aquí solo se valida y se describe. */
 export const sacaLineSchema = z.object({
@@ -32,14 +19,17 @@ export const sacaLineSchema = z.object({
 })
 export type SacaLine = z.infer<typeof sacaLineSchema>
 
+/** Por tipo: stock − pedidos de mañana + proyección de pasado mañana + plus (nunca menos de 0). */
 export const sacaGroupSchema = z.object({
   name: z.string(),
-  projected: z.number().int(),
-  ordered: z.number().int(),
-  demand: z.number().int(),
   stock: z.number().int(),
-  need: z.number().int(),
-  factor: z.number(),
+  // Stock de calidad B: ya está sumado en `stock`.
+  stock_b: z.number().int().default(0),
+  ordered: z.number().int(),
+  projected: z.number().int(),
+  plus: z.number().int().default(0),
+  // stock − pedidos + proyección (puede ser negativo).
+  balance: z.number().int(),
   farm_order: z.number().int(),
 })
 export type SacaGroup = z.infer<typeof sacaGroupSchema>
@@ -55,10 +45,14 @@ export const sacaSchema = z.object({
   request_kg: z.number(),
   live_kg: z.number(),
   yield_factor: z.number(),
-  method: sacaMethodSchema.default(DEFAULT_METHOD),
-  // Pedido final a granja: por tipo, lo que hace falta por su factor.
+  method: z.string().default(SACA_METHOD),
+  // Pedidos de mañana (D+1) y proyección de pasado mañana (D+2).
+  orders_date: isoDateSchema,
+  projection_date: isoDateSchema,
+  plus: z.number().int().default(0),
+  // Pedido final a granja: suma por tipo de max(0, balance + plus).
   farm_order: z.number().int(),
-  // Stock de calidad B (descuenta por tipo) y stock en lotes antiguos (no se descuenta).
+  // Stock de calidad B (se suma a su tipo) y stock en lotes antiguos (no se descuenta).
   stock_b: z.number().int().default(0),
   stock_old: z.number().int().default(0),
   stock_lot_days: z.number().int().nullish(),
@@ -74,21 +68,21 @@ export const sacaSchema = z.object({
 })
 export type Saca = z.infer<typeof sacaSchema>
 
-export const MAX_FACTOR = 2
-/** Factores escritos por el supervisor (texto) → números; null si alguno no es válido. */
-export function parseFactors(draft: Record<string, string>): Record<string, number> | null {
+export const MAX_PLUS = 100_000
+/** Plus escrito por el supervisor (texto, admite «4,000» o «4 000») → enteros; null si alguno no es válido. */
+export function parsePlus(draft: Record<string, string>): Record<string, number> | null {
   const out: Record<string, number> = {}
   for (const [name, raw] of Object.entries(draft)) {
-    const text = raw.trim().replace(',', '.')
-    if (!/^\d+(\.\d+)?$/.test(text)) return null
-    const value = Number(text)
-    if (value > MAX_FACTOR) return null
+    const text = raw.trim()
+    if (!/^(\d+|\d{1,3}([ ,.\u00a0]\d{3})+)$/.test(text)) return null
+    const value = Number(text.replace(/\D/g, ''))
+    if (value > MAX_PLUS) return null
     out[name] = value
   }
   return out
 }
 
-/** Días que se pueden consultar: desde ayer hasta una semana adelante (por defecto, mañana). */
+/** Días del cálculo que se pueden consultar: desde ayer hasta una semana adelante (por defecto, hoy). */
 export const sacaDays = (ref: IsoDate): IsoDate[] => Array.from({ length: 9 }, (_, i) => addDays(ref, i - 1))
 
 /** Vendedores que aún no registraron su proyección del día (el cálculo queda corto sin ellos). */

@@ -20,7 +20,7 @@ describe('claves de consulta', () => {
 
   it('cada consulta cuelga del prefijo de su módulo (invalidar `all` la alcanza)', () => {
     expect(startsWith(queryKeys.projections.range('2026-11-01', '2026-11-30'), queryKeys.projections.all)).toBe(true)
-    expect(startsWith(queryKeys.saca.plan('2026-11-13', 'auto'), queryKeys.saca.all)).toBe(true)
+    expect(startsWith(queryKeys.saca.plan('2026-11-13'), queryKeys.saca.all)).toBe(true)
     expect(startsWith(queryKeys.stock.options, queryKeys.stock.all)).toBe(true)
     expect(startsWith(queryKeys.production.forecast([2.4, 2.6]), queryKeys.production.all)).toBe(true)
     expect(startsWith(queryKeys.editing.unlocks, queryKeys.editing.all)).toBe(true)
