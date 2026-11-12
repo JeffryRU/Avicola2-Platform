@@ -90,6 +90,7 @@ import {
 import { useRegisterStock, useStock, useStockOptions } from '@/features/stock/ui/hooks'
 import { DayStrip } from '@/shared/ui/components/day-strip'
 import { EmptyState } from '@/shared/ui/components/feedback'
+import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
@@ -110,7 +111,8 @@ const dayTitle = (day: IsoDate) => `${dDowLong(day)} ${dShort(day).split(' ')[1]
 export function StockPage() {
   const session = useRequiredSession()
   const canManage = can(session, 'manage_stock')
-  const options = useStockOptions().data
+  const optionsQuery = useStockOptions()
+  const options = optionsQuery.options
   const ref = today()
   const [day, setDay] = useState<IsoDate>(ref)
   const stock = useStock(addDays(ref, -(HISTORY_DAYS - 1)), ref)
@@ -145,7 +147,8 @@ export function StockPage() {
           markedLabel={REGISTERED_LABEL}
           caption={(d) => (d === ref ? TODAY_LABEL : d === addDays(ref, -1) ? YESTERDAY_LABEL : undefined)}
         />
-        {stock.isPending || !options ? null : (
+        <SyncStatus queries={[stock, optionsQuery]} />
+        {
           <Board
             // Al cambiar de día, de ubicación o al guardar, el borrador parte de lo registrado.
             key={`${day}:${current.location}:${record?.recorded_at ?? ''}`}
@@ -159,7 +162,7 @@ export function StockPage() {
             readOnlyNote={canManage && !isEditableDay(day, ref) ? READ_ONLY_DAY_LABEL : undefined}
             history={history}
           />
-        )}
+        }
       </PageBody>
     </div>
   )

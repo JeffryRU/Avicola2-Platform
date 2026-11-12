@@ -1,6 +1,6 @@
 import { useState, type SyntheticEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, Check, Minus, Pencil, TriangleAlert } from 'lucide-react'
+import { Check, Minus, Pencil, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
 import { addDays, dDowLong, dShort, today, type IsoDate } from '@/shared/domain/dates'
@@ -12,6 +12,7 @@ import type { Product } from '@/features/catalog/domain/schemas'
 import { useCatalog } from '@/features/catalog/ui/hooks'
 import {
   SACA_METHODS,
+  emptySaca,
   missingSellers,
   parseFactors,
   sacaDays,
@@ -51,6 +52,7 @@ import {
   SAVE_FACTORS,
   SOURCE,
   SOURCES_TITLE,
+  WAITING_SOURCES,
   TODAY_LABEL,
   TOMORROW_LABEL,
   arrivalNote,
@@ -62,7 +64,8 @@ import {
   stockOldNote,
 } from '@/features/saca/types/saca'
 import { DayStrip } from '@/shared/ui/components/day-strip'
-import { EmptyState, Note } from '@/shared/ui/components/feedback'
+import { EmptyState } from '@/shared/ui/components/feedback'
+import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
 
@@ -78,7 +81,9 @@ export function SacaPage() {
     storeMethod(globalThis.localStorage, next)
     setMethod(next)
   }
-  const plan = query.data
+  // Sin respuesta del servidor se dibuja la saca en cero; los datos llegan cuando responde.
+  const waiting = !query.data
+  const plan = query.data ?? emptySaca(day, method, catalog.products)
 
   return (
     <div>
@@ -107,26 +112,28 @@ export function SacaPage() {
             ))}
           </select>
         </label>
-        {query.isError && (
-          <Note tone="bad" icon={<AlertCircle />}>
-            <div>{query.error.message}</div>
-          </Note>
-        )}
-        {plan && (
+        <SyncStatus queries={[query]} />
+        {
           // En pantallas anchas: resumen y detalle a la izquierda, datos de origen fijos a la derecha.
           // En angostas se apilan en este orden: resumen, datos de origen, detalle.
           <div className="grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_340px]">
             <Hero plan={plan} />
-            <Sources plan={plan} />
+            {waiting ? (
+              <Section title={SOURCES_TITLE} className="@4xl/main:sticky @4xl/main:top-6 @4xl/main:row-span-2">
+                <p className="px-4 pb-4 text-[13.5px] text-muted-foreground dsk:px-5">{WAITING_SOURCES}</p>
+              </Section>
+            ) : (
+              <Sources plan={plan} />
+            )}
             <Section title={BY_PRODUCT_TITLE} className="@4xl/main:col-start-1">
-              {plan.sellers_registered === 0 ? (
+              {plan.sellers_registered === 0 && !waiting ? (
                 <EmptyState title={NOTHING_TITLE}>{NOTHING_BODY}</EmptyState>
               ) : (
-                <ByProduct plan={plan} products={catalog?.products ?? []} />
+                <ByProduct plan={plan} products={catalog.products} />
               )}
             </Section>
           </div>
-        )}
+        }
       </PageBody>
     </div>
   )

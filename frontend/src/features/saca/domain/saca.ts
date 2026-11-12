@@ -88,6 +88,58 @@ export function parseFactors(draft: Record<string, string>): Record<string, numb
   return out
 }
 
+/** Saca en cero para dibujar la pantalla mientras el servidor no responde. */
+export function emptySaca(
+  day: IsoDate,
+  method: SacaMethod,
+  products: { id: string; subcategory?: string | null; category: string }[],
+): Saca {
+  const line = (id: string) => ({
+    product_id: id,
+    projected: 0,
+    ordered: 0,
+    demand: 0,
+    stock: 0,
+    request: 0,
+    request_kg: 0,
+    expected: null,
+    expected_a: null,
+  })
+  const groups = [...new Set(products.map((p) => p.subcategory ?? p.category))]
+  return {
+    date: day,
+    lines: products.map((p) => line(p.id)),
+    projected: 0,
+    ordered: 0,
+    demand: 0,
+    stock: 0,
+    request: 0,
+    request_kg: 0,
+    live_kg: 0,
+    yield_factor: 0.75,
+    method,
+    farm_order: 0,
+    stock_b: 0,
+    stock_old: 0,
+    stock_lot_days: null,
+    groups: groups.map((name) => ({
+      name,
+      projected: 0,
+      ordered: 0,
+      demand: 0,
+      stock: 0,
+      need: 0,
+      factor: 1,
+      farm_order: 0,
+    })),
+    stock_date: null,
+    sellers_registered: 0,
+    sellers_total: 0,
+    orders_available: false,
+    forecast: null,
+  }
+}
+
 /** Días que se pueden consultar: desde ayer hasta una semana adelante (por defecto, mañana). */
 export const sacaDays = (ref: IsoDate): IsoDate[] => Array.from({ length: 9 }, (_, i) => addDays(ref, i - 1))
 

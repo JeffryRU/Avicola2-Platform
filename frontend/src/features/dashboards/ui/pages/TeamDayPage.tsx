@@ -1,3 +1,4 @@
+import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { ChevronLeft, ChevronRight, Package, Pencil, ShoppingBag, ShoppingCart, Users } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router'
 import { paths } from '@/app/routes'
@@ -44,12 +45,13 @@ export function TeamDayView({
   back: string | null
 }) {
   const { catalog } = useCatalog()
-  const sellers = useSellers().data
+  const sellersQuery = useSellers()
+  const sellers = sellersQuery.data ?? []
   const data = useWindowData()
   const firstEditable = useFirstEditableDay()
-  if (!catalog || !sellers || !data.data) return <PageHeader title={title} subtitle={subtitle} back={back} />
+  const source = data.data ?? { projections: [], sales: [] }
 
-  const day = teamDay(date, sellers, data.data.projections, data.data.sales, catalog)
+  const day = teamDay(date, sellers, source.projections, source.sales, catalog)
   const pending = day.rows.filter((r) => !r.confirmed)
   // El supervisor edita cualquier día de la ventana (aunque haya cerrado): desde mañana.
   const editable = date >= firstEditable
@@ -67,6 +69,7 @@ export function TeamDayView({
   return (
     <div>
       <PageHeader title={title} subtitle={subtitle} back={back} actions={dayNav} mobileActions={dayNav} />
+      <SyncStatus queries={[data, sellersQuery]} className="mx-4 mt-3 dsk:mx-8" />
       <PageBody>
         <div className="mb-3 grid grid-cols-2 gap-2.5 dsk:mb-4 dsk:gap-4 @4xl/main:grid-cols-4">
           <Kpi

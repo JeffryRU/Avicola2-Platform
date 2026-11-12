@@ -54,6 +54,7 @@ export function modelLabel(method: string): string {
 export const stockBNote = (n: number) => `Además, ${n.toLocaleString('es-PE')} de calidad B, que descuentan de su tipo.`
 export const stockOldNote = (n: number, days: number) =>
   `No se descuentan ${n.toLocaleString('es-PE')} unid. de lotes de más de ${String(days)} días (se trozan).`
+export const WAITING_SOURCES = 'Esperando los datos del servidor: proyecciones, stock, pedidos y llegada estimada.'
 export const NO_STOCK = 'Sin registro en los 3 días anteriores: no se descuenta nada.'
 export const NO_ORDERS = 'No hay pedidos de ARIS cargados para este día: se usan solo las proyecciones.'
 export const ORDERS_OK = 'Pedidos de ARIS cargados para este día (pollo entero para brasa).'
