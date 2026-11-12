@@ -179,7 +179,10 @@ function Sidebar() {
             )}
           </>
         ) : (
-          <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
+          <>
+            <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
+            <SideItem to={paths.requests} icon={<LockOpen />} label="Solicitudes de apertura" />
+          </>
         )}
         {can(session, 'view_saca') && <SideItem to={paths.saca} icon={<Bird />} label="Cálculo de saca" />}
         {can(session, 'view_production') && <SideItem to={paths.production} icon={<Factory />} label="Producción" />}
@@ -197,7 +200,8 @@ function Sidebar() {
 const BOTTOM = [
   { to: paths.home, icon: Home, label: 'Inicio', end: true },
   { to: paths.register, icon: Plus, label: 'Registrar' },
-  { to: paths.mine, icon: ClipboardList, label: 'Mis proyecciones' },
+  { to: paths.mine, icon: ClipboardList, label: 'Proyecciones' },
+  { to: paths.requests, icon: LockOpen, label: 'Solicitudes' },
   { to: paths.profile, icon: User, label: 'Perfil' },
 ]
 const BOTTOM_SUPERVISOR = [

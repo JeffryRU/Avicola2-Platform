@@ -17,6 +17,7 @@ export const paths = {
   password: '/perfil/contrasena',
   accounts: '/usuarios',
   unlocks: '/habilitaciones',
+  requests: '/solicitudes',
   history: '/historial',
   stock: '/stock',
   saca: '/saca',

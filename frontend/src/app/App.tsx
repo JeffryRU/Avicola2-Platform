@@ -73,6 +73,9 @@ const ProfilePage = lazy(() =>
 const ForecastPage = lazy(() =>
   import('@/features/production/ui/pages/ForecastPage').then((m) => ({ default: m.ForecastPage })),
 )
+const MyRequestsPage = lazy(() =>
+  import('@/features/editing/ui/pages/MyRequestsPage').then((m) => ({ default: m.MyRequestsPage })),
+)
 const ProductionPage = lazy(() =>
   import('@/features/production/ui/pages/ProductionPage').then((m) => ({ default: m.ProductionPage })),
 )
@@ -197,6 +200,7 @@ function Routed() {
               <Route path={paths.register} element={<NewProjectionPage />} />
               <Route path={paths.registered} element={<SuccessPage />} />
               <Route path={paths.mine} element={<MyProjectionsPage />} />
+              <Route path={paths.requests} element={<MyRequestsPage />} />
               <Route path={paths.history} element={<HistoryPage />} />
               <Route path="/proyecciones/:date" element={<DayDetailPage />} />
               <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />
