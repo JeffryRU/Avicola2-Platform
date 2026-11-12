@@ -14,3 +14,4 @@ Cada decisión de arquitectura relevante o supuesto de proceso se registra aquí
 | [0008](0008-frontend-por-features.md) | Frontend por features (screaming) y vocabulario en una sola fuente | aceptado |
 | [0009](0009-app-movil-kotlin-multiplatform.md) | App móvil con Kotlin Multiplatform, distribuida por GitHub Releases | aceptado |
 | [0010](0010-roles-y-permisos.md) | Roles y permisos en una sola fuente, con supervisor general | aceptado |
+| [0014](0014-cache-en-memoria-o-redis.md) | Caché de lecturas frecuentes, en memoria o en Redis | aceptado |

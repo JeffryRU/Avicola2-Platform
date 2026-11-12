@@ -37,7 +37,7 @@ El diseño original usaba un contenedor de PostgreSQL con dos bases (`app` y `n8
 **Negativas / a tener en cuenta**
 - **Hace falta internet** para desarrollar (o usar el perfil `localdb`).
 - **El plan gratuito pausa el proyecto tras ~1 semana sin actividad.** Se reactiva desde el dashboard, y hay que hacerlo antes de una demo.
-- **Límites del plan gratuito:** unos 500 MB de base y un número limitado de conexiones en el pooler. Los pools son chicos y configurables (`DB_POOL_SIZE=5`, `N8N_DB_POOL_SIZE=2`).
+- **Límites del plan gratuito:** unos 500 MB de base y un número limitado de conexiones en el pooler. Los pools son chicos y configurables (`DB_POOL_SIZE=10` + `DB_MAX_OVERFLOW=3`, `N8N_DB_POOL_SIZE=2`; el total debe caber en el "Pool Size" del pooler).
 - **SSL de n8n:** el certificado del pooler lo firma la CA de Supabase. Por defecto `N8N_DB_SSL_REJECT_UNAUTHORIZED=false` (cifrado, sin verificar la CA). Para verificarlo, montar la CA del dashboard y usar `DB_POSTGRESDB_SSL_CA`.
 - **Latencia:** la región del proyecto de Supabase debe estar cerca de la VM de GCP (por ejemplo, ambas en `us-east`, o São Paulo para Perú).
 - **El histórico analítico sigue en el lakehouse Delta** (ADR 0001), no en Supabase. Supabase solo guarda el estado transaccional.

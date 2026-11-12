@@ -106,7 +106,7 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
 
 ## Después del primer despliegue (común)
 
-1. **Comprobar:** `https://APP_DOMAIN/health` responde `{"status":"ok","database":"ok"}`.
+1. **Comprobar:** `https://APP_DOMAIN/health` responde `{"status":"ok"}` (solo el proceso; es el que usa el healthcheck) y `https://APP_DOMAIN/health/ready` responde `{"status":"ok","database":"ok"}`.
 2. **Primer supervisor** (los usuarios de prueba no existen en producción):
    ```bash
    docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli init

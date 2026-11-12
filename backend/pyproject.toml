@@ -18,6 +18,7 @@ dependencies = [
     "pyjwt>=2.15.1",
     "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
+    "redis>=5",
     "scikit-learn>=1.5",
     "sqlalchemy>=2",
 ]
@@ -29,6 +30,7 @@ azure = [
 
 [dependency-groups]
 dev = [
+    "fakeredis>=2.40.0",
     "hypothesis>=6.170.15",
     "pytest>=9.1.1",
     "ruff>=0.17.1",

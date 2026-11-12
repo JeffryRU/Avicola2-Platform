@@ -144,12 +144,14 @@ def test_client_errors_go_to_frontend_log_only(log_dir):
                     "stack": "TypeError: x\n    at Matrix (matrix.tsx:10)",
                     "route": "/registrar",
                     "user": "rnavarro",
+                    "request_id": "a1b2c3d4e5f6",
                 }
             ]
         },
     )
     assert r.status_code == 204
     front = _read(log_dir / "frontend.log")
+    assert "api_request_id=a1b2c3d4e5f6" in front  # enlaza con la línea del backend
     assert "react en /registrar: No se pudo leer 'units' FALSO 2026 ERROR" in front
     assert "user=rnavarro" in front and "\n        at Matrix (matrix.tsx:10)" in front
     assert "No se pudo leer" not in _read(log_dir / "app.log")

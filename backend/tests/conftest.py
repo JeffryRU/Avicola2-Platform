@@ -17,6 +17,9 @@ os.environ["PLANNING_MAX_DAYS"] = "7"
 os.environ["PLANNING_STARTS_IN_DAYS"] = "0"
 os.environ["PLANNING_CUTOFF_ENABLED"] = "true"
 os.environ["PLANNING_SCHEDULER_SECONDS"] = "0"
+# Con caché, como en producción: así los tests de la API prueban también que cada escritura
+# la invalida. Se vacía antes de cada test (fixture _fresh_cache), porque cada uno recrea la base.
+os.environ.setdefault("CACHE_TTL_SECONDS", "60")
 
 from datetime import date
 from pathlib import Path
@@ -103,3 +106,11 @@ def fast_hasher(monkeypatch):
 def examples(default: int) -> int:
     """Intensidad de Hypothesis: ligera por defecto (CI); `FUZZ_EXAMPLES=200`, a fondo."""
     return int(os.environ.get("FUZZ_EXAMPLES", default))
+
+
+@pytest.fixture(autouse=True)
+def _fresh_cache():
+    """Cada test recrea la base: la caché de un test no debe verse en el siguiente."""
+    from app.planning.bootstrap import planning_cache
+
+    planning_cache.invalidate()
