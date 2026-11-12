@@ -7,6 +7,8 @@ interface Options {
   timeoutMs: number
   /** El servidor rechazó la sesión (401): la cookie venció o fue invalidada. */
   onUnauthorized: () => void
+  /** El servidor negó el permiso (403): puede que la sesión del navegador ya sea otra cuenta. */
+  onForbidden?: () => void
   /** Solo para pruebas: reemplaza la red por una función. */
   adapter?: AxiosRequestConfig['adapter']
 }
@@ -39,6 +41,7 @@ export class AxiosHttpClient implements HttpClient {
     })
     this.api.interceptors.response.use((response) => {
       if (response.status === 401) options.onUnauthorized()
+      if (response.status === 403) options.onForbidden?.()
       return response
     })
   }

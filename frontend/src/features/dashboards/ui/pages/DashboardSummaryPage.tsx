@@ -1,3 +1,4 @@
+import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { Calendar, Layers, Package, ShoppingBag } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { dDM, dDow, dShort } from '@/shared/domain/dates'
@@ -22,9 +23,9 @@ export function DashboardSummaryPage() {
   const dayPath = useDayPath()
   const detail = useDetailSelection(period.dates, catalog)
   const subtitle = period.custom ? 'Resumen del período' : 'Resumen semanal'
-  if (!catalog || !data.data) return <PageHeader title="Planificación de Demanda" subtitle={subtitle} />
+  const source = data.data ?? { projections: [], sales: [] }
 
-  const { projections, sales } = data.data
+  const { projections, sales } = source
   const days = periodAgg(period.dates, sellers, projections, sales, catalog)
   const prev = periodAgg(previousDates(period), sellers, projections, sales, catalog)
   // Variación contra los mismos días confirmados del período anterior.
@@ -38,6 +39,7 @@ export function DashboardSummaryPage() {
   return (
     <div>
       <PageHeader title="Planificación de Demanda" subtitle={subtitle} sticky={false} />
+      <SyncStatus queries={[data]} className="mx-4 mt-3 dsk:mx-8" />
       <DashboardFilterBar
         extra={<DetailFilterMenus dates={period.dates} custom={period.custom} catalog={catalog} />}
         chips={detail.chips}

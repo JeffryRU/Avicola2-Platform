@@ -80,3 +80,30 @@ export function projectionTotals(groups: ProjectedGroup[]) {
     largest: Math.max(0, ...lines.map((l) => l.expected)),
   }
 }
+
+/** Pronóstico en cero, con los tipos del catálogo, para dibujar la pantalla mientras el
+ *  servidor no responde. */
+export function emptyForecast(
+  products: { id: string; subcategory?: string | null; category: string }[],
+): ArrivalForecast {
+  const names = [...new Set(products.map((p) => p.subcategory ?? p.category))]
+  return {
+    available: true,
+    method: '',
+    candidates: [],
+    weights_used: {},
+    min_days: 14,
+    days: 0,
+    date_from: null,
+    date_to: null,
+    groups: names.map((name) => ({
+      name,
+      last_ordered: 0,
+      last_weight: null,
+      products: products
+        .filter((p) => (p.subcategory ?? p.category) === name)
+        .map((p) => ({ product_id: p.id, share: 0, quality_a_rate: 1 })),
+    })),
+    accuracy: null,
+  }
+}

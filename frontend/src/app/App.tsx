@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { toast } from 'sonner'
@@ -86,7 +86,15 @@ const SuccessPage = lazy(() =>
 )
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+      // Si el servidor no respondió, se vuelve a intentar sola cada 20 s hasta que conteste.
+      refetchInterval: (query) => (query.state.status === 'error' ? 20_000 : false),
+    },
+  },
 })
 
 /** Reintenta la cola offline al volver la conexión y al iniciar sesión. */
@@ -121,9 +129,25 @@ function useSessionLifecycle() {
   const user = session?.seller.username
   useEffect(() => {
     void auth.verify()
+    // Al volver a la pestaña se confirma la sesión: en otra pestaña pudieron entrar con otra cuenta.
+    const check = () => {
+      if (document.visibilityState === 'visible') void auth.verify()
+    }
+    document.addEventListener('visibilitychange', check)
+    window.addEventListener('focus', check)
+    return () => {
+      document.removeEventListener('visibilitychange', check)
+      window.removeEventListener('focus', check)
+    }
   }, [auth])
+  const previous = useRef(user)
   useEffect(() => {
-    if (!user) client.clear()
+    // Otra cuenta (o ninguna): los datos guardados eran de la anterior.
+    if (previous.current !== user) client.clear()
+    if (previous.current && user && previous.current !== user) {
+      toast.info(`En otra pestaña se entró como ${user}. Esta pestaña ahora usa esa cuenta.`)
+    }
+    previous.current = user
   }, [user, client])
 }
 

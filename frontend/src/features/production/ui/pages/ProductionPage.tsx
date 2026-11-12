@@ -64,6 +64,7 @@ import { useProduction, useRegisterProduction } from '@/features/production/ui/h
 import { editableDays, isEditableDay, parseUnits } from '@/features/stock/domain/stock'
 import { DayStrip } from '@/shared/ui/components/day-strip'
 import { EmptyState } from '@/shared/ui/components/feedback'
+import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
@@ -98,7 +99,7 @@ export function ProductionPage() {
   const query = useProduction(addDays(ref, -(HISTORY_DAYS - 1)), ref)
   const days = query.data ?? []
   const record = days.find((d) => d.date === day)
-  const products = catalog?.products ?? []
+  const products = catalog.products
   const strip = editableDays(ref).includes(day) ? editableDays(ref) : [...editableDays(ref), day]
   const editable = canManage && isEditableDay(day, ref)
   const forecastLink = (
@@ -130,7 +131,8 @@ export function ProductionPage() {
           markedLabel={REGISTERED_LABEL}
           caption={(d) => (d === ref ? TODAY_LABEL : d === addDays(ref, -1) ? YESTERDAY_LABEL : undefined)}
         />
-        {query.isPending || !catalog ? null : editable ? (
+        <SyncStatus queries={[query]} />
+        {editable ? (
           <Editor
             key={`${day}:${record?.recorded_at ?? ''}`}
             day={day}
