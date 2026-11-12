@@ -1,11 +1,16 @@
 import type { LogSink } from '@/shared/application/ports'
 import type { ClientLogEntry } from '@/shared/domain/client-log'
+import { apiUrl, endpoints } from '@/shared/infrastructure/api/endpoints'
 
-/** Envía los reportes a POST {baseUrl}/client-logs (responde 204, sin cuerpo). */
+/**
+ * Envía los reportes a POST {baseUrl}/client-logs (responde 204, sin cuerpo). Va con fetch y
+ * sendBeacon, no con el cliente HTTP: debe funcionar aunque la app esté rota o cerrándose.
+ * Cada reporte de un error de la API lleva su `request_id` (y lo repite al final del mensaje).
+ */
 export class HttpLogSink implements LogSink {
   private readonly url: string
   constructor(baseUrl: string) {
-    this.url = `${baseUrl}/client-logs`
+    this.url = apiUrl(baseUrl, endpoints.logs.client)
   }
 
   async send(entries: ClientLogEntry[]) {

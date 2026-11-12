@@ -1,18 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
+import { queryKeys } from '@/shared/application/query-keys'
 import type { IsoDate } from '@/shared/domain/dates'
 import type { StockEntry } from '@/features/stock/domain/stock'
 
-const stockKeys = { all: ['stock'] as const }
-
 export function useStock(from: IsoDate, to: IsoDate) {
   const { stock } = useContainer()
-  return useQuery({ queryKey: [...stockKeys.all, from, to], queryFn: () => stock.list(from, to) })
+  return useQuery({ queryKey: queryKeys.stock.range(from, to), queryFn: () => stock.list(from, to) })
 }
 
 export function useStockOptions() {
   const { stock } = useContainer()
-  return useQuery({ queryKey: [...stockKeys.all, 'options'], queryFn: () => stock.options(), staleTime: 10 * 60_000 })
+  return useQuery({ queryKey: queryKeys.stock.options, queryFn: () => stock.options(), staleTime: 10 * 60_000 })
 }
 
 export function useRegisterStock() {
@@ -22,9 +21,9 @@ export function useRegisterStock() {
     mutationFn: ({ day, location, lines }: { day: IsoDate; location: string; lines: StockEntry[] }) =>
       stock.register(day, location, lines),
     onSuccess: () => {
-      void client.invalidateQueries({ queryKey: stockKeys.all })
+      void client.invalidateQueries({ queryKey: queryKeys.stock.all })
       // La saca descuenta este stock.
-      void client.invalidateQueries({ queryKey: ['saca'] })
+      void client.invalidateQueries({ queryKey: queryKeys.saca.all })
     },
   })
 }

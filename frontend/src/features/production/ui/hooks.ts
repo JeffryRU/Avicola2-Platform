@@ -1,20 +1,19 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
+import { queryKeys } from '@/shared/application/query-keys'
 import type { IsoDate } from '@/shared/domain/dates'
 import type { ProductionEntry } from '@/features/production/domain/production'
 
-const keys = { all: ['production'] as const }
-
 export function useProduction(from: IsoDate, to: IsoDate) {
   const { production } = useContainer()
-  return useQuery({ queryKey: [...keys.all, from, to], queryFn: () => production.list(from, to) })
+  return useQuery({ queryKey: queryKeys.production.range(from, to), queryFn: () => production.list(from, to) })
 }
 
 /** `weights`: peso esperado de la parvada por tipo, en el orden de los tipos (0 = el último anotado). */
 export function useArrivalForecast(weights: number[] = []) {
   const { production } = useContainer()
   return useQuery({
-    queryKey: [...keys.all, 'forecast', ...weights],
+    queryKey: queryKeys.production.forecast(weights),
     queryFn: () => production.forecast(weights),
     placeholderData: keepPreviousData,
   })
@@ -34,9 +33,9 @@ export function useRegisterProduction() {
       weights: Record<string, number>
     }) => production.register(day, lines, weights),
     onSuccess: () => {
-      void client.invalidateQueries({ queryKey: keys.all })
+      void client.invalidateQueries({ queryKey: queryKeys.production.all })
       // La estimación de llegada de la saca usa esta historia.
-      void client.invalidateQueries({ queryKey: ['saca'] })
+      void client.invalidateQueries({ queryKey: queryKeys.saca.all })
     },
   })
 }

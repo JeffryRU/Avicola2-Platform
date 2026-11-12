@@ -1,6 +1,12 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig, isAxiosError, isCancel } from 'axios'
 import type { z } from 'zod'
-import { ApiError, type HttpClient, type UploadOptions } from '@/shared/application/ports'
+import {
+  ApiError,
+  REQUEST_ID_HEADER,
+  type HttpClient,
+  type QueryParams,
+  type UploadOptions,
+} from '@/shared/application/ports'
 
 interface Options {
   baseUrl: string
@@ -9,9 +15,9 @@ interface Options {
   onUnauthorized: () => void
   /** Solo para pruebas: reemplaza la red por una función. */
   adapter?: AxiosRequestConfig['adapter']
+  /** Id de cada petición (por defecto, 12 caracteres hex como los que genera el backend). */
+  newRequestId?: () => string
 }
-
-type Query = Record<string, string | number | undefined>
 
 const UPLOAD_TIMEOUT_MS = 5 * 60_000
 
@@ -22,11 +28,17 @@ const UPLOAD_TIMEOUT_MS = 5 * 60_000
  *
  * La sesión va en una cookie HttpOnly que el navegador adjunta solo (mismo origen): este código
  * nunca ve el token.
+ *
+ * Trazabilidad: cada petición lleva un `X-Request-ID` nuevo. El backend lo usa en su log
+ * (`[id]` en cada línea) y lo devuelve; un `ApiError` lo trae en `requestId` y el reporte de
+ * errores del navegador lo incluye, así un error de la app se ubica en el log del servidor.
  */
 export class AxiosHttpClient implements HttpClient {
   private readonly api: AxiosInstance
+  private readonly newRequestId: () => string
 
   constructor(options: Options) {
+    this.newRequestId = options.newRequestId ?? defaultRequestId
     this.api = axios.create({
       baseURL: options.baseUrl,
       timeout: options.timeoutMs,
@@ -35,6 +47,8 @@ export class AxiosHttpClient implements HttpClient {
       headers: { Accept: 'application/json' },
       // Las respuestas se validan con zod: axios no debe lanzar por el código ni transformar nada raro.
       validateStatus: () => true,
+      // Listas como parámetro repetido (?weight=1&weight=2), que es lo que lee FastAPI.
+      paramsSerializer: { indexes: null },
       adapter: options.adapter,
     })
     this.api.interceptors.response.use((response) => {
@@ -43,7 +57,7 @@ export class AxiosHttpClient implements HttpClient {
     })
   }
 
-  get<T>(path: string, schema: z.ZodType<T>, query?: Query) {
+  get<T>(path: string, schema: z.ZodType<T>, query?: QueryParams) {
     return this.request({ url: path, method: 'GET', params: definedOnly(query) }, schema)
   }
 
@@ -79,18 +93,25 @@ export class AxiosHttpClient implements HttpClient {
   }
 
   private async request<T>(config: AxiosRequestConfig, schema: z.ZodType<T>): Promise<T> {
+    const sent = this.newRequestId()
     let response
     try {
-      response = await this.api.request<unknown>(config)
+      response = await this.api.request<unknown>({ ...config, headers: { [REQUEST_ID_HEADER]: sent } })
     } catch (e) {
-      throw networkError(e)
+      throw networkError(e, sent)
     }
+    // El backend devuelve el id que usó (el nuestro, o uno propio si el nuestro no era válido).
+    const echoed: unknown = response.headers[REQUEST_ID_HEADER.toLowerCase()]
+    const requestId = typeof echoed === 'string' && echoed ? echoed : sent
     const data = response.data === '' ? null : response.data
     if (response.status < 200 || response.status >= 300) {
-      throw new ApiError(errorMessage(data) ?? `El servidor respondió ${response.status}.`, response.status)
+      const message = errorMessage(data) ?? `El servidor respondió ${response.status}.`
+      throw new ApiError(message, response.status, requestId)
     }
     const parsed = schema.safeParse(data)
-    if (!parsed.success) throw new ApiError('La respuesta del servidor no tiene el formato esperado.', response.status)
+    if (!parsed.success) {
+      throw new ApiError('La respuesta del servidor no tiene el formato esperado.', response.status, requestId)
+    }
     return parsed.data
   }
 }
@@ -101,17 +122,23 @@ function percent(loaded: number, total: number) {
   return Math.min(100, Math.round((loaded / total) * 100))
 }
 
-function definedOnly(query?: Query) {
+/** 12 caracteres hex, como los ids que genera el backend (acepta [A-Za-z0-9._-]{1,64}). */
+function defaultRequestId() {
+  // getRandomValues funciona también fuera de HTTPS (randomUUID no).
+  return Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function definedOnly(query?: QueryParams) {
   if (!query) return undefined
   return Object.fromEntries(Object.entries(query).filter(([, v]) => v !== undefined))
 }
 
-function networkError(e: unknown): ApiError {
-  if (isCancel(e)) return new ApiError('Se canceló el envío.', 0)
+function networkError(e: unknown, requestId: string): ApiError {
+  if (isCancel(e)) return new ApiError('Se canceló el envío.', 0, requestId)
   if (isAxiosError(e) && (e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT')) {
-    return new ApiError('El servidor no respondió a tiempo.', 0)
+    return new ApiError('El servidor no respondió a tiempo.', 0, requestId)
   }
-  return new ApiError('No se pudo conectar con el servidor.', 0)
+  return new ApiError('No se pudo conectar con el servidor.', 0, requestId)
 }
 
 /** FastAPI responde {"detail": "texto"} o {"detail": [{msg}]} en errores de validación. */

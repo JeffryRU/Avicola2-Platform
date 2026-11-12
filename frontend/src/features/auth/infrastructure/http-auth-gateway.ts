@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { HttpClient } from '@/shared/application/ports'
+import { endpoints } from '@/shared/infrastructure/api/endpoints'
 import type { AuthGateway } from '@/features/auth/application/ports'
 import { sessionSchema } from '@/features/auth/domain/session'
 
@@ -11,22 +12,26 @@ export class HttpAuthGateway implements AuthGateway {
   }
 
   login(username: string, password: string, remember: boolean) {
-    return this.http.post('/auth/login', { username, password, remember }, sessionSchema)
+    return this.http.post(endpoints.auth.login, { username, password, remember }, sessionSchema)
   }
 
   async logout() {
-    await this.http.post('/auth/logout', {}, z.null())
+    await this.http.post(endpoints.auth.logout, {}, z.null())
   }
 
   me() {
-    return this.http.get('/auth/me', sessionSchema)
+    return this.http.get(endpoints.auth.me, sessionSchema)
   }
 
   updateProfile(name: string) {
-    return this.http.patch('/auth/profile', { name }, sessionSchema)
+    return this.http.patch(endpoints.auth.profile, { name }, sessionSchema)
   }
 
   changePassword(current: string, next: string, remember: boolean) {
-    return this.http.post('/auth/password', { current_password: current, new_password: next, remember }, sessionSchema)
+    return this.http.post(
+      endpoints.auth.password,
+      { current_password: current, new_password: next, remember },
+      sessionSchema,
+    )
   }
 }

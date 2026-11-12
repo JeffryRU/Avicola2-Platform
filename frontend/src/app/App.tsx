@@ -1,17 +1,20 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
+import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { AppShell } from '@/app/AppShell'
 import type { Container } from '@/app/container'
-import { ContainerProvider, useContainer } from '@/app/di'
+import { ContainerProvider } from '@/app/di'
+import { createQueryClient } from '@/app/query-client'
 import { paths } from '@/app/routes'
 import { can, hasTeamView } from '@/features/auth/domain/session'
 import { ForcedPasswordChange } from '@/features/auth/ui/ChangePasswordPage'
 import { LoginPage } from '@/features/auth/ui/LoginPage'
 import { useRealtime } from '@/features/notifications/ui/hooks'
 import { useSession } from '@/features/auth/ui/use-session'
+import { useVerifySession } from '@/features/auth/ui/hooks'
+import { useFlushQueue } from '@/features/projections/ui/hooks'
 import { BrandProvider, type BrandId } from '@/shared/ui/components/brand'
 import { ErrorBoundary } from '@/shared/ui/components/error-boundary'
 import { Splash } from '@/shared/ui/components/feedback'
@@ -85,21 +88,16 @@ const SuccessPage = lazy(() =>
   import('@/features/projections/ui/pages/SuccessPage').then((m) => ({ default: m.SuccessPage })),
 )
 
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },
-})
-
 /** Reintenta la cola offline al volver la conexión y al iniciar sesión. */
 function useOutboxSync() {
-  const { planning } = useContainer()
   const session = useSession()
-  const client = useQueryClient()
+  // mutateAsync es estable entre renders; al terminar ya refrescó las proyecciones.
+  const { mutateAsync: flushQueue } = useFlushQueue()
   useEffect(() => {
     if (!session) return
     const seller = session.seller.username
     const flush = async (silent: boolean) => {
-      const r = await planning.flush(seller)
-      if (r.sent) void client.invalidateQueries({ queryKey: ['window'] })
+      const r = await flushQueue(seller)
       r.rejected.forEach((m) => toast.error(`Un envío fue rechazado: ${m}`))
       if (!silent && r.sent) toast.success(`${r.sent} ${r.sent === 1 ? 'envío sincronizado' : 'envíos sincronizados'}`)
     }
@@ -110,18 +108,15 @@ function useOutboxSync() {
       clearTimeout(t)
       removeEventListener('online', online)
     }
-  }, [planning, session, client])
+  }, [flushQueue, session])
 }
 
 /** Confirma la cookie al abrir la app y, al cerrar sesión, olvida los datos del usuario anterior. */
 function useSessionLifecycle() {
-  const { auth } = useContainer()
   const session = useSession()
   const client = useQueryClient()
   const user = session?.seller.username
-  useEffect(() => {
-    void auth.verify()
-  }, [auth])
+  useVerifySession(user)
   useEffect(() => {
     if (!user) client.clear()
   }, [user, client])
@@ -224,6 +219,8 @@ function Routed() {
 const brandSchema = z.enum(['noraves', 'rocio'])
 
 export function App({ container }: { container: Container }) {
+  // Uno por app (useState lo crea una vez): sus valores por defecto están en query-client.ts.
+  const [queryClient] = useState(() => createQueryClient(container.errors))
   const persistBrand = useCallback((b: BrandId) => container.preferences.set('nv_brand', b), [container])
   const reportCrash = useCallback(
     (error: unknown, componentStack: string) => {

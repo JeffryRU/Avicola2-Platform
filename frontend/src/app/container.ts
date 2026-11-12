@@ -4,6 +4,7 @@ import { BrowserAppInstaller } from '@/shared/infrastructure/browser-app-install
 import { BrowserStore } from '@/shared/infrastructure/browser-store'
 import { clearCachedApiData } from '@/shared/infrastructure/cached-data'
 import { AxiosHttpClient } from '@/shared/infrastructure/axios-http-client'
+import { apiUrl, endpoints } from '@/shared/infrastructure/api/endpoints'
 import { installGlobalErrorCapture } from '@/shared/infrastructure/global-error-capture'
 import { HttpLogSink } from '@/shared/infrastructure/http-log-sink'
 import type { AccountsGateway } from '@/features/accounts/application/ports'
@@ -98,7 +99,7 @@ export function createContainer(): Container {
     planning: new PlanningService(projections, queue, () => crypto.randomUUID()),
     drafts,
     notifications: new HttpNotificationsGateway(http),
-    events: new SseEventStream(`${baseUrl}/events`),
+    events: new SseEventStream(apiUrl(baseUrl, endpoints.events.stream)),
     exporter: new BrowserTableExporter(),
     preferences: local,
     errors,

@@ -1,8 +1,6 @@
 import { useState, type SyntheticEvent } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Check, Minus, Pencil, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
-import { useContainer } from '@/app/di'
 import { addDays, dDowLong, dShort, today, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
 import { can } from '@/features/auth/domain/session'
@@ -10,6 +8,7 @@ import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { bySubcategory } from '@/features/catalog/domain/catalog'
 import type { Product } from '@/features/catalog/domain/schemas'
 import { useCatalog } from '@/features/catalog/ui/hooks'
+import { useSacaPlan, useSetSacaFactors } from '@/features/saca/ui/hooks'
 import {
   SACA_METHODS,
   missingSellers,
@@ -68,12 +67,11 @@ import { cn } from '@/shared/ui/lib/utils'
 
 /** Supervisor: cuánto pedir a granja para un día, por producto, y con qué datos se calculó. */
 export function SacaPage() {
-  const { saca } = useContainer()
   const { catalog } = useCatalog()
   const ref = today()
   const [day, setDay] = useState<IsoDate>(addDays(ref, 1))
   const [method, setMethod] = useState<SacaMethod>(() => storedMethod(globalThis.localStorage))
-  const query = useQuery({ queryKey: ['saca', day, method], queryFn: () => saca.plan(day, method) })
+  const query = useSacaPlan(day, method)
   const chooseMethod = (next: SacaMethod) => {
     storeMethod(globalThis.localStorage, next)
     setMethod(next)
@@ -171,19 +169,9 @@ function Hero({ plan }: { plan: Saca }) {
 /** Pedido final por tipo. Los supervisores cambian el factor con el lápiz. */
 function FarmOrder({ plan }: { plan: Saca }) {
   const session = useRequiredSession()
-  const { saca } = useContainer()
-  const client = useQueryClient()
   const [draft, setDraft] = useState<Record<string, string> | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const save = useMutation({
-    mutationFn: (factors: Record<string, number>) => saca.setFactors(factors),
-    onSuccess: () => {
-      setDraft(null)
-      toast.success(FACTORS_SAVED)
-      void client.invalidateQueries({ queryKey: ['saca'] })
-    },
-    onError: (e) => setError(e.message),
-  })
+  const save = useSetSacaFactors()
   const start = () => {
     setError(null)
     setDraft(Object.fromEntries(plan.groups.map((g) => [g.name, String(g.factor)])))
@@ -196,7 +184,13 @@ function FarmOrder({ plan }: { plan: Saca }) {
       return
     }
     setError(null)
-    save.mutate(factors)
+    save.mutate(factors, {
+      onSuccess: () => {
+        setDraft(null)
+        toast.success(FACTORS_SAVED)
+      },
+      onError: (e) => setError(e.message),
+    })
   }
   const factorInput =
     'h-9 w-[4.5rem] rounded-[8px] border border-white/40 bg-white/15 px-2 text-right text-[15px] font-bold text-white tabular-nums outline-none focus:border-white'

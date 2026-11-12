@@ -1,18 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
+import { queryKeys } from '@/shared/application/query-keys'
 import { today, type IsoDate } from '@/shared/domain/dates'
 import type { UnlockAction } from '@/features/editing/domain/editing'
-
-export const editingKeys = {
-  all: ['editing'] as const,
-  window: ['editing', 'window'] as const,
-  unlocks: ['editing', 'unlocks'] as const,
-}
 
 /** Días que se pueden registrar y hasta cuándo (se refresca cada minuto: el corte llega solo). */
 export function useEditingWindow() {
   const { editing } = useContainer()
-  return useQuery({ queryKey: editingKeys.window, queryFn: () => editing.window(), refetchInterval: 60_000 })
+  return useQuery({ queryKey: queryKeys.editing.window, queryFn: () => editing.window(), refetchInterval: 60_000 })
 }
 
 /** Primer día que se puede registrar (mañana, según el servidor); mientras carga, hoy. */
@@ -22,12 +17,12 @@ export function useFirstEditableDay(): IsoDate {
 
 export function useUnlocks(enabled = true) {
   const { editing } = useContainer()
-  return useQuery({ queryKey: editingKeys.unlocks, queryFn: () => editing.unlocks(), enabled })
+  return useQuery({ queryKey: queryKeys.editing.unlocks, queryFn: () => editing.unlocks(), enabled })
 }
 
 function useRefresh() {
   const client = useQueryClient()
-  return () => void client.invalidateQueries({ queryKey: editingKeys.all })
+  return () => void client.invalidateQueries({ queryKey: queryKeys.editing.all })
 }
 
 export function useRequestUnlock() {

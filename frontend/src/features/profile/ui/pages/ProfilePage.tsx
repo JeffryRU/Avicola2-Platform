@@ -1,10 +1,10 @@
 import { Bird, ChevronRight, History, KeyRound, LockOpen, LogOut, PackageCheck, UserCog } from 'lucide-react'
 import { Link } from 'react-router'
-import { useContainer } from '@/app/di'
 import { InstallOption } from '@/app/install'
 import { paths } from '@/app/routes'
 import { initials } from '@/shared/domain/format'
 import { can, hasTeamView, roleLabel } from '@/features/auth/domain/session'
+import { useLogout } from '@/features/auth/ui/hooks'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
@@ -14,7 +14,7 @@ const optCls =
 const tileCls = 'grid size-10 flex-none place-items-center rounded-xl [&>svg]:size-5'
 
 export function ProfilePage() {
-  const { auth } = useContainer()
+  const logout = useLogout()
   const session = useRequiredSession()
   const { seller } = session
   // El jefe de despacho no proyecta: no tiene historial de proyecciones.
@@ -102,7 +102,7 @@ export function ProfilePage() {
             </span>
             <ChevronRight className="size-[18px]" />
           </Link>
-          <button type="button" className={optCls} onClick={auth.logout}>
+          <button type="button" className={optCls} onClick={() => logout.mutate()}>
             <span className={cn(tileCls, 'bg-bad-soft text-destructive')}>
               <LogOut />
             </span>

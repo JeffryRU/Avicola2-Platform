@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { HttpClient } from '@/shared/application/ports'
+import { endpoints } from '@/shared/infrastructure/api/endpoints'
 import type { IsoDate } from '@/shared/domain/dates'
 import type { HistoryGateway } from '@/features/history/application/ports'
 import { changeSchema } from '@/features/history/domain/history'
@@ -11,5 +12,5 @@ export class HttpHistoryGateway implements HistoryGateway {
   }
 
   changes = (from: IsoDate, to: IsoDate, seller?: string) =>
-    this.http.get('/projections/history', z.array(changeSchema), { date_from: from, date_to: to, seller })
+    this.http.get(endpoints.projections.history, z.array(changeSchema), { date_from: from, date_to: to, seller })
 }

@@ -1,6 +1,7 @@
 import type { StatusGateway } from '@/features/connection/application/ports'
 import { dbStatusSchema } from '@/features/connection/domain/schemas'
 import type { HttpClient } from '@/shared/application/ports'
+import { endpoints } from '@/shared/infrastructure/api/endpoints'
 
 export class HttpStatusGateway implements StatusGateway {
   private readonly http: HttpClient
@@ -8,5 +9,5 @@ export class HttpStatusGateway implements StatusGateway {
     this.http = http
   }
 
-  status = () => this.http.get('/status', dbStatusSchema)
+  status = () => this.http.get(endpoints.status.db, dbStatusSchema)
 }

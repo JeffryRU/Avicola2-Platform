@@ -2,6 +2,7 @@ import type { LogSink } from '@/shared/application/ports'
 import {
   clientLogEntrySchema,
   describeError,
+  requestIdOf,
   type ClientLogEntry,
   type ClientLogLevel,
 } from '@/shared/domain/client-log'
@@ -60,6 +61,7 @@ export class ErrorReporter {
         route: route.slice(0, 300),
         user,
         app_version: version,
+        request_id: requestIdOf(error),
         at: at.toISOString(),
       })
       if (!entry.success || this.buffer.length >= maxBuffer) return

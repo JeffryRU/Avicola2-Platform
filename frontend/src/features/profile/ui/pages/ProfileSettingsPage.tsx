@@ -3,10 +3,10 @@ import { Loader2, Save } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { initials } from '@/shared/domain/format'
 import { isSupervisor, profileSchema, roleLabel } from '@/features/auth/domain/session'
+import { useUpdateProfile } from '@/features/auth/ui/hooks'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
@@ -15,11 +15,11 @@ import { Label } from '@/shared/ui/components/shadcn/label'
 
 /** Datos de la cuenta: el nombre lo edita cada persona; usuario, rol y zona son de solo lectura. */
 export function ProfileSettingsPage() {
-  const { auth } = useContainer()
+  const update = useUpdateProfile()
   const { seller } = useRequiredSession()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const busy = update.isPending
 
   async function submit(e: SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -30,15 +30,12 @@ export function ProfileSettingsPage() {
     }
     setError(null)
     if (parsed.data.name === seller.name) return void navigate(paths.profile)
-    setBusy(true)
     try {
-      await auth.updateProfile(parsed.data.name)
+      await update.mutateAsync(parsed.data.name)
       toast.success('Perfil actualizado.')
       void navigate(paths.profile)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar el perfil.')
-    } finally {
-      setBusy(false)
     }
   }
 

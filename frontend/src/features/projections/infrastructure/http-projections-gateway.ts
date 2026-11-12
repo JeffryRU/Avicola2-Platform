@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { HttpClient } from '@/shared/application/ports'
+import { endpoints } from '@/shared/infrastructure/api/endpoints'
 import type { IsoDate } from '@/shared/domain/dates'
 import type { DateRange, ProjectionsGateway } from '@/features/projections/application/ports'
 import {
@@ -18,14 +19,14 @@ export class HttpProjectionsGateway implements ProjectionsGateway {
     this.http = http
   }
 
-  projections = (r: DateRange) => this.http.get('/projections', z.array(projectionSchema), rangeQuery(r))
-  sales = (r: DateRange) => this.http.get('/sales', z.array(dailyUnitsSchema), rangeQuery(r))
+  projections = (r: DateRange) => this.http.get(endpoints.projections.list, z.array(projectionSchema), rangeQuery(r))
+  sales = (r: DateRange) => this.http.get(endpoints.sales.list, z.array(dailyUnitsSchema), rangeQuery(r))
   suggestions = (category: string, start: IsoDate, days: number, seller?: string) =>
-    this.http.get('/suggestions', suggestionSchema, { category, start, days, on_behalf: seller })
+    this.http.get(endpoints.suggestions.get, suggestionSchema, { category, start, days, on_behalf: seller })
 
   submit = (s: Submission) =>
     this.http.post(
-      '/projections',
+      endpoints.projections.list,
       {
         submission_id: s.submission_id,
         category: s.category,

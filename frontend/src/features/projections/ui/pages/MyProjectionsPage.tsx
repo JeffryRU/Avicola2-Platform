@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { ChevronRight, Clock, Package, Plus, Scale } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { useQueryClient } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import {
@@ -26,7 +25,7 @@ import { type ExportFormat } from '@/shared/domain/export'
 import { Segmented } from '@/shared/ui/components/segmented'
 import { ExportMenu } from '@/shared/ui/components/export-menu'
 import { useCatalog } from '@/features/catalog/ui/hooks'
-import { useMyDays, useQueue, useWindowData } from '@/features/projections/ui/hooks'
+import { useFlushQueue, useMyDays, useQueue, useWindowData } from '@/features/projections/ui/hooks'
 import { StatusBadge } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
@@ -94,15 +93,14 @@ export function MyProjectionsPage() {
   const { seller } = useRequiredSession()
   const data = useWindowData()
   const queue = useQueue().filter((q) => q.seller === seller.username)
-  const { planning, exporter } = useContainer()
-  const client = useQueryClient()
+  const { exporter } = useContainer()
+  const flushQueue = useFlushQueue()
   const mobile = useIsMobile()
   const navigate = useNavigate()
   const current = weekStart(today())
 
   async function retry() {
-    const r = await planning.flush(seller.username)
-    if (r.sent) await client.invalidateQueries({ queryKey: ['window'] })
+    const r = await flushQueue.mutateAsync(seller.username)
     toast(
       r.sent
         ? `${r.sent} ${r.sent === 1 ? 'envío sincronizado' : 'envíos sincronizados'}`

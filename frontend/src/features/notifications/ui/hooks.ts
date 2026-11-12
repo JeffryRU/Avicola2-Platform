@@ -2,10 +2,10 @@ import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
+import { queryKeys } from '@/shared/application/query-keys'
 import { useSession } from '@/features/auth/ui/use-session'
 import type { NotificationPage } from '@/features/notifications/domain/notifications'
 
-export const notificationKeys = { all: ['notifications'] as const }
 const EMPTY: NotificationPage = { items: [], unread: 0 }
 
 /** Notificaciones del usuario. Se actualizan solas con el canal en tiempo real. */
@@ -13,7 +13,7 @@ export function useNotifications() {
   const { notifications } = useContainer()
   const session = useSession()
   const query = useQuery({
-    queryKey: notificationKeys.all,
+    queryKey: queryKeys.notifications.all,
     queryFn: () => notifications.list(),
     enabled: !!session && !session.must_change_password,
     staleTime: 60_000,
@@ -28,7 +28,7 @@ export function useMarkRead() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (ids?: number[]) => notifications.markRead(ids),
-    onSuccess: () => void client.invalidateQueries({ queryKey: notificationKeys.all }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.notifications.all }),
   })
 }
 
@@ -48,14 +48,14 @@ export function useRealtime() {
       (event) => {
         switch (event.type) {
           case 'notification':
-            void client.invalidateQueries({ queryKey: notificationKeys.all })
+            void client.invalidateQueries({ queryKey: queryKeys.notifications.all })
             toast(event.data.title, { description: event.data.body })
             break
           case 'projections.changed':
-            void client.invalidateQueries({ queryKey: ['window'] })
+            void client.invalidateQueries({ queryKey: queryKeys.projections.all })
             break
           case 'editing.changed':
-            void client.invalidateQueries({ queryKey: ['editing'] })
+            void client.invalidateQueries({ queryKey: queryKeys.editing.all })
             break
           case 'session.revoked':
             toast.error(event.data.reason, { description: 'Vuelve a iniciar sesión.' })
@@ -67,8 +67,8 @@ export function useRealtime() {
         // Si el canal se cae del todo, puede ser que la sesión ya no valga: se confirma.
         onLost: () => void auth.verify(),
         onReconnect: () => {
-          void client.invalidateQueries({ queryKey: notificationKeys.all })
-          void client.invalidateQueries({ queryKey: ['window'] })
+          void client.invalidateQueries({ queryKey: queryKeys.notifications.all })
+          void client.invalidateQueries({ queryKey: queryKeys.projections.all })
         },
       },
     )

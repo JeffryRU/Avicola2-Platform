@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { useContainer } from '@/app/di'
 import { addDays, dShort, formatTime, hhmm, today } from '@/shared/domain/dates'
 import { isSupervisor } from '@/features/auth/domain/session'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { useCatalog } from '@/features/catalog/ui/hooks'
 import { useSellers } from '@/features/dashboards/ui/hooks'
 import { dateOf } from '@/features/editing/domain/editing'
+import { useHistory } from '@/features/history/ui/hooks'
 import { bySupervisor, changedLines, type ProjectionChange } from '@/features/history/domain/history'
 import {
   AFTER_CUTOFF_LABEL,
@@ -32,7 +31,6 @@ const triggerCls = '!h-10 min-w-[11rem] rounded-[10px] border-[1.5px] bg-white f
 
 /** Quién creó o modificó cada proyección (el vendedor ve lo suyo; el supervisor, todo). */
 export function HistoryPage() {
-  const { history } = useContainer()
   const { seller: me } = useRequiredSession()
   const team = isSupervisor(me)
   const { catalog } = useCatalog()
@@ -42,10 +40,7 @@ export function HistoryPage() {
   const to = today()
   const from = addDays(to, -(range - 1))
   const seller = team && who !== ALL ? who : undefined
-  const changes = useQuery({
-    queryKey: ['history', from, to, seller],
-    queryFn: () => history.changes(from, to, seller),
-  })
+  const changes = useHistory(from, to, seller)
   const names = new Map([...sellers.map((s) => [s.username, s.name] as const), [me.username, me.name] as const])
   const nameOf = (username: string) => names.get(username) ?? username
   const list = changes.data ?? []

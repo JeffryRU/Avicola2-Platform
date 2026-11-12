@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { HttpClient } from '@/shared/application/ports'
+import { endpoints } from '@/shared/infrastructure/api/endpoints'
 import type { IsoDate } from '@/shared/domain/dates'
 import type { SacaGateway } from '@/features/saca/application/ports'
 import { sacaSchema, type SacaMethod } from '@/features/saca/domain/saca'
@@ -13,7 +14,7 @@ export class HttpSacaGateway implements SacaGateway {
   }
 
   setFactors = async (factors: Record<string, number>) =>
-    (await this.http.put('/saca/factors', { factors }, factorsSchema)).factors
+    (await this.http.put(endpoints.saca.factors, { factors }, factorsSchema)).factors
 
-  plan = (day: IsoDate, method: SacaMethod) => this.http.get('/saca', sacaSchema, { date: day, method })
+  plan = (day: IsoDate, method: SacaMethod) => this.http.get(endpoints.saca.plan, sacaSchema, { date: day, method })
 }

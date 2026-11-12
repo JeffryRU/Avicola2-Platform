@@ -1,4 +1,4 @@
-import { AxiosError, CanceledError, type AxiosAdapter, type InternalAxiosRequestConfig } from 'axios'
+import axios, { AxiosError, CanceledError, type AxiosAdapter, type InternalAxiosRequestConfig } from 'axios'
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { ApiError } from '@/shared/application/ports'
@@ -7,12 +7,17 @@ import { AxiosHttpClient } from '@/shared/infrastructure/axios-http-client'
 const okSchema = z.object({ ok: z.boolean() })
 
 /** Red falsa: responde lo que se le indique y guarda la última petición. */
-function fakeNetwork(status: number, data: unknown, onRequest?: (c: InternalAxiosRequestConfig) => void) {
+function fakeNetwork(
+  status: number,
+  data: unknown,
+  onRequest?: (c: InternalAxiosRequestConfig) => void,
+  headers: Record<string, string> = {},
+) {
   const calls: InternalAxiosRequestConfig[] = []
   const adapter: AxiosAdapter = async (config) => {
     calls.push(config)
     onRequest?.(config)
-    return { data, status, statusText: '', headers: {}, config }
+    return { data, status, statusText: '', headers, config }
   }
   return { adapter, calls }
 }
@@ -104,5 +109,53 @@ describe('AxiosHttpClient', () => {
     const pending = client(adapter).http.upload('/x', new Blob(['x']), okSchema, { signal: controller.signal })
     controller.abort()
     await expect(pending).rejects.toMatchObject({ status: 0, message: 'Se canceló el envío.' })
+  })
+
+  it('envía un X-Request-ID por petición y el error lo trae', async () => {
+    const { adapter, calls } = fakeNetwork(500, { detail: 'Error interno del servidor.' })
+    let n = 0
+    const http = new AxiosHttpClient({
+      baseUrl: '/api',
+      timeoutMs: 1000,
+      onUnauthorized: vi.fn(),
+      adapter,
+      newRequestId: () => `rid${++n}`,
+    })
+    const error = (await http.get('/x', okSchema).catch((e: unknown) => e)) as ApiError
+    expect(calls[0].headers['X-Request-ID']).toBe('rid1')
+    expect(calls[0].headers.Accept).toBe('application/json')
+    expect(error.requestId).toBe('rid1')
+    expect(error.status).toBe(500)
+    await http.get('/x', okSchema).catch(() => undefined)
+    expect(calls[1].headers['X-Request-ID']).toBe('rid2')
+  })
+
+  it('usa el id que devuelve el backend si es otro', async () => {
+    const { adapter } = fakeNetwork(404, { detail: 'No existe.' }, undefined, { 'x-request-id': 'srv123' })
+    const error = (await client(adapter)
+      .http.get('/x', okSchema)
+      .catch((e: unknown) => e)) as ApiError
+    expect(error.requestId).toBe('srv123')
+  })
+
+  it('genera ids que el backend acepta', async () => {
+    const { adapter, calls } = fakeNetwork(200, { ok: true })
+    await client(adapter).http.get('/x', okSchema)
+    expect(calls[0].headers['X-Request-ID']).toMatch(/^[0-9a-f]{12}$/)
+  })
+
+  it('sin conexión el error conserva el id enviado', async () => {
+    const offline: AxiosAdapter = (config) => Promise.reject(new AxiosError('Network Error', 'ERR_NETWORK', config))
+    const error = (await client(offline)
+      .http.get('/x', okSchema)
+      .catch((e: unknown) => e)) as ApiError
+    expect(error.requestId).toMatch(/^[0-9a-f]{12}$/)
+    expect(error.isTransient).toBe(true)
+  })
+
+  it('una lista se envía repitiendo el parámetro', async () => {
+    const { adapter, calls } = fakeNetwork(200, { ok: true })
+    await client(adapter).http.get('/production/forecast', okSchema, { weight: [2.5, 3] })
+    expect(axios.getUri(calls[0])).toBe('/api/production/forecast?weight=2.5&weight=3')
   })
 })

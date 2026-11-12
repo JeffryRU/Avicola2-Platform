@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ErrorReporter } from '@/shared/application/error-reporter'
-import type { LogSink } from '@/shared/application/ports'
+import { ApiError, type LogSink } from '@/shared/application/ports'
 import type { ClientLogEntry } from '@/shared/domain/client-log'
 
 class FakeSink implements LogSink {
@@ -93,5 +93,16 @@ describe('reportero de errores', () => {
       reporter.report(new Error(`e${i}`))
     }
     expect(reporter.pending()).toBeLessThanOrEqual(50)
+  })
+
+  it('un error de la API lleva su request_id para ubicarlo en el log del backend', async () => {
+    const { sink, reporter } = setup()
+    reporter.report(new ApiError('Error interno del servidor.', 500, 'abc123def456'), 'api')
+    await reporter.flush()
+    expect(sink.sent[0][0]).toMatchObject({
+      kind: 'api',
+      request_id: 'abc123def456',
+      message: 'ApiError: Error interno del servidor. [request_id=abc123def456]',
+    })
   })
 })
