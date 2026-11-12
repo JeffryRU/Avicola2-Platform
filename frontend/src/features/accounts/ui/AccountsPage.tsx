@@ -31,10 +31,9 @@ import { Label } from '@/shared/ui/components/shadcn/label'
 import { cn } from '@/shared/ui/lib/utils'
 import { ACCOUNT_STATE_LABEL } from '@/features/accounts/types/accounts'
 import { ROLE_HINT, ROLE_LABEL, roleName } from '@/features/auth/types/roles'
-import { activeUnlocks, policyKey, type EditingWindow, type Unlock } from '@/features/editing/domain/editing'
-import { CUTOFF_TITLE, GRANT_LABEL, REVOKE_LABEL, grantedLabel, revokeDone } from '@/features/editing/types/editing'
+import { activeUnlocks, type Unlock } from '@/features/editing/domain/editing'
+import { GRANT_LABEL, REVOKE_LABEL, grantedLabel, revokeDone } from '@/features/editing/types/editing'
 import { useEditingWindow, useRevokeEditing, useUnlocks } from '@/features/editing/ui/hooks'
-import { CutoffForm } from '@/features/editing/ui/components/cutoff-form'
 import { GrantEditingDialog } from '@/features/editing/ui/components/grant-editing'
 
 const KEY = ['admin', 'accounts']
@@ -436,15 +435,6 @@ function AccountRow({
   )
 }
 
-/** Bloqueo por horario al lado de la lista (el mismo de Habilitaciones). */
-function CutoffPanel({ window }: { window: EditingWindow | undefined }) {
-  return (
-    <Section title={CUTOFF_TITLE} className="@5xl/main:sticky @5xl/main:top-4">
-      {window && <CutoffForm key={policyKey(window.policy)} policy={window.policy} idPrefix="accounts-cutoff" />}
-    </Section>
-  )
-}
-
 /** Supervisores: alta de cuentas, recuperación de contraseña, desactivación, edición y roles.
  *  Qué cuentas puede tocar cada uno lo decide el backend (`can_manage`, `assignable_roles`). */
 export function AccountsPage() {
@@ -479,7 +469,7 @@ export function AccountsPage() {
         }
       />
       <PageBody>
-        <div className="grid gap-4 @5xl/main:grid-cols-[minmax(0,1fr)_minmax(0,360px)] @5xl/main:items-start">
+        <div className="grid gap-4">
           <Section>
             {list.isPending ? (
               <div className="grid place-items-center p-10">
@@ -502,7 +492,6 @@ export function AccountsPage() {
               </ul>
             )}
           </Section>
-          <CutoffPanel window={editing} />
         </div>
       </PageBody>
       <GrantEditingDialog seller={granting} window={editing} onClose={() => setGranting(null)} />

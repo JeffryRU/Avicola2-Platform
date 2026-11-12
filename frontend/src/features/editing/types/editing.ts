@@ -79,3 +79,14 @@ export const closedDaysNote = (dates: IsoDate[]) =>
   `${dates.map(dShort).join(', ')} ya ${dates.length === 1 ? 'cerró' : 'cerraron'}. Pide habilitación o elige otros días.`
 export const requestFor = (date: IsoDate) =>
   `Para editar el ${dShort(date)}, que ya cerró. El supervisor recibirá el aviso.`
+
+/** Pantalla del vendedor para pedir que le abran un día y seguir sus solicitudes. */
+export const MY_REQUESTS_TITLE = 'Solicitudes de apertura'
+export const MY_REQUESTS_NAV = 'Solicitudes'
+export const MY_REQUESTS_SUBTITLE = 'Pide que te abran un día que ya cerró y mira qué pasó con lo que pediste.'
+export const MY_REQUESTS_HINT =
+  'En los días cerrados aparece «Pedir habilitación». El supervisor recibe el pedido y decide; te llega un aviso con la respuesta.'
+export const MY_REQUESTS_LIST_TITLE = 'Mis solicitudes'
+export const MY_REQUESTS_EMPTY = 'No pediste ninguna apertura en los últimos 30 días.'
+export const decidedByLabel = (status: UnlockStatus, by: string) =>
+  status === 'approved' ? `la habilitó ${by}` : status === 'rejected' ? `la rechazó ${by}` : `la cerró ${by}`
