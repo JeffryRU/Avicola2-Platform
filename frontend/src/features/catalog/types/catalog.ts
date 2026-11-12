@@ -32,3 +32,9 @@ export function joinLabels(names: string[]): string {
 
 /** Peso por unidad tal como se muestra junto a cada producto: "1.20 kg/unidad". */
 export const kgPerUnitLabel = (kg: number) => `${kg.toFixed(2)} kg/unidad`
+
+/** Nombre de la categoría para mostrar: "BRASA" → "Brasa"; las que ya vienen escritas se dejan. */
+export const categoryName = (category: string) =>
+  category === category.toUpperCase() ? category.charAt(0) + category.slice(1).toLowerCase() : category
+
+export const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)

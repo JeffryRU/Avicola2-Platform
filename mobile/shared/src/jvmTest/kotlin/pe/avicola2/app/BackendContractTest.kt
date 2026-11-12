@@ -144,13 +144,19 @@ class BackendContractTest {
         val today = pe.avicola2.app.domain.today()
         val product = chief.planning.catalog().first()
         val stock = HttpStockGateway(chief.api)
-        val saved = stock.register(today, listOf(StockEntry(product.id, 12)))
-        assertEquals(12, saved.totalUnits)
-        assertEquals(product.kgPerUnit * 12, saved.totalKg, 0.01) // sin kg: peso promedio
+        val options = stock.options()
+        assertTrue(options.items.any { it.quality == "B" } && options.locations.isNotEmpty())
+        val place = options.locations.first()
+        // Se guarda una ubicación; el día devuelto trae también las demás.
+        val saved = stock.register(today, place, listOf(StockEntry(product.id, 12, today)))
+        val here = saved.lines.filter { it.location == place }
+        assertEquals(12, here.sumOf { it.units })
+        assertEquals(product.kgPerUnit * 12, here.sumOf { it.kg }, 0.01) // kg: peso promedio
+        assertEquals(today, here.single().lotDate)
         assertEquals("despacho", saved.recordedBy)
         assertTrue(stock.list(today, today).any { it.date == today })
         // No puede registrar el stock de mañana ni ver la saca.
-        assertFailsWith<ApiError> { stock.register(today.plusDays(1), listOf(StockEntry(product.id, 1))) }
+        assertFailsWith<ApiError> { stock.register(today.plusDays(1), "Trujillo", listOf(StockEntry(product.id, 1))) }
         assertEquals(403, assertFailsWith<ApiError> { HttpSacaGateway(chief.api).plan(today) }.status)
 
         val supervisor = Session(url).apply { session.login("supervisor", "demo1234") }
@@ -160,7 +166,7 @@ class BackendContractTest {
         assertEquals(plan.lines.sumOf { it.request }, plan.request)
         // El supervisor consulta el stock pero no lo registra.
         assertTrue(HttpStockGateway(supervisor.api).list(today, today).isNotEmpty())
-        assertEquals(403, assertFailsWith<ApiError> { HttpStockGateway(supervisor.api).register(today, listOf(StockEntry(product.id, 1))) }.status)
+        assertEquals(403, assertFailsWith<ApiError> { HttpStockGateway(supervisor.api).register(today, "Trujillo", listOf(StockEntry(product.id, 1))) }.status)
     }
 
     @Test

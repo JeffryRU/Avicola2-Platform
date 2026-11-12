@@ -104,6 +104,7 @@ class ProductOut(BaseModel):
     kg_per_unit: float
     sort_order: int
     subcategory: str | None = None
+    quality: str = Field(default="A", description="A, o B (calidad B: solo en el stock).")
 
 
 class ProjectionOut(BaseModel):
@@ -274,18 +275,38 @@ class ChangeOut(BaseModel):
 class StockLineIn(BaseModel):
     product_id: str = Field(min_length=1, max_length=10)
     units: int = Field(ge=0, le=1_000_000)
-    # Sin kg, se calcula con el peso promedio del producto.
-    kg: float | None = Field(default=None, ge=0, le=10_000_000)
+    lot_date: date | None = Field(
+        default=None, description="Fecha de beneficio del lote; sin ella, el día del stock."
+    )
+    # Se aceptaba antes; ahora los kg se calculan siempre con el peso del producto.
+    kg: float | None = Field(default=None, ge=0, le=10_000_000, deprecated=True)
 
 
 class StockIn(BaseModel):
-    lines: list[StockLineIn] = Field(min_length=1, max_length=200)
+    lines: list[StockLineIn] = Field(min_length=1, max_length=2000)
+    location: str | None = Field(
+        default=None,
+        max_length=60,
+        description="Ubicación que se registra (reemplaza solo esa); sin ella, la primera.",
+    )
 
 
 class StockLineOut(BaseModel):
     product_id: str
     units: int
     kg: float
+    location: str
+    lot_date: date
+
+
+class StockOptionsOut(BaseModel):
+    """Con qué se arma el formulario de stock."""
+
+    items: list[ProductOut] = Field(description="Artículos del stock, incluida la calidad B.")
+    locations: list[str]
+    lot_days: int = Field(
+        description="Antigüedad máxima (días) de los lotes que descuenta la saca."
+    )
 
 
 class StockDayOut(BaseModel):
@@ -331,6 +352,7 @@ class SacaGroupOut(BaseModel):
     ordered: int
     demand: int
     stock: int
+    stock_b: int = Field(description="De ese stock, cuánto es calidad B.")
     need: int = Field(description="Lo que hace falta del tipo: demanda menos stock, nunca < 0.")
     factor: float = Field(description="Parte de lo que hace falta que se pide a granja.")
     farm_order: int
@@ -361,6 +383,9 @@ class SacaOut(BaseModel):
     yield_factor: float
     method: str = Field(description="Forma de cálculo usada: sum o max.")
     farm_order: int = Field(description="Aves del pedido final a granja (suma de los tipos).")
+    stock_b: int = Field(description="Stock de calidad B descontado (por tipo).")
+    stock_old: int = Field(description="Stock en lotes antiguos, que no se descuenta.")
+    stock_lot_days: int | None = Field(description="Antigüedad máxima de los lotes que cuentan.")
     groups: list[SacaGroupOut] = Field(description="Pedido final a granja por tipo.")
     stock_date: date | None = Field(
         description="Día del stock descontado; null si no hay reciente."

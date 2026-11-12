@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -58,15 +59,19 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import pe.avicola2.app.AppContainer
 import pe.avicola2.app.domain.Account
-import pe.avicola2.app.domain.Catalog
 import pe.avicola2.app.domain.Product
-import pe.avicola2.app.domain.StockCell
 import pe.avicola2.app.domain.StockDay
 import pe.avicola2.app.domain.StockDraft
+import pe.avicola2.app.domain.StockTotals
+import pe.avicola2.app.domain.linesAt
+import pe.avicola2.app.domain.stockKey
+import pe.avicola2.app.domain.stockLocations
+import pe.avicola2.app.domain.stockLots
+import pe.avicola2.app.domain.stockType
+import pe.avicola2.app.domain.stockUnitsAt
 import pe.avicola2.app.domain.editableStockDays
 import pe.avicola2.app.domain.formatKg
 import pe.avicola2.app.domain.formatNumber
-import pe.avicola2.app.domain.hasInvalidStockKg
 import pe.avicola2.app.domain.isEditableStockDay
 import pe.avicola2.app.domain.parseServerTime
 import pe.avicola2.app.domain.parseStockUnits
@@ -79,6 +84,7 @@ import pe.avicola2.app.domain.stockKg
 import pe.avicola2.app.domain.stockTotals
 import pe.avicola2.app.domain.today
 import pe.avicola2.app.ui.Load
+import pe.avicola2.app.ui.components.ChoiceChip
 import pe.avicola2.app.ui.components.DayStrip
 import pe.avicola2.app.ui.components.ErrorState
 import pe.avicola2.app.ui.components.GroupHeader
@@ -92,13 +98,23 @@ import pe.avicola2.app.ui.userMessage
 /** Se consultan los últimos 30 días (lo mismo que la web). */
 private const val HISTORY_DAYS = 30
 
-data class StockData(val products: List<Product>, val days: List<StockDay>)
+data class StockData(val items: List<Product>, val locations: List<String>, val lotDays: Int, val days: List<StockDay>)
+
+private const val LOCATION_KEY = "stock.location"
 
 class StockViewModel(private val c: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow<Load<StockData>>(Load.Loading)
     val state: StateFlow<Load<StockData>> = _state.asStateFlow()
 
     var day by mutableStateOf(today())
+        private set
+
+    /** Ubicación que se está viendo o registrando; se recuerda en el equipo. */
+    var location by mutableStateOf(c.prefs.getString(LOCATION_KEY).orEmpty())
+        private set
+
+    /** Lote (fecha de beneficio) cuyas cantidades se muestran. */
+    var lot by mutableStateOf(today())
         private set
     var draft by mutableStateOf<StockDraft>(emptyMap())
         private set
@@ -124,9 +140,12 @@ class StockViewModel(private val c: AppContainer) : ViewModel() {
         _state.value = if (current is Load.Ready) current.copy(refreshing = true) else Load.Loading
         viewModelScope.launch {
             try {
-                val catalog = async { Catalog(c.planningGateway.catalog()) }
+                val options = async { c.stock.options() }
                 val days = c.stock.list(today().plusDays(-(HISTORY_DAYS - 1)), today())
-                _state.value = Load.Ready(StockData(catalog.await().products, days))
+                val o = options.await()
+                val locations = stockLocations(o.locations, days)
+                if (location !in locations) location = locations.firstOrNull().orEmpty()
+                _state.value = Load.Ready(StockData(o.items, locations, o.lotDays, days))
                 reset()
             } catch (e: Exception) {
                 _state.value = Load.Failed(e.userMessage())
@@ -136,32 +155,40 @@ class StockViewModel(private val c: AppContainer) : ViewModel() {
 
     fun select(date: LocalDate) {
         day = date
+        lot = date
         reset()
     }
 
+    fun chooseLocation(next: String) {
+        location = next
+        c.prefs.putString(LOCATION_KEY, next)
+        reset()
+    }
+
+    fun chooseLot(next: LocalDate) {
+        lot = next
+    }
+
     private fun reset() {
-        saved = stockDraftOf(data?.products.orEmpty(), record())
+        saved = stockDraftOf(record().linesAt(location), day)
         draft = saved
         error = null
     }
 
-    fun set(product: String, cell: StockCell) {
-        draft = draft + (product to cell)
+    fun set(product: String, units: String) {
+        val key = stockKey(product, lot)
+        draft = if (units.isEmpty()) draft - key else draft + (key to units)
     }
 
     fun save() {
-        val products = data?.products ?: return
-        if (hasInvalidStockKg(draft)) {
-            error = "Revisa los kg: usa números con hasta dos decimales."
-            return
-        }
+        val items = data?.items ?: return
         error = null
         busy = true
         viewModelScope.launch {
             try {
-                val stored = c.stock.register(day, stockEntries(products, draft))
+                val stored = c.stock.register(day, location, stockEntries(items, draft, day))
                 val days = (data?.days.orEmpty().filter { it.date != stored.date } + stored).sortedByDescending { it.date }
-                _state.value = Load.Ready(StockData(products, days))
+                _state.value = Load.Ready(data!!.copy(days = days))
                 reset()
                 message = "Stock guardado."
             } catch (e: Exception) {
@@ -174,7 +201,7 @@ class StockViewModel(private val c: AppContainer) : ViewModel() {
 }
 
 /**
- * Stock de despacho. El jefe de despacho lo registra por día (unidades y kg por producto); quien
+ * Stock de despacho. El jefe de despacho lo registra por día, ubicación y lote (unidades); quien
  * solo puede verlo (el supervisor) lo consulta. `onBack` es null cuando es la pantalla de inicio.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -216,9 +243,11 @@ private fun StockContent(vm: StockViewModel, data: StockData, canManage: Boolean
     val editable = canManage && isEditableStockDay(vm.day, ref)
     val record = vm.record()
     val strip = editableStockDays(ref).let { if (vm.day in it) it else it + vm.day }
-    val totals = if (editable) stockTotals(data.products, vm.draft) else null
-    val units = totals?.units ?: record?.totalUnits ?: 0
-    val kg = totals?.kg ?: record?.totalKg ?: 0.0
+    val here = record.linesAt(vm.location)
+    val totals = stockTotals(data.items, vm.draft)
+    val units = totals.units
+    val kg = totals.kg
+    val registered = record.takeIf { here.isNotEmpty() }
 
     BoxWithConstraints(modifier.fillMaxSize().imePadding()) {
         val wide = maxWidth >= 840.dp
@@ -229,7 +258,15 @@ private fun StockContent(vm: StockViewModel, data: StockData, canManage: Boolean
                 onSelect = vm::select,
                 marked = data.days.map { it.date }.toSet(),
                 caption = { if (it == ref) "Hoy" else if (it == ref.plusDays(-1)) "Ayer" else null },
-                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp),
+                modifier = Modifier.padding(top = 4.dp, bottom = 6.dp),
+            )
+            ChipRow("UBICACIÓN", data.locations, vm.location, { it }, vm::chooseLocation)
+            ChipRow(
+                "LOTE (FECHA DE BENEFICIO)",
+                stockLots(vm.day, here),
+                vm.lot,
+                { lot -> lot.short() + if (vm.day.toEpochDays() - lot.toEpochDays() > data.lotDays) " · no descuenta" else "" },
+                vm::chooseLot,
             )
             Row(Modifier.weight(1f)) {
                 LazyColumn(
@@ -237,10 +274,10 @@ private fun StockContent(vm: StockViewModel, data: StockData, canManage: Boolean
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    if (!wide) item(key = "summary") { SummaryCard(units, kg, record, vm.dirty && editable, canManage && !editable) }
+                    if (!wide) item(key = "summary") { SummaryCard(totals, registered, vm.dirty && editable, canManage && !editable) }
                     item(key = "rows") {
                         SectionCard {
-                            if (!editable && record == null) {
+                            if (!editable && registered == null) {
                                 Text("Sin registro", style = MaterialTheme.typography.titleMedium)
                                 Text(
                                     "Aún no se registró el stock de este día.",
@@ -248,7 +285,7 @@ private fun StockContent(vm: StockViewModel, data: StockData, canManage: Boolean
                                     modifier = Modifier.padding(top = 4.dp),
                                 )
                             } else {
-                                StockRows(vm, data.products, record, editable)
+                                StockRows(vm, data.items, editable)
                             }
                         }
                     }
@@ -260,12 +297,12 @@ private fun StockContent(vm: StockViewModel, data: StockData, canManage: Boolean
                         contentPadding = PaddingValues(end = 16.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        item(key = "summary") { SummaryCard(units, kg, record, vm.dirty && editable, canManage && !editable) }
+                        item(key = "summary") { SummaryCard(totals, registered, vm.dirty && editable, canManage && !editable) }
                         historyItems(data.days, vm)
                     }
                 }
             }
-            if (editable) SaveBar(vm, units, kg, update = record != null)
+            if (editable) SaveBar(vm, units, kg, update = registered != null)
         }
     }
 }
@@ -305,7 +342,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.historyItems(days: Li
 }
 
 @Composable
-private fun SummaryCard(units: Int, kg: Double, record: StockDay?, dirty: Boolean, locked: Boolean) {
+private fun SummaryCard(totals: StockTotals, record: StockDay?, dirty: Boolean, locked: Boolean) {
+    val units = totals.units
+    val kg = totals.kg
     SectionCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Resumen del día", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
@@ -325,6 +364,12 @@ private fun SummaryCard(units: Int, kg: Double, record: StockDay?, dirty: Boolea
                 Text("kg", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        Text(
+            "Calidad A ${formatNumber(totals.unitsA.toDouble())} · calidad B ${formatNumber(totals.unitsB.toDouble())}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp),
+        )
         record?.let { r ->
             HorizontalDivider(Modifier.padding(vertical = 10.dp))
             Text(
@@ -344,61 +389,71 @@ private fun SummaryCard(units: Int, kg: Double, record: StockDay?, dirty: Boolea
     }
 }
 
-/** Filas por producto, agrupadas por tamaño. Editables para el jefe de despacho. */
+/** Una fila de opciones que se desplaza de lado (ubicaciones, lotes). */
 @Composable
-private fun StockRows(vm: StockViewModel, products: List<Product>, record: StockDay?, editable: Boolean) {
-    val saved = record?.lines.orEmpty().associateBy { it.productId }
+private fun <T> ChipRow(title: String, options: List<T>, selected: T, label: (T) -> String, onPick: (T) -> Unit) {
+    if (options.isEmpty()) return
+    Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(options) { option -> ChoiceChip(label(option), option == selected) { onPick(option) } }
+        }
+    }
+}
+
+/** Artículos agrupados por tipo, con las unidades del lote elegido. Editables para el jefe de despacho. */
+@Composable
+private fun StockRows(vm: StockViewModel, items: List<Product>, editable: Boolean) {
     Row(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
-        Text("PRODUCTO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Text("ARTÍCULO · LOTE ${vm.lot.short().uppercase()}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
         Text("UNID.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.width(UNITS_WIDTH))
         Text("KG", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.padding(start = 8.dp).width(KG_WIDTH))
     }
-    products.groupBy { it.subcategory }.forEach { (group, items) ->
-        val groupUnits = items.sumOf { if (editable) parseStockUnits(vm.draft[it.id]?.units.orEmpty()) ?: 0 else saved[it.id]?.units ?: 0 }
-        val groupKg = items.sumOf { if (editable) it.stockKg(vm.draft[it.id]) else saved[it.id]?.kg ?: 0.0 }
+    items.groupBy { it.stockType }.forEach { (group, products) ->
+        val groupUnits = products.sumOf { stockUnitsAt(vm.draft, it.id, vm.lot) }
+        val groupKg = products.sumOf { it.stockKg(stockUnitsAt(vm.draft, it.id, vm.lot)) }
         GroupHeader(
-            group ?: "Otros",
+            group,
             "${formatNumber(groupUnits.toDouble())} unid. · ${formatKg(groupKg)}",
             Modifier.fillMaxWidth().padding(top = 6.dp),
         )
-        items.forEach { p ->
+        products.forEach { p ->
+            val units = stockUnitsAt(vm.draft, p.id, vm.lot)
+            val faint = MaterialTheme.colorScheme.outline
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(p.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${formatNumber(p.kgPerUnit, 1)} kg c/u", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        (if (p.quality == "B") "Calidad B · " else "") + "${formatNumber(p.kgPerUnit, 2)} kg c/u",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (p.quality == "B") Warning else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 if (editable) {
-                    val cell = vm.draft[p.id] ?: StockCell()
-                    val estimate = p.stockKg(cell.copy(kg = ""))
-                    NumberField(cell.units, "0", KeyboardType.Number, UNITS_WIDTH, bold = true) { t ->
-                        vm.set(p.id, cell.copy(units = t.filter { it.isDigit() }.take(7)))
-                    }
-                    NumberField(cell.kg, if (estimate > 0) formatNumber(estimate, 1) else "—", KeyboardType.Decimal, KG_WIDTH, Modifier.padding(start = 8.dp)) { t ->
-                        vm.set(p.id, cell.copy(kg = t.filter { it.isDigit() || it == '.' || it == ',' }.take(11)))
+                    NumberField(vm.draft[stockKey(p.id, vm.lot)].orEmpty(), "0", KeyboardType.Number, UNITS_WIDTH, bold = true) { t ->
+                        vm.set(p.id, t.filter { it.isDigit() }.take(7))
                     }
                 } else {
-                    val line = saved[p.id]
-                    val faint = MaterialTheme.colorScheme.outline
                     Text(
-                        formatNumber((line?.units ?: 0).toDouble()),
+                        formatNumber(units.toDouble()),
                         fontWeight = FontWeight.SemiBold,
-                        color = if ((line?.units ?: 0) > 0) MaterialTheme.colorScheme.onSurface else faint,
+                        color = if (units > 0) MaterialTheme.colorScheme.onSurface else faint,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.width(UNITS_WIDTH),
                     )
-                    Text(
-                        line?.kg?.takeIf { it > 0 }?.let { formatNumber(it, 1) } ?: "—",
-                        color = if ((line?.kg ?: 0.0) > 0) MaterialTheme.colorScheme.onSurface else faint,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(start = 8.dp).width(KG_WIDTH),
-                    )
                 }
+                Text(
+                    if (units > 0) formatNumber(p.stockKg(units), 1) else "—",
+                    color = if (units > 0) MaterialTheme.colorScheme.onSurfaceVariant else faint,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(start = 8.dp).width(KG_WIDTH),
+                )
             }
         }
     }
     if (editable) {
         Text(
-            "Deja los kg en blanco y se calculan con el peso promedio.",
+            "Se escriben unidades por lote; los kg se calculan con el peso promedio. Cambia de lote arriba para registrar otro.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),

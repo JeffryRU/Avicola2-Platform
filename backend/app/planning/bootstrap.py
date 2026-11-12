@@ -84,6 +84,7 @@ class PlanningUseCases:
     revoke_editing: ed.RevokeEditing
     register_stock: st.RegisterStock
     list_stock: st.ListStock
+    stock_options: st.GetStockOptions
     calculate_saca: sc.CalculateSaca
     set_saca_factors: sc.SetSacaFactors
     register_production: pr.RegisterProduction
@@ -176,8 +177,11 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         update_cutoff=ed.UpdateCutoff(editing, event_bus, clock),
         grant_editing=ed.GrantEditing(editing, unlocks, sellers, notifier, event_bus, clock),
         revoke_editing=ed.RevokeEditing(unlocks, sellers, notifier, event_bus, clock),
-        register_stock=st.RegisterStock(products, stock, clock),
+        register_stock=st.RegisterStock(products, stock, clock, settings.stock_locations),
         list_stock=st.ListStock(stock),
+        stock_options=st.GetStockOptions(
+            products, settings.stock_locations, settings.saca_stock_lot_days
+        ),
         calculate_saca=sc.CalculateSaca(
             products,
             projections,
@@ -188,6 +192,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             production,
             arrival_model,
             saca_factors,
+            settings.saca_stock_lot_days,
         ),
         set_saca_factors=sc.SetSacaFactors(products, stored_settings, clock),
         register_production=pr.RegisterProduction(products, production, clock),

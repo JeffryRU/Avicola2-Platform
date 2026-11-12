@@ -20,6 +20,10 @@ from app.planning.domain.stock import DailyStock
 class ProductRepository(Protocol):
     def list_active(self) -> list[Product]: ...
 
+    def list_stock_items(self) -> list[Product]:
+        """Incluye los artículos de calidad B, que solo se cuentan en el stock."""
+        ...
+
 
 class SellerRepository(Protocol):
     """Cuentas de usuario. Hoy en la base de la app; cuando la app sea un módulo de ARIS,
@@ -67,8 +71,9 @@ class StockRepository(Protocol):
         """Días con registro en el rango, del más reciente al más antiguo."""
         ...
 
-    def save(self, stock: DailyStock) -> None:
-        """Guarda el día en una sola transacción y reemplaza lo que hubiera de ese día."""
+    def save(self, stock: DailyStock, location: str) -> None:
+        """Guarda en una sola transacción las líneas de esa ubicación y reemplaza las que
+        hubiera de ese día y esa ubicación (las de otras ubicaciones no se tocan)."""
         ...
 
 

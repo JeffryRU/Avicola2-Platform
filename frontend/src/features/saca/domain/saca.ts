@@ -58,6 +58,10 @@ export const sacaSchema = z.object({
   method: sacaMethodSchema.default(DEFAULT_METHOD),
   // Pedido final a granja: por tipo, lo que hace falta por su factor.
   farm_order: z.number().int(),
+  // Stock de calidad B (descuenta por tipo) y stock en lotes antiguos (no se descuenta).
+  stock_b: z.number().int().default(0),
+  stock_old: z.number().int().default(0),
+  stock_lot_days: z.number().int().nullish(),
   groups: z.array(sacaGroupSchema),
   stock_date: isoDateSchema.nullable(),
   sellers_registered: z.number().int(),

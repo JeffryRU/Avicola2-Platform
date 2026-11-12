@@ -16,6 +16,7 @@ import pe.avicola2.app.domain.Saca
 import pe.avicola2.app.domain.Seller
 import pe.avicola2.app.domain.StockDay
 import pe.avicola2.app.domain.StockEntry
+import pe.avicola2.app.domain.StockOptions
 import pe.avicola2.app.domain.SubmissionRequest
 import pe.avicola2.app.domain.SubmissionResult
 import pe.avicola2.app.domain.Suggestion
@@ -62,8 +63,11 @@ interface PlanningGateway {
 interface StockGateway {
     /** Días con registro en el rango, del más reciente al más antiguo. */
     suspend fun list(from: LocalDate, to: LocalDate): List<StockDay>
-    /** Registra o corrige el stock de un día (reemplaza lo anterior). */
-    suspend fun register(day: LocalDate, lines: List<StockEntry>): StockDay
+    /** Artículos (con calidad B) y ubicaciones para armar el formulario. */
+    suspend fun options(): StockOptions
+
+    /** Registra o corrige el stock de un día en una ubicación (reemplaza lo de esa ubicación). */
+    suspend fun register(day: LocalDate, location: String, lines: List<StockEntry>): StockDay
 }
 
 /** Producción diaria (el backend decide quién la ve y quién la registra). */

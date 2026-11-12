@@ -54,6 +54,8 @@ products = Table(
     Column("kg_per_unit", Numeric(6, 2, asdecimal=False), nullable=False),
     Column("sort_order", Integer, nullable=False, default=0),
     Column("is_active", Boolean, nullable=False, default=True),
+    # «A» o «B» (calidad B: solo para el stock de despacho).
+    Column("quality", String(1), nullable=False, default="A", server_default="A"),
 )
 
 projections = Table(
@@ -164,9 +166,12 @@ dispatch_stock = Table(
     Column("product_id", String(10), ForeignKey(TABLES.fk("products")), nullable=False),
     Column("units", Integer, nullable=False),
     Column("kg", Numeric(10, 2, asdecimal=False), nullable=False),
+    # Dónde está el stock y de qué lote es (el lote es la fecha de beneficio).
+    Column("location", String(60), nullable=False, server_default="General"),
+    Column("lot_date", Date, nullable=False),
     Column("recorded_by", String(50), nullable=False),
     Column("recorded_at", DateTime(timezone=True), nullable=False),
-    UniqueConstraint("date", "product_id"),
+    UniqueConstraint("date", "location", "product_id", "lot_date"),
     CheckConstraint("units >= 0", name="units_non_negative"),
     CheckConstraint("kg >= 0", name="kg_non_negative"),
 )

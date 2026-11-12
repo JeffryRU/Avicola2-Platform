@@ -17,6 +17,15 @@ products:
     - {id: P0008, name: Brasa 8, subcategory: Brasa grande, kg_per_unit: 1.8}
     - {id: P0009, name: Brasa 9, subcategory: Brasa grande, kg_per_unit: 1.9}
     - {id: P0010, name: Brasa 10, subcategory: Brasa grande, kg_per_unit: 2.0}
+    # Calidad B: no se proyecta; se cuenta en el stock por tipo (como en el cuadro de despacho).
+    - {id: P0101, name: Brasa chica B, subcategory: Brasa chica, kg_per_unit: 1.3, quality: B}
+    - {id: P0102, name: Brasa mediana B, subcategory: Brasa mediana, kg_per_unit: 1.65, quality: B}
+    - {id: P0103, name: Brasa grande B, subcategory: Brasa grande, kg_per_unit: 1.9, quality: B}
+  # Pollo de mercado. SUPUESTO: el peso por unidad es el promedio despachado en 2026 (ARIS).
+  Pollo de mercado:
+    - {id: P0011, name: Pollo entero con menudencia, kg_per_unit: 2.07}
+    - {id: P0012, name: Pollo entero carne sin menudencia, kg_per_unit: 1.8}
+    - {id: P0112, name: Pollo entero carne sin menudencia B, kg_per_unit: 1.8, quality: B}
 
 # Vendedores (id_usuario U0001..U0007 de la tabla maestra). Solo se crean con APP_ENV=local, con la
 # contraseña de PLANNING_DEMO_PASSWORD (por defecto demo1234). En producción, el primer supervisor

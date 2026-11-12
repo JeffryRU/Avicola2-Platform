@@ -30,6 +30,7 @@ import { useMyDays } from '@/features/projections/ui/hooks'
 import { LoadingOverlay, Note } from '@/shared/ui/components/feedback'
 import { FooterActions, PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
+import { capitalize, categoryName, shortSizeLabel } from '@/features/catalog/types/catalog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
@@ -109,7 +110,6 @@ export function NewProjectionPage() {
   const products = catalog.selected(draft)
   const choiceLabel = catalog.label(draft)
   const choices = catalog.choices
-  const choiceIndex = choices.findIndex((c) => c.category === draft.category && c.subcategory === draft.subcategory)
   const invalid = draft.tried ? emptyDays(draft) : []
   const alreadyConfirmed = dates.filter((d) => days.has(d))
   // Hojas vigentes de esos días: lo que se envíe ahora es la hoja siguiente y las reemplaza.
@@ -156,6 +156,49 @@ export function NewProjectionPage() {
                     </Select>
                   </div>
                 )}
+                <div className="mb-[22px]">
+                  <span id="np-cat-label" className="mb-2.5 block text-base font-bold">
+                    Categoría
+                  </span>
+                  {/* Todas las opciones a la vista: cada categoría con «todas» y sus tamaños. */}
+                  <div role="radiogroup" aria-labelledby="np-cat-label" className="grid gap-3">
+                    {catalog.categories.map((category) => (
+                      <div key={category} className="rounded-[14px] border-[1.5px] border-border p-2.5">
+                        <span className="mb-2 block px-1 text-[12px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
+                          {categoryName(category)}
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {choices
+                            .filter((c) => c.category === category)
+                            .map((c) => {
+                              const on = c.category === draft.category && c.subcategory === draft.subcategory
+                              return (
+                                <button
+                                  key={c.subcategory ?? ''}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={on}
+                                  onClick={() => {
+                                    // Cambiar solo el tamaño conserva lo escrito; cambiar de categoría lo borra.
+                                    const units = c.category === draft.category ? draft.units : {}
+                                    setDraft({ ...draft, category: c.category, subcategory: c.subcategory, units })
+                                  }}
+                                  className={cn(
+                                    'min-h-11 rounded-[10px] border-[1.5px] px-3.5 text-[15px] font-bold transition-colors',
+                                    on
+                                      ? 'border-primary bg-primary text-white'
+                                      : 'border-border bg-white text-foreground',
+                                  )}
+                                >
+                                  {c.subcategory ? capitalize(shortSizeLabel(c.category, c.subcategory)) : c.label}
+                                </button>
+                              )
+                            })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 <div className="mb-[22px]">
                   <label htmlFor="np-start" className="mb-2.5 block text-base font-bold">
                     Fecha de inicio
@@ -211,34 +254,6 @@ export function NewProjectionPage() {
                   )}
                 </div>
                 <EditingDays className="mb-[22px]" />
-                <div className="mb-1.5">
-                  <label id="np-cat-label" className="mb-2.5 block text-base font-bold">
-                    Categoría
-                  </label>
-                  <Select
-                    value={String(choiceIndex)}
-                    onValueChange={(i) => {
-                      const c = choices[Number(i)]
-                      // Cambiar solo el tamaño conserva lo escrito; cambiar de categoría lo borra.
-                      const units = c.category === draft.category ? draft.units : {}
-                      setDraft({ ...draft, category: c.category, subcategory: c.subcategory, units })
-                    }}
-                  >
-                    <SelectTrigger
-                      aria-labelledby="np-cat-label"
-                      className="!h-[54px] w-full rounded-[14px] border-[1.5px] bg-white text-[17px] font-semibold"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {choices.map((c, i) => (
-                        <SelectItem key={`${c.category}|${c.subcategory ?? ''}`} value={String(i)}>
-                          {c.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
             </Section>
             <Section
