@@ -2,8 +2,8 @@ import { useState, type SyntheticEvent } from 'react'
 import { Eye, EyeOff, Loader2, Lock, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { useContainer } from '@/app/di'
 import { credentialsSchema } from '@/features/auth/domain/session'
+import { useLogin } from '@/features/auth/ui/hooks'
 import { LoginShowcase } from '@/features/auth/ui/LoginShowcase'
 import { BRANDS, BrandMark, useBrand } from '@/shared/ui/components/brand'
 import { Button } from '@/shared/ui/components/shadcn/button'
@@ -17,11 +17,11 @@ type FieldErrors = Partial<Record<'username' | 'password' | 'form', string>>
 const DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_USERS === 'true'
 
 export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
-  const { auth } = useContainer()
+  const login = useLogin()
   const { brand } = useBrand()
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<FieldErrors>({})
-  const [busy, setBusy] = useState(false)
+  const busy = login.isPending
   const [shakeKey, setShakeKey] = useState(0)
 
   async function submit(e: SyntheticEvent<HTMLFormElement>) {
@@ -39,15 +39,12 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
       return
     }
     setErrors({})
-    setBusy(true)
     try {
-      await auth.login(parsed.data)
+      await login.mutateAsync(parsed.data)
       onLoggedIn()
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : 'No se pudo iniciar sesión.' })
       setShakeKey((k) => k + 1)
-    } finally {
-      setBusy(false)
     }
   }
 

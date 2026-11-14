@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
+import { queryKeys } from '@/shared/application/query-keys'
 import { Catalog } from '@/features/catalog/domain/catalog'
 import { DEFAULT_PRODUCTS } from '@/features/catalog/domain/defaults'
 import { productSchema } from '@/features/catalog/domain/schemas'
@@ -15,7 +16,7 @@ const CACHE_KEY = 'nv_catalog_cache'
  */
 export function useCatalog() {
   const { catalog: gateway, preferences } = useContainer()
-  const q = useQuery({ queryKey: ['catalog'], queryFn: () => gateway.catalog(), staleTime: 10 * 60_000 })
+  const q = useQuery({ queryKey: queryKeys.catalog.all, queryFn: () => gateway.catalog(), staleTime: 10 * 60_000 })
   useEffect(() => {
     if (q.data) preferences.set(CACHE_KEY, q.data)
   }, [q.data, preferences])

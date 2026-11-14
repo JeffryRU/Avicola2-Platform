@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.planning.application.use_cases import DayUnits, SubmitProjection
+from app.planning.bootstrap import planning_cache
 from app.planning.domain.accounts import AccountChange, ChangeOutcome, check_username
 from app.planning.domain.models import SELLER, Seller, SellerAccount
 from app.planning.domain.permissions import (
@@ -415,9 +416,19 @@ def clear(session: Session) -> None:
 
 
 def main(argv: list[str]) -> int:
-    cmd = argv[0] if argv else ""
     settings = get_settings()
     configure_from_settings(settings)
+    try:
+        return _run(argv, settings)
+    finally:
+        # La CLI escribe productos, cuentas y configuración por fuera de los repositorios con
+        # caché. Con Redis, esto la limpia también para la API; en memoria, la API lo verá al
+        # vencer el TTL (es otro proceso).
+        planning_cache.invalidate()
+
+
+def _run(argv: list[str], settings: Settings) -> int:
+    cmd = argv[0] if argv else ""
     with SessionLocal() as session:
         if cmd == "init":
             init(session, settings)

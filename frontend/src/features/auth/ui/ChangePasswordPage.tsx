@@ -3,9 +3,9 @@ import { Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { newPasswordSchema } from '@/features/auth/domain/session'
+import { useChangePassword, useLogout } from '@/features/auth/ui/hooks'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
@@ -22,10 +22,10 @@ const FIELDS: { name: Field; label: string; autoComplete: string }[] = [
 ]
 
 function PasswordForm({ onDone }: { onDone: () => void }) {
-  const { auth } = useContainer()
+  const change = useChangePassword()
   const { seller } = useRequiredSession()
   const [errors, setErrors] = useState<Errors>({})
-  const [busy, setBusy] = useState(false)
+  const busy = change.isPending
   const [show, setShow] = useState(false)
 
   async function submit(e: SyntheticEvent<HTMLFormElement>) {
@@ -40,15 +40,12 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
       return
     }
     setErrors({})
-    setBusy(true)
     try {
-      await auth.changePassword(parsed.data.current, parsed.data.next)
+      await change.mutateAsync({ current: parsed.data.current, next: parsed.data.next })
       toast.success('Contraseña actualizada. Se cerraron tus sesiones en otros equipos.')
       onDone()
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : 'No se pudo cambiar la contraseña.' })
-    } finally {
-      setBusy(false)
     }
   }
 
@@ -108,7 +105,7 @@ export function ChangePasswordPage() {
 
 /** Con contraseña temporal (la dio el supervisor): no se puede usar la app hasta cambiarla. */
 export function ForcedPasswordChange() {
-  const { auth } = useContainer()
+  const logout = useLogout()
   const { seller } = useRequiredSession()
   return (
     <div className="flex min-h-dvh items-start justify-center bg-background px-4 pt-16 pb-8">
@@ -121,7 +118,7 @@ export function ForcedPasswordChange() {
         </div>
         <PasswordForm onDone={() => {}} />
         <div className="border-t px-5 py-3 text-center">
-          <button type="button" onClick={auth.logout} className="text-sm font-semibold text-muted-foreground">
+          <button type="button" onClick={() => logout.mutate()} className="text-sm font-semibold text-muted-foreground">
             Cerrar sesión
           </button>
         </div>

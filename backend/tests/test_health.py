@@ -19,13 +19,20 @@ def _client(fail: bool) -> TestClient:
     return TestClient(app)
 
 
-def test_health_ok() -> None:
-    response = _client(fail=False).get("/health")
+def test_liveness_does_not_touch_db() -> None:
+    # Con la base caída /health sigue en 200: el proxy no debe sacar al backend.
+    response = _client(fail=True).get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_ready_ok() -> None:
+    response = _client(fail=False).get("/health/ready")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "database": "ok"}
 
 
-def test_health_db_down() -> None:
-    response = _client(fail=True).get("/health")
+def test_ready_db_down() -> None:
+    response = _client(fail=True).get("/health/ready")
     assert response.status_code == 503
     assert response.json()["database"] == "unreachable"

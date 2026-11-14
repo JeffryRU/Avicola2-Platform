@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { HttpClient } from '@/shared/application/ports'
+import { endpoints } from '@/shared/infrastructure/api/endpoints'
 import type { NotificationsGateway } from '@/features/notifications/application/ports'
 import { notificationPageSchema } from '@/features/notifications/domain/notifications'
 
@@ -9,9 +10,9 @@ export class HttpNotificationsGateway implements NotificationsGateway {
     this.http = http
   }
 
-  list = () => this.http.get('/notifications', notificationPageSchema)
+  list = () => this.http.get(endpoints.notifications.list, notificationPageSchema)
 
   markRead = async (ids?: number[]) => {
-    await this.http.post('/notifications/read', ids ? { ids } : {}, z.object({ updated: z.number() }))
+    await this.http.post(endpoints.notifications.read, ids ? { ids } : {}, z.object({ updated: z.number() }))
   }
 }

@@ -1,4 +1,10 @@
-"""Chequeo de salud: API viva y base de datos alcanzable."""
+"""Chequeos de salud.
+
+- `/health` (liveness): solo confirma que el proceso responde. No toca la base, así un pico de
+  uso que agote el pool o un corte breve de Supabase no saca al backend del proxy
+  (Docker/Coolify/Traefik usan este).
+- `/health/ready` (readiness): además confirma que la base es alcanzable. Para monitoreo.
+"""
 
 import logging
 from typing import Annotated
@@ -15,7 +21,12 @@ router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
-def health(response: Response, session: Annotated[Session, Depends(get_session)]) -> dict[str, str]:
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@router.get("/health/ready")
+def ready(response: Response, session: Annotated[Session, Depends(get_session)]) -> dict[str, str]:
     try:
         session.execute(text("SELECT 1"))
     except SQLAlchemyError as exc:

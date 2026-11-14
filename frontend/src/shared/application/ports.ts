@@ -23,9 +23,12 @@ export interface UploadOptions {
   timeoutMs?: number
 }
 
+/** Parámetros de una consulta; una lista se envía repitiendo el nombre (?weight=1&weight=2). */
+export type QueryParams = Record<string, string | number | readonly (string | number)[] | undefined>
+
 /** Cliente HTTP que valida cada respuesta con un esquema de zod. */
 export interface HttpClient {
-  get<T>(path: string, schema: z.ZodType<T>, query?: Record<string, string | number | undefined>): Promise<T>
+  get<T>(path: string, schema: z.ZodType<T>, query?: QueryParams): Promise<T>
   post<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
   patch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
   put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
@@ -33,12 +36,29 @@ export interface HttpClient {
   upload<T>(path: string, file: Blob, schema: z.ZodType<T>, options?: UploadOptions): Promise<T>
 }
 
-/** Error de la API con el código HTTP (0 = sin conexión, sin respuesta o cancelada). */
+/** Cabecera con el id de cada petición: el backend lo acepta, lo imprime en su log y lo devuelve. */
+export const REQUEST_ID_HEADER = 'X-Request-ID'
+
+/**
+ * Error de la API con el código HTTP (0 = sin conexión, sin respuesta o cancelada) y el id de la
+ * petición (`requestId`), el mismo que aparece entre corchetes en el log del backend.
+ */
 export class ApiError extends Error {
   readonly status: number
-  constructor(message: string, status: number) {
+  readonly requestId: string | undefined
+  constructor(message: string, status: number, requestId?: string) {
     super(message)
+    this.name = 'ApiError'
     this.status = status
+    this.requestId = requestId
+  }
+
+  /**
+   * Falla pasajera (sin conexión, timeout, servidor saturado o reiniciando: 408, 429, 502-504):
+   * reintentar más tarde puede funcionar. Un 500 es un error del servidor y se repetiría igual.
+   */
+  get isTransient() {
+    return [0, 408, 429, 502, 503, 504].includes(this.status)
   }
 
   /** 4xx: la petición es inválida y reintentarla no sirve. */

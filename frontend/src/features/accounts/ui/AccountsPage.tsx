@@ -4,6 +4,7 @@ import { Check, Copy, KeyRound, Loader2, Lock, LockOpen, Power, UserCog, UserPlu
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
+import { queryKeys } from '@/shared/application/query-keys'
 import {
   accountState,
   newAccountSchema,
@@ -35,8 +36,6 @@ import { activeUnlocks, type Unlock } from '@/features/editing/domain/editing'
 import { GRANT_LABEL, REVOKE_LABEL, grantedLabel, revokeDone } from '@/features/editing/types/editing'
 import { useEditingWindow, useRevokeEditing, useUnlocks } from '@/features/editing/ui/hooks'
 import { GrantEditingDialog } from '@/features/editing/ui/components/grant-editing'
-
-const KEY = ['admin', 'accounts']
 
 const STATE_CLS: Record<AccountState, string> = {
   active: 'bg-ok-soft text-ok',
@@ -244,7 +243,7 @@ function ChangeRoleDialog({ account, onClose }: { account: AdminAccount | null; 
     try {
       await change.mutateAsync({ username: account.username, role: selected })
       toast.success(`${account.name} ahora es ${ROLE_LABEL[selected].toLowerCase()}.`)
-      void client.invalidateQueries({ queryKey: KEY })
+      void client.invalidateQueries({ queryKey: queryKeys.accounts.all })
       close()
     } catch {
       // El error se muestra en el diálogo.
@@ -349,7 +348,7 @@ function AccountRow({
 }) {
   const { accounts } = useContainer()
   const client = useQueryClient()
-  const refresh = () => void client.invalidateQueries({ queryKey: KEY })
+  const refresh = () => void client.invalidateQueries({ queryKey: queryKeys.accounts.all })
   const reset = useMutation({ mutationFn: () => accounts.resetPassword(account.username) })
   const toggle = useMutation({ mutationFn: () => accounts.setActive(account.username, !account.is_active) })
   const state = accountState(account, new Date())
@@ -440,7 +439,7 @@ function AccountRow({
 export function AccountsPage() {
   const { accounts } = useContainer()
   const client = useQueryClient()
-  const list = useQuery({ queryKey: KEY, queryFn: () => accounts.list() })
+  const list = useQuery({ queryKey: queryKeys.accounts.all, queryFn: () => accounts.list() })
   const [creating, setCreating] = useState(false)
   const [credentials, setCredentials] = useState<NewCredentials | null>(null)
   const [granting, setGranting] = useState<AdminAccount | null>(null)
@@ -502,7 +501,7 @@ export function AccountsPage() {
         onCreated={(c) => {
           setCreating(false)
           setCredentials(c)
-          void client.invalidateQueries({ queryKey: KEY })
+          void client.invalidateQueries({ queryKey: queryKeys.accounts.all })
         }}
       />
       <CredentialsDialog credentials={credentials} onClose={() => setCredentials(null)} />

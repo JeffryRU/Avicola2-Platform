@@ -6,7 +6,7 @@ import { DEFAULT_PRODUCTS } from '@/features/catalog/domain/defaults'
 // Sin backend las pantallas se dibujan con estos valores en cero.
 describe('pantallas sin datos del servidor', () => {
   it('la saca vacía tiene una fila por producto y todo en cero', () => {
-    const s = emptySaca('2026-11-12', 'sum', DEFAULT_PRODUCTS)
+    const s = emptySaca('2026-11-12', DEFAULT_PRODUCTS)
     expect(s.lines).toHaveLength(DEFAULT_PRODUCTS.length)
     expect(s.lines.every((l) => l.request === 0 && l.stock === 0)).toBe(true)
     expect(s.farm_order).toBe(0)

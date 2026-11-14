@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, ArrowRight, Calendar, ChevronLeft, Copy, Files, Info, Loader2, Lock, Wand2 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -26,7 +25,7 @@ import { DaysSlider } from '@/features/projections/ui/components/days-slider'
 import { ProjectionMatrix } from '@/features/projections/ui/components/projection-matrix'
 import { ReviewDialog } from '@/features/projections/ui/components/review-dialog'
 import { useCatalog } from '@/features/catalog/ui/hooks'
-import { useMyDays } from '@/features/projections/ui/hooks'
+import { useMyDays, useSubmitProjection, useSuggestion } from '@/features/projections/ui/hooks'
 import { LoadingOverlay, Note } from '@/shared/ui/components/feedback'
 import { FooterActions, PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
@@ -57,7 +56,7 @@ function normalize(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): D
 }
 
 export function NewProjectionPage() {
-  const { drafts, planning, projections } = useContainer()
+  const { drafts } = useContainer()
   const { seller } = useRequiredSession()
   const { catalog } = useCatalog()
   const [params] = useSearchParams()
@@ -74,7 +73,8 @@ export function NewProjectionPage() {
   const firstOpen = editing ? openDates(editing)[0] : undefined
   const mobile = useIsMobile()
   const navigate = useNavigate()
-  const client = useQueryClient()
+  const submit = useSubmitProjection()
+  const suggestion = useSuggestion()
   // ?dia=AAAA-MM-DD abre la edición de un solo día (desde Inicio o el detalle).
   const [stored, setStored] = useState<Draft>(() => {
     const day = params.get('dia')
@@ -83,7 +83,6 @@ export function NewProjectionPage() {
   })
   const [reviewing, setReviewing] = useState(false)
   const [sending, setSending] = useState(false)
-  const [suggesting, setSuggesting] = useState(false)
 
   // Borrador efectivo: categoría válida y días ya confirmados precargados (derivado, sin efectos).
   const draft = useMemo(() => {
@@ -313,9 +312,13 @@ export function NewProjectionPage() {
   }
 
   async function suggest() {
-    setSuggesting(true)
     try {
-      const s = await projections.suggestions(draft.category, draft.start, draft.days, supervisor ? owner : undefined)
+      const s = await suggestion.mutateAsync({
+        category: draft.category,
+        start: draft.start,
+        days: draft.days,
+        seller: supervisor ? owner : undefined,
+      })
       const filled = s.days.filter((d) => Object.keys(d.units).length)
       if (!filled.length) return void toast('Aún no hay historial suficiente para sugerir.')
       const units = { ...draft.units }
@@ -329,8 +332,6 @@ export function NewProjectionPage() {
       toast.success(`Sugerencia cargada (${filled.length} de ${draft.days} días). Revísala antes de enviar.`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo obtener la sugerencia.')
-    } finally {
-      setSuggesting(false)
     }
   }
 
@@ -347,10 +348,10 @@ export function NewProjectionPage() {
     setSending(true)
     const started = Date.now()
     try {
-      const outcome = await planning.submit(draft, loaded, owner, seller.username)
+      // Al terminar, la mutación ya refrescó las proyecciones.
+      const outcome = await submit.mutateAsync({ draft, catalog: loaded, owner, author: seller.username })
       await new Promise((r) => setTimeout(r, Math.max(0, 1200 - (Date.now() - started))))
       drafts.clear()
-      await client.invalidateQueries({ queryKey: ['window'] })
       if (supervisor) {
         // El supervisor vuelve al detalle del día del equipo, donde ve el cambio.
         if (outcome.sync === 'ok') toast.success(`Proyección de ${ownerName} guardada.`)
@@ -367,8 +368,8 @@ export function NewProjectionPage() {
   }
 
   const suggestBtn = (
-    <Button variant="ghost" disabled={suggesting} className="h-10 font-bold text-ink-2" onClick={suggest}>
-      {suggesting ? <Loader2 className="animate-spin" /> : <Wand2 />} Sugerir con historial
+    <Button variant="ghost" disabled={suggestion.isPending} className="h-10 font-bold text-ink-2" onClick={suggest}>
+      {suggestion.isPending ? <Loader2 className="animate-spin" /> : <Wand2 />} Sugerir con historial
     </Button>
   )
 

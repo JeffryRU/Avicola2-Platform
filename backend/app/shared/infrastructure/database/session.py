@@ -10,7 +10,12 @@ from app.shared.infrastructure.database.metadata import APP_SCHEMA
 
 _settings = get_settings()
 engine = build_engine(
-    _settings.database_url, APP_SCHEMA, _settings.db_schema, _settings.db_pool_size
+    _settings.database_url,
+    APP_SCHEMA,
+    _settings.db_schema,
+    _settings.db_pool_size,
+    max_overflow=_settings.db_max_overflow,
+    pool_timeout=_settings.db_pool_timeout,
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 

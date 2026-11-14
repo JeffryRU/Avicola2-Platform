@@ -26,7 +26,14 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-production}
       DATABASE_URL: ${DATABASE_URL:?Falta DATABASE_URL (Supabase, pooler en modo sesión)}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-3}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-10}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-60}
+      # Caché compartida en Redis (ADR 0014). memory = sin Redis, por proceso. Si Redis cae, la
+      # API sigue leyendo de la base.
+      CACHE_BACKEND: ${CACHE_BACKEND:-redis}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       DB_SCHEMA: ${DB_SCHEMA:-}
       # Fuera de local la API no arranca sin estos dos (ver docs/adr/0005).
       AUTH_SECRET: ${AUTH_SECRET:?Falta AUTH_SECRET (openssl rand -hex 32)}
@@ -54,14 +61,32 @@ services:
       - logs:/data/logs
     expose:
       - "8000"
+    depends_on:
+      redis: {condition: service_started}
     healthcheck:
-      # /health consulta la base cada 10 s: además mantiene activo el proyecto de Supabase.
+      # /health no toca la base: un pico que agote el pool no saca al backend del proxy.
+      # La base se comprueba en /health/ready (la revisión de cortes, cada minuto, ya mantiene
+      # activo el proyecto de Supabase).
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
       timeout: 3s
       retries: 10
       start_period: 30s
     mem_limit: ${BACKEND_MEM_LIMIT:-768m}
+    logging: *logging
+
+  # Caché de lecturas frecuentes (ADR 0014). Solo caché: sin disco ni puertos publicados; si se
+  # reinicia vacío, la API vuelve a llenarlo desde la base.
+  redis:
+    image: redis:7.4.2-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "48mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 64m
     logging: *logging
 
   n8n:

@@ -9,7 +9,7 @@ La app móvil no usa cookies: pide el token con `POST /api/auth/token` y lo env�
 
 from dataclasses import asdict
 from datetime import date
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
@@ -34,6 +34,7 @@ from app.planning.domain.production import (
     DailyProduction,
     overall_error,
 )
+from app.planning.domain.saca import METHOD
 from app.planning.domain.stock import DailyStock
 from app.planning.infrastructure.exporters import WRITERS, ExportFormat
 from app.planning.infrastructure.http import schemas as s
@@ -616,22 +617,21 @@ def calculate_saca(
     use_cases: UseCases,
     viewer: CurrentSeller,
     day: Annotated[date, Query(alias="date")],
-    method: Annotated[Literal["sum", "max"], Query()] = "sum",
 ) -> s.SacaOut:
-    """Cuánto pedir a granja para el día. `method`: «sum» = proyección + pedidos confirmados −
-    stock (la del negocio, por defecto); «max» = el mayor entre proyección y pedidos, menos stock.
-    `groups` trae el pedido final por tipo, con su factor."""
-    plan = use_cases.calculate_saca(viewer, day, method)
-    totals = ("projected", "ordered", "demand", "stock", "request", "request_kg", "live_kg")
+    """Cuánto pedir a granja, calculado el día `date` (hoy): por tipo, stock − pedidos de mañana
+    + proyección de pasado mañana + plus. `groups` trae el pedido final por tipo."""
+    plan = use_cases.calculate_saca(viewer, day)
     arrival = plan.arrival
     return s.SacaOut(
         date=plan.date,
+        orders_date=plan.orders_date,
+        projection_date=plan.projection_date,
         lines=[
             s.SacaLineOut(
                 product_id=line.product.id,
                 projected=line.projected,
                 ordered=line.ordered,
-                demand=line.demand,
+                demand=line.balance,
                 stock=line.stock,
                 request=line.request,
                 request_kg=line.request_kg,
@@ -640,9 +640,16 @@ def calculate_saca(
             )
             for line in plan.lines
         ],
-        **{name: getattr(plan, name) for name in totals},
+        projected=plan.projected,
+        ordered=plan.ordered,
+        demand=plan.balance,
+        stock=plan.stock,
+        plus=plan.plus,
+        request=plan.request,
+        request_kg=plan.request_kg,
+        live_kg=plan.live_kg,
         yield_factor=plan.yield_factor,
-        method=plan.method,
+        method=METHOD,
         farm_order=plan.farm_order,
         stock_b=plan.stock_b,
         stock_old=plan.stock_old,
@@ -650,14 +657,15 @@ def calculate_saca(
         groups=[
             s.SacaGroupOut(
                 name=g.name,
-                projected=g.projected,
-                ordered=g.ordered,
-                demand=g.demand,
                 stock=g.stock,
                 stock_b=g.stock_b,
-                need=g.need,
-                factor=g.factor,
+                ordered=g.ordered,
+                projected=g.projected,
+                plus=g.plus,
+                balance=g.balance,
                 farm_order=g.farm_order,
+                demand=g.balance,
+                need=g.farm_order,
             )
             for g in plan.groups
         ],
@@ -676,12 +684,10 @@ def calculate_saca(
     )
 
 
-@saca.put("/factors", dependencies=[requires(Permission.MANAGE_EDITING)])
-def set_saca_factors(
-    use_cases: UseCases, actor: CurrentSeller, body: s.SacaFactorsIn
-) -> s.SacaFactorsOut:
-    """Un supervisor cambia por cuánto se multiplica lo que hace falta de cada tipo."""
-    return s.SacaFactorsOut(factors=use_cases.set_saca_factors(actor, body.factors))
+@saca.put("/plus", dependencies=[requires(Permission.MANAGE_EDITING)])
+def set_saca_plus(use_cases: UseCases, actor: CurrentSeller, body: s.SacaPlusIn) -> s.SacaPlusOut:
+    """Un supervisor cambia el plus (aves extra) de cada tipo."""
+    return s.SacaPlusOut(plus=use_cases.set_saca_plus(actor, body.plus))
 
 
 # --- Producción diaria --------------------------------------------------------------------

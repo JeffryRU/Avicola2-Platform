@@ -19,20 +19,17 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -64,15 +61,13 @@ import pe.avicola2.app.application.ServerEvent
 import pe.avicola2.app.domain.Account
 import pe.avicola2.app.domain.Catalog
 import pe.avicola2.app.domain.Product
-import pe.avicola2.app.domain.SACA_METHOD_MAX
-import pe.avicola2.app.domain.SACA_METHOD_SUM
 import pe.avicola2.app.domain.arrivalModelLabel
+import pe.avicola2.app.domain.parseSacaPlus
 import pe.avicola2.app.domain.sacaFormula
-import pe.avicola2.app.domain.sacaMethodOf
+import pe.avicola2.app.domain.SacaGroup
 import pe.avicola2.app.domain.Saca
 import pe.avicola2.app.domain.SacaLine
 import pe.avicola2.app.domain.formatKg
-import pe.avicola2.app.domain.parseSacaFactors
 import pe.avicola2.app.domain.formatNumber
 import pe.avicola2.app.domain.plusDays
 import pe.avicola2.app.domain.sacaDays
@@ -88,28 +83,15 @@ import pe.avicola2.app.ui.theme.Success
 import pe.avicola2.app.ui.theme.Warning
 import pe.avicola2.app.ui.userMessage
 
-private const val METHOD_KEY = "saca.method"
-
 data class SacaData(val products: List<Product>, val plan: Saca)
 
 class SacaViewModel(private val c: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow<Load<SacaData>>(Load.Loading)
     val state: StateFlow<Load<SacaData>> = _state.asStateFlow()
 
-    /** Por defecto, mañana: la saca se decide el día anterior. */
-    var day by mutableStateOf(today().plusDays(1))
+    /** Día del cálculo; por defecto, hoy (resta los pedidos de mañana y suma la proyección de pasado mañana). */
+    var day by mutableStateOf(today())
         private set
-
-    /** Forma de cálculo; se recuerda en el equipo. */
-    var method by mutableStateOf(sacaMethodOf(c.prefs.getString(METHOD_KEY)))
-        private set
-
-    fun choose(next: String) {
-        if (next == method) return
-        method = next
-        c.prefs.putString(METHOD_KEY, next)
-        load()
-    }
 
     init {
         load()
@@ -123,44 +105,45 @@ class SacaViewModel(private val c: AppContainer) : ViewModel() {
         load()
     }
 
-    /** Edición de factores (supervisores): null = cerrada. */
-    var factorDraft by mutableStateOf<Map<String, String>?>(null)
+    /** Edición del plus por tipo (supervisores): null = cerrada. */
+    var plusDraft by mutableStateOf<Map<String, String>?>(null)
         private set
-    var factorError by mutableStateOf<String?>(null)
+    var plusError by mutableStateOf<String?>(null)
         private set
-    var savingFactors by mutableStateOf(false)
+    var savingPlus by mutableStateOf(false)
         private set
 
-    fun editFactors(plan: Saca) {
-        factorError = null
-        factorDraft = plan.groups.associate { it.name to it.factor.toString() }
+    fun editPlus(plan: Saca) {
+        plusError = null
+        plusDraft = plan.groups.associate { it.name to it.plus.toString() }
     }
 
-    fun setFactor(name: String, raw: String) {
-        factorDraft = factorDraft?.plus(name to raw.filter { it.isDigit() || it == '.' || it == ',' }.take(5))
+    fun setPlus(name: String, raw: String) {
+        plusDraft = plusDraft?.plus(name to raw.filter { it.isDigit() || it in " ,." }.take(9))
     }
 
-    fun closeFactors() {
-        factorDraft = null
+    fun closePlus() {
+        plusDraft = null
+        plusError = null
     }
 
-    fun saveFactors() {
-        val factors = factorDraft?.let(::parseSacaFactors)
-        if (factors == null) {
-            factorError = "Escribe un número entre 0 y 2 en cada tipo (por ejemplo 0,80)."
+    fun savePlus() {
+        val plus = plusDraft?.let(::parseSacaPlus)
+        if (plus == null) {
+            plusError = "Escribe un número entero entre 0 y 100 000 en cada tipo (por ejemplo 4000)."
             return
         }
-        factorError = null
-        savingFactors = true
+        plusError = null
+        savingPlus = true
         viewModelScope.launch {
             try {
-                c.saca.setFactors(factors)
-                factorDraft = null
+                c.saca.setPlus(plus)
+                plusDraft = null
                 load()
             } catch (e: Exception) {
-                factorError = e.userMessage()
+                plusError = e.userMessage()
             } finally {
-                savingFactors = false
+                savingPlus = false
             }
         }
     }
@@ -168,15 +151,15 @@ class SacaViewModel(private val c: AppContainer) : ViewModel() {
     fun load() {
         val current = _state.value
         if (current is Load.Ready) _state.value = current.copy(refreshing = true)
-        val asked = day to method
+        val asked = day
         viewModelScope.launch {
             try {
                 val catalog = async { Catalog(c.planningGateway.catalog()) }
-                val plan = c.saca.plan(asked.first, asked.second)
+                val plan = c.saca.plan(asked)
                 // Si cambió de día mientras llegaba la respuesta, se descarta.
-                if (asked == day to method) _state.value = Load.Ready(SacaData(catalog.await().products, plan))
+                if (asked == day) _state.value = Load.Ready(SacaData(catalog.await().products, plan))
             } catch (e: Exception) {
-                if (asked == day to method) _state.value = Load.Failed(e.userMessage())
+                if (asked == day) _state.value = Load.Failed(e.userMessage())
             }
         }
     }
@@ -192,6 +175,12 @@ fun SacaScreen(container: AppContainer, account: Account, onOpenStock: () -> Uni
 
     Scaffold(topBar = { TopAppBar(title = { Text("Cálculo de saca") }) }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
+            Text(
+                "DÍA DEL CÁLCULO",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+            )
             DayStrip(
                 days = sacaDays(ref),
                 selected = vm.day,
@@ -199,13 +188,11 @@ fun SacaScreen(container: AppContainer, account: Account, onOpenStock: () -> Uni
                 caption = { if (it == ref) "Hoy" else if (it == ref.plusDays(1)) "Mañana" else null },
                 modifier = Modifier.padding(top = 4.dp, bottom = 10.dp),
             )
-            MethodPicker(vm.method, vm::choose)
-            vm.factorDraft?.let { FactorsDialog(vm, it) }
             when (val s = state) {
                 Load.Loading -> Loading()
                 is Load.Failed -> ErrorState(s.message, onRetry = vm::load)
                 is Load.Ready -> PullToRefreshBox(isRefreshing = s.refreshing, onRefresh = vm::load) {
-                    SacaContent(s.value, onOpenStock.takeIf { account.canViewStock }, onEditFactors = { vm.editFactors(s.value.plan) }.takeIf { account.canEditSacaFactors })
+                    SacaContent(s.value, onOpenStock.takeIf { account.canViewStock }, vm.takeIf { account.canEditSacaPlus })
                 }
             }
         }
@@ -213,7 +200,7 @@ fun SacaScreen(container: AppContainer, account: Account, onOpenStock: () -> Uni
 }
 
 @Composable
-private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?, onEditFactors: (() -> Unit)?) {
+private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?, editor: SacaViewModel?) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 840.dp
         Row(Modifier.fillMaxSize()) {
@@ -222,7 +209,8 @@ private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?, onEditFactor
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                item(key = "hero") { Hero(data.plan, onEditFactors) }
+                item(key = "hero") { Hero(data.plan) }
+                if (data.plan.groups.isNotEmpty()) item(key = "types") { ByType(data.plan, editor) }
                 if (!wide) item(key = "sources") { Sources(data.plan, onOpenStock) }
                 item(key = "products") { ByProduct(data) }
             }
@@ -235,64 +223,14 @@ private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?, onEditFactor
     }
 }
 
-/** Forma de cálculo: la recomendada (el mayor) o la del negocio (la suma). */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MethodPicker(method: String, onChoose: (String) -> Unit) {
-    val options = listOf(SACA_METHOD_SUM to "Proyección + pedidos", SACA_METHOD_MAX to "El mayor de los dos")
-    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) {
-        Text("FORMA DE CÁLCULO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-            options.forEachIndexed { index, (value, label) ->
-                SegmentedButton(
-                    selected = method == value,
-                    onClick = { onChoose(value) },
-                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
-                ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-            }
-        }
-    }
-}
-
-/** Supervisores: por cuánto se multiplica lo que hace falta de cada tipo. */
-@Composable
-private fun FactorsDialog(vm: SacaViewModel, draft: Map<String, String>) {
-    AlertDialog(
-        onDismissRequest = vm::closeFactors,
-        title = { Text("Factor por tipo") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "Lo que hace falta de cada tipo se multiplica por este número para el pedido a granja.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                draft.forEach { (name, value) ->
-                    OutlinedTextField(
-                        value = value,
-                        onValueChange = { vm.setFactor(name, it) },
-                        label = { Text(name) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                vm.factorError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-            }
-        },
-        confirmButton = { TextButton(onClick = vm::saveFactors, enabled = !vm.savingFactors) { Text("Guardar") } },
-        dismissButton = { TextButton(onClick = vm::closeFactors) { Text("Cancelar") } },
-    )
-}
-
 /** El número que importa, grande; lo demás, al lado. */
 @Composable
-private fun Hero(plan: Saca, onEditFactors: (() -> Unit)?) {
+private fun Hero(plan: Saca) {
     val scheme = MaterialTheme.colorScheme
     Surface(color = scheme.primary, contentColor = scheme.onPrimary, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp)) {
             Text(
-                "PEDIDO FINAL A GRANJA · ${plan.date.short().uppercase()}",
+                "PEDIDO FINAL A GRANJA · CÁLCULO DEL ${plan.date.short().uppercase()}",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = scheme.onPrimary.copy(alpha = 0.8f),
@@ -302,38 +240,109 @@ private fun Hero(plan: Saca, onEditFactors: (() -> Unit)?) {
                 Text("aves", style = MaterialTheme.typography.titleMedium, color = scheme.onPrimary.copy(alpha = 0.85f), modifier = Modifier.padding(start = 8.dp, bottom = 10.dp))
             }
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                HeroStat(formatNumber(plan.request.toDouble()), "hacen falta")
+                HeroStat(formatNumber(plan.request.toDouble()), "aves según los productos")
                 HeroStat(formatNumber(plan.requestKg, 1), "kg de producto")
                 HeroStat(formatNumber(plan.liveKg, 1), "kg vivos")
             }
-            if (plan.groups.isNotEmpty()) {
-                Surface(color = scheme.onPrimary.copy(alpha = 0.12f), contentColor = scheme.onPrimary, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) {
-                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                        if (onEditFactors != null) {
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Text("POR TIPO", style = MaterialTheme.typography.labelSmall, color = scheme.onPrimary.copy(alpha = 0.8f), modifier = Modifier.weight(1f))
-                                IconButton(onClick = onEditFactors, modifier = Modifier.size(36.dp)) {
-                                    Icon(Icons.Filled.Edit, "Cambiar por cuánto se multiplica", modifier = Modifier.size(20.dp))
-                                }
-                            }
-                        }
-                        plan.groups.forEach { g ->
-                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(g.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                Text(
-                                    "${formatNumber(g.need.toDouble())} × ${formatNumber(g.factor, 2)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = scheme.onPrimary.copy(alpha = 0.85f),
-                                    modifier = Modifier.padding(end = 12.dp),
-                                )
-                                Text(formatNumber(g.farmOrder.toDouble()), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                            }
-                        }
-                    }
+        }
+    }
+}
+
+private val TYPE_COLUMNS = listOf("Stock", "− Pedidos", "+ Proyección", "+ Plus", "= Pedir")
+
+/** Pedido a granja por tipo, en el orden de la regla: stock − pedidos + proyección + plus = pedir. */
+@Composable
+private fun ByType(plan: Saca, editor: SacaViewModel?) {
+    val draft = editor?.plusDraft
+    SectionCard {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Pedido a granja por tipo", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            if (editor != null && draft == null) {
+                IconButton(onClick = { editor.editPlus(plan) }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.Edit, "Cambiar el plus de cada tipo", modifier = Modifier.size(20.dp))
                 }
             }
         }
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp)) {
+            TypeCell("Tipo", header = true, first = true)
+            TYPE_COLUMNS.forEach { TypeCell(it, header = true) }
+        }
+        HorizontalDivider()
+        plan.groups.forEach { g -> TypeRow(g, draft?.get(g.name), editor) }
+        HorizontalDivider()
+        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            TypeCell("Total", bold = true, first = true)
+            TypeCell(formatNumber(plan.groups.sumOf { it.stock }.toDouble()), bold = true)
+            TypeCell("−" + formatNumber(plan.groups.sumOf { it.ordered }.toDouble()), bold = true)
+            TypeCell("+" + formatNumber(plan.groups.sumOf { it.projected }.toDouble()), bold = true)
+            TypeCell("+" + formatNumber(plan.groups.sumOf { it.plus }.toDouble()), bold = true)
+            TypeCell(formatNumber((plan.farmOrder ?: plan.groups.sumOf { it.farmOrder }).toDouble()), bold = true, accent = true)
+        }
+        if (editor != null && draft != null) {
+            editor.plusError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = editor::closePlus) { Text("Cancelar") }
+                TextButton(onClick = editor::savePlus, enabled = !editor.savingPlus) { Text("Guardar") }
+            }
+        }
+        Text(
+            sacaFormula(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
+}
+
+@Composable
+private fun TypeRow(g: SacaGroup, draft: String?, editor: SacaViewModel?) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1.4f)) {
+            Text(g.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (g.stockB > 0) {
+                Text("incl. ${formatNumber(g.stockB.toDouble())} en B", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        TypeCell(formatNumber(g.stock.toDouble()))
+        TypeCell("−" + formatNumber(g.ordered.toDouble()))
+        TypeCell("+" + formatNumber(g.projected.toDouble()))
+        if (draft != null && editor != null) {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { editor.setPlus(g.name, it) },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodySmall,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
+            )
+        } else {
+            TypeCell("+" + formatNumber(g.plus.toDouble()))
+        }
+        TypeCell(formatNumber(g.farmOrder.toDouble()), bold = true, accent = g.farmOrder > 0)
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.TypeCell(
+    text: String,
+    header: Boolean = false,
+    bold: Boolean = false,
+    accent: Boolean = false,
+    first: Boolean = false,
+) {
+    Text(
+        text,
+        style = if (header) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
+        fontWeight = if (bold) FontWeight.Bold else null,
+        color = when {
+            header -> MaterialTheme.colorScheme.onSurfaceVariant
+            accent -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.onSurface
+        },
+        textAlign = if (first) TextAlign.Start else TextAlign.End,
+        maxLines = 2,
+        modifier = Modifier.weight(if (first) 1.4f else 1f),
+    )
 }
 
 @Composable
@@ -352,7 +361,7 @@ private fun Sources(plan: Saca, onOpenStock: (() -> Unit)?) {
         val missing = plan.missingSellers
         SourceRow(
             ok = missing == 0,
-            label = "Proyecciones",
+            label = "Proyecciones" + (plan.projectionDate?.let { " del ${it.short()}" } ?: ""),
             value = "${plan.sellersRegistered} de ${plan.sellersTotal}",
             note = when (missing) {
                 0 -> "Registraron todos los vendedores."
@@ -372,9 +381,9 @@ private fun Sources(plan: Saca, onOpenStock: (() -> Unit)?) {
         HorizontalDivider()
         SourceRow(
             ok = plan.stockDate != null,
-            label = "Stock de despacho",
+            label = plan.stockDate?.let { "Stock al ${it.short()}" } ?: "Stock de despacho",
             value = plan.stockDate?.let { "${formatNumber(plan.stock.toDouble())} unid." },
-            note = plan.stockDate?.let { "Registro del ${it.short()}." } ?: "Sin registro en los 3 días anteriores: no se descuenta nada.",
+            note = if (plan.stockDate != null) "Último registro de despacho (hasta el día del cálculo)." else "Sin registro de stock entre anteayer y hoy: se toma como 0.",
         ) {
             if (onOpenStock != null) {
                 Text(
@@ -388,9 +397,9 @@ private fun Sources(plan: Saca, onOpenStock: (() -> Unit)?) {
         HorizontalDivider()
         SourceRow(
             ok = if (plan.ordersAvailable) true else null,
-            label = "Pedidos confirmados",
+            label = "Pedidos" + (plan.ordersDate?.let { " del ${it.short()}" } ?: " de mañana"),
             value = if (plan.ordersAvailable) "${formatNumber(plan.ordered.toDouble())} unid." else null,
-            note = if (plan.ordersAvailable) "Pedidos de ARIS cargados para este día." else "No hay pedidos de ARIS cargados para este día: se usan solo las proyecciones.",
+            note = if (plan.ordersAvailable) "Pedidos de ARIS cargados para mañana (pollo entero para brasa)." else "No hay pedidos de ARIS cargados para mañana: se toman como 0.",
         )
         HorizontalDivider()
         SourceRow(
@@ -399,12 +408,6 @@ private fun Sources(plan: Saca, onOpenStock: (() -> Unit)?) {
             value = null,
             note = plan.forecast?.let { "Con ${it.days} días de producción, del ${it.dateFrom.short()} al ${it.dateTo.short()}. Modelo en uso: ${arrivalModelLabel(it.method)}." }
                 ?: "Sin historia de producción suficiente (mínimo 14 días registrados).",
-        )
-        Text(
-            sacaFormula(plan.method),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 10.dp),
         )
     }
 }
@@ -442,9 +445,9 @@ private fun ByProduct(data: SacaData) {
     val plan = data.plan
     SectionCard {
         Text("Por producto", style = MaterialTheme.typography.titleMedium)
-        if (plan.sellersRegistered == 0) {
+        if (plan.lines.all { it.stock == 0 && it.ordered == 0 && it.projected == 0 } && plan.plus == 0) {
             Text(
-                "Nadie registró proyecciones para este día.",
+                "No hay stock, pedidos de mañana, proyecciones de pasado mañana ni plus para este cálculo.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp),
             )
@@ -454,7 +457,7 @@ private fun ByProduct(data: SacaData) {
         val max = plan.lines.maxOfOrNull { it.request }?.coerceAtLeast(1) ?: 1
         data.products.groupBy { it.subcategory }.forEach { (group, items) ->
             val request = items.sumOf { lines[it.id]?.request ?: 0 }
-            GroupHeader(group ?: "Otros", "${formatNumber(request.toDouble())} hacen falta", Modifier.fillMaxWidth().padding(top = 8.dp))
+            GroupHeader(group ?: "Otros", "${formatNumber(request.toDouble())} resultado", Modifier.fillMaxWidth().padding(top = 8.dp))
             items.forEach { p -> lines[p.id]?.let { ProductLine(p, it, max) } }
         }
         Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
@@ -468,7 +471,7 @@ private fun ByProduct(data: SacaData) {
 
 @Composable
 private fun ProductLine(product: Product, line: SacaLine, max: Int) {
-    val idle = line.demand == 0 && line.stock == 0 && (line.expected ?: 0) == 0
+    val idle = line.demand == 0 && line.stock == 0 && line.ordered == 0 && line.projected == 0 && (line.expected ?: 0) == 0
     Row(
         Modifier.fillMaxWidth().padding(vertical = 8.dp).alpha(if (idle) 0.45f else 1f),
         verticalAlignment = Alignment.CenterVertically,
@@ -485,7 +488,7 @@ private fun ProductLine(product: Product, line: SacaLine, max: Int) {
                 )
             }
             Text(
-                "${formatNumber(line.demand.toDouble())} proy." + if (line.stock > 0) " − ${formatNumber(line.stock.toDouble())} stock" else "",
+                "Stock ${formatNumber(line.stock.toDouble())} − ped. ${formatNumber(line.ordered.toDouble())} + proy. ${formatNumber(line.projected.toDouble())} = ${formatNumber(line.demand.toDouble())}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

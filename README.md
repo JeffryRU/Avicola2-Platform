@@ -59,8 +59,9 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
    ```
    El backend aplica las migraciones al arrancar.
    - App de vendedores (PWA): http://127.0.0.1:8000
-   - Backend: http://127.0.0.1:8000/health · documentación de la API: http://127.0.0.1:8000/docs
+   - Backend: http://127.0.0.1:8000/health (proceso vivo) · http://127.0.0.1:8000/health/ready (con base) · documentación de la API: http://127.0.0.1:8000/docs
    - n8n: http://127.0.0.1:5678
+   - Redis: caché compartida de configuración, catálogo y vendedores ([ADR 0014](docs/adr/0014-cache-en-memoria-o-redis.md)). Sin Redis, `CACHE_BACKEND=memory`.
 
 3. **Sin internet (Postgres local en lugar de Supabase):** ajusta `.env` según la sección "perfil localdb" de `.env.example` y luego:
    ```bash

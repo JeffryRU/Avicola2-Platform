@@ -9,7 +9,7 @@ from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.planning.application import accounts as acc
 from app.planning.application import editing as ed
 from app.planning.application import export as ex
@@ -24,6 +24,11 @@ from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.events import event_bus
 from app.planning.infrastructure.forecast import OrderHistoryForecaster, WeekdayAverageForecaster
 from app.planning.infrastructure.orders import LoadedOrders
+from app.planning.infrastructure.persistence.cached import (
+    CachedProductRepository,
+    CachedSellerRepository,
+    CachedSettingsRepository,
+)
 from app.planning.infrastructure.persistence.editing import (
     SqlSettingsRepository,
     SqlUnlockRepository,
@@ -45,8 +50,13 @@ from app.planning.infrastructure.security import (
     RandomTemporaryPasswords,
     ScryptPasswordHasher,
 )
+from app.shared.infrastructure.cache import build_cache
 from app.shared.infrastructure.database.engine import physical_schema
 from app.shared.infrastructure.database.metadata import APP_SCHEMA
+
+# Una sola caché por proceso, compartida por todas las peticiones: en memoria o en Redis según
+# CACHE_BACKEND (ver shared/infrastructure/cache.py y ADR 0014).
+planning_cache = build_cache(**get_settings().cache_options())
 
 
 @dataclass(frozen=True)
@@ -86,15 +96,15 @@ class PlanningUseCases:
     list_stock: st.ListStock
     stock_options: st.GetStockOptions
     calculate_saca: sc.CalculateSaca
-    set_saca_factors: sc.SetSacaFactors
+    set_saca_plus: sc.SetSacaPlus
     register_production: pr.RegisterProduction
     list_production: pr.ListProduction
     forecast_arrival: pr.ForecastArrival
 
 
 def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
-    products = SqlProductRepository(session)
-    sellers = SqlSellerRepository(session)
+    products = CachedProductRepository(SqlProductRepository(session), planning_cache)
+    sellers = CachedSellerRepository(SqlSellerRepository(session), planning_cache)
     projections = SqlProjectionRepository(session)
     clock = ZoneClock(settings.tz)
     tokens = JwtTokenService(settings.auth_secret, settings.auth_token_ttl_hours)
@@ -114,8 +124,8 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     stock = SqlStockRepository(session)
     production = SqlProductionRepository(session)
     sales = SimulatedSalesSource(projections, clock)
-    stored_settings = SqlSettingsRepository(session)
-    saca_factors = sc.SacaFactors(stored_settings, settings.saca_group_factors)
+    stored_settings = CachedSettingsRepository(SqlSettingsRepository(session), planning_cache)
+    saca_plus = sc.SacaPlus(stored_settings, settings.saca_group_plus)
     editing = ed.EditingSettings(
         stored_settings,
         settings.planning_cutoff_time,
@@ -191,10 +201,10 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             settings.yield_factor,
             production,
             arrival_model,
-            saca_factors,
+            saca_plus,
             settings.saca_stock_lot_days,
         ),
-        set_saca_factors=sc.SetSacaFactors(products, stored_settings, clock),
+        set_saca_plus=sc.SetSacaPlus(products, stored_settings, clock),
         register_production=pr.RegisterProduction(products, production, clock),
         list_production=pr.ListProduction(production),
         forecast_arrival=pr.ForecastArrival(products, production, clock, arrival_model),

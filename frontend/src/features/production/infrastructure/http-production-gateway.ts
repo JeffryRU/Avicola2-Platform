@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { HttpClient } from '@/shared/application/ports'
+import { endpoints } from '@/shared/infrastructure/api/endpoints'
 import type { IsoDate } from '@/shared/domain/dates'
 import type { ProductionGateway } from '@/features/production/application/ports'
 import { arrivalForecastSchema } from '@/features/production/domain/forecast'
@@ -12,14 +13,14 @@ export class HttpProductionGateway implements ProductionGateway {
   }
 
   list = (from: IsoDate, to: IsoDate) =>
-    this.http.get('/production', z.array(productionDaySchema), { date_from: from, date_to: to })
+    this.http.get(endpoints.production.list, z.array(productionDaySchema), { date_from: from, date_to: to })
 
   forecast = (weights: number[] = []) =>
-    this.http.get(
-      `/production/forecast${weights.length ? `?${weights.map((kg) => `weight=${String(kg)}`).join('&')}` : ''}`,
-      arrivalForecastSchema,
-    )
+    // ?weight=a&weight=b: una lista se envía repitiendo el parámetro.
+    this.http.get(endpoints.production.forecast, arrivalForecastSchema, {
+      weight: weights.length ? weights : undefined,
+    })
 
   register = (day: IsoDate, lines: ProductionEntry[], weights: Record<string, number>) =>
-    this.http.put(`/production/${day}`, { lines, weights }, productionDaySchema)
+    this.http.put(endpoints.production.day(day), { lines, weights }, productionDaySchema)
 }

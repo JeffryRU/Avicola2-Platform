@@ -1,8 +1,6 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, BarChart3, Calendar, Clock, Send, Tag } from 'lucide-react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { dFull, dShort } from '@/shared/domain/dates'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
@@ -11,7 +9,7 @@ import { sumUnits } from '@/features/catalog/domain/catalog'
 import type { Draft } from '@/features/projections/domain/draft'
 import type { Units } from '@/features/catalog/domain/schemas'
 import { useCatalog } from '@/features/catalog/ui/hooks'
-import { useQueue } from '@/features/projections/ui/hooks'
+import { useFlushQueue, useQueue } from '@/features/projections/ui/hooks'
 import { SummaryRow } from '@/features/projections/ui/components/review-dialog'
 import { CountUp } from '@/shared/ui/components/charts'
 import { Confetti, Note } from '@/shared/ui/components/feedback'
@@ -24,11 +22,10 @@ import { kgAmount, unitsCount } from '@/shared/types/labels'
 export function SuccessPage() {
   const state = useLocation().state as { outcome: SubmitOutcome; draft: Draft } | null
   const { catalog } = useCatalog()
-  const { planning } = useContainer()
+  const flushQueue = useFlushQueue()
   const { seller } = useRequiredSession()
   const queue = useQueue()
   const navigate = useNavigate()
-  const client = useQueryClient()
   // Si la cola se vació (se reintentó con éxito), el envío ya está sincronizado.
   const pending =
     state?.outcome.sync === 'pending' && queue.some((q) => q.submission_id === state.outcome.submission.submission_id)
@@ -43,9 +40,8 @@ export function SuccessPage() {
   const kg = days.reduce((s, d) => s + catalog.kg(shown(d.units)), 0)
 
   async function retry() {
-    const r = await planning.flush(seller.username)
+    const r = await flushQueue.mutateAsync(seller.username)
     if (r.sent) {
-      await client.invalidateQueries({ queryKey: ['window'] })
       toast.success('Proyección sincronizada')
     } else toast('No se pudo sincronizar. Se intentará de nuevo.')
   }

@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,7 +22,22 @@ class Settings(BaseSettings):
     # El motor sale de la URL: postgresql+psycopg (Supabase), mssql+pymssql (Azure SQL),
     # sqlite:// (memoria, pruebas). Ver app/shared/infrastructure/database/engine.py.
     database_url: str = "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/postgres"
-    db_pool_size: int = 5
+    # Conexiones a la base: hasta db_pool_size + db_max_overflow a la vez. El total no debe
+    # superar el "Pool Size" del pooler de Supabase (Database → Settings → Connection pooling).
+    db_pool_size: int = Field(10, gt=0)
+    db_max_overflow: int = Field(3, ge=0)
+    # Segundos que una petición espera una conexión libre antes de fallar (rápido, no 30 s).
+    db_pool_timeout: float = Field(10, gt=0)
+    # Caché de lecturas frecuentes (configuración, catálogo, vendedores activos). ADR 0014.
+    # memory: por proceso · redis: compartida entre procesos (necesita REDIS_URL).
+    cache_backend: Literal["memory", "redis"] = "memory"
+    # Segundos de vida; 0 = desactivada. Con memory, lo que cambia otro proceso se ve tras este
+    # tiempo; con redis, al instante.
+    cache_ttl_seconds: float = Field(60, ge=0)
+    redis_url: str | None = None
+    # Prefijo de las claves en Redis; vacío = "avicola2:<APP_ENV>:" (develop y producción
+    # pueden compartir un Redis sin pisarse).
+    cache_namespace: str = ""
     # Esquema físico; vacío = el de config/tables.yaml (`app`). En Azure SQL p. ej. `dbo`.
     db_schema: str | None = None
 
@@ -87,8 +103,6 @@ class Settings(BaseSettings):
     # Conversión de kg de producto a saca (pollo vivo). Valores de referencia por validar.
     yield_factor: float = Field(0.75, gt=0, le=1)  # kg de producto por kg vivo
     avg_live_weight_kg: float = Field(2.6, gt=0)  # peso vivo promedio por ave
-    # Pedido final a granja por tipo: lo que hace falta de cada tipo se multiplica por su factor
-    # (regla del negocio). Los tipos que no figuran usan 1. Se cambia con SACA_GROUP_FACTORS (JSON).
     # Ubicaciones donde se cuenta el stock de despacho (STOCK_LOCATIONS, JSON). SUPUESTO: las
     # zonas con más pedidos; falta la lista real del negocio.
     stock_locations: list[str] = Field(
@@ -96,8 +110,16 @@ class Settings(BaseSettings):
     )
     # Para la saca solo cuenta el stock de lotes de hasta estos días (lo más antiguo se troza).
     saca_stock_lot_days: int = Field(3, ge=0, le=30)
-    saca_group_factors: dict[str, float] = Field(
-        default_factory=lambda: {"Brasa chica": 0.8, "Brasa mediana": 0.7}
+    # Plus de la saca: aves extra por tipo que se suman al pedido a granja (regla del negocio).
+    # Se cambia con SACA_GROUP_PLUS (JSON) o, desde la app, un supervisor.
+    # «Carne» del negocio = el tipo «Pollo de mercado» del catálogo (SUPUESTO, docs/assumptions).
+    saca_group_plus: dict[str, int] = Field(
+        default_factory=lambda: {
+            "Brasa chica": 4000,
+            "Brasa mediana": 1500,
+            "Brasa grande": 1500,
+            "Pollo de mercado": 4000,
+        }
     )
 
     @field_validator("auth_cookie_secure", mode="before")
@@ -109,6 +131,15 @@ class Settings(BaseSettings):
     @property
     def is_local(self) -> bool:
         return self.app_env == "local"
+
+    def cache_options(self) -> dict[str, Any]:
+        """Argumentos de `build_cache` según la configuración."""
+        return {
+            "backend": self.cache_backend,
+            "ttl_seconds": self.cache_ttl_seconds,
+            "redis_url": self.redis_url,
+            "namespace": self.cache_namespace or f"avicola2:{self.app_env}:",
+        }
 
     @property
     def trusted_origin_list(self) -> tuple[str, ...]:

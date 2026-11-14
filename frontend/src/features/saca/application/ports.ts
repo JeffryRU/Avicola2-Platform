@@ -1,9 +1,10 @@
 import type { IsoDate } from '@/shared/domain/dates'
-import type { Saca, SacaMethod } from '@/features/saca/domain/saca'
+import type { Saca } from '@/features/saca/domain/saca'
 
-/** Cuánto pedir a granja para un día (el backend decide quién lo ve). */
+/** Cuánto pedir a granja (el backend decide quién lo ve). */
 export interface SacaGateway {
-  plan(day: IsoDate, method: SacaMethod): Promise<Saca>
-  /** Solo supervisores: por cuánto se multiplica lo que hace falta de cada tipo. */
-  setFactors(factors: Record<string, number>): Promise<Record<string, number>>
+  /** Cálculo hecho el día `day`: stock de hasta hoy, pedidos de mañana y proyección de pasado mañana. */
+  plan(day: IsoDate): Promise<Saca>
+  /** Solo supervisores: el plus de aves que se suma a cada tipo. */
+  setPlus(plus: Record<string, number>): Promise<Record<string, number>>
 }

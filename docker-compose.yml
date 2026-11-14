@@ -81,6 +81,20 @@ services:
     mem_limit: ${N8N_MEM_LIMIT:-768m}
     logging: *logging
 
+  # Caché de lecturas frecuentes (ADR 0014). Solo caché: sin disco ni puertos publicados; si se
+  # reinicia vacío, la API vuelve a llenarlo desde la base.
+  redis:
+    image: redis:7.4.2-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "48mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 64m
+    logging: *logging
+
   backend:
     # La imagen incluye el build de la PWA (frontend/), que FastAPI sirve en /.
     build:
@@ -93,7 +107,14 @@ services:
       APP_ENV: ${APP_ENV:-local}
       # Supabase (pooler en modo sesión). Con el perfil localdb se usa DATABASE_URL_CONTAINER.
       DATABASE_URL: ${DATABASE_URL_CONTAINER:-${DATABASE_URL}}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-3}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-10}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-60}
+      # Caché compartida en Redis (ADR 0014). memory = sin Redis, por proceso. Si Redis cae, la
+      # API sigue leyendo de la base.
+      CACHE_BACKEND: ${CACHE_BACKEND:-redis}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       INGEST_API_TOKEN: ${INGEST_API_TOKEN:-}
       DB_SCHEMA: ${DB_SCHEMA:-}
       AUTH_SECRET: ${AUTH_SECRET}
@@ -117,6 +138,7 @@ services:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres: {condition: service_healthy, required: false}
+      redis: {condition: service_started}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s

@@ -44,7 +44,7 @@ data class Account(
     val canViewSaca: Boolean get() = can("view_saca", "supervisor", "general_supervisor")
 
     /** Supervisores: pueden cambiar por cuánto se multiplica el pedido de cada tipo. */
-    val canEditSacaFactors: Boolean get() = can("manage_editing", "supervisor", "general_supervisor")
+    val canEditSacaPlus: Boolean get() = can("manage_editing", "supervisor", "general_supervisor")
     val canViewProduction: Boolean
         get() = can("view_production", "dispatch_chief", "supervisor", "general_supervisor")
     val canManageProduction: Boolean get() = can("manage_production", "dispatch_chief", "general_supervisor")
@@ -246,18 +246,12 @@ data class StockOptions(
 
 // --- Cálculo de saca -----------------------------------------------------------------------
 
-/** Formas de cálculo: proyección + pedidos (la del negocio, por defecto) o el mayor de los dos. */
-const val SACA_METHOD_MAX = "max"
-const val SACA_METHOD_SUM = "sum"
+/** Forma de cálculo única (la decide el backend). */
+const val SACA_METHOD = "stock_orders_projection_plus"
 
-const val SACA_METHOD_DEFAULT = SACA_METHOD_SUM
-
-fun sacaMethodOf(stored: String?): String = if (stored == SACA_METHOD_MAX) SACA_METHOD_MAX else SACA_METHOD_DEFAULT
-
-fun sacaFormula(method: String): String =
-    (if (method == SACA_METHOD_MAX) "Hace falta = el mayor entre proyección y pedidos confirmados, menos el stock."
-    else "Hace falta = proyección + pedidos confirmados − stock.") +
-        " Nunca menos de 0. A granja se pide por tipo: lo que hace falta de cada uno por su factor."
+/** Regla de la saca, en el orden del negocio. */
+fun sacaFormula(): String =
+    "Pedir a granja = stock − pedidos de mañana + proyección de pasado mañana + plus. Nunca menos de 0."
 
 /** Nombre legible del modelo de llegada en uso (lo elige solo el backend). */
 fun arrivalModelLabel(method: String): String {
@@ -289,29 +283,40 @@ data class SacaForecast(
     @SerialName("date_to") val dateTo: LocalDate,
 )
 
-/** Un tipo de pedido a granja (Brasa chica...): lo que hace falta y el pedido final con su factor. */
+/** Un tipo de pedido a granja (Brasa chica...): stock − pedidos + proyección + plus = pedido final. */
 @Serializable
 data class SacaGroup(
     val name: String,
-    val need: Int,
-    val factor: Double,
+    val stock: Int = 0,
+    @SerialName("stock_b") val stockB: Int = 0,
+    /** Pedidos de mañana. */
+    val ordered: Int = 0,
+    /** Proyección de pasado mañana. */
+    val projected: Int = 0,
+    /** Aves extra fijas del tipo. */
+    val plus: Int = 0,
+    /** stock − pedidos + proyección, antes del plus (puede ser negativo). */
+    val balance: Int = 0,
+    /** balance + plus, nunca menos de 0. */
     @SerialName("farm_order") val farmOrder: Int,
 )
 
 @Serializable
-data class SacaFactors(val factors: Map<String, Double>)
+data class SacaPlus(val plus: Map<String, Int>)
 
-const val MAX_SACA_FACTOR = 2.0
+const val MAX_SACA_PLUS = 100_000
 
-/** Factores escritos por el supervisor (texto) → números; null si alguno no es válido. */
-fun parseSacaFactors(draft: Map<String, String>): Map<String, Double>? {
-    val out = mutableMapOf<String, Double>()
+private val PLUS_PATTERN = Regex("""\d+|\d{1,3}([ ,.\u00a0]\d{3})+""")
+
+/** Plus escrito por el supervisor (texto: «4000», «4,000», «4 000», «4.000») → enteros; null si alguno no es válido. */
+fun parseSacaPlus(draft: Map<String, String>): Map<String, Int>? {
+    val out = mutableMapOf<String, Int>()
     for ((name, raw) in draft) {
-        val text = raw.trim().replace(',', '.')
-        if (!Regex("""\d+(\.\d+)?""").matches(text)) return null
-        val value = text.toDouble()
-        if (value > MAX_SACA_FACTOR) return null
-        out[name] = value
+        val text = raw.trim()
+        if (!PLUS_PATTERN.matches(text)) return null
+        val value = text.filter { it.isDigit() }.toLongOrNull() ?: return null
+        if (value > MAX_SACA_PLUS) return null
+        out[name] = value.toInt()
     }
     return out
 }
@@ -334,9 +339,13 @@ data class Saca(
     @SerialName("sellers_total") val sellersTotal: Int,
     @SerialName("orders_available") val ordersAvailable: Boolean,
     val forecast: SacaForecast? = null,
-    /** Forma de cálculo usada: «sum» o «max». */
-    val method: String = SACA_METHOD_DEFAULT,
-    /** Pedido final a granja: por tipo, lo que hace falta por su factor (null: backend anterior). */
+    /** Día de los pedidos que se restan (mañana) y de la proyección que se suma (pasado mañana). */
+    @SerialName("orders_date") val ordersDate: LocalDate? = null,
+    @SerialName("projection_date") val projectionDate: LocalDate? = null,
+    /** Suma del plus de los tipos. */
+    val plus: Int = 0,
+    val method: String = SACA_METHOD,
+    /** Pedido final a granja: suma de los tipos (null: backend anterior). */
     @SerialName("farm_order") val farmOrder: Int? = null,
     val groups: List<SacaGroup> = emptyList(),
 ) {

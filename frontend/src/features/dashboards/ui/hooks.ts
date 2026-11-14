@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
+import { queryKeys } from '@/shared/application/query-keys'
 import { paths } from '@/app/routes'
 import { addDays, dShort, type IsoDate } from '@/shared/domain/dates'
 import type { Period } from '@/features/dashboards/domain/period'
@@ -13,7 +14,7 @@ import { ALL, NO_ZONE_LABEL, type FilterChip } from '@/features/dashboards/types
 
 export function useSellers() {
   const { sellers } = useContainer()
-  return useQuery({ queryKey: ['sellers'], queryFn: () => sellers.sellers(), staleTime: 10 * 60_000 })
+  return useQuery({ queryKey: queryKeys.sellers.all, queryFn: () => sellers.sellers(), staleTime: 10 * 60_000 })
 }
 
 /** A dónde lleva tocar un día: el vendedor ve su proyección; el supervisor, la de todo el equipo. */

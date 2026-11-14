@@ -4,12 +4,16 @@ Cada motor soportado tiene un perfil con sus diferencias (argumentos de conexió
 esquemas, cómo crear un esquema). Para sumar un motor basta con agregar un perfil.
 """
 
+import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import Connection, Engine, create_engine, make_url, text
+from sqlalchemy import Connection, Engine, create_engine, event, make_url, text
 from sqlalchemy.pool import StaticPool
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -55,9 +59,19 @@ def physical_schema(url: str, logical: str, override: str | None) -> str | None:
 
 
 def build_engine(
-    url: str, logical_schema: str, schema_override: str | None, pool_size: int
+    url: str,
+    logical_schema: str,
+    schema_override: str | None,
+    pool_size: int,
+    max_overflow: int = 2,
+    pool_timeout: float = 30,
 ) -> Engine:
-    """Crea el engine y traduce el esquema lógico de las tablas al físico del motor."""
+    """Crea el engine y traduce el esquema lógico de las tablas al físico del motor.
+
+    Conexiones máximas = pool_size + max_overflow. Con Supabase (pooler en modo sesión) cada una
+    ocupa una conexión real: el total no debe superar el "Pool Size" del pooler del proyecto.
+    pool_timeout es cuánto espera una petición por una conexión libre antes de fallar.
+    """
     profile = profile_for(url)
     u = make_url(url)
     kwargs: dict[str, Any] = {"pool_pre_ping": True, "connect_args": profile.connect_args}
@@ -65,12 +79,34 @@ def build_engine(
         if u.database in (None, "", ":memory:"):
             kwargs["poolclass"] = StaticPool  # una sola base en memoria para toda la app
     else:
-        kwargs |= {"pool_size": pool_size, "max_overflow": 2}
+        kwargs |= {
+            "pool_size": pool_size,
+            "max_overflow": max_overflow,
+            "pool_timeout": pool_timeout,
+        }
     engine = create_engine(url, **kwargs)
+    _log_new_connections(engine)
     target = physical_schema(url, logical_schema, schema_override)
     if target != logical_schema:
         engine = engine.execution_options(schema_translate_map={logical_schema: target})
     return engine
+
+
+def _log_new_connections(engine: Engine) -> None:
+    """Registra cada conexión física nueva y cuánto tardó en abrirse. Con el pooler de Supabase
+    abrir una conexión cuesta de 0.5 a 2 s: si aparecen muchas, el pool es chico o se recicla."""
+
+    @event.listens_for(engine, "do_connect")
+    def _start(_dialect, conn_rec, _cargs, _cparams):
+        conn_rec.info["connect_started"] = time.perf_counter()
+
+    @event.listens_for(engine, "connect")
+    def _done(_dbapi_conn, conn_rec):
+        started = conn_rec.info.pop("connect_started", None)
+        if started is not None:
+            ms = (time.perf_counter() - started) * 1000
+            pool = engine.pool
+            logger.info("Nueva conexión a la base en %.0f ms (pool: %s)", ms, pool.status())
 
 
 def ensure_schema(connection: Connection, url: str, schema: str | None) -> None:

@@ -37,6 +37,8 @@ class ClientLogEntry(BaseModel):
     # Lo informa el navegador: sirve para ubicar el caso, no es una identidad verificada.
     user: Annotated[str | None, Field(max_length=64, pattern=r"^[\w.@-]+$")] = None
     app_version: Annotated[str | None, Field(max_length=40)] = None
+    # Id de la petición a la API que falló (X-Request-ID): el mismo `[rid]` del log del backend.
+    request_id: Annotated[str | None, Field(max_length=64, pattern=r"^[A-Za-z0-9._-]+$")] = None
     at: datetime | None = None
 
 
@@ -93,6 +95,8 @@ def client_logs(batch: ClientLogBatch, request: Request) -> Response:
                 "user": entry.user or "-",
                 "app_version": _one_line(entry.app_version or "") or "-",
                 "client_time": entry.at.isoformat() if entry.at else "-",
+                # No `request_id`: ese campo es el de esta petición (/client-logs).
+                "api_request_id": entry.request_id or "-",
                 "ip": ip,
                 "user_agent": agent,
             },

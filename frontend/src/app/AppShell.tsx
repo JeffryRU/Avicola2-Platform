@@ -19,11 +19,11 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router'
-import { useContainer } from '@/app/di'
 import { InstallBanner } from '@/app/install'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
 import { initials } from '@/shared/domain/format'
 import { can, hasTeamView, roleLabel } from '@/features/auth/domain/session'
+import { useLogout } from '@/features/auth/ui/hooks'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { useUnreadCount } from '@/features/notifications/ui/hooks'
 import { useUnlocks } from '@/features/editing/ui/hooks'
@@ -61,7 +61,7 @@ function SideItem({
 }
 
 function Sidebar() {
-  const { auth } = useContainer()
+  const logout = useLogout()
   const session = useRequiredSession()
   const { seller } = session
   const { pathname } = useLocation()
@@ -100,7 +100,7 @@ function Sidebar() {
         </div>
       </div>
       <SideItem to={paths.profile} icon={<Settings />} label="Configuración" />
-      <button type="button" className={itemCls(false)} onClick={auth.logout}>
+      <button type="button" className={itemCls(false)} onClick={() => logout.mutate()}>
         <LogOut />
         <span>Cerrar sesión</span>
       </button>

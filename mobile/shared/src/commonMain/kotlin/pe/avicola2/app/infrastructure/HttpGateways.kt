@@ -26,7 +26,7 @@ import pe.avicola2.app.domain.ProductionEntry
 import pe.avicola2.app.domain.ProductionRequest
 import pe.avicola2.app.domain.Projection
 import pe.avicola2.app.domain.Saca
-import pe.avicola2.app.domain.SacaFactors
+import pe.avicola2.app.domain.SacaPlus
 import pe.avicola2.app.domain.Seller
 import pe.avicola2.app.domain.StockDay
 import pe.avicola2.app.domain.StockEntry
@@ -105,10 +105,10 @@ class HttpStockGateway(private val api: ApiClient) : StockGateway {
 }
 
 class HttpSacaGateway(private val api: ApiClient) : SacaGateway {
-    override suspend fun plan(day: LocalDate, method: String): Saca = api.get("/saca", mapOf("date" to day, "method" to method))
+    override suspend fun plan(day: LocalDate): Saca = api.get("/saca", mapOf("date" to day))
 
-    override suspend fun setFactors(factors: Map<String, Double>): Map<String, Double> =
-        api.put<SacaFactors, SacaFactors>("/saca/factors", SacaFactors(factors)).factors
+    override suspend fun setPlus(plus: Map<String, Int>): Map<String, Int> =
+        api.put<SacaPlus, SacaPlus>("/saca/plus", SacaPlus(plus)).plus
 }
 
 class HttpProductionGateway(private val api: ApiClient) : ProductionGateway {

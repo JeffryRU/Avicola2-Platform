@@ -1,13 +1,12 @@
 import { useMemo, useSyncExternalStore } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
+import { queryKeys } from '@/shared/application/query-keys'
 import { addDays, today, weekStart } from '@/shared/domain/dates'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { myDays } from '@/features/projections/domain/aggregation'
-
-export const keys = {
-  window: (from: string, to: string) => ['window', from, to] as const,
-}
+import type { Catalog } from '@/features/catalog/domain/catalog'
+import type { Draft } from '@/features/projections/domain/draft'
 
 /** Ventana de datos que usa toda la app: 3 semanas atrás y 2 adelante (como el mockup). */
 export function dataWindow(ref = today()) {
@@ -25,7 +24,7 @@ export function useWindowData() {
 export function useRangeData(from: string, to: string) {
   const { projections: gateway } = useContainer()
   return useQuery({
-    queryKey: keys.window(from, to),
+    queryKey: queryKeys.projections.range(from, to),
     queryFn: async () => {
       const [projections, sales] = await Promise.all([gateway.projections({ from, to }), gateway.sales({ from, to })])
       return { projections, sales }
@@ -50,4 +49,63 @@ export function useMyDays(username?: string) {
   const owner = username ?? session.seller.username
   const days = useMemo(() => myDays(data.data?.projections ?? [], queue, owner), [data.data, queue, owner])
   return { days, isLoading: data.isLoading, error: data.error }
+}
+
+/**
+ * Reenvía la cola offline de quien tiene la sesión (POST /projections por cada envío pendiente).
+ * Si algo llegó, refresca las proyecciones; `mutateAsync` espera ese refresco.
+ */
+export function useFlushQueue() {
+  const { planning } = useContainer()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (seller: string) => planning.flush(seller),
+    onSuccess: async (r) => {
+      if (r.sent) await client.invalidateQueries({ queryKey: queryKeys.projections.all })
+    },
+  })
+}
+
+/** Envía una proyección (con cola offline: sin conexión queda pendiente) y refresca los datos. */
+export function useSubmitProjection() {
+  const { planning } = useContainer()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      draft,
+      catalog,
+      owner,
+      author,
+    }: {
+      draft: Draft
+      catalog: Catalog
+      owner: string
+      author: string
+    }) => planning.submit(draft, catalog, owner, author),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.projections.all }),
+  })
+}
+
+/** Sugerencia con el historial: se pide al tocar el botón y siempre fresca (GET /suggestions). */
+export function useSuggestion() {
+  const { projections } = useContainer()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      category,
+      start,
+      days,
+      seller,
+    }: {
+      category: string
+      start: string
+      days: number
+      seller?: string
+    }) =>
+      client.query({
+        queryKey: queryKeys.suggestions.get(category, start, days, seller),
+        queryFn: () => projections.suggestions(category, start, days, seller),
+        staleTime: 0,
+      }),
+  })
 }

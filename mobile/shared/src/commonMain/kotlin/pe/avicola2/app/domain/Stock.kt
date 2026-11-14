@@ -12,7 +12,7 @@ fun editableStockDays(ref: LocalDate = today()): List<LocalDate> = (0..STOCK_BAC
 
 fun isEditableStockDay(day: LocalDate, ref: LocalDate = today()): Boolean = day in editableStockDays(ref)
 
-/** Días que se consultan para la saca: desde ayer hasta una semana adelante. */
+/** Días del cálculo de saca que se pueden consultar: desde ayer hasta una semana adelante (por defecto, hoy). */
 fun sacaDays(ref: LocalDate = today()): List<LocalDate> = (-1..7).map { ref.plusDays(it) }
 
 /** Lo escrito en el formulario: «producto|lote» → unidades (texto, para no pelear con el teclado). */

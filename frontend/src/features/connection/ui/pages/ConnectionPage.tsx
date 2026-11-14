@@ -1,11 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Check, Layers, RefreshCw, Send, User } from 'lucide-react'
 import { toast } from 'sonner'
-import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { SummaryRow } from '@/features/projections/ui/components/review-dialog'
-import { useQueue } from '@/features/projections/ui/hooks'
+import { useFlushQueue, useQueue } from '@/features/projections/ui/hooks'
 import { useStatus } from '@/features/connection/ui/hooks'
 import { Note } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
@@ -20,7 +19,7 @@ const DIALECTS: Record<string, string> = {
 
 export function ConnectionPage() {
   const status = useStatus()
-  const { planning } = useContainer()
+  const flushQueue = useFlushQueue()
   const { seller } = useRequiredSession()
   const pending = useQueue().filter((q) => q.seller === seller.username).length
   const client = useQueryClient()
@@ -32,8 +31,7 @@ export function ConnectionPage() {
     toast(r.data?.database && r.data.tables ? 'Conexión correcta' : 'Sin conexión')
   }
   const flush = async () => {
-    const r = await planning.flush(seller.username)
-    if (r.sent) await client.invalidateQueries({ queryKey: ['window'] })
+    const r = await flushQueue.mutateAsync(seller.username)
     toast(r.sent ? `${r.sent} enviado(s)` : 'No se pudo sincronizar. Se intentará de nuevo.')
   }
   const reload = async () => {
