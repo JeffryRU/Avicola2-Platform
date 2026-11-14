@@ -44,6 +44,8 @@ export function createQueryClient(errors: ErrorReporter) {
         refetchOnReconnect: true,
         retry: shouldRetry,
         retryDelay: (attempt) => retryDelay(attempt),
+        // Si el servidor no respondió, la consulta se vuelve a intentar sola cada 20 s hasta que conteste.
+        refetchInterval: (query) => (query.state.status === 'error' ? 20_000 : false),
       },
       mutations: { retry: false },
     },

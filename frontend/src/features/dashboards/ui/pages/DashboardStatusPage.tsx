@@ -1,3 +1,4 @@
+import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { Check, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { dDM, dDow, dFull, dShort, rangeLabel } from '@/shared/domain/dates'
@@ -23,9 +24,9 @@ export function DashboardStatusPage() {
   const { bind, node } = useTooltip()
   const title = 'Estado de proyecciones'
   const subtitle = rangeLabel(period.from, period.to, true)
-  if (!catalog || !data.data) return <PageHeader title={title} subtitle={subtitle} />
+  const source = data.data ?? { projections: [], sales: [] }
 
-  const days = periodAgg(period.dates, sellers, data.data.projections, data.data.sales, catalog)
+  const days = periodAgg(period.dates, sellers, source.projections, source.sales, catalog)
   const units = days.reduce((s, d) => s + d.u, 0)
   const kg = days.reduce((s, d) => s + d.kg, 0)
   const legend = (
@@ -48,6 +49,7 @@ export function DashboardStatusPage() {
   return (
     <div>
       <PageHeader title={title} subtitle={subtitle} sticky={false} />
+      <SyncStatus queries={[data]} className="mx-4 mt-3 dsk:mx-8" />
       <DashboardFilterBar />
       <DashboardTabs />
       <PageBody>

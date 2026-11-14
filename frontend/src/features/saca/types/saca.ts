@@ -61,6 +61,7 @@ export const stockOldNote = (n: number, days: number) =>
 export const NO_STOCK = 'Sin registro de stock entre anteayer y hoy: se toma como 0.'
 export const NO_ORDERS = 'No hay pedidos de ARIS cargados para mañana: se toman como 0.'
 export const ORDERS_OK = 'Pedidos de ARIS cargados para mañana (pollo entero para brasa).'
+export const WAITING_SOURCES = 'Esperando los datos del servidor: proyecciones, stock, pedidos y llegada estimada.'
 
 export const COLUMNS = {
   product: 'Producto',

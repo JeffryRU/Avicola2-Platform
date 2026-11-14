@@ -78,6 +78,7 @@ export function createContainer(): Container {
     baseUrl,
     timeoutMs: 15_000,
     onUnauthorized: () => auth?.expire(),
+    onForbidden: () => void auth?.verify(),
   })
   const drafts = new StoredDraftRepository(local)
   // Al cerrar sesión se borran el borrador y las respuestas guardadas; la cola offline se

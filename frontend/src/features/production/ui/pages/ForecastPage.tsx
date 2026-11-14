@@ -5,6 +5,7 @@ import { nf0 } from '@/shared/domain/format'
 import { paths } from '@/app/routes'
 import { useCatalog } from '@/features/catalog/ui/hooks'
 import {
+  emptyForecast,
   project,
   projectionTotals,
   requestDraftOf,
@@ -46,6 +47,7 @@ import {
   weightDraftOf,
   type WeightDraft,
 } from '@/features/production/domain/production'
+import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { modelLabel } from '@/features/saca/types/saca'
 import { useArrivalForecast } from '@/features/production/ui/hooks'
 import { EmptyState } from '@/shared/ui/components/feedback'
@@ -71,27 +73,30 @@ export function ForecastPage() {
   const [edited, setEdited] = useState<WeightDraft | null>(null)
   const [applied, setApplied] = useState<number[]>([])
   const query = useArrivalForecast(applied)
-  const forecast = query.data
-  const groupNames = (forecast?.groups ?? []).map((g) => g.name)
+  // Sin respuesta del servidor se dibuja en cero con los tipos del catálogo.
+  const forecast = query.data ?? emptyForecast(catalog.products)
+  const groupNames = forecast.groups.map((g) => g.name)
   const weights =
-    edited ??
-    weightDraftOf(groupNames, Object.fromEntries((forecast?.groups ?? []).map((g) => [g.name, g.last_weight ?? 0])))
+    edited ?? weightDraftOf(groupNames, Object.fromEntries(forecast.groups.map((g) => [g.name, g.last_weight ?? 0])))
   const applyWeights = () => {
     if (invalidWeights(weights).length) return
     const next = groupNames.map((g) => parseKg(weights[g] ?? '') ?? 0)
     setApplied(next.some((kg) => kg > 0) ? next : [])
   }
-  const names = new Map((catalog?.products ?? []).map((p) => [p.id, p.name]))
+  const names = new Map(catalog.products.map((p) => [p.id, p.name]))
   return (
     <div>
       <PageHeader title={FORECAST_TITLE} subtitle={FORECAST_SUBTITLE} back={paths.production} />
       <PageBody>
-        {!forecast || !catalog ? null : !forecast.available ? (
+        <SyncStatus queries={[query]} />
+        {!forecast.available ? (
           <Section>
             <EmptyState title={NO_HISTORY_TITLE}>{noHistoryBody(forecast.min_days)}</EmptyState>
           </Section>
         ) : (
           <Projector
+            // Al llegar los datos, el formulario parte de lo último que se pidió.
+            key={query.data ? 'server' : 'empty'}
             forecast={forecast}
             name={(id) => names.get(id) ?? id}
             weights={weights}

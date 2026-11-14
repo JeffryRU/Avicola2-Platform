@@ -1,3 +1,4 @@
+import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { BarChart3, ShoppingCart, Target, TrendingDown } from 'lucide-react'
 import { dDM, dDow, dShort } from '@/shared/domain/dates'
 import { nf0, nf1, pct1 } from '@/shared/domain/format'
@@ -20,9 +21,9 @@ export function DashboardVersusPage() {
   const data = usePeriodData(period)
   const title = 'Proyección vs Venta Real'
   const subtitle = 'Comparativo de proyección y ventas reales por producto'
-  if (!catalog || !data.data) return <PageHeader title={title} subtitle={subtitle} />
+  const source = data.data ?? { projections: [], sales: [] }
 
-  const days = periodAgg(period.dates, sellers, data.data.projections, data.data.sales, catalog)
+  const days = periodAgg(period.dates, sellers, source.projections, source.sales, catalog)
   const vs = versusReal(days, catalog)
   const withReal = days.filter((d) => d.real)
   const points = days
@@ -35,6 +36,7 @@ export function DashboardVersusPage() {
   return (
     <div>
       <PageHeader title={title} subtitle={subtitle} sticky={false} />
+      <SyncStatus queries={[data]} className="mx-4 mt-3 dsk:mx-8" />
       <DashboardFilterBar />
       <DashboardTabs />
       <PageBody>

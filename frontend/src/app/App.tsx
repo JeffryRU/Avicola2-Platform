@@ -1,11 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { AppShell } from '@/app/AppShell'
 import type { Container } from '@/app/container'
-import { ContainerProvider } from '@/app/di'
+import { ContainerProvider, useContainer } from '@/app/di'
 import { createQueryClient } from '@/app/query-client'
 import { paths } from '@/app/routes'
 import { can, hasTeamView } from '@/features/auth/domain/session'
@@ -116,9 +116,28 @@ function useSessionLifecycle() {
   const session = useSession()
   const client = useQueryClient()
   const user = session?.seller.username
+  const { auth } = useContainer()
   useVerifySession(user)
   useEffect(() => {
-    if (!user) client.clear()
+    // Al volver a la pestaña se confirma la sesión: en otra pestaña pudieron entrar con otra cuenta.
+    const check = () => {
+      if (document.visibilityState === 'visible') void auth.verify()
+    }
+    document.addEventListener('visibilitychange', check)
+    window.addEventListener('focus', check)
+    return () => {
+      document.removeEventListener('visibilitychange', check)
+      window.removeEventListener('focus', check)
+    }
+  }, [auth])
+  const previous = useRef(user)
+  useEffect(() => {
+    // Otra cuenta (o ninguna): los datos guardados eran de la anterior.
+    if (previous.current !== user) client.clear()
+    if (previous.current && user && previous.current !== user) {
+      toast.info(`En otra pestaña se entró como ${user}. Esta pestaña ahora usa esa cuenta.`)
+    }
+    previous.current = user
   }, [user, client])
 }
 

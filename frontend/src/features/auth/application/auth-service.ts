@@ -35,6 +35,19 @@ export class AuthService {
    *  conserva el perfil guardado (la PWA funciona offline y la cola se envía después). */
   async verify() {
     if (!this.session) return
+    // Varias llamadas seguidas (al volver a la pestaña, un 403) comparten la misma consulta.
+    this.verifying ??= this.check().finally(() => {
+      this.verifying = null
+    })
+    return this.verifying
+  }
+
+  private verifying: Promise<void> | null = null
+
+  /** La cookie es del navegador, no de la pestaña: si en otra pestaña se entró con otra cuenta,
+   *  esta pasa a ser esa cuenta. Aquí se adopta la que el servidor reconoce. */
+  private async check() {
+    if (!this.session) return
     try {
       this.store(await this.gateway.me(), this.remember)
     } catch (e) {

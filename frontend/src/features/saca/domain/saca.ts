@@ -82,6 +82,59 @@ export function parsePlus(draft: Record<string, string>): Record<string, number>
   return out
 }
 
+/** Saca en cero para dibujar la pantalla mientras el servidor no responde. */
+export function emptySaca(
+  day: IsoDate,
+  products: { id: string; subcategory?: string | null; category: string }[],
+): Saca {
+  const groups = [...new Set(products.map((p) => p.subcategory ?? p.category))]
+  return {
+    date: day,
+    lines: products.map((p) => ({
+      product_id: p.id,
+      projected: 0,
+      ordered: 0,
+      demand: 0,
+      stock: 0,
+      request: 0,
+      request_kg: 0,
+      expected: null,
+      expected_a: null,
+    })),
+    projected: 0,
+    ordered: 0,
+    demand: 0,
+    stock: 0,
+    request: 0,
+    request_kg: 0,
+    live_kg: 0,
+    yield_factor: 0.75,
+    method: SACA_METHOD,
+    orders_date: addDays(day, 1),
+    projection_date: addDays(day, 2),
+    plus: 0,
+    farm_order: 0,
+    stock_b: 0,
+    stock_old: 0,
+    stock_lot_days: null,
+    groups: groups.map((name) => ({
+      name,
+      stock: 0,
+      stock_b: 0,
+      ordered: 0,
+      projected: 0,
+      plus: 0,
+      balance: 0,
+      farm_order: 0,
+    })),
+    stock_date: null,
+    sellers_registered: 0,
+    sellers_total: 0,
+    orders_available: false,
+    forecast: null,
+  }
+}
+
 /** Días del cálculo que se pueden consultar: desde ayer hasta una semana adelante (por defecto, hoy). */
 export const sacaDays = (ref: IsoDate): IsoDate[] => Array.from({ length: 9 }, (_, i) => addDays(ref, i - 1))
 
