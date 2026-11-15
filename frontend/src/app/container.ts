@@ -36,6 +36,8 @@ import type { SacaGateway } from '@/features/saca/application/ports'
 import { HttpSacaGateway } from '@/features/saca/infrastructure/http-saca-gateway'
 import { BrowserTableExporter } from '@/shared/infrastructure/table-exporter'
 import { StoredDraftRepository, StoredSubmissionQueue } from '@/features/projections/infrastructure/stored-repositories'
+import type { VersionsGateway } from '@/features/versions/application/ports'
+import { GithubVersionsGateway } from '@/features/versions/infrastructure/github-versions'
 
 /** Lo que la interfaz puede usar: solo casos de uso y puertos, nunca adaptadores concretos. */
 export interface Container {
@@ -51,6 +53,8 @@ export interface Container {
   events: EventStream
   exporter: TableExporter
   preferences: KeyValueStore
+  /** Versiones publicadas (MVP 1, MVP 2…) y sus novedades. */
+  versions: VersionsGateway
   errors: ErrorReporter
   accounts: AccountsGateway
   editing: EditingGateway
@@ -101,6 +105,7 @@ export function createContainer(): Container {
     events: new SseEventStream(`${baseUrl}/events`),
     exporter: new BrowserTableExporter(),
     preferences: local,
+    versions: new GithubVersionsGateway(),
     errors,
     accounts: new HttpAccountsGateway(http),
     editing: new HttpEditingGateway(http),

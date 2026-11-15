@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
@@ -9,8 +10,23 @@ const backend = process.env.VITE_BACKEND_URL ?? 'http://127.0.0.1:8000'
 
 const version = `${process.env.npm_package_version ?? '0.0.0'}+${new Date().toISOString().slice(0, 16)}`
 
+/** Rama y commit de este build: en Vercel vienen en el entorno; en local, de git. */
+function git(args: string, fallback: string) {
+  try {
+    return execSync(`git ${args}`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  } catch {
+    return fallback
+  }
+}
+const branch = process.env.VERCEL_GIT_COMMIT_REF ?? git('rev-parse --abbrev-ref HEAD', '')
+const commit = process.env.VERCEL_GIT_COMMIT_SHA ?? git('rev-parse HEAD', '')
+
 export default defineConfig({
-  define: { __APP_VERSION__: JSON.stringify(version) },
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+    __APP_BRANCH__: JSON.stringify(branch),
+    __APP_COMMIT__: JSON.stringify(commit),
+  },
   plugins: [
     react(),
     tailwindcss(),
