@@ -13,6 +13,7 @@ import { LoginPage } from '@/features/auth/ui/LoginPage'
 import { useRealtime } from '@/features/notifications/ui/hooks'
 import { useSession } from '@/features/auth/ui/use-session'
 import { useVerifySession } from '@/features/auth/ui/hooks'
+import { VersionProvider } from '@/features/versions/ui/versions'
 import { useFlushQueue } from '@/features/projections/ui/hooks'
 import { BrandProvider, type BrandId } from '@/shared/ui/components/brand'
 import { ErrorBoundary } from '@/shared/ui/components/error-boundary'
@@ -155,7 +156,7 @@ function Routed() {
     setTimeout(() => setSplash(false), 1550)
   }
   return (
-    <>
+    <VersionProvider>
       <Splash visible={splash} durationS={2.2} />
       {!session ? (
         <LoginPage onLoggedIn={showSplash} />
@@ -228,7 +229,7 @@ function Routed() {
           </Routes>
         </Suspense>
       )}
-    </>
+    </VersionProvider>
   )
 }
 
