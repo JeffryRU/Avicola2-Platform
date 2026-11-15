@@ -28,11 +28,11 @@ export function useCurrentVersion(): {
   const { data: catalog } = useVersionCatalog()
   const version = catalog ? versionOfBranch(catalog, BUILD.branch) : null
   const repo = catalog?.repo ?? ''
-  const tag = version?.tag ?? ''
+  const ref = version?.ref ?? ''
   const live = useQuery({
-    queryKey: ['versions', 'changes', repo, tag, BUILD.commit],
-    queryFn: () => versions.changes(repo, tag, BUILD.commit),
-    enabled: !!repo && !!tag && !!version?.moving && !!BUILD.commit,
+    queryKey: ['versions', 'changes', repo, ref, BUILD.commit],
+    queryFn: () => versions.changes(repo, ref, BUILD.commit),
+    enabled: !!repo && !!ref && !!version?.moving && !!BUILD.commit,
     staleTime: 30 * 60_000,
     ...NO_POLLING,
   })
