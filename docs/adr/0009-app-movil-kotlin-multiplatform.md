@@ -53,7 +53,7 @@
   - Acepta `Authorization: Bearer <token>` en todas las rutas, incluido `/api/events`.
 - **La web no cambia:** `/api/auth/login` sigue sin devolver el token y el navegador usa solo la cookie.
 - **Sin riesgo de CSRF:** el encabezado `Authorization` no lo adjunta el navegador por su cuenta. La app no envía `Origin`, así que la protección CSRF actual no la bloquea.
-- Con contraseña temporal, la app obliga a cambiarla. Después vuelve a pedir el token, porque el servidor invalida los anteriores.
+- ~~Con contraseña temporal, la app obliga a cambiarla.~~ Retirado el 2026-11-15: se entra directo. Al cambiar la contraseña desde el perfil, la app vuelve a pedir el token, porque el servidor invalida los anteriores.
 
 ### Distribución: GitHub Releases
 

@@ -108,9 +108,8 @@ fun App(container: AppContainer) {
             when (val s = state) {
                 SessionState.Restoring -> Loading()
                 is SessionState.SignedOut -> LoginScreen(container, s.reason)
-                is SessionState.SignedIn ->
-                    if (s.account.mustChangePassword) ChangePasswordScreen(container, forced = true, onDone = {})
-                    else MainShell(container, s.account)
+                // Sin cambio de contraseña obligatorio: con la inicial se entra directo.
+                is SessionState.SignedIn -> MainShell(container, s.account)
             }
         }
     }
@@ -263,7 +262,7 @@ private fun AppNavHost(
             NewProjectionScreen(container, account, start, onClose = { nav.popBackStack() })
         }
         composable<ChangePasswordRoute> {
-            ChangePasswordScreen(container, forced = false, onDone = { nav.popBackStack() })
+            ChangePasswordScreen(container, onDone = { nav.popBackStack() })
         }
     }
 }

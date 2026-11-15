@@ -142,7 +142,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               type="button"
               className="font-bold text-primary hover:underline"
               onClick={() =>
-                toast('Pide a tu supervisor que restablezca tu contraseña: te dará una temporal para entrar.')
+                toast('Pide a tu supervisor que restablezca tu contraseña: te dará una nueva para entrar.')
               }
             >
               ¿Olvidaste tu contraseña?

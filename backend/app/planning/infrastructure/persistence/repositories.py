@@ -176,7 +176,6 @@ class SqlSellerRepository:
         if change.password_hash is not None:
             values.update(
                 password_hash=change.password_hash,
-                must_change_password=True,
                 failed_logins=0,
                 locked_until=None,
             )

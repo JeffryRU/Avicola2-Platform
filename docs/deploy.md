@@ -113,13 +113,13 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
    docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli supervisor <usuario> "<Nombre Apellido>" --general
    ```
    - `init` carga el catálogo de productos.
-   - `supervisor` muestra una contraseña temporal, que se cambia al entrar. Con `--general` crea un supervisor general, el único que gestiona a otros supervisores y cambia roles ([ADR 0010](adr/0010-roles-y-permisos.md)).
+   - `supervisor` muestra una contraseña inicial (se puede cambiar desde el perfil, no es obligatorio). Con `--general` crea un supervisor general, el único que gestiona a otros supervisores y cambia roles ([ADR 0010](adr/0010-roles-y-permisos.md)).
    - Si ya había un supervisor de antes, se lo asciende con `cli rol <usuario> general_supervisor`.
    - Después, el supervisor crea a los vendedores desde la pantalla **Usuarios**, o se cargan de una vez los 7 de la tabla maestra (`config/planning_seed.yaml`):
      ```bash
      docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli vendedores
      ```
-     Imprime una tabla con usuario, contraseña temporal, nombre y zona. Cada uno debe cambiar su contraseña al entrar.
+     Imprime una tabla con usuario, contraseña inicial, nombre y zona. Cada uno puede cambiarla desde su perfil.
      - `--simple`: contraseña `<usuario>2026` (p. ej. `cvillalobos2026`), fácil de dictar. Como contiene el usuario, la app no la acepta como contraseña definitiva.
      - `--reset`: también restablece a los que ya existen y cierra sus sesiones. Sin `--reset`, los existentes no se tocan.
 
@@ -164,4 +164,4 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
 - [ ] HTTPS activo en `APP_DOMAIN`. El login funciona y la cookie `nv_session` sale con `Secure`.
 - [ ] Editor de n8n sin exponer a internet, o con verificación en dos pasos si se publicó su dominio.
 - [ ] Respaldo de la base del día visible en el volumen `backups`, y copia fuera del servidor configurada.
-- [ ] Primer supervisor creado y contraseña temporal cambiada.
+- [ ] Primer supervisor creado (conviene que cambie la contraseña inicial desde su perfil).

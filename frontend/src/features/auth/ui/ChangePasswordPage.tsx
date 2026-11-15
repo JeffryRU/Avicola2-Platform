@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { paths } from '@/app/routes'
 import { newPasswordSchema } from '@/features/auth/domain/session'
-import { useChangePassword, useLogout } from '@/features/auth/ui/hooks'
+import { useChangePassword } from '@/features/auth/ui/hooks'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
@@ -99,30 +99,6 @@ export function ChangePasswordPage() {
           <PasswordForm onDone={() => navigate(paths.profile)} />
         </Section>
       </PageBody>
-    </div>
-  )
-}
-
-/** Con contraseña temporal (la dio el supervisor): no se puede usar la app hasta cambiarla. */
-export function ForcedPasswordChange() {
-  const logout = useLogout()
-  const { seller } = useRequiredSession()
-  return (
-    <div className="flex min-h-dvh items-start justify-center bg-background px-4 pt-16 pb-8">
-      <div className="w-full max-w-[440px] rounded-3xl bg-card shadow-sheet">
-        <div className="px-5 pt-6">
-          <h1 className="text-2xl font-extrabold">Crea tu contraseña</h1>
-          <p className="mt-1 text-ink-2">
-            Hola, {seller.name}. Entraste con una contraseña temporal: elige una nueva para continuar.
-          </p>
-        </div>
-        <PasswordForm onDone={() => {}} />
-        <div className="border-t px-5 py-3 text-center">
-          <button type="button" onClick={() => logout.mutate()} className="text-sm font-semibold text-muted-foreground">
-            Cerrar sesión
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

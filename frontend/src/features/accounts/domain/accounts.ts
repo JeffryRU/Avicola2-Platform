@@ -23,7 +23,7 @@ export const adminAccountSchema = z.object({
 })
 export type AdminAccount = z.infer<typeof adminAccountSchema>
 
-/** La contraseña temporal llega una sola vez: se muestra y no se guarda en ningún lado. */
+/** La contraseña inicial llega una sola vez: se muestra y no se guarda en ningún lado. */
 export const newCredentialsSchema = z.object({ account: adminAccountSchema, temporary_password: z.string() })
 export type NewCredentials = z.infer<typeof newCredentialsSchema>
 
@@ -47,7 +47,6 @@ export type NewAccount = z.infer<typeof newAccountSchema>
 export function accountState(account: AdminAccount, now: Date): AccountState {
   if (!account.is_active) return 'inactive'
   if (account.locked_until && new Date(account.locked_until) > now) return 'locked'
-  if (account.must_change_password) return 'must_change'
   return 'active'
 }
 
