@@ -206,7 +206,6 @@ class CreateAccount:
         account = SellerAccount(
             Seller(username, name, (zone or "").strip() or None, role),
             self.hasher.hash(temporary),
-            must_change_password=True,
         )
         self.sellers.create(account)
         logger.info("%s creó la cuenta %s (%s)", actor.seller.username, username, role)

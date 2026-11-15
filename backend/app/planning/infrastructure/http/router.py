@@ -80,9 +80,8 @@ def current_account(use_cases: UseCases, token: SessionToken) -> SellerAccount:
 
 
 def active_account(account: Annotated[SellerAccount, Depends(current_account)]) -> SellerAccount:
-    """Con contraseña temporal solo se puede cambiar la contraseña o cerrar sesión."""
-    if account.must_change_password:
-        raise ForbiddenError("Debes cambiar tu contraseña antes de continuar.")
+    """Cuenta con sesión válida. Ya no se obliga a cambiar la contraseña temporal al entrar:
+    cada uno puede cambiarla cuando quiera desde su perfil."""
     return account
 
 

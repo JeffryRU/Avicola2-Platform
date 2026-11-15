@@ -108,15 +108,16 @@ def test_role_change_publishes_session_revoked_for_target(db):
     ]
 
 
-def test_general_with_temporary_password_cannot_use_admin(db):
+def test_new_general_uses_admin_with_initial_password(db):
+    """Sin cambio de contraseña obligatorio: un supervisor general recién creado entra y
+    administra con la contraseña inicial que le dieron."""
     gen = login("general")
-    temp = gen.post(
+    initial = gen.post(
         "/api/admin/accounts",
         json={"username": "gen2", "name": "G2", "role": GENERAL_SUPERVISOR},
     ).json()["temporary_password"]
-    g2 = login("gen2", temp)
-    assert g2.get("/api/admin/accounts").status_code == 403
-    assert g2.put("/api/admin/accounts/rnavarro/role", json={"role": SUPERVISOR}).status_code == 403
+    g2 = login("gen2", initial)
+    assert g2.get("/api/admin/accounts").status_code == 200
 
 
 def test_sequential_mutual_demotion_is_stopped_by_session_revocation(db):

@@ -35,10 +35,7 @@ def _authenticate(token: str | None) -> SellerAccount:
     if not token:
         raise AuthenticationError("Inicia sesión para continuar.")
     with SessionLocal() as session:
-        account = build_use_cases(session, get_settings()).current_account(token)
-    if account.must_change_password:
-        raise ForbiddenError("Debes cambiar tu contraseña antes de continuar.")
-    return account
+        return build_use_cases(session, get_settings()).current_account(token)
 
 
 def _format(event: Event) -> str:

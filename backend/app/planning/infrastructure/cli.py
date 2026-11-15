@@ -2,14 +2,14 @@
 
     uv run python -m app.planning.infrastructure.cli init         productos (+ usuarios de prueba)
     uv run python -m app.planning.infrastructure.cli supervisor <usuario> "<nombre>" [--general]
-                        supervisor con contraseña temporal (--general: supervisor general,
+                        supervisor con contraseña inicial (--general: supervisor general,
                         el único que gestiona a otros supervisores; el primero debe serlo)
     uv run python -m app.planning.infrastructure.cli rol <usuario> <rol>
                         cambia el rol de una cuenta y cierra sus sesiones (p. ej., para
                         ascender a supervisor general a un supervisor que ya existe).
                         Roles: seller, supervisor, general_supervisor
     uv run python -m app.planning.infrastructure.cli vendedores [--simple] [--reset]
-                        vendedores de la tabla maestra con contraseña temporal
+                        vendedores de la tabla maestra con contraseña inicial
                         (--simple: <usuario>2026; --reset: también a los que ya existen)
     uv run python -m app.planning.infrastructure.cli produccion <archivo.xlsx>
                         carga la historia de producción (hoja DB_CALIDA_B: pedido, producción y
@@ -162,10 +162,9 @@ def create_supervisor(session: Session, username: str, name: str, general: bool 
         SellerAccount(
             Seller(username, name, None, role),
             ScryptPasswordHasher().hash(temporary),
-            must_change_password=True,
         )
     )
-    print(f"OK: {ROLE_LABELS[role]} {username} creado. Contraseña temporal (cámbiala al entrar):")
+    print(f"OK: {ROLE_LABELS[role]} {username} creado. Contraseña inicial:")
     print(f"  {temporary}")
     return 0
 
@@ -215,7 +214,7 @@ SIMPLE_PASSWORD_SUFFIX = "2026"  # noqa: S105
 def create_sellers(
     session: Session, settings: Settings, *, simple: bool = False, reset: bool = False
 ) -> None:
-    """Vendedores de config/planning_seed.yaml (U0001..U0007), con contraseña temporal.
+    """Vendedores de config/planning_seed.yaml (U0001..U0007), con contraseña inicial.
 
     Sirve en producción: imprime usuario y contraseña de cada uno, y al entrar se les pide
     cambiarla. `simple` usa <usuario>2026 (fácil de dictar en una entrevista); `reset` también
@@ -254,7 +253,6 @@ def create_sellers(
                 SellerAccount(
                     Seller(username, s["name"], s.get("zone"), SELLER),
                     hasher.hash(password),
-                    must_change_password=True,
                 )
             )
         rows.append((username, password, s["name"], s.get("zone") or ""))
@@ -263,7 +261,7 @@ def create_sellers(
         print(f"{username:<14}{password:<26}{name:<20}{zone}")
     changed = sum(1 for r in rows if not r[1].startswith("("))
     print()
-    print(f"OK: {changed} cuentas listas. Al entrar, cada uno debe cambiar su contraseña.")
+    print(f"OK: {changed} cuentas listas. Cada uno puede cambiar su contraseña desde el perfil.")
 
 
 def seed_history(session: Session, settings: Settings) -> None:

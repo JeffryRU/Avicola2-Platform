@@ -4,7 +4,7 @@ App de vendedores en **Kotlin Multiplatform + Compose Multiplatform**: un solo c
 
 ## Qué hace
 
-- **Login** con usuario y contraseña. El token se guarda cifrado (Keystore en Android, Keychain en iOS). Con contraseña temporal, obliga a cambiarla.
+- **Login** con usuario y contraseña. El token se guarda cifrado (Keystore en Android, Keychain en iOS).
 - **Inicio:**
   - Días abiertos y cerrados, con la hora de corte.
   - Qué días ya registraste y cuáles faltan.

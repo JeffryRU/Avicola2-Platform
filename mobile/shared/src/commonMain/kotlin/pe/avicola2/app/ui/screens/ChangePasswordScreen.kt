@@ -21,7 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,13 +46,10 @@ fun passwordProblem(new: String, confirm: String, current: String): String? = wh
     else -> null
 }
 
-/**
- * Cambio de contraseña. `forced`: la cuenta tiene contraseña temporal y no puede seguir sin
- * cambiarla (solo puede cerrar sesión).
- */
+/** Cambio de contraseña desde el perfil (no es obligatorio al entrar). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChangePasswordScreen(container: AppContainer, forced: Boolean, onDone: () -> Unit) {
+fun ChangePasswordScreen(container: AppContainer, onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
     var current by remember { mutableStateOf("") }
     var new by remember { mutableStateOf("") }
@@ -80,24 +76,15 @@ fun ChangePasswordScreen(container: AppContainer, forced: Boolean, onDone: () ->
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (forced) "Crea tu contraseña" else "Cambiar contraseña") },
+                title = { Text("Cambiar contraseña") },
                 navigationIcon = {
-                    if (!forced) {
-                        IconButton(onClick = onDone) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") }
-                    }
+                    IconButton(onClick = onDone) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") }
                 },
             )
         },
     ) { padding ->
         Centered(Modifier.padding(padding), maxWidth = 480) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(20.dp)) {
-                if (forced) {
-                    Text(
-                        "Tu cuenta tiene una contraseña temporal. Elige una nueva para continuar.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = 12.dp),
-                    )
-                }
                 listOf(
                     Triple("Contraseña actual", current) { v: String -> current = v },
                     Triple("Nueva contraseña", new) { v: String -> new = v },
@@ -122,11 +109,6 @@ fun ChangePasswordScreen(container: AppContainer, forced: Boolean, onDone: () ->
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp)) }
                 Button(onClick = ::submit, enabled = !busy, modifier = Modifier.fillMaxWidth().padding(top = 20.dp).height(52.dp)) {
                     if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp) else Text("Guardar contraseña")
-                }
-                if (forced) {
-                    TextButton(onClick = { container.session.signOut() }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                        Text("Cerrar sesión")
-                    }
                 }
             }
         }

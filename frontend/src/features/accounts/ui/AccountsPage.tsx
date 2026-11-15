@@ -39,7 +39,6 @@ import { GrantEditingDialog } from '@/features/editing/ui/components/grant-editi
 
 const STATE_CLS: Record<AccountState, string> = {
   active: 'bg-ok-soft text-ok',
-  must_change: 'bg-warn-soft text-warn',
   locked: 'bg-bad-soft text-destructive',
   inactive: 'bg-pend-soft text-slate-500',
 }
@@ -50,7 +49,7 @@ function StateBadge({ state }: { state: AccountState }) {
   return <span className={cn('rounded-full px-2.5 py-1 text-[12.5px] font-bold whitespace-nowrap', cls)}>{label}</span>
 }
 
-/** Muestra la contraseña temporal una sola vez, con botón para copiarla. */
+/** Muestra la contraseña inicial una sola vez, con botón para copiarla. */
 function CredentialsDialog({ credentials, onClose }: { credentials: NewCredentials | null; onClose: () => void }) {
   const [copied, setCopied] = useState(false)
   const copy = async () => {
@@ -70,7 +69,7 @@ function CredentialsDialog({ credentials, onClose }: { credentials: NewCredentia
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Contraseña temporal de {credentials?.account.name}</DialogTitle>
+          <DialogTitle>Contraseña inicial de {credentials?.account.name}</DialogTitle>
           <DialogDescription>
             Entrégasela en persona. Se muestra solo esta vez: al entrar, {credentials?.account.username} tendrá que
             elegir una nueva.
@@ -197,7 +196,9 @@ function NewAccountDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Nuevo usuario</DialogTitle>
-          <DialogDescription>Se genera una contraseña temporal que deberá cambiar al entrar.</DialogDescription>
+          <DialogDescription>
+            Se genera una contraseña inicial para entregarle. Puede cambiarla cuando quiera desde su perfil.
+          </DialogDescription>
         </DialogHeader>
         <form id="new-account" onSubmit={submit} noValidate className="grid gap-3.5">
           {field('username', 'Usuario', 'Minúsculas, sin espacios. Ej.: ltorres')}
@@ -401,7 +402,7 @@ function AccountRow({
           )}
           <ConfirmDialog
             title={`¿Restablecer la contraseña de ${account.name}?`}
-            description="Se genera una contraseña temporal para entregarle y se cierran sus sesiones abiertas. Si la cuenta estaba bloqueada, se desbloquea."
+            description="Se genera una contraseña nueva para entregarle y se cierran sus sesiones abiertas. Si la cuenta estaba bloqueada, se desbloquea."
             confirmLabel="Restablecer"
             onConfirm={doReset}
             trigger={(open) => (

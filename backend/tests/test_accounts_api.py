@@ -161,7 +161,8 @@ def test_supervisor_creates_account_with_temporary_password(client):
     )
     assert r.status_code == 201, r.text
     body = r.json()
-    assert body["account"]["username"] == "ltorres" and body["account"]["must_change_password"]
+    assert body["account"]["username"] == "ltorres"
+    assert body["account"]["must_change_password"] is False
     temporary = body["temporary_password"]
     assert (
         client.post("/api/admin/accounts", json={"username": "ltorres", "name": "Otro"}).status_code
@@ -170,9 +171,10 @@ def test_supervisor_creates_account_with_temporary_password(client):
 
     seller = TestClient(app)
     login = _login(seller, "ltorres", temporary)
-    assert login.json()["must_change_password"] is True
-    # Con la temporal solo puede cambiar la contraseña.
-    assert seller.get("/api/catalog").status_code == 403
+    # Ya no se obliga a cambiarla al entrar: con la contraseña inicial usa la app de inmediato.
+    assert login.json()["must_change_password"] is False
+    assert seller.get("/api/catalog").status_code == 200
+    # Y puede cambiarla cuando quiera.
     changed = seller.post(
         "/api/auth/password", json={"current_password": temporary, "new_password": NEW_PASSWORD}
     )
@@ -191,7 +193,7 @@ def test_reset_password_unlocks_and_closes_sessions(client):
     assert r.status_code == 200
     temporary = r.json()["temporary_password"]
     assert seller.get("/api/auth/me").status_code == 401  # sesión anterior cerrada
-    assert _login(TestClient(app), "rnavarro", temporary).json()["must_change_password"]
+    assert _login(TestClient(app), "rnavarro", temporary).json()["must_change_password"] is False
 
 
 def test_deactivated_account_cannot_log_in(client):
@@ -309,7 +311,7 @@ def test_update_profile_requires_session(client):
 
 
 def test_cli_creates_the_master_table_sellers_with_temporary_passwords(capsys):
-    """`cli vendedores` (producción): 7 cuentas que deben cambiar su contraseña al entrar."""
+    """`cli vendedores` (producción): 7 cuentas con contraseña inicial, sin cambio obligatorio."""
     metadata.drop_all(engine)
     metadata.create_all(engine)
     with SessionLocal() as session:
@@ -323,11 +325,11 @@ def test_cli_creates_the_master_table_sellers_with_temporary_passwords(capsys):
     client = TestClient(app)
     r = _login(client, "cvillalobos", temporary)
     assert r.status_code == 200
-    assert r.json()["must_change_password"] is True
+    assert r.json()["must_change_password"] is False
     assert r.json()["seller"]["zone"] == "Trujillo"
 
 
-def test_cli_simple_reset_gives_username_passwords_that_must_be_changed(capsys):
+def test_cli_simple_reset_gives_username_passwords(capsys):
     metadata.drop_all(engine)
     metadata.create_all(engine)
     with SessionLocal() as session:
@@ -337,7 +339,7 @@ def test_cli_simple_reset_gives_username_passwords_that_must_be_changed(capsys):
     client = TestClient(app)
     r = _login(client, "eauleste", "eauleste2026")
     assert r.status_code == 200
-    assert r.json()["must_change_password"] is True
+    assert r.json()["must_change_password"] is False
     # La contraseña simple no sirve como contraseña definitiva (contiene el usuario).
     with pytest.raises(DomainError):
         check_new_password("eauleste2026", "eauleste")

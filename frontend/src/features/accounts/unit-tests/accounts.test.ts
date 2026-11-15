@@ -24,11 +24,11 @@ const account = (over: Partial<AdminAccount> = {}): AdminAccount => ({
 const NOW = new Date('2026-11-03T10:00:00Z')
 
 describe('cuentas', () => {
-  it('calcula el estado: desactivada, bloqueada, contraseña temporal o activa', () => {
+  it('calcula el estado: desactivada, bloqueada o activa (sin cambio de contraseña obligatorio)', () => {
     expect(accountState(account({ is_active: false }), NOW)).toBe('inactive')
     expect(accountState(account({ locked_until: '2026-11-03T11:00:00Z' }), NOW)).toBe('locked')
     expect(accountState(account({ locked_until: '2026-11-03T09:00:00Z' }), NOW)).toBe('active')
-    expect(accountState(account({ must_change_password: true }), NOW)).toBe('must_change')
+    expect(accountState(account({ must_change_password: true }), NOW)).toBe('active')
     expect(ACCOUNT_STATE_LABEL[accountState(account(), NOW)]).toBe('Activa')
   })
 

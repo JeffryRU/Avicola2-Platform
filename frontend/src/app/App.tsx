@@ -9,7 +9,6 @@ import { ContainerProvider, useContainer } from '@/app/di'
 import { createQueryClient } from '@/app/query-client'
 import { paths } from '@/app/routes'
 import { can, hasTeamView } from '@/features/auth/domain/session'
-import { ForcedPasswordChange } from '@/features/auth/ui/ChangePasswordPage'
 import { LoginPage } from '@/features/auth/ui/LoginPage'
 import { useRealtime } from '@/features/notifications/ui/hooks'
 import { useSession } from '@/features/auth/ui/use-session'
@@ -160,8 +159,6 @@ function Routed() {
       <Splash visible={splash} durationS={2.2} />
       {!session ? (
         <LoginPage onLoggedIn={showSplash} />
-      ) : session.must_change_password ? (
-        <ForcedPasswordChange />
       ) : hasTeamView(session) ? (
         <Suspense fallback={null}>
           <Routes>

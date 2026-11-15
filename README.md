@@ -84,7 +84,7 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
 - **Datos reales:** copia `DESPACHO.csv`, `VENTAS.csv` y el Excel de producción en `data/inbox/` (no se versiona) y ejecuta `cli historia`. Carga el catálogo, los pedidos de despacho (`np_dispatch_orders`), las ventas en tienda (`np_store_sales`) y la producción (`np_production`); cada ejecución reemplaza lo anterior.
 - **Cuentas y seguridad** ([ADR 0005](docs/adr/0005-seguridad-de-sesion-y-cuentas.md)):
   - La sesión va en una cookie HttpOnly. El token no aparece en las respuestas ni en el almacenamiento del navegador.
-  - El **supervisor** crea las cuentas de los vendedores y restablece las contraseñas olvidadas desde la pantalla **Usuarios**: entrega una contraseña temporal que el vendedor cambia al entrar.
+  - El **supervisor** crea las cuentas de los vendedores y restablece las contraseñas olvidadas desde la pantalla **Usuarios**: entrega una contraseña inicial con la que el vendedor entra directo; puede cambiarla cuando quiera desde su perfil.
   - El **supervisor general** además gestiona a los supervisores y cambia roles. Los permisos están en una sola fuente ([ADR 0010](docs/adr/0010-roles-y-permisos.md)).
   - Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.
   - Cada vendedor ve solo sus datos.
