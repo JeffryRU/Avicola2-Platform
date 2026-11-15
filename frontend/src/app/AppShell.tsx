@@ -19,6 +19,7 @@ import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
 import { initials } from '@/shared/domain/format'
 import { isSupervisor, roleLabel } from '@/features/auth/domain/session'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { VersionChip } from '@/features/versions/ui/versions'
 import { useUnreadCount } from '@/features/notifications/ui/hooks'
 import { Logo } from '@/shared/ui/components/brand'
 import { cn } from '@/shared/ui/lib/utils'
@@ -118,6 +119,7 @@ function Sidebar() {
         />
       </nav>
       <div className="mt-auto grid gap-0.5 pt-4">
+        <VersionChip className="mb-2" />
         <div className="mb-2 flex items-center gap-3 px-3 py-2.5">
           <div className="grid size-10 flex-none place-items-center rounded-full bg-secondary text-sm font-extrabold text-primary">
             {initials(seller.name)}

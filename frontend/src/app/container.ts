@@ -26,6 +26,8 @@ import type { SellersGateway } from '@/features/dashboards/application/ports'
 import { HttpSellersGateway } from '@/features/dashboards/infrastructure/http-sellers-gateway'
 import { BrowserTableExporter } from '@/shared/infrastructure/table-exporter'
 import { StoredDraftRepository, StoredSubmissionQueue } from '@/features/projections/infrastructure/stored-repositories'
+import type { VersionsGateway } from '@/features/versions/application/ports'
+import { GithubVersionsGateway } from '@/features/versions/infrastructure/github-versions'
 
 /** Lo que la interfaz puede usar: solo casos de uso y puertos, nunca adaptadores concretos. */
 export interface Container {
@@ -41,6 +43,8 @@ export interface Container {
   events: EventStream
   exporter: TableExporter
   preferences: KeyValueStore
+  /** Versiones publicadas (MVP 1, MVP 2…) y sus novedades. */
+  versions: VersionsGateway
   errors: ErrorReporter
   accounts: AccountsGateway
   installer: AppInstaller
@@ -86,6 +90,7 @@ export function createContainer(): Container {
     events: new SseEventStream(`${baseUrl}/events`),
     exporter: new BrowserTableExporter(),
     preferences: local,
+    versions: new GithubVersionsGateway(),
     errors,
     accounts: new HttpAccountsGateway(http),
     installer: new BrowserAppInstaller(),

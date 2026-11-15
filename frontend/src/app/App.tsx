@@ -16,6 +16,7 @@ import { BrandProvider, type BrandId } from '@/shared/ui/components/brand'
 import { ErrorBoundary } from '@/shared/ui/components/error-boundary'
 import { Splash } from '@/shared/ui/components/feedback'
 import { Toaster } from '@/shared/ui/components/shadcn/sonner'
+import { VersionProvider } from '@/features/versions/ui/versions'
 
 /** Pantallas cargadas a demanda: el celular descarga solo lo que abre. */
 const AccountsPage = lazy(() =>
@@ -125,7 +126,7 @@ function Routed() {
     setTimeout(() => setSplash(false), 1550)
   }
   return (
-    <>
+    <VersionProvider>
       <Splash visible={splash} durationS={2.2} />
       {!session ? (
         <LoginPage onLoggedIn={showSplash} />
@@ -174,7 +175,7 @@ function Routed() {
           </Routes>
         </Suspense>
       )}
-    </>
+    </VersionProvider>
   )
 }
 
