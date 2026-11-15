@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import pe.avicola2.app.application.MasterDataCache
 import pe.avicola2.app.application.ApiError
 import pe.avicola2.app.application.FileSharer
 import pe.avicola2.app.application.KeyValueStore
@@ -75,6 +76,8 @@ class AppContainer(
     val api = ApiClient({ server.url.value }, tokens, onUnauthorized = { expire() }, engine = engine)
 
     val planningGateway = HttpPlanningGateway(api)
+    /** Catálogo y opciones de stock guardados: sin servidor, las pantallas se dibujan con esto. */
+    val cache = MasterDataCache(prefs)
     val notifications = HttpNotificationsGateway(api)
     val stock: StockGateway = HttpStockGateway(api)
     val saca: SacaGateway = HttpSacaGateway(api)

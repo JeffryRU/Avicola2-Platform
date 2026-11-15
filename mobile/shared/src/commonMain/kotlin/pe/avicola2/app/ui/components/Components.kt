@@ -17,12 +17,14 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Warning as WarningIcon
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import pe.avicola2.app.ui.Load
+import pe.avicola2.app.ui.theme.Warning
 
 /** Contenido centrado con ancho máximo: en tablet o PC no se estira de lado a lado. */
 @Composable
@@ -42,6 +46,52 @@ fun Centered(modifier: Modifier = Modifier, maxWidth: Int = 720, content: @Compo
 @Composable
 fun Loading(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+}
+
+/**
+ * Estado de la conexión sobre una pantalla que se dibuja igual sin servidor: un spinner mientras
+ * llega la primera respuesta y, si falla, el aviso con «Reintentar» (también se reintenta sola).
+ */
+@Composable
+fun SyncBanner(state: Load.Ready<*>, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    val offline = state.offline
+    when {
+        offline != null -> Surface(
+            color = Warning.copy(alpha = 0.14f),
+            shape = MaterialTheme.shapes.medium,
+            modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        ) {
+            Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.WarningIcon, null, tint = Warning, modifier = Modifier.size(20.dp))
+                Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                    Text(
+                        if (state.pending) "Sin datos del servidor" else "Sin actualizar",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "$offline Se reintenta sola.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (state.refreshing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                else TextButton(onClick = onRetry) { Text("Reintentar") }
+            }
+        }
+        state.pending -> Row(
+            modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            Text(
+                "Cargando datos…",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 10.dp),
+            )
+        }
+    }
 }
 
 /** Error con botón "Reintentar". */

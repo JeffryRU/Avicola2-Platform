@@ -44,6 +44,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -77,6 +78,10 @@ import pe.avicola2.app.ui.components.Stat
 import pe.avicola2.app.ui.theme.Success
 import pe.avicola2.app.ui.theme.Warning
 import pe.avicola2.app.ui.userMessage
+import pe.avicola2.app.ui.AutoRetry
+import pe.avicola2.app.ui.failed
+import pe.avicola2.app.ui.placeholder
+import pe.avicola2.app.ui.components.SyncBanner
 
 data class HomeData(
     val catalog: Catalog,
@@ -88,7 +93,10 @@ data class HomeData(
 )
 
 class HomeViewModel(private val c: AppContainer, private val supervisor: Boolean) : ViewModel() {
-    private val _state = MutableStateFlow<Load<HomeData>>(Load.Loading)
+    private val _state = MutableStateFlow<Load<HomeData>>(
+        placeholder(HomeData(Catalog(c.cache.products()), emptyList(), emptyList(), emptyList())),
+    )
+    private val retry = AutoRetry(viewModelScope)
     val state: StateFlow<Load<HomeData>> = _state.asStateFlow()
 
     init {
@@ -101,20 +109,26 @@ class HomeViewModel(private val c: AppContainer, private val supervisor: Boolean
     fun load(silent: Boolean = false) {
         val current = _state.value
         if (!silent || current !is Load.Ready) _state.value = if (current is Load.Ready) current.copy(refreshing = true) else Load.Loading
+        retry.cancel()
         viewModelScope.launch {
             try {
-                val catalog = async { Catalog(c.planningGateway.catalog()) }
-                val window = async { c.planningGateway.editingWindow() }
-                val sellers = async { c.planningGateway.sellers() }
-                val days = window.await().days
-                val from = days.minOfOrNull { it.date } ?: today()
-                val to = days.maxOfOrNull { it.date } ?: today().plusDays(6)
-                val projections = c.planningGateway.projections(from, to)
-                val unlocks = if (supervisor) c.planningGateway.unlocks() else emptyList()
-                _state.value = Load.Ready(HomeData(catalog.await(), days, projections, sellers.await(), unlocks))
+                // coroutineScope: si una consulta falla, llega su error (no una cancelación).
+                _state.value = coroutineScope {
+                    val catalog = async { Catalog(c.cache.fetchProducts { c.planningGateway.catalog() }) }
+                    val window = async { c.planningGateway.editingWindow() }
+                    val sellers = async { c.planningGateway.sellers() }
+                    val days = window.await().days
+                    val from = days.minOfOrNull { it.date } ?: today()
+                    val to = days.maxOfOrNull { it.date } ?: today().plusDays(6)
+                    val projections = c.planningGateway.projections(from, to)
+                    val unlocks = if (supervisor) c.planningGateway.unlocks() else emptyList()
+                    Load.Ready(HomeData(catalog.await(), days, projections, sellers.await(), unlocks))
+                }
             } catch (e: Exception) {
-                if (current is Load.Ready && silent) _state.value = current.copy(refreshing = false)
-                else _state.value = Load.Failed(e.userMessage())
+                // Sin servidor: se sigue viendo lo último (o la pantalla en cero) y se reintenta sola.
+                val shown = _state.value
+                _state.value = if (shown is Load.Ready) shown.failed(e.userMessage()) else Load.Failed(e.userMessage())
+                retry.schedule { load(silent = true) }
             }
         }
     }
@@ -176,7 +190,9 @@ fun HomeScreen(
             when (val s = state) {
                 Load.Loading -> Loading()
                 is Load.Failed -> ErrorState(s.message, onRetry = { vm.load() })
-                is Load.Ready -> PullToRefreshBox(isRefreshing = s.refreshing, onRefresh = { vm.load() }) {
+                is Load.Ready -> Column {
+                    SyncBanner(s, onRetry = { vm.load() })
+                    PullToRefreshBox(isRefreshing = s.refreshing && !s.pending, onRefresh = { vm.load() }) {
                     HomeContent(
                         data = s.value,
                         account = account,
@@ -200,6 +216,7 @@ fun HomeScreen(
                             }
                         },
                     )
+                }
                 }
             }
         }
