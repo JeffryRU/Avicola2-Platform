@@ -35,9 +35,9 @@ const longDate = (iso: string) =>
 
 /** Punto del historial con el que se calculan las novedades de una versión. */
 function headOf(v: AppVersion, current: AppVersion | null): string {
-  if (!v.moving) return v.tag
+  if (!v.moving) return v.ref
   if (current?.id === v.id && BUILD.commit) return BUILD.commit
-  return v.branches[0] ?? v.tag
+  return v.branches[0] ?? v.ref
 }
 
 const SPLASH_KEY = 'nv_version_splash'
@@ -391,7 +391,7 @@ function NewsTab({ catalog, current }: { catalog: VersionCatalog; current: AppVe
             Lo que cambió desde {prev.name} (v{prev.version}) hasta {version.name}
             {version.moving ? ' hoy' : ` (v${version.version})`}:
           </p>
-          <ChangeList repo={catalog.repo} from={prev.tag} to={headOf(version, current)} />
+          <ChangeList repo={catalog.repo} from={prev.ref} to={headOf(version, current)} />
         </>
       ) : (
         <>
@@ -436,7 +436,7 @@ function CompareTab({
           <b>
             Qué cambió de {older.name} a {newer.name}
           </b>
-          <ChangeList repo={catalog.repo} from={older.tag} to={headOf(newer, current)} />
+          <ChangeList repo={catalog.repo} from={older.ref} to={headOf(newer, current)} />
         </div>
       )}
     </div>

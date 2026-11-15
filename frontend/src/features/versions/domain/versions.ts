@@ -2,14 +2,15 @@ import { z } from 'zod'
 
 /**
  * Versiones publicadas de la app (MVP 1, MVP 2…). El catálogo vive en versions.json: agregar una
- * versión es agregar un renglón. Cada versión tiene su propio despliegue (rama) y su tag de git.
+ * versión es agregar un renglón. Cada versión tiene su propio despliegue (rama) y su punto en git.
  */
 export const appVersionSchema = z.object({
   id: z.string(),
   name: z.string(),
-  /** Número base de la versión (el del tag). */
+  /** Número base de la versión. */
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
-  tag: z.string(),
+  /** Punto del historial donde empieza (rama, tag o commit): base para el número y las novedades. */
+  ref: z.string(),
   /** Ramas cuyo despliegue es esta versión. */
   branches: z.array(z.string()).default([]),
   /** Sigue recibiendo cambios: su número sube con cada PR y commit. */
@@ -73,7 +74,7 @@ export function toChanges(commits: RawCommit[]): Change[] {
 }
 
 /**
- * Número de una versión en curso: el del medio sube con cada PR unido desde el tag y el último con
+ * Número de una versión en curso: el del medio sube con cada PR unido desde su inicio y el último con
  * cada commit suelto después del último PR. 3.0.0 + 2 PR + 1 commit → 3.2.1.
  */
 export function liveNumber(base: string, changes: Change[]): string {
