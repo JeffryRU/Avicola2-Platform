@@ -51,6 +51,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -82,16 +83,23 @@ import pe.avicola2.app.ui.components.SectionCard
 import pe.avicola2.app.ui.theme.Success
 import pe.avicola2.app.ui.theme.Warning
 import pe.avicola2.app.ui.userMessage
+import pe.avicola2.app.ui.AutoRetry
+import pe.avicola2.app.ui.failed
+import pe.avicola2.app.ui.placeholder
+import pe.avicola2.app.ui.components.SyncBanner
+import pe.avicola2.app.domain.emptySaca
 
 data class SacaData(val products: List<Product>, val plan: Saca)
 
 class SacaViewModel(private val c: AppContainer) : ViewModel() {
-    private val _state = MutableStateFlow<Load<SacaData>>(Load.Loading)
+    private val _state = MutableStateFlow<Load<SacaData>>(placeholder(SacaData(c.cache.products(), emptySaca(today(), c.cache.products()))))
     val state: StateFlow<Load<SacaData>> = _state.asStateFlow()
 
     /** Día del cálculo; por defecto, hoy (resta los pedidos de mañana y suma la proyección de pasado mañana). */
     var day by mutableStateOf(today())
         private set
+
+    private val retry = AutoRetry(viewModelScope)
 
     init {
         load()
@@ -101,7 +109,8 @@ class SacaViewModel(private val c: AppContainer) : ViewModel() {
 
     fun select(date: LocalDate) {
         day = date
-        _state.value = Load.Loading
+        val products = (_state.value as? Load.Ready)?.value?.products ?: c.cache.products()
+        _state.value = placeholder(SacaData(products, emptySaca(date, products)))
         load()
     }
 
@@ -152,14 +161,23 @@ class SacaViewModel(private val c: AppContainer) : ViewModel() {
         val current = _state.value
         if (current is Load.Ready) _state.value = current.copy(refreshing = true)
         val asked = day
+        retry.cancel()
         viewModelScope.launch {
             try {
-                val catalog = async { Catalog(c.planningGateway.catalog()) }
-                val plan = c.saca.plan(asked)
+                val data = coroutineScope {
+                    val catalog = async { Catalog(c.cache.fetchProducts { c.planningGateway.catalog() }) }
+                    val plan = c.saca.plan(asked)
+                    SacaData(catalog.await().products, plan)
+                }
                 // Si cambió de día mientras llegaba la respuesta, se descarta.
-                if (asked == day) _state.value = Load.Ready(SacaData(catalog.await().products, plan))
+                if (asked == day) _state.value = Load.Ready(data)
             } catch (e: Exception) {
-                if (asked == day) _state.value = Load.Failed(e.userMessage())
+                // Sin servidor: se sigue viendo la saca (en cero si no llegó nada) y se reintenta sola.
+                val shown = _state.value
+                if (asked == day && shown is Load.Ready) {
+                    _state.value = shown.failed(e.userMessage())
+                    retry.schedule(::load)
+                }
             }
         }
     }
@@ -191,8 +209,11 @@ fun SacaScreen(container: AppContainer, account: Account, onOpenStock: () -> Uni
             when (val s = state) {
                 Load.Loading -> Loading()
                 is Load.Failed -> ErrorState(s.message, onRetry = vm::load)
-                is Load.Ready -> PullToRefreshBox(isRefreshing = s.refreshing, onRefresh = vm::load) {
-                    SacaContent(s.value, onOpenStock.takeIf { account.canViewStock }, vm.takeIf { account.canEditSacaPlus })
+                is Load.Ready -> {
+                    SyncBanner(s, onRetry = vm::load)
+                    PullToRefreshBox(isRefreshing = s.refreshing && !s.pending, onRefresh = vm::load) {
+                        SacaContent(s.value, onOpenStock.takeIf { account.canViewStock }, vm.takeIf { account.canEditSacaPlus }, waiting = s.pending)
+                    }
                 }
             }
         }
@@ -200,7 +221,7 @@ fun SacaScreen(container: AppContainer, account: Account, onOpenStock: () -> Uni
 }
 
 @Composable
-private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?, editor: SacaViewModel?) {
+private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?, editor: SacaViewModel?, waiting: Boolean) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 840.dp
         Row(Modifier.fillMaxSize()) {
@@ -211,15 +232,29 @@ private fun SacaContent(data: SacaData, onOpenStock: (() -> Unit)?, editor: Saca
             ) {
                 item(key = "hero") { Hero(data.plan) }
                 if (data.plan.groups.isNotEmpty()) item(key = "types") { ByType(data.plan, editor) }
-                if (!wide) item(key = "sources") { Sources(data.plan, onOpenStock) }
+                if (!wide) item(key = "sources") { if (waiting) WaitingSources() else Sources(data.plan, onOpenStock) }
                 item(key = "products") { ByProduct(data) }
             }
             if (wide) {
                 LazyColumn(Modifier.width(360.dp), contentPadding = PaddingValues(end = 16.dp, bottom = 16.dp)) {
-                    item(key = "sources") { Sources(data.plan, onOpenStock) }
+                    item(key = "sources") { if (waiting) WaitingSources() else Sources(data.plan, onOpenStock) }
                 }
             }
         }
+    }
+}
+
+/** En lugar de «Con qué datos se calculó» mientras no responde el servidor. */
+@Composable
+private fun WaitingSources() {
+    SectionCard {
+        Text("Con qué datos se calculó", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Esperando los datos del servidor: proyecciones, stock, pedidos y llegada estimada.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
 
@@ -239,10 +274,11 @@ private fun Hero(plan: Saca) {
                 Text(formatNumber((plan.farmOrder ?: plan.request).toDouble()), style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold)
                 Text("aves", style = MaterialTheme.typography.titleMedium, color = scheme.onPrimary.copy(alpha = 0.85f), modifier = Modifier.padding(start = 8.dp, bottom = 10.dp))
             }
-            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                HeroStat(formatNumber(plan.request.toDouble()), "aves según los productos")
-                HeroStat(formatNumber(plan.requestKg, 1), "kg de producto")
-                HeroStat(formatNumber(plan.liveKg, 1), "kg vivos")
+            // Tres columnas iguales: ninguna queda aplastada en pantallas angostas.
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HeroStat(formatNumber(plan.request.toDouble()), "aves según los productos", Modifier.weight(1f))
+                HeroStat(formatNumber(plan.requestKg, 1), "kg de producto", Modifier.weight(1f))
+                HeroStat(formatNumber(plan.liveKg, 1), "kg vivos", Modifier.weight(1f))
             }
         }
     }
@@ -346,8 +382,8 @@ private fun androidx.compose.foundation.layout.RowScope.TypeCell(
 }
 
 @Composable
-private fun HeroStat(value: String, label: String) {
-    Column {
+private fun HeroStat(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
         Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
     }

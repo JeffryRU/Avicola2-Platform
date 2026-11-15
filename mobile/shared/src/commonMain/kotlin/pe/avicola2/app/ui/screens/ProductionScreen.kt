@@ -51,6 +51,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -92,13 +93,18 @@ import pe.avicola2.app.ui.components.SectionCard
 import pe.avicola2.app.ui.theme.Success
 import pe.avicola2.app.ui.theme.Warning
 import pe.avicola2.app.ui.userMessage
+import pe.avicola2.app.ui.AutoRetry
+import pe.avicola2.app.ui.failed
+import pe.avicola2.app.ui.placeholder
+import pe.avicola2.app.ui.components.SyncBanner
 
 private const val HISTORY_DAYS = 30
 
 data class ProductionData(val products: List<Product>, val days: List<ProductionDay>)
 
 class ProductionViewModel(private val c: AppContainer) : ViewModel() {
-    private val _state = MutableStateFlow<Load<ProductionData>>(Load.Loading)
+    private val _state = MutableStateFlow<Load<ProductionData>>(placeholder(ProductionData(c.cache.products(), emptyList())))
+    private val retry = AutoRetry(viewModelScope)
     val state: StateFlow<Load<ProductionData>> = _state.asStateFlow()
 
     var day by mutableStateOf(today())
@@ -122,6 +128,7 @@ class ProductionViewModel(private val c: AppContainer) : ViewModel() {
     val groups: List<String> get() = data?.products.orEmpty().mapNotNull { it.subcategory }.distinct()
 
     init {
+        reset()
         load()
     }
 
@@ -132,14 +139,23 @@ class ProductionViewModel(private val c: AppContainer) : ViewModel() {
     fun load() {
         val current = _state.value
         _state.value = if (current is Load.Ready) current.copy(refreshing = true) else Load.Loading
+        retry.cancel()
         viewModelScope.launch {
             try {
-                val catalog = async { Catalog(c.planningGateway.catalog()) }
-                val days = c.production.list(today().plusDays(-(HISTORY_DAYS - 1)), today())
-                _state.value = Load.Ready(ProductionData(catalog.await().products, days))
-                reset()
+                _state.value = Load.Ready(
+                    coroutineScope {
+                        val catalog = async { Catalog(c.cache.fetchProducts { c.planningGateway.catalog() }) }
+                        val days = c.production.list(today().plusDays(-(HISTORY_DAYS - 1)), today())
+                        ProductionData(catalog.await().products, days)
+                    },
+                )
+                // Lo que se escribió mientras no había servidor no se pierde.
+                if (!dirty) reset()
             } catch (e: Exception) {
-                _state.value = Load.Failed(e.userMessage())
+                // Sin servidor: la tabla se sigue viendo (en cero si no llegó nada) y se reintenta sola.
+                val shown = _state.value
+                _state.value = if (shown is Load.Ready) shown.failed(e.userMessage()) else Load.Failed(e.userMessage())
+                retry.schedule(::load)
             }
         }
     }
@@ -225,7 +241,10 @@ fun ProductionScreen(container: AppContainer, account: Account, onBack: (() -> U
         when (val s = state) {
             Load.Loading -> Loading(Modifier.padding(padding))
             is Load.Failed -> ErrorState(s.message, onRetry = vm::load, modifier = Modifier.padding(padding))
-            is Load.Ready -> Content(vm, s.value, account.canManageProduction, Modifier.padding(padding))
+            is Load.Ready -> Column(Modifier.padding(padding)) {
+                SyncBanner(s, onRetry = vm::load)
+                Content(vm, s.value, account.canManageProduction, Modifier)
+            }
         }
     }
 }

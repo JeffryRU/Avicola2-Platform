@@ -128,4 +128,20 @@ class ScreenshotTest {
         shot("12c-produccion-tablet", 1280 * 2, 800 * 2) { ProductionScreen(chief, chiefAccount) }
         shot("12d-produccion-supervisor", phoneW, phoneH) { ProductionScreen(sup, supAccount, onBack = {}) }
     }
+
+    /** Con la sesión abierta y el servidor caído: las pantallas se dibujan en cero con el aviso. */
+    @Test
+    fun offline() {
+        if (url == null || out == null) return println("AVICOLA_E2E_URL / AVICOLA_SCREENSHOTS no definidos: se omite")
+        val phoneW = 393 * 2
+        val phoneH = 852 * 2
+        val (sup, supAccount) = container("supervisor")
+        val (chief, chiefAccount) = container("despacho")
+        // Puerto sin nadie escuchando: toda consulta falla como si no hubiera backend.
+        listOf(sup, chief).forEach { it.server.set("http://127.0.0.1:9/api") }
+        shot("20-sin-backend-inicio", phoneW, phoneH) { App(sup) }
+        shot("21-sin-backend-saca", phoneW, phoneH) { SacaScreen(sup, supAccount, onOpenStock = {}) }
+        shot("22-sin-backend-stock", phoneW, phoneH) { StockScreen(chief, chiefAccount) }
+        shot("23-sin-backend-produccion", phoneW, phoneH) { ProductionScreen(chief, chiefAccount) }
+    }
 }

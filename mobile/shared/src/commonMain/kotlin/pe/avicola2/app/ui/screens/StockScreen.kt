@@ -52,6 +52,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -94,6 +95,11 @@ import pe.avicola2.app.ui.components.SectionCard
 import pe.avicola2.app.ui.theme.Success
 import pe.avicola2.app.ui.theme.Warning
 import pe.avicola2.app.ui.userMessage
+import pe.avicola2.app.ui.AutoRetry
+import pe.avicola2.app.ui.failed
+import pe.avicola2.app.ui.placeholder
+import pe.avicola2.app.ui.components.SyncBanner
+import pe.avicola2.app.domain.StockOptions
 
 /** Se consultan los últimos 30 días (lo mismo que la web). */
 private const val HISTORY_DAYS = 30
@@ -104,6 +110,7 @@ private const val LOCATION_KEY = "stock.location"
 
 class StockViewModel(private val c: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow<Load<StockData>>(Load.Loading)
+    private val retry = AutoRetry(viewModelScope)
     val state: StateFlow<Load<StockData>> = _state.asStateFlow()
 
     var day by mutableStateOf(today())
@@ -128,7 +135,16 @@ class StockViewModel(private val c: AppContainer) : ViewModel() {
     val dirty: Boolean get() = draft != saved
 
     init {
+        // Mientras llega el servidor: los artículos y ubicaciones guardados (o los de respaldo), sin registros.
+        _state.value = placeholder(dataOf(c.cache.stockOptions(), emptyList()))
+        reset()
         load()
+    }
+
+    private fun dataOf(o: StockOptions, days: List<StockDay>): StockData {
+        val locations = stockLocations(o.locations, days)
+        if (location !in locations) location = locations.firstOrNull().orEmpty()
+        return StockData(o.items, locations, o.lotDays, days)
     }
 
     private val data: StockData? get() = (_state.value as? Load.Ready)?.value
@@ -138,17 +154,23 @@ class StockViewModel(private val c: AppContainer) : ViewModel() {
     fun load() {
         val current = _state.value
         _state.value = if (current is Load.Ready) current.copy(refreshing = true) else Load.Loading
+        retry.cancel()
         viewModelScope.launch {
             try {
-                val options = async { c.stock.options() }
-                val days = c.stock.list(today().plusDays(-(HISTORY_DAYS - 1)), today())
-                val o = options.await()
-                val locations = stockLocations(o.locations, days)
-                if (location !in locations) location = locations.firstOrNull().orEmpty()
-                _state.value = Load.Ready(StockData(o.items, locations, o.lotDays, days))
-                reset()
+                _state.value = Load.Ready(
+                    coroutineScope {
+                        val options = async { c.cache.fetchStockOptions { c.stock.options() } }
+                        val days = c.stock.list(today().plusDays(-(HISTORY_DAYS - 1)), today())
+                        dataOf(options.await(), days)
+                    },
+                )
+                // Lo que se escribió mientras no había servidor no se pierde.
+                if (!dirty) reset()
             } catch (e: Exception) {
-                _state.value = Load.Failed(e.userMessage())
+                // Sin servidor: la tabla se sigue viendo (vacía si no llegó nada) y se reintenta sola.
+                val shown = _state.value
+                _state.value = if (shown is Load.Ready) shown.failed(e.userMessage()) else Load.Failed(e.userMessage())
+                retry.schedule(::load)
             }
         }
     }
@@ -232,7 +254,10 @@ fun StockScreen(container: AppContainer, account: Account, onBack: (() -> Unit)?
         when (val s = state) {
             Load.Loading -> Loading(Modifier.padding(padding))
             is Load.Failed -> ErrorState(s.message, onRetry = vm::load, modifier = Modifier.padding(padding))
-            is Load.Ready -> StockContent(vm, s.value, canManage, Modifier.padding(padding))
+            is Load.Ready -> Column(Modifier.padding(padding)) {
+                SyncBanner(s, onRetry = vm::load)
+                StockContent(vm, s.value, canManage, Modifier)
+            }
         }
     }
 }
