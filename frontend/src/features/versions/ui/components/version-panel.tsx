@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { ArrowRight, Download, ExternalLink, GitCompare, History, Layers, Loader2, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowRight, Download, ExternalLink, Loader2 } from 'lucide-react'
 import {
   changeLabel,
   notableChanges,
@@ -16,6 +16,9 @@ import {
   DialogTitle,
 } from '@/shared/ui/components/shadcn/dialog'
 import { cn } from '@/shared/ui/lib/utils'
+import { Segmented } from '@/shared/ui/components/segmented'
+import { StatusDot } from '@/shared/ui/components/feedback'
+import { Button } from '@/shared/ui/components/shadcn/button'
 import { toneOf, longDate } from '@/features/versions/ui/components/version-style'
 
 /** Punto del historial con el que se calculan las novedades de una versión. */
@@ -28,12 +31,9 @@ function headOf(v: AppVersion, current: AppVersion | null): string {
 export function Highlights({ items }: { items: string[] }) {
   if (items.length === 0) return null
   return (
-    <ul className="grid gap-1.5 text-[14px]">
+    <ul className="grid list-disc gap-1 pl-5 text-base marker:text-muted-foreground">
       {items.map((h) => (
-        <li key={h} className="flex gap-2">
-          <Sparkles className="mt-0.5 size-4 flex-none text-primary" />
-          <span>{h}</span>
-        </li>
+        <li key={h}>{h}</li>
       ))}
     </ul>
   )
@@ -45,10 +45,10 @@ export function VersionPanel({ open, onOpenChange }: { open: boolean; onOpenChan
   const [tab, setTab] = useState<Tab>('versions')
   const { catalog, version: current, number } = useCurrentVersion()
   if (!catalog || !current) return null
-  const tabs: [Tab, string, ReactNode][] = [
-    ['versions', 'Versiones', <Layers key="v" />],
-    ['news', 'Novedades', <History key="n" />],
-    ['compare', 'Comparar', <GitCompare key="c" />],
+  const tabs: { value: Tab; label: string }[] = [
+    { value: 'versions', label: 'Versiones' },
+    { value: 'news', label: 'Novedades' },
+    { value: 'compare', label: 'Comparar' },
   ]
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -59,24 +59,7 @@ export function VersionPanel({ open, onOpenChange }: { open: boolean; onOpenChan
             Estás en {current.name} · versión {number}. Cada versión se abre aparte, con sus propios datos.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex gap-1 rounded-xl bg-secondary p-1" role="tablist">
-          {tabs.map(([id, label, icon]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={tab === id}
-              onClick={() => setTab(id)}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-bold [&_svg]:size-4',
-                tab === id ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground',
-              )}
-            >
-              {icon}
-              {label}
-            </button>
-          ))}
-        </div>
+        <Segmented value={tab} options={tabs} onChange={setTab} full />
         {tab === 'versions' && <VersionsTab catalog={catalog} current={current} currentNumber={number} />}
         {tab === 'news' && <NewsTab catalog={catalog} current={current} />}
         {tab === 'compare' && <CompareTab catalog={catalog} current={current} currentNumber={number} />}
@@ -98,11 +81,11 @@ function VersionSelect({
 }) {
   return (
     <label className="grid gap-1.5">
-      <span className="text-[12px] font-bold tracking-[0.04em] text-muted-foreground uppercase">{label}</span>
+      <span className="text-sm font-medium text-ink-2">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 rounded-[10px] border-[1.5px] border-border bg-white px-3 text-[15px] font-semibold outline-none focus:border-primary"
+        className="h-touch rounded-md border-control border-input bg-surface px-3 text-base text-foreground focus-visible:border-ring dsk:h-control"
       >
         {catalog.versions.map((v) => (
           <option key={v.id} value={v.id}>
@@ -119,27 +102,22 @@ function OpenButtons({ version, current }: { version: AppVersion; current: AppVe
   return (
     <div className="flex flex-wrap gap-2">
       {version.id === current.id ? (
-        <span className="inline-flex h-10 items-center rounded-xl bg-secondary px-4 text-sm font-bold text-primary">
-          Estás en esta versión
+        <span className="dsk:min-h-control inline-flex min-h-touch items-center gap-1.5 text-sm text-muted-foreground">
+          <StatusDot tone="ok" /> Estás en esta versión
         </span>
       ) : (
-        <a
-          href={version.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground"
-        >
-          <ExternalLink className="size-4" /> Abrir {version.name}
-        </a>
+        <Button asChild>
+          <a href={version.url} target="_blank" rel="noopener noreferrer">
+            <ExternalLink /> Abrir {version.name}
+          </a>
+        </Button>
       )}
       {version.apk && (
-        <a
-          href={version.apk}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-bold"
-          rel="noopener noreferrer"
-        >
-          <Download className="size-4" /> App Android
-        </a>
+        <Button asChild variant="outline">
+          <a href={version.apk} rel="noopener noreferrer">
+            <Download /> App Android
+          </a>
+        </Button>
       )}
     </div>
   )
@@ -157,22 +135,18 @@ function VersionCard({
   current: AppVersion
 }) {
   return (
-    <div className="grid gap-3 rounded-2xl border p-4">
-      <div className="flex items-center gap-3">
-        <span
-          className={cn('grid size-11 flex-none place-items-center rounded-xl text-white', toneOf(catalog, version))}
-        >
-          <Layers className="size-5" />
-        </span>
+    <div className="grid gap-3 rounded-md border border-border p-4 hc:border-x-0 hc:border-t-heavy hc:border-b-heavy">
+      <div className="flex items-start gap-3">
+        <span aria-hidden className={cn('mt-2 size-2.5 flex-none rounded-full', toneOf(catalog, version))} />
         <div>
-          <b className="block text-lg leading-tight">{version.name}</b>
-          <small className="text-muted-foreground">
+          <b className="block text-lg font-semibold hc:font-extrabold">{version.name}</b>
+          <small className="num text-sm text-muted-foreground">
             v{number} · {longDate(version.date)}
             {version.moving ? ' · en curso' : ''}
           </small>
         </div>
       </div>
-      <p className="text-[14px] text-ink-2">{version.summary}</p>
+      <p className="text-base text-ink-2">{version.summary}</p>
       <Highlights items={version.highlights} />
       <OpenButtons version={version} current={current} />
     </div>
@@ -218,15 +192,10 @@ function ChangeList({ repo, from, to }: { repo: string; from: string | null; to:
   if (list.length === 0) return <p className="text-sm text-muted-foreground">Sin cambios registrados.</p>
   const shown = list.slice(0, 60)
   return (
-    <ul className="grid gap-1.5 text-[14px]">
+    <ul className="grid gap-1.5 text-base">
       {shown.map((c) => (
-        <li key={c.sha} className="flex gap-2">
-          <span
-            className={cn(
-              'mt-0.5 h-5 flex-none rounded-md px-1.5 text-[11px] leading-5 font-bold',
-              c.pr ? 'bg-secondary text-primary' : 'bg-muted text-muted-foreground',
-            )}
-          >
+        <li key={c.sha} className="flex gap-3">
+          <span className="num w-16 flex-none pt-0.5 text-xs text-muted-foreground">
             {c.pr ? `PR #${String(c.pr)}` : c.sha.slice(0, 7)}
           </span>
           <span>{changeLabel(c.title)}</span>
@@ -294,7 +263,7 @@ function CompareTab({
       </div>
       {older.id !== newer.id && (
         <div className="grid gap-2">
-          <b>
+          <b className="font-semibold">
             Qué cambió de {older.name} a {newer.name}
           </b>
           <ChangeList repo={catalog.repo} from={older.ref} to={headOf(newer, current)} />

@@ -9,6 +9,7 @@ import {
 } from '@/features/accounts/domain/accounts'
 import { useRequiredSession } from '@/features/auth'
 import { ConfirmDialog } from '@/shared/ui/components/confirm-dialog'
+import { StatusDot } from '@/shared/ui/components/feedback'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
 import { ACCOUNT_STATE_LABEL } from '@/features/accounts/types/accounts'
@@ -16,16 +17,27 @@ import { roleName } from '@/shared/types/roles'
 import { GRANT_LABEL, grantedLabel, REVOKE_LABEL, revokeDone, type Unlock, useRevokeEditing } from '@/features/editing'
 import { useRefreshAccounts, useResetPassword, useSetActive } from '@/features/accounts/ui/hooks'
 
-const STATE_CLS: Record<AccountState, string> = {
-  active: 'bg-ok-soft text-ok',
-  locked: 'bg-bad-soft text-destructive',
-  inactive: 'bg-pend-soft text-slate-500',
+/** Estado de la cuenta con punto y texto: bloqueada pide acción (ámbar), inactiva va en gris. */
+const STATE_TONE: Record<AccountState, 'ok' | 'warn' | 'draft'> = {
+  active: 'ok',
+  locked: 'warn',
+  inactive: 'draft',
 }
 
 function StateBadge({ state }: { state: AccountState }) {
-  const label = ACCOUNT_STATE_LABEL[state]
-  const cls = STATE_CLS[state]
-  return <span className={cn('rounded-full px-2.5 py-1 text-[12.5px] font-bold whitespace-nowrap', cls)}>{label}</span>
+  const tone = STATE_TONE[state]
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 text-sm whitespace-nowrap',
+        tone === 'warn' && 'font-medium text-warn hc:font-bold',
+        tone === 'draft' && 'text-muted-foreground',
+      )}
+    >
+      <StatusDot tone={tone} />
+      {ACCOUNT_STATE_LABEL[state]}
+    </span>
+  )
 }
 
 /** Habilitar o cerrar la edición de proyecciones de un vendedor (aunque haya pasado el corte). */
@@ -56,7 +68,8 @@ function EditingControl({
   }
   return (
     <span className="flex flex-wrap items-center gap-2">
-      <span className="rounded-full bg-ok-soft px-2.5 py-1 text-[12.5px] font-bold whitespace-nowrap text-ok">
+      <span className="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
+        <StatusDot tone="ok" />
         {grantedLabel(granted.map((u) => u.date))}
       </span>
       <ConfirmDialog
@@ -114,25 +127,29 @@ export function AccountRow({
   }
 
   return (
-    <li className="flex flex-wrap items-center gap-3 border-b border-muted px-4 py-3.5 last:border-0 dsk:px-5">
-      <div className="min-w-0 flex-[1_1_200px]">
-        <b className="block">
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-rule px-4 py-3 last:border-0 dsk:grid dsk:grid-cols-[minmax(0,1fr)_7rem_24rem] dsk:px-5 hc:dsk:grid-cols-[minmax(0,1fr)_7rem_30rem]">
+      <div className="min-w-0 flex-[1_1_14rem] dsk:flex-none">
+        <b className="block font-medium hc:font-semibold">
           {account.name}{' '}
-          {account.role !== 'seller' && <small className="text-primary">· {roleName(account.role)}</small>}
+          {account.role !== 'seller' && (
+            <small className="text-sm font-normal text-muted-foreground">· {roleName(account.role)}</small>
+          )}
         </b>
-        <small className="text-muted-foreground">
+        <small className="text-sm text-muted-foreground">
           {account.username}
           {account.zone ? ` · ${account.zone}` : ''}
         </small>
       </div>
-      <StateBadge state={state} />
+      <span className="w-28 flex-none">
+        <StateBadge state={state} />
+      </span>
       {own ? (
-        <small className="font-semibold text-muted-foreground">Tu cuenta</small>
+        <small className="text-sm text-muted-foreground dsk:text-right">Tu cuenta</small>
       ) : !account.can_manage ? (
         // Un supervisor no gestiona a otros supervisores: eso lo hace el supervisor general.
-        <small className="font-semibold text-muted-foreground">Lo gestiona el supervisor general</small>
+        <small className="text-sm text-muted-foreground dsk:text-right">Lo gestiona el supervisor general</small>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 dsk:justify-end">
           {granted && <EditingControl account={account} granted={granted} onGrant={onGrant} />}
           {otherRoles(account).length > 0 && (
             <Button type="button" variant="outline" size="sm" onClick={onChangeRole}>

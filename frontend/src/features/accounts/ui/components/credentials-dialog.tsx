@@ -43,8 +43,8 @@ export function CredentialsDialog({
             elegir una nueva.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex items-center gap-2 rounded-xl bg-muted p-3">
-          <code className="flex-1 text-lg font-bold tracking-wider">{credentials?.temporary_password}</code>
+        <div className="flex items-center gap-2 rounded-md border border-border bg-muted p-3">
+          <code className="num flex-1 text-lg font-medium tracking-wider">{credentials?.temporary_password}</code>
           <Button type="button" variant="outline" size="sm" onClick={copy}>
             {copied ? <Check /> : <Copy />} {copied ? 'Copiada' : 'Copiar'}
           </Button>

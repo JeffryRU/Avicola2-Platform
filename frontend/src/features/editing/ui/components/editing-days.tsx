@@ -1,5 +1,5 @@
 import { useState, type SyntheticEvent } from 'react'
-import { CheckCircle2, Clock, Loader2, Lock, LockOpen, Send } from 'lucide-react'
+import { CheckCircle2, Loader2, Lock, LockOpen, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { dShort, today, type IsoDate } from '@/shared/domain/dates'
@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from '@/shared/ui/components/shadcn/dialog'
 import { Label } from '@/shared/ui/components/shadcn/label'
+import { StatusDot } from '@/shared/ui/components/feedback'
 import { cn } from '@/shared/ui/lib/utils'
 
 /** Lista de los días que se pueden registrar: hasta cuándo, cerrados y su habilitación. */
@@ -38,8 +39,8 @@ export function EditingDays({ className }: { className?: string }) {
   const now = today()
   return (
     <div className={className}>
-      <span className="mb-2.5 block text-base font-bold">{EDITABLE_DAYS_TITLE}</span>
-      <ul className="grid gap-2">
+      <span className="mb-2 block text-base font-semibold">{EDITABLE_DAYS_TITLE}</span>
+      <ul className="border-t border-rule">
         {data.days.map((d) => (
           <DayRow key={d.date} day={d} today={now} onAsk={() => setAsking(d.date)} />
         ))}
@@ -54,33 +55,33 @@ function DayRow({ day, today: now, onAsk }: { day: EditingDay; today: IsoDate; o
   const pending = unlock?.status === 'requested'
   const approved = unlock?.status === 'approved'
   const closed = !day.open
-  const Icon = approved ? LockOpen : closed ? Lock : Clock
+  // Solo los días cerrados o abiertos a pedido llevan ícono (candado); los normales, no.
+  const Icon = approved ? LockOpen : closed ? Lock : null
   return (
     <li
       className={cn(
-        'flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border-[1.5px] px-3.5 py-2.5',
-        closed ? 'border-border bg-muted/50' : 'border-border bg-white',
-        approved && 'border-ok/40 bg-ok-soft/50',
+        'flex min-h-touch flex-wrap items-center gap-x-3 gap-y-2 border-b border-rule px-1 py-2',
+        closed && 'bg-muted',
       )}
     >
-      <Icon className={cn('size-5 flex-none', closed ? 'text-faint' : approved ? 'text-ok' : 'text-primary')} />
+      {Icon && <Icon aria-hidden className={cn('size-4 flex-none', approved ? 'text-ok' : 'text-muted-foreground')} />}
       <div className="min-w-0 flex-1">
-        <b className="block">{dShort(day.date)}</b>
-        <small className="text-muted-foreground">
+        <b className="block font-medium">{dShort(day.date)}</b>
+        <small className="text-sm text-muted-foreground">
           {approved ? UNLOCK_STATUS_LABEL.approved : closesLabel(day.closes_at, day.open, now)}
         </small>
       </div>
       {closed && pending && (
-        <span className="flex items-center gap-1.5 rounded-full bg-warn-soft px-2.5 py-1 text-[12.5px] font-bold text-warn">
-          <Send className="size-3.5" /> {UNLOCK_STATUS_LABEL.requested}
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-warn hc:font-bold">
+          <StatusDot tone="warn" /> {UNLOCK_STATUS_LABEL.requested}
         </span>
       )}
       {closed && !pending && (
-        <Button type="button" variant="outline" size="sm" className="font-bold" onClick={onAsk}>
+        <Button type="button" variant="outline" size="sm" onClick={onAsk}>
           {REQUEST_UNLOCK_LABEL}
         </Button>
       )}
-      {approved && <CheckCircle2 className="size-5 text-ok" />}
+      {approved && <CheckCircle2 aria-hidden className="size-4.5 text-ok" />}
     </li>
   )
 }
@@ -89,9 +90,7 @@ function DayRow({ day, today: now, onAsk }: { day: EditingDay; today: IsoDate; o
 export function RequestDialog({ date, onClose }: { date: IsoDate | null; onClose: () => void }) {
   return (
     <Dialog open={date !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="w-[calc(100%-2rem)] rounded-[20px] sm:max-w-[440px]">
-        {date && <RequestForm date={date} onDone={onClose} />}
-      </DialogContent>
+      <DialogContent className="sm:max-w-md">{date && <RequestForm date={date} onDone={onClose} />}</DialogContent>
     </Dialog>
   )
 }
@@ -120,9 +119,7 @@ function RequestForm({ date, onDone }: { date: IsoDate; onDone: () => void }) {
   return (
     <form onSubmit={submit} noValidate className="grid gap-4">
       <DialogHeader className="text-left">
-        <DialogTitle className="flex items-center gap-2 text-[20px] font-extrabold">
-          <LockOpen className="size-5" /> {REQUEST_TITLE}
-        </DialogTitle>
+        <DialogTitle className="text-xl font-semibold hc:font-extrabold">{REQUEST_TITLE}</DialogTitle>
         <DialogDescription>{requestFor(date)}</DialogDescription>
       </DialogHeader>
       <div className="grid gap-1.5">
@@ -134,19 +131,19 @@ function RequestForm({ date, onDone }: { date: IsoDate; onDone: () => void }) {
           maxLength={300}
           placeholder={REASON_PLACEHOLDER}
           aria-invalid={!!error}
-          className="w-full resize-none rounded-[12px] border-[1.5px] bg-white px-3 py-2.5 outline-none focus:border-primary focus:ring-4 focus:ring-primary-ring"
+          className="w-full resize-none rounded-md border-control border-input bg-surface px-3 py-2.5 text-md text-foreground placeholder:text-muted-foreground focus-visible:border-ring aria-invalid:border-bad dsk:text-base"
         />
         {error && (
-          <p role="alert" className="text-[13px] font-semibold text-destructive">
+          <p role="alert" className="text-sm font-medium text-bad">
             {error}
           </p>
         )}
       </div>
       <DialogFooter className="flex-row gap-2 sm:justify-end">
-        <Button type="button" variant="ghost" className="h-11 flex-1 font-bold sm:flex-none sm:px-6" onClick={onDone}>
+        <Button type="button" variant="ghost" className="flex-1 sm:flex-none sm:px-6" onClick={onDone}>
           {CANCEL_LABEL}
         </Button>
-        <Button type="submit" disabled={request.isPending} className="h-11 flex-1 font-bold sm:flex-none sm:px-6">
+        <Button type="submit" disabled={request.isPending} className="flex-1 sm:flex-none sm:px-6">
           {request.isPending ? <Loader2 className="animate-spin" /> : <Send />} {SEND_REQUEST_LABEL}
         </Button>
       </DialogFooter>

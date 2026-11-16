@@ -22,20 +22,20 @@ export function BrandProvider({
   return <BrandContext.Provider value={{ brand, setBrand }}>{children}</BrandContext.Provider>
 }
 
-/** Mascota de Noraves en un círculo con borde dorado (y salto opcional). */
+/** Mascota de Noraves en un círculo con borde fino dorado (y salto opcional). Identidad del cliente. */
 export function Mascot({ size, animated, shadow }: { size: number; animated?: boolean; shadow?: boolean }) {
   return (
     <div className="flex flex-col items-center">
       <div
         className={cn(
-          'relative flex-none overflow-hidden rounded-full border-brand-accent bg-white',
+          'relative flex-none overflow-hidden rounded-full border-brand-accent bg-head-foreground',
           animated && 'animate-hop',
         )}
-        style={{ width: size, height: size, borderWidth: Math.max(2, Math.round(size * 0.04)) }}
+        style={{ width: size, height: size, borderWidth: Math.max(1.5, Math.round(size * 0.025)) }}
       >
         <img src="/mascot.png" alt="" className="absolute top-0 h-full w-auto max-w-none" style={{ left: '-17.3%' }} />
       </div>
-      {shadow && <div className={cn('mt-2 h-2 w-[56%] rounded-full bg-head/20', animated && 'animate-shad')} />}
+      {shadow && <div className={cn('mt-2 h-1.5 w-1/2 rounded-full bg-foreground/15', animated && 'animate-shad')} />}
     </div>
   )
 }
@@ -84,8 +84,8 @@ export function IsoMark({ size, onDark, animated }: { size: number; onDark?: boo
           <path
             key={d}
             d={d}
-            fill={onDark ? '#fff' : '#E2231A'}
-            stroke={onDark ? '#1F1D1B' : '#fff'}
+            fill={onDark ? 'var(--head-foreground)' : 'var(--brand-accent)'}
+            stroke={onDark ? 'var(--head)' : 'var(--surface)'}
             strokeWidth={4.5}
             strokeLinejoin="round"
           />
@@ -115,19 +115,31 @@ export function BrandMark({
   )
 }
 
-export function Logo({ onDark }: { onDark?: boolean }) {
+/** Marca del producto: cuadro con la inicial, «AviPlanner» y la marca del cliente debajo. */
+export function Logo({ onDark, compact }: { onDark?: boolean; compact?: boolean }) {
   const { brand } = useBrand()
   return (
     <div className="flex items-center gap-2.5">
-      {brand === 'rocio' ? <IsoMark size={34} onDark={onDark} /> : <Mascot size={44} />}
       <span
+        aria-hidden
         className={cn(
-          'font-extrabold tracking-[-0.04em]',
-          brand === 'rocio' ? 'text-[22px]' : 'text-[26px]',
-          onDark ? 'text-white' : 'text-foreground',
+          'grid size-6.5 flex-none place-items-center rounded-md text-sm font-semibold hc:font-extrabold',
+          onDark ? 'bg-brand-accent text-head' : 'bg-head text-brand-accent',
         )}
       >
-        {BRANDS[brand].name}
+        A
+      </span>
+      <span className="flex min-w-0 flex-col leading-tight">
+        <span
+          className={cn('text-md font-semibold hc:font-extrabold', onDark ? 'text-head-foreground' : 'text-foreground')}
+        >
+          AviPlanner
+        </span>
+        {!compact && (
+          <span className={cn('text-xs', onDark ? 'text-head-muted' : 'text-muted-foreground')}>
+            {BRANDS[brand].name}
+          </span>
+        )}
       </span>
     </div>
   )

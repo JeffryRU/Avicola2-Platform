@@ -1,9 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
-import { Layers } from 'lucide-react'
 import { PanelContext, useCurrentVersion, useOpenVersions } from '@/features/versions/ui/hooks'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/shared/ui/components/shadcn/dialog'
+import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
 import { Highlights } from '@/features/versions/ui/components/version-panel'
 import { VersionPanel } from '@/features/versions/ui/components/version-panel'
@@ -65,16 +65,13 @@ function VersionRibbon({ onOpen }: { onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className={cn(
-        'flex w-full items-center justify-center gap-2 px-4 py-1.5 text-[13px] font-semibold text-white',
-        toneOf(catalog, version),
-      )}
+      className="flex min-h-8 w-full items-center justify-center gap-2 border-b border-border bg-muted px-4 py-1 text-xs text-ink-2 hover:text-foreground hc:border-b-2 hc:border-foreground hc:text-sm"
     >
-      <Layers className="size-4" />
+      <span aria-hidden className={cn('size-2 flex-none rounded-full', toneOf(catalog, version))} />
       <span>
-        Estás viendo <b className="font-extrabold">{version.name}</b> · versión {number}
+        Estás viendo <b className="font-semibold text-foreground">{version.name}</b> · versión {number}
       </span>
-      <span className="ml-1 hidden underline underline-offset-2 sm:inline">Ver otras versiones</span>
+      <span className="ml-1 hidden text-primary underline underline-offset-2 sm:inline">Ver otras versiones</span>
     </button>
   )
 }
@@ -85,29 +82,26 @@ function VersionSplash({ open, onClose, onMore }: { open: boolean; onClose: () =
   if (!version) return null
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-md">
-        <div className={cn('px-6 pt-7 pb-6 text-white', toneOf(catalog, version))}>
-          <p className="text-[13px] font-bold tracking-[0.08em] uppercase opacity-80">Esta es la versión</p>
-          <DialogTitle className="mt-1 text-[44px] leading-none font-extrabold">{version.name}</DialogTitle>
-          <p className="mt-2 text-lg font-semibold">
-            v{number} · {longDate(version.date)}
-          </p>
-        </div>
-        <div className="grid gap-4 px-6 pb-6">
-          <DialogDescription className="text-[15px] text-ink-2">{version.summary}</DialogDescription>
-          <Highlights items={version.highlights} />
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-11 flex-1 rounded-xl bg-primary px-4 font-bold text-primary-foreground"
-            >
-              Continuar
-            </button>
-            <button type="button" onClick={onMore} className="h-11 flex-1 rounded-xl border px-4 font-bold">
-              Ver otras versiones
-            </button>
+      <DialogContent className="sm:max-w-md">
+        <div className="flex items-start gap-3">
+          <span aria-hidden className={cn('mt-2 size-2.5 flex-none rounded-full', toneOf(catalog, version))} />
+          <div>
+            <p className="eyebrow">Esta es la versión</p>
+            <DialogTitle className="text-3xl font-semibold hc:font-extrabold">{version.name}</DialogTitle>
+            <p className="num text-sm text-muted-foreground">
+              v{number} · {longDate(version.date)}
+            </p>
           </div>
+        </div>
+        <DialogDescription className="text-md text-ink-2">{version.summary}</DialogDescription>
+        <Highlights items={version.highlights} />
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={onClose} className="flex-1">
+            Continuar
+          </Button>
+          <Button type="button" variant="outline" onClick={onMore} className="flex-1">
+            Ver otras versiones
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -124,17 +118,15 @@ export function VersionChip({ className }: { className?: string }) {
       type="button"
       onClick={open}
       className={cn(
-        'flex w-full items-center gap-2.5 rounded-xl border bg-card px-3 py-2 text-left hover:bg-secondary',
+        'flex min-h-8 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm text-ink-2 hover:bg-muted hover:text-foreground',
         className,
       )}
     >
-      <span className={cn('grid size-8 flex-none place-items-center rounded-lg text-white', toneOf(catalog, version))}>
-        <Layers className="size-4" />
-      </span>
+      <span aria-hidden className={cn('size-2 flex-none rounded-full', toneOf(catalog, version))} />
       <span className="min-w-0 flex-1">
-        <b className="block text-sm">{version.name}</b>
-        <small className="text-muted-foreground">versión {number} · cambiar</small>
+        <b className="font-medium text-foreground">{version.name}</b> · v{number}
       </span>
+      <span className="text-xs text-primary">Cambiar</span>
     </button>
   )
 }

@@ -7,7 +7,7 @@ import { kgAmount } from '@/shared/types/labels'
 import { cn } from '@/shared/ui/lib/utils'
 
 const cellCls =
-  'h-10 w-full min-w-[4.25rem] rounded-[10px] border-[1.5px] border-border bg-white px-1.5 text-center text-[15px] tabular-nums outline-none transition-colors placeholder:text-faint focus:border-primary focus:ring-4 focus:ring-primary-ring'
+  'num h-touch w-full min-w-17 rounded-sm border-control border-input bg-surface px-1.5 text-right text-md outline-none transition-colors placeholder:text-faint focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring dsk:h-9 dsk:text-base'
 
 /** Artículos en filas y lotes en columnas. Con `onChange` las celdas se escriben; sin él, se leen. */
 export function Grid({
@@ -33,25 +33,28 @@ export function Grid({
   const sumKg = (items: Product[], lot?: IsoDate) =>
     items.reduce((s, p) => s + kgOf(p, lot ? unitsAt(draft, p.id, lot) : rowUnits(p)), 0)
   const rowUnits = (p: Product) => lots.reduce((s, lot) => s + unitsAt(draft, p.id, lot), 0)
-  const th = 'px-1.5 pb-2 text-right align-bottom text-[12px] font-bold tracking-[0.03em] text-muted-foreground'
+  const th =
+    'border-b border-rule-strong px-1.5 pb-2 text-right align-bottom text-xs font-medium text-muted-foreground hc:border-b-heavy hc:font-bold hc:text-foreground'
   return (
     // La tabla se desplaza dentro de su marco; la página nunca se ensancha.
-    <div className="overflow-x-auto px-3 pt-2 pb-3 dsk:px-4">
-      <table className="w-full border-separate border-spacing-0 text-[15px]">
+    <div className="overflow-x-auto px-3 pt-3 pb-3 dsk:px-4">
+      <table className="w-full border-separate border-spacing-0 text-base">
         <thead>
           <tr>
-            <th className={cn(th, 'sticky left-0 z-[1] bg-card !text-left uppercase')}>{COLUMNS.product}</th>
+            <th className={cn(th, 'sticky left-0 z-[1] bg-surface !text-left')}>{COLUMNS.product}</th>
             {lots.map((lot) => {
               const age = diffDays(day, lot)
               return (
                 <th key={lot} className={cn(th, 'whitespace-nowrap')} title={lotAgeLabel(age)}>
-                  <span className="block uppercase">{dDow(lot)}</span>
-                  <span className="block text-[13.5px] text-foreground tabular-nums">{dDM(lot)}</span>
-                  {age > lotDays && <span className="block text-[10.5px] font-semibold text-warn">{OLD_LOT}</span>}
+                  <span className="block">{dDow(lot)}</span>
+                  <span className="num block text-sm text-foreground">{dDM(lot)}</span>
+                  {age > lotDays && (
+                    <span className="block text-2xs font-medium text-warn hc:font-bold">{OLD_LOT}</span>
+                  )}
                 </th>
               )
             })}
-            <th className={cn(th, 'uppercase')}>{COLUMNS.total}</th>
+            <th className={th}>{COLUMNS.total}</th>
           </tr>
         </thead>
         {groups.map((g) => (
@@ -59,14 +62,14 @@ export function Grid({
             <tr>
               <th
                 scope="rowgroup"
-                className="sticky left-0 z-[1] rounded-l-[10px] bg-muted px-3 py-2 text-left text-[13px] tracking-[0.02em] text-ink-2 uppercase"
+                className="eyebrow sticky left-0 z-[1] border-b border-rule bg-muted px-3 py-2 text-left hc:text-foreground"
               >
                 {g.name}
               </th>
               {lots.map((lot) => (
                 <td
                   key={lot}
-                  className="bg-muted px-1.5 py-2 text-right text-[13px] text-muted-foreground tabular-nums"
+                  className="num border-b border-rule bg-muted px-1.5 py-2 text-right text-sm text-muted-foreground"
                 >
                   <Amount
                     units={g.items.reduce((s, p) => s + unitsAt(draft, p.id, lot), 0)}
@@ -76,7 +79,7 @@ export function Grid({
                   />
                 </td>
               ))}
-              <td className="rounded-r-[10px] bg-muted px-1.5 py-2 text-right text-[13px] font-bold tabular-nums">
+              <td className="num border-b border-rule bg-muted px-1.5 py-2 text-right text-sm font-semibold">
                 <Amount units={g.items.reduce((s, p) => s + rowUnits(p), 0)} kg={sumKg(g.items)} unit={unit} compact />
               </td>
             </tr>
@@ -84,20 +87,18 @@ export function Grid({
               <tr key={p.id}>
                 <th
                   scope="row"
-                  className="sticky left-0 z-[1] max-w-[11rem] min-w-[7.5rem] border-b border-muted bg-card px-3 py-2 text-left font-bold"
+                  className="sticky left-0 z-[1] max-w-44 min-w-30 border-b border-rule bg-surface px-3 py-2 text-left font-medium"
                 >
                   <span className="block truncate">{p.name}</span>
                   {p.quality === 'B' && (
-                    <span className="mt-0.5 inline-block rounded-full bg-warn-soft px-1.5 text-[11px] font-bold text-warn">
-                      {QUALITY_B_TAG}
-                    </span>
+                    <span className="mt-0.5 block text-2xs font-medium text-warn hc:font-bold">{QUALITY_B_TAG}</span>
                   )}
                 </th>
                 {lots.map((lot) => {
                   const key = cellKey(p.id, lot)
                   const units = unitsAt(draft, p.id, lot)
                   return (
-                    <td key={lot} className="border-b border-muted px-1 py-1.5 text-right">
+                    <td key={lot} className="border-b border-rule px-1 py-1.5 text-right">
                       {onChange ? (
                         <>
                           <input
@@ -109,7 +110,7 @@ export function Grid({
                             className={cellCls}
                           />
                           {unit !== 'units' && units > 0 && (
-                            <small className="block pt-0.5 text-center text-[11.5px] text-muted-foreground tabular-nums">
+                            <small className="num block pt-0.5 text-right text-2xs text-muted-foreground">
                               {kgAmount(kgOf(p, units))}
                             </small>
                           )}
@@ -120,7 +121,7 @@ export function Grid({
                     </td>
                   )
                 })}
-                <td className="border-b border-muted px-1.5 py-1.5 text-right">{show(p, rowUnits(p), true)}</td>
+                <td className="border-b border-rule px-1.5 py-1.5 text-right">{show(p, rowUnits(p), true)}</td>
               </tr>
             ))}
           </tbody>
@@ -146,10 +147,10 @@ export function Amount({
 }) {
   const main = unit === 'kg' ? nf1(kg) : nf0(units)
   return (
-    <span className={cn('whitespace-nowrap tabular-nums', strong && 'font-bold', !units && 'font-normal text-faint')}>
+    <span className={cn('num whitespace-nowrap', strong && 'font-semibold', !units && 'font-normal text-faint')}>
       {main}
       {unit === 'both' && units > 0 && (
-        <small className={cn('text-[11.5px] font-normal text-muted-foreground', compact ? 'ml-1' : 'block')}>
+        <small className={cn('text-2xs font-normal text-muted-foreground', compact ? 'ml-1' : 'block')}>
           {kgAmount(kg)}
         </small>
       )}

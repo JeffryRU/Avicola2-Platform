@@ -40,4 +40,4 @@ Se instalaron en el usuario (`~/.claude/skills`), porque `.claude/` del proyecto
 
 - La skill de Vercel para React está pensada sobre todo para Next.js. En este proyecto se aplican solo las reglas de React y del bundle.
 - `design-taste-frontend` está orientada a sitios y landing pages. En AviPlanner sirve para la pasada «anti-IA», no como guía de layout.
-- Las reglas de las skills se usaron en las tareas 0004 (rendimiento de React y Vite) y 0003 (auditoría y crítica de diseño). Las skills aparecen en Claude Code a partir de una sesión nueva.
+- Las reglas de las skills se usaron en las tareas 0004 (rendimiento de React y Vite) y 0003 (auditoría y crítica de diseño). Las skills ya aparecen disponibles en Claude Code.

@@ -24,37 +24,39 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        'flex',
+        'flex items-center gap-2 border-b border-border bg-background px-4 py-2.5',
         sticky && 'sticky top-0 z-20',
-        'items-center gap-2.5 bg-background/95 px-4 pt-3.5 pb-3 backdrop-blur-md dsk:static dsk:mb-[22px] dsk:flex-wrap dsk:items-end dsk:gap-4 dsk:bg-transparent dsk:p-0 dsk:backdrop-blur-none',
+        'dsk:static dsk:mb-6 dsk:flex-wrap dsk:items-end dsk:gap-4 dsk:border-0 dsk:bg-transparent dsk:p-0',
       )}
     >
       {back !== null && (
         <Link
           to={back}
           aria-label="Volver"
-          className="-ml-2 grid size-[38px] place-items-center rounded-[10px] text-primary dsk:hidden"
+          className="-ml-2 grid size-touch flex-none place-items-center rounded-md text-foreground hover:bg-muted dsk:hidden"
         >
-          <ChevronLeft className="size-6" strokeWidth={2.4} />
+          <ChevronLeft className="size-6" strokeWidth={2} />
         </Link>
       )}
       <div className="min-w-0 flex-1 dsk:flex-[1_1_auto]">
-        <h1 className="text-[22px] font-extrabold tracking-[-0.02em] dsk:text-[34px] dsk:tracking-[-0.035em]">
-          {title}
-        </h1>
-        {subtitle && <p className="mt-0.5 text-[13px] text-ink-2 dsk:mt-1.5 dsk:text-base">{subtitle}</p>}
+        <h1 className="text-xl font-semibold dsk:text-2xl hc:font-extrabold">{title}</h1>
+        {subtitle && <p className="text-sm text-muted-foreground dsk:mt-1 dsk:text-base">{subtitle}</p>}
       </div>
-      {mobileActions && <div className="dsk:hidden">{mobileActions}</div>}
+      {mobileActions && <div className="flex-none dsk:hidden">{mobileActions}</div>}
       {actions && <div className="hidden max-w-full dsk:block">{actions}</div>}
     </header>
   )
 }
 
-/** Contenido de la pantalla con los márgenes del mockup. */
+/** Contenido de la pantalla con los márgenes del sistema. */
 export function PageBody({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('px-4 pt-3 dsk:p-0', className)}>{children}</div>
+  return <div className={cn('px-4 pt-4 dsk:p-0', className)}>{children}</div>
 }
 
+/**
+ * Bloque de contenido: superficie con borde de 1 px (reglas gruesas arriba y abajo en alto
+ * contraste) y un encabezado opcional separado por una regla.
+ */
 export function Section({
   title,
   aside,
@@ -67,11 +69,11 @@ export function Section({
   className?: string
 }) {
   return (
-    <section className={cn('min-w-0 rounded-[18px] bg-card shadow-card', className)}>
+    <section className={cn('panel min-w-0', className)}>
       {title && (
-        <div className="flex flex-wrap items-center gap-3 px-4 pt-4 pb-1.5 dsk:px-5 dsk:pt-[18px] dsk:pb-2">
-          <h2 className="min-w-0 flex-1 text-[17px] font-extrabold dsk:text-[19px]">{title}</h2>
-          {aside}
+        <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 border-b border-rule px-4 py-2.5 dsk:px-5">
+          <h2 className="min-w-0 flex-1 text-md font-semibold hc:text-lg hc:font-extrabold">{title}</h2>
+          {aside && <div className="text-sm text-muted-foreground">{aside}</div>}
         </div>
       )}
       {children}
@@ -79,59 +81,50 @@ export function Section({
   )
 }
 
-/** Tarjeta de indicador (KPI) con ícono de color. */
+/** Franja de cifras (KPI): celdas separadas por una regla, sin iconos. */
+export function KpiStrip({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <section
+      aria-label="Resumen"
+      className={cn(
+        'grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-rule dsk:grid-cols-4 hc:rounded-none hc:border-x-0 hc:border-t-heavy hc:border-b-heavy hc:bg-foreground',
+        className,
+      )}
+    >
+      {children}
+    </section>
+  )
+}
+
+/** Una cifra de la franja: etiqueta, valor y una nota opcional. `extra` va a la derecha (p. ej. un anillo). */
 export function Kpi({
-  icon,
-  tone,
   label,
   value,
   foot,
   extra,
-  index = 0,
 }: {
-  icon?: ReactNode
-  tone?: string
   label: string
   value: ReactNode
   foot?: ReactNode
   extra?: ReactNode
-  index?: number
 }) {
-  // Angosta (celular, 4 por fila): todo centrado y apilado. Ancha: ícono a la izquierda y texto al lado.
-  // El gráfico (extra) ocupa el lugar del ícono, así todas las tarjetas siguen el mismo orden.
-  const badge =
-    extra ??
-    (icon && (
-      <div
-        className={cn(
-          'grid size-12 place-items-center rounded-2xl @[16rem]:size-[58px] [&>svg]:size-6 @[16rem]:[&>svg]:size-7',
-          tone,
-        )}
-      >
-        {icon}
-      </div>
-    ))
   return (
-    <div
-      className="@container animate-rise rounded-[18px] bg-card shadow-card dsk:min-h-[118px]"
-      style={{ animationDelay: `${index * 0.06}s` }}
-    >
-      <div className="flex h-full flex-col items-center justify-center gap-2.5 p-4 text-center dsk:p-5 @[16rem]:flex-row @[16rem]:justify-start @[16rem]:gap-4 @[16rem]:text-left">
-        {badge && <div className="flex-none">{badge}</div>}
-        <div className="w-full min-w-0 @[16rem]:flex-1">
-          <span className="block text-[14px] leading-snug font-semibold text-ink-2 @[16rem]:text-[14.5px]">
-            {label}
-          </span>
-          <b className="mt-1 block text-[22px] leading-tight font-extrabold tracking-[-0.03em] whitespace-nowrap @[16rem]:text-[25px] @[20rem]:text-[28px]">
-            {value}
-          </b>
-          {foot && (
-            <small className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground @[16rem]:justify-start">
-              {foot}
-            </small>
-          )}
-        </div>
+    <div className="flex min-w-0 items-start gap-3 bg-surface px-4 py-3.5 dsk:px-5 dsk:py-4">
+      <div className="min-w-0 flex-1">
+        <span className="block text-xs text-muted-foreground hc:text-sm hc:font-semibold hc:text-foreground">
+          {label}
+        </span>
+        <b className="num mt-1 block text-xl leading-tight font-medium whitespace-nowrap dsk:text-2xl hc:font-extrabold">
+          {value}
+        </b>
+        {foot && (
+          <small className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+            {foot}
+          </small>
+        )}
       </div>
+      {/* En celular la cifra basta: el gráfico chico solo apretaría la etiqueta. */}
+      {extra && <div className="hidden flex-none dsk:block">{extra}</div>}
     </div>
   )
 }
@@ -139,7 +132,7 @@ export function Kpi({
 /** Botones de pie: fijos abajo en celular. */
 export function FooterActions({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 mt-4 flex items-center gap-3 border-t bg-white/95 px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] backdrop-blur-md dsk:static dsk:mx-0 dsk:justify-end dsk:border-0 dsk:bg-transparent dsk:p-0 dsk:backdrop-blur-none">
+    <div className="sticky bottom-0 z-10 -mx-4 mt-4 flex items-center gap-3 border-t border-border bg-surface px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] dsk:static dsk:mx-0 dsk:justify-end dsk:border-0 dsk:bg-transparent dsk:p-0 hc:border-t-heavy hc:border-foreground">
       {children}
     </div>
   )

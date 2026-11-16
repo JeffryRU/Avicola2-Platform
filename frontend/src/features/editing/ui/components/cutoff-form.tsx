@@ -47,12 +47,12 @@ export function CutoffForm({ policy, idPrefix = 'cutoff' }: { policy: Cutoff; id
   }
 
   return (
-    <form onSubmit={submit} noValidate className="grid gap-4 px-4 pb-4 dsk:px-5 dsk:pb-5">
+    <form onSubmit={submit} noValidate className="grid gap-4 px-4 pt-3 pb-4 dsk:px-5 dsk:pb-5">
       <label
         htmlFor={`${idPrefix}-enabled`}
-        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-border bg-white px-3.5 py-3"
+        className="flex min-h-touch cursor-pointer items-center gap-3 border-b border-rule pb-3"
       >
-        <span className="flex-1 font-bold">{LOCK_LABEL}</span>
+        <span className="flex-1 font-medium">{LOCK_LABEL}</span>
         <Switch id={`${idPrefix}-enabled`} checked={enabled} onCheckedChange={setEnabled} />
       </label>
       <div className={cn('grid grid-cols-2 gap-3', !enabled && 'opacity-50')}>
@@ -65,13 +65,13 @@ export function CutoffForm({ policy, idPrefix = 'cutoff' }: { policy: Cutoff; id
             disabled={!enabled}
             onChange={(e) => setTime(e.target.value)}
             aria-invalid={!!error}
-            className="h-11"
+            className="num"
           />
         </div>
         <div className="grid gap-1.5">
           <Label id={`${idPrefix}-days-label`}>{DAYS_BEFORE_LABEL}</Label>
           <Select value={String(daysBefore)} onValueChange={(v) => setDaysBefore(Number(v))} disabled={!enabled}>
-            <SelectTrigger aria-labelledby={`${idPrefix}-days-label`} className="!h-11 w-full bg-white font-semibold">
+            <SelectTrigger aria-labelledby={`${idPrefix}-days-label`} className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -84,17 +84,17 @@ export function CutoffForm({ policy, idPrefix = 'cutoff' }: { policy: Cutoff; id
           </Select>
         </div>
       </div>
-      <p className="flex gap-2 rounded-[12px] bg-muted/60 p-3 text-[13.5px] text-ink-2">
-        <Clock className="mt-0.5 size-4 flex-none" />
+      <p className="flex gap-2 rounded-md bg-muted p-3 text-sm text-ink-2">
+        <Clock className="mt-0.5 size-4 flex-none text-muted-foreground" aria-hidden />
         {cutoffRule(time || policy.cutoff_time, daysBefore, enabled)}
       </p>
       {error && (
-        <p role="alert" className="text-[13px] font-semibold text-destructive">
+        <p role="alert" className="text-sm font-medium text-bad">
           {error}
         </p>
       )}
       <div className="flex justify-end">
-        <Button type="submit" disabled={!changed || update.isPending} className="h-11 font-bold">
+        <Button type="submit" disabled={!changed || update.isPending}>
           {update.isPending ? <Loader2 className="animate-spin" /> : <Save />} {SAVE_LABEL}
         </Button>
       </div>

@@ -61,11 +61,11 @@ export function NewAccountDialog({
   const field = (name: 'username' | 'name' | 'zone', label: string, hint?: string) => (
     <div className="grid gap-1.5">
       <Label htmlFor={`na-${name}`}>{label}</Label>
-      <Input id={`na-${name}`} name={name} autoComplete="off" aria-invalid={!!errors[name]} className="h-11" />
+      <Input id={`na-${name}`} name={name} autoComplete="off" aria-invalid={!!errors[name]} />
       {errors[name] ? (
-        <p className="text-[13px] font-semibold text-destructive">{errors[name]}</p>
+        <p className="text-sm font-medium text-bad">{errors[name]}</p>
       ) : (
-        hint && <p className="text-[13px] text-muted-foreground">{hint}</p>
+        hint && <p className="text-sm text-muted-foreground">{hint}</p>
       )}
     </div>
   )
@@ -85,7 +85,7 @@ export function NewAccountDialog({
           {field('zone', 'Zona (opcional)')}
           {roles.length > 1 && <RolePicker name="na-role" roles={roles} value={role} onChange={setRole} />}
           {errors.form && (
-            <p role="alert" className="text-[13px] font-semibold text-destructive">
+            <p role="alert" className="text-sm font-medium text-bad">
               {errors.form}
             </p>
           )}

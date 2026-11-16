@@ -42,7 +42,7 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait',
         theme_color: '#0B2C61',
-        background_color: '#F0F5FC',
+        background_color: '#F6F6F3',
         icons: [
           { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
@@ -50,6 +50,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Fuentes propias incluidas: la app se ve igual sin conexión.
+        globPatterns: ['**/*.{js,css,html,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/docs/, /^\/ingest\//],
         // Catálogo y vendedores: se pueden leer sin conexión con la última copia.

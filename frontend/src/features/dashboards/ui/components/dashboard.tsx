@@ -8,28 +8,30 @@ import { cn } from '@/shared/ui/lib/utils'
 export function DashboardTabs() {
   const [params] = useSearchParams()
   return (
-    <div className="flex px-4 pt-2 pb-2.5 dsk:hidden">
-      <div className="flex flex-1 gap-0.5 rounded-xl bg-muted p-1">
-        {DASHBOARDS.map((d) => (
-          <NavLink
-            key={d.to}
-            to={{ pathname: d.to, search: params.toString() }}
-            className={({ isActive }) =>
-              cn(
-                'flex-1 rounded-[9px] px-2 py-[9px] text-center text-sm font-bold text-ink-2 transition-colors',
-                isActive && 'bg-white text-primary shadow-sm',
-              )
-            }
-          >
-            {d.short}
-          </NavLink>
-        ))}
-      </div>
-    </div>
+    <nav
+      aria-label="Dashboards"
+      className="flex border-b border-border px-4 dsk:hidden hc:border-b-2 hc:border-foreground"
+    >
+      {DASHBOARDS.map((d) => (
+        <NavLink
+          key={d.to}
+          to={{ pathname: d.to, search: params.toString() }}
+          className={({ isActive }) =>
+            cn(
+              'relative flex h-touch flex-1 items-center justify-center px-2 text-center text-sm font-medium text-ink-2 transition-colors hover:text-foreground',
+              isActive &&
+                'font-semibold text-foreground after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:bg-primary hc:bg-nav-active hc:font-extrabold hc:text-nav-active-foreground hc:after:hidden',
+            )
+          }
+        >
+          {d.short}
+        </NavLink>
+      ))}
+    </nav>
   )
 }
 
-/** Variación porcentual con flecha (verde sube, rojo baja). */
+/** Variación porcentual: flecha y signo (no solo color), verde si sube y rojo si baja. */
 export function Delta({
   current,
   previous,
@@ -43,13 +45,8 @@ export function Delta({
   const v = ((current - previous) / previous) * 100
   return (
     <>
-      <span
-        className={cn(
-          'inline-flex items-center gap-1 rounded-full px-[9px] py-[3px] text-xs font-bold',
-          v >= 0 ? 'bg-ok-soft text-ok' : 'bg-bad-soft text-destructive',
-        )}
-      >
-        {v >= 0 ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
+      <span className={cn('num inline-flex items-center gap-0.5 font-medium', v >= 0 ? 'text-ok' : 'text-bad')}>
+        {v >= 0 ? <ArrowUp className="size-3" aria-hidden /> : <ArrowDown className="size-3" aria-hidden />}
         {pct1(v)}
       </span>
       <span className="hidden dsk:inline">{note}</span>

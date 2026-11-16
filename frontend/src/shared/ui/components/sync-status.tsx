@@ -24,8 +24,10 @@ export function SyncStatus({ queries, className }: { queries: SyncQuery[]; class
       role="status"
       aria-live="polite"
       className={cn(
-        'mb-3 flex items-center gap-2 rounded-[12px] px-3 py-2 text-[13px] font-semibold',
-        failed ? 'bg-warn-soft text-warn' : 'text-muted-foreground',
+        'mb-3 flex items-center gap-2 rounded-md px-3 py-2 text-sm',
+        failed
+          ? 'border border-warn-border bg-warn-soft text-warn-foreground [&>svg]:text-warn'
+          : 'text-muted-foreground',
         className,
       )}
     >
@@ -34,13 +36,13 @@ export function SyncStatus({ queries, className }: { queries: SyncQuery[]; class
         {failed
           ? 'No se pudieron traer los datos del servidor. Se muestra la pantalla sin datos y se reintenta sola.'
           : 'Cargando datos…'}
-        {failed && detail && <small className="block font-normal opacity-80">{detail}</small>}
+        {failed && detail && <small className="block text-xs">{detail}</small>}
       </span>
       {failed && (
         <button
           type="button"
           onClick={() => queries.forEach((q) => void q.refetch())}
-          className="inline-flex flex-none items-center gap-1 rounded-[8px] px-2 py-1 font-bold hover:bg-white/60"
+          className="inline-flex min-h-touch flex-none items-center gap-1 rounded-sm px-2 font-semibold underline-offset-4 hover:underline dsk:min-h-8"
         >
           {loading ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} {RETRY_LABEL}
         </button>

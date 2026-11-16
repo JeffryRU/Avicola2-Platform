@@ -1,5 +1,5 @@
 import { useState, type SyntheticEvent } from 'react'
-import { Check, Loader2, Save, TrendingUp } from 'lucide-react'
+import { Loader2, Save, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
 import {
@@ -69,7 +69,7 @@ import {
 import { FORECAST_NAV_LABEL } from '@/features/production/types/forecast'
 import { useProduction, useRegisterProduction } from '@/features/production/ui/hooks'
 import { DayStrip } from '@/shared/ui/components/day-strip'
-import { EmptyState } from '@/shared/ui/components/feedback'
+import { EmptyState, StatusDot } from '@/shared/ui/components/feedback'
 import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
@@ -82,8 +82,8 @@ const rowCls =
   'grid grid-cols-3 items-center gap-x-2 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_repeat(3,6.5rem)_5rem] sm:gap-x-3'
 const nameCls = 'col-span-3 min-w-0 sm:col-span-1'
 const cellCls =
-  'h-11 w-full min-w-0 rounded-[10px] border-[1.5px] border-border bg-white px-2 text-center text-[15px] tabular-nums outline-none transition-colors placeholder:text-faint focus:border-primary focus:ring-4 focus:ring-primary-ring'
-const splitCls = 'grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_340px]'
+  'num h-touch w-full min-w-0 rounded-sm border-control border-input bg-surface px-2 text-right text-md text-foreground outline-none transition-colors placeholder:text-faint focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring dsk:h-9 dsk:text-base'
+const splitCls = 'grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_21rem]'
 const asideCls = 'grid gap-4 @4xl/main:sticky @4xl/main:top-6'
 const pct = (share: number) => `${nf1(share * 100)} %`
 
@@ -109,12 +109,11 @@ export function ProductionPage() {
   const strip = recentDayStrip(day, ref, PRODUCTION_BACK_DAYS)
   const editable = canManage && isEditableDay(day, ref)
   const forecastLink = (
-    <Link
-      to={paths.forecast}
-      className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-secondary px-3 text-[13.5px] font-bold text-primary"
-    >
-      <TrendingUp className="size-4" /> {FORECAST_NAV_LABEL}
-    </Link>
+    <Button asChild variant="outline">
+      <Link to={paths.forecast}>
+        <TrendingUp /> {FORECAST_NAV_LABEL}
+      </Link>
+    </Button>
   )
   const history = <History days={days} selected={day} onSelect={setDay} pending={query.isPending} />
 
@@ -182,11 +181,14 @@ function ColumnHead() {
   return (
     <div className="hidden sm:block">
       <div
-        className={cn(rowCls, 'px-3 pb-1.5 text-[12px] font-bold tracking-[0.04em] text-muted-foreground uppercase')}
+        className={cn(
+          rowCls,
+          'border-b border-rule-strong px-4 py-2.5 text-xs font-medium text-muted-foreground dsk:px-5 hc:border-b-heavy hc:font-bold hc:text-foreground',
+        )}
       >
         <span>{PRODUCT_LABEL}</span>
         {FIELDS.map((f) => (
-          <span key={f} className="text-center">
+          <span key={f} className="text-right">
             {FIELD_LABEL[f]}
           </span>
         ))}
@@ -199,7 +201,7 @@ function ColumnHead() {
 /** Lo que llegó menos lo pedido, con signo. */
 function Deviation({ value }: { value: number }) {
   return (
-    <span className={cn(value < 0 && 'text-warn', !value && 'text-faint')}>
+    <span className={cn('num', value < 0 && 'text-warn hc:font-bold', !value && 'text-faint')}>
       {value > 0 ? '+' : ''}
       {nf0(value)}
     </span>
@@ -208,10 +210,11 @@ function Deviation({ value }: { value: number }) {
 
 function GroupHead({ name, ordered, produced }: { name: string | null; ordered: number; produced: number }) {
   return (
-    <div className="flex items-baseline gap-3 rounded-[10px] bg-muted/70 px-3 py-2">
-      <b className="min-w-0 flex-1 text-[13px] tracking-[0.02em] text-ink-2 uppercase">{name ?? 'Otros'}</b>
-      <span className="text-[13px] text-muted-foreground tabular-nums">
-        pedido {nf0(ordered)} · llegó <b className="text-foreground">{nf0(produced)}</b>
+    <div className="flex items-baseline gap-3 border-b border-rule bg-muted px-4 py-2 dsk:px-5">
+      <b className="eyebrow min-w-0 flex-1 hc:text-foreground">{name ?? 'Otros'}</b>
+      <span className="text-sm text-muted-foreground">
+        pedido <span className="num">{nf0(ordered)}</span> · llegó{' '}
+        <b className="num font-medium text-foreground">{nf0(produced)}</b>
       </span>
     </div>
   )
@@ -228,9 +231,9 @@ function Rows({
   cell?: (product: Product, field: Field) => React.ReactNode
 }) {
   return (
-    <div className="px-3 pt-2 pb-4 dsk:px-4">
+    <div className="pb-1">
       <ColumnHead />
-      <div className="grid gap-3">
+      <div className="grid">
         {bySubcategory(products).map((g) => (
           <div key={g.name ?? '-'}>
             <GroupHead
@@ -239,16 +242,16 @@ function Rows({
               produced={g.products.reduce((s, p) => s + read(p.id, 'produced'), 0)}
             />
             {g.products.map((p) => (
-              <div key={p.id} className={cn(rowCls, 'border-b border-muted px-3 py-2.5 last:border-0')}>
+              <div key={p.id} className={cn(rowCls, 'border-b border-rule px-4 py-2.5 last:border-0 dsk:px-5')}>
                 <span className={cn(nameCls, 'flex items-baseline gap-2')}>
-                  <b className="min-w-0 flex-1 truncate text-[15px]">{p.name}</b>
-                  <small className="text-[12.5px] text-muted-foreground tabular-nums sm:hidden">
+                  <b className="min-w-0 flex-1 truncate font-medium">{p.name}</b>
+                  <small className="text-xs text-muted-foreground sm:hidden">
                     desv. <Deviation value={read(p.id, 'produced') - read(p.id, 'ordered')} />
                   </small>
                 </span>
                 {FIELDS.map((f) => (
                   <span key={f} className="min-w-0">
-                    <small className="mb-0.5 block text-center text-[11px] font-semibold text-muted-foreground uppercase sm:hidden">
+                    <small className="mb-0.5 block text-right text-2xs text-muted-foreground sm:hidden">
                       {FIELD_SHORT[f]}
                     </small>
                     {cell ? (
@@ -256,8 +259,8 @@ function Rows({
                     ) : (
                       <span
                         className={cn(
-                          'block text-center text-[15px] tabular-nums',
-                          f === 'produced' && 'font-bold',
+                          'num block text-right text-base',
+                          f === 'produced' && 'font-semibold',
                           !read(p.id, f) && 'text-faint',
                         )}
                       >
@@ -266,7 +269,7 @@ function Rows({
                     )}
                   </span>
                 ))}
-                <span className="hidden text-right text-[14.5px] tabular-nums sm:block">
+                <span className="hidden text-right text-base sm:block">
                   <Deviation value={read(p.id, 'produced') - read(p.id, 'ordered')} />
                 </span>
               </div>
@@ -293,61 +296,58 @@ function Summary({
 }) {
   const diff = deviation(t.ordered, t.produced)
   const status = dirty ? STATUS_EDITING : record ? STATUS_SAVED : STATUS_PENDING
+  const tone = dirty ? 'warn' : record ? 'ok' : 'draft'
+  const stat = (label: string, value: React.ReactNode, warn = false) => (
+    <div className="flex flex-col-reverse bg-surface px-4 py-3 dsk:px-5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={cn('num text-lg font-medium hc:font-bold', warn && 'text-warn')}>{value}</dd>
+    </div>
+  )
   return (
-    <Section>
-      <div className="p-4 dsk:p-5">
-        <div className="flex items-center gap-2">
-          <h2 className="min-w-0 flex-1 text-[15px] font-extrabold">{SUMMARY_TITLE}</h2>
-          <span
-            className={cn(
-              'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-bold',
-              dirty ? 'bg-warn-soft text-warn' : record ? 'bg-ok-soft text-ok' : 'bg-muted text-ink-2',
-            )}
-          >
-            {record && !dirty && <Check className="size-3.5" strokeWidth={3} />}
-            {status}
-          </span>
-        </div>
-        <div className="mt-3">
-          <b className="block text-[34px] leading-none font-extrabold tracking-[-0.03em] tabular-nums">
-            {nf0(t.produced)}
-          </b>
-          <small className="mt-1 block text-[13px] text-muted-foreground">aves que llegaron</small>
-        </div>
-        <dl className="mt-3.5 grid grid-cols-3 gap-2 border-t border-muted pt-3 text-[13px]">
-          <div>
-            <dd className="text-[16px] font-extrabold tabular-nums">{nf0(t.ordered)}</dd>
-            <dt className="text-muted-foreground">pedidas</dt>
-          </div>
-          <div>
-            <dd className={cn('text-[16px] font-extrabold tabular-nums', diff.birds < 0 && 'text-warn')}>
-              {diff.birds > 0 ? '+' : ''}
-              {nf0(diff.birds)}
-            </dd>
-            <dt className="text-muted-foreground">diferencia</dt>
-          </div>
-          <div>
-            <dd className="text-[16px] font-extrabold tabular-nums">{pct(t.bShare)}</dd>
-            <dt className="text-muted-foreground">calidad B</dt>
-          </div>
-        </dl>
-        {record && (
-          <p className="mt-3 border-t border-muted pt-3 text-[13px] text-muted-foreground">
-            Registró <b className="text-foreground">{record.recorded_by}</b> · {dShort(dateOf(record.recorded_at))},{' '}
-            {clockTime(record.recorded_at)}
-          </p>
-        )}
-        {record && Object.keys(record.weights).length > 0 && (
-          <p className="mt-2 text-[13px] text-muted-foreground">
-            Peso promedio:{' '}
-            {Object.entries(record.weights)
-              .map(([group, kg]) => `${group} ${String(kg)} kg`)
-              .join(' · ')}
-          </p>
-        )}
-        {note && <p className="mt-2 text-[13px] text-muted-foreground">{note}</p>}
-        {action}
+    <Section
+      title={SUMMARY_TITLE}
+      aside={
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 text-sm',
+            tone === 'warn' && 'font-medium text-warn hc:font-bold',
+            tone === 'ok' && 'text-foreground',
+          )}
+        >
+          <StatusDot tone={tone} />
+          {status}
+        </span>
+      }
+    >
+      <div className="px-4 py-4 dsk:px-5">
+        <b className="num block text-3xl leading-none font-medium hc:font-extrabold">{nf0(t.produced)}</b>
+        <small className="mt-1.5 block text-sm text-muted-foreground">aves que llegaron</small>
       </div>
+      <dl className="grid grid-cols-3 gap-px border-t border-rule bg-rule">
+        {stat('pedidas', nf0(t.ordered))}
+        {stat('diferencia', `${diff.birds > 0 ? '+' : ''}${nf0(diff.birds)}`, diff.birds < 0)}
+        {stat('calidad B', pct(t.bShare))}
+      </dl>
+      {(record ?? note) && (
+        <div className="border-t border-rule px-4 py-3 text-sm text-muted-foreground dsk:px-5">
+          {record && (
+            <p>
+              Registró <b className="font-medium text-foreground">{record.recorded_by}</b> ·{' '}
+              {dShort(dateOf(record.recorded_at))}, {clockTime(record.recorded_at)}
+            </p>
+          )}
+          {record && Object.keys(record.weights).length > 0 && (
+            <p className="mt-1">
+              Peso promedio:{' '}
+              {Object.entries(record.weights)
+                .map(([group, kg]) => `${group} ${String(kg)} kg`)
+                .join(' · ')}
+            </p>
+          )}
+          {note && <p className="mt-1">{note}</p>}
+        </div>
+      )}
+      {action}
     </Section>
   )
 }
@@ -366,9 +366,9 @@ function History({
   return (
     <Section title={RECORDED_TITLE}>
       {pending ? null : days.length === 0 ? (
-        <p className="px-4 pt-1 pb-5 text-[14px] text-muted-foreground dsk:px-5">{RECORDED_EMPTY}</p>
+        <p className="px-4 py-4 text-base text-muted-foreground dsk:px-5">{RECORDED_EMPTY}</p>
       ) : (
-        <ul className="px-2 pt-1 pb-2.5">
+        <ul className="p-1.5">
           {days.map((d) => (
             <li key={d.date}>
               <button
@@ -376,17 +376,18 @@ function History({
                 aria-current={d.date === selected}
                 onClick={() => onSelect(d.date)}
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left transition-colors hover:bg-muted/70',
-                  d.date === selected && 'bg-secondary hover:bg-secondary',
+                  'flex min-h-touch w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted',
+                  d.date === selected &&
+                    'bg-nav-active text-nav-active-foreground hover:bg-nav-active hc:font-semibold',
                 )}
               >
                 <span className="min-w-0 flex-1">
-                  <b className="block text-[14.5px]">{dShort(d.date)}</b>
-                  <small className="block truncate text-[12.5px] text-muted-foreground">pedido {nf0(d.ordered)}</small>
+                  <b className="block text-base font-medium">{dShort(d.date)}</b>
+                  <small className="block truncate text-xs text-muted-foreground">pedido {nf0(d.ordered)}</small>
                 </span>
-                <span className="text-right tabular-nums">
-                  <b className="block text-[14.5px]">{nf0(d.produced)}</b>
-                  <small className="block text-[12.5px] text-muted-foreground">
+                <span className="num text-right">
+                  <b className="block text-base font-medium">{nf0(d.produced)}</b>
+                  <small className="block text-xs text-muted-foreground">
                     B {pct(d.produced ? d.quality_b / d.produced : 0)}
                   </small>
                 </span>
@@ -444,12 +445,12 @@ function Editor({
   }
 
   const save = (className: string) => (
-    <Button type="submit" form={FORM_ID} disabled={register.isPending} className={cn('h-12 font-bold', className)}>
+    <Button type="submit" form={FORM_ID} disabled={register.isPending} className={className}>
       {register.isPending ? <Loader2 className="animate-spin" /> : <Save />} {record ? UPDATE_LABEL : SAVE_LABEL}
     </Button>
   )
   const alert = error && (
-    <p role="alert" className="text-[13px] font-semibold text-destructive">
+    <p role="alert" className="text-sm font-medium text-bad">
       {error}
     </p>
   )
@@ -469,20 +470,23 @@ function Editor({
                   placeholder="0"
                   value={draft[p.id]?.[f] ?? ''}
                   onChange={(e) => set(p.id, f, keepDigits(e.target.value, RECORD_MAX_DIGITS))}
-                  className={cn(cellCls, f === 'produced' && 'font-bold')}
+                  className={cn(cellCls, f === 'produced' && 'font-semibold')}
                 />
               )}
             />
-            <p className="px-6 pb-3 text-[13px] text-muted-foreground dsk:px-7">
+            <p className="px-4 py-3 text-sm text-muted-foreground dsk:px-5">
               {HINT} {DEVIATION_HINT}
             </p>
             {groups.length > 0 && (
-              <fieldset className="mx-3 mb-4 rounded-[12px] border border-muted px-3 pt-2 pb-3 dsk:mx-4">
-                <legend className="px-1 text-[13px] font-bold text-ink-2">{WEIGHTS_TITLE}</legend>
+              <fieldset className="border-t border-rule px-4 pt-3 pb-4 dsk:px-5">
+                <legend className="sr-only">{WEIGHTS_TITLE}</legend>
+                <p aria-hidden className="mb-2 text-sm font-semibold">
+                  {WEIGHTS_TITLE}
+                </p>
                 <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {groups.map((g) => (
                     <label key={g} className="block min-w-0">
-                      <span className="mb-1 block truncate text-[12.5px] font-semibold text-muted-foreground">{g}</span>
+                      <span className="mb-1 block truncate text-xs font-medium text-ink-2">{g}</span>
                       <input
                         inputMode="decimal"
                         placeholder="—"
@@ -497,7 +501,7 @@ function Editor({
                     </label>
                   ))}
                 </div>
-                <p className="mt-2 text-[12.5px] text-muted-foreground">{WEIGHTS_HINT}</p>
+                <p className="mt-2 text-xs text-muted-foreground">{WEIGHTS_HINT}</p>
               </fieldset>
             )}
           </form>
@@ -508,7 +512,7 @@ function Editor({
             record={record}
             dirty={dirty}
             action={
-              <div className="mt-4 hidden gap-2 @4xl/main:grid">
+              <div className="hidden gap-2 border-t border-rule px-4 py-3 dsk:px-5 @4xl/main:grid">
                 {alert}
                 {save('w-full')}
               </div>
@@ -517,14 +521,16 @@ function Editor({
           {history}
         </aside>
       </div>
-      <div className="sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-10 mt-4 rounded-[16px] border bg-white/95 p-3 shadow-card backdrop-blur-md dsk:bottom-4 @4xl/main:hidden">
-        {alert && <div className="px-1 pb-2">{alert}</div>}
+      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 -mx-4 mt-4 border-t border-border bg-surface px-4 py-3 dsk:bottom-0 dsk:mx-0 @4xl/main:hidden hc:border-t-heavy hc:border-foreground">
+        {alert && <div className="pb-2">{alert}</div>}
         <div className="flex items-center gap-3">
-          <span className="min-w-0 flex-1 pl-1 tabular-nums">
-            <b className="block text-[17px] leading-tight">
-              {nf0(t.produced)} <span className="text-[13px] font-semibold text-muted-foreground">llegaron</span>
+          <span className="min-w-0 flex-1">
+            <b className="num block text-lg leading-tight font-medium hc:font-bold">
+              {nf0(t.produced)} <span className="font-sans text-sm font-normal text-muted-foreground">llegaron</span>
             </b>
-            <small className="block text-[12.5px] text-muted-foreground">de {nf0(t.ordered)} pedidas</small>
+            <small className="block text-xs text-muted-foreground">
+              de <span className="num">{nf0(t.ordered)}</span> pedidas
+            </small>
           </span>
           {save('flex-none px-5')}
         </div>

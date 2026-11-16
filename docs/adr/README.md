@@ -18,3 +18,4 @@ Cada decisión de arquitectura relevante o supuesto de proceso se registra aquí
 | [0015](0015-nombre-del-producto-aviplanner.md) | El producto se llama AviPlanner (Avícola 2 sigue siendo el cliente) | aceptado |
 | [0016](0016-capas-con-import-linter-y-fuentes-unicas.md) | Capas verificadas con import-linter, `shared/` como módulo común y una sola fuente por regla | aceptado |
 | [0017](0017-agente-de-ia-con-mcp-y-n8n.md) | Agente de IA: servidor MCP de solo lectura en el backend y workflow de n8n con AI Agent | aceptado |
+| [0018](0018-sistema-visual-y-temas.md) | Sistema visual propio en tokens, modo oscuro y alto contraste | aceptado |

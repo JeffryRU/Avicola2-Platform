@@ -49,7 +49,7 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} noValidate aria-label="Cambiar contraseña" className="grid gap-3.5 p-5">
+    <form onSubmit={submit} noValidate aria-label="Cambiar contraseña" className="grid gap-4 p-4 dsk:p-5">
       {FIELDS.map((f) => (
         <div key={f.name} className="grid gap-1.5">
           <Label htmlFor={`pw-${f.name}`}>{f.label}</Label>
@@ -59,28 +59,27 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
             type={show ? 'text' : 'password'}
             autoComplete={f.autoComplete}
             aria-invalid={!!errors[f.name]}
-            className="h-11"
           />
-          {errors[f.name] && <p className="text-[13px] font-semibold text-destructive">{errors[f.name]}</p>}
+          {errors[f.name] && <p className="text-sm font-medium text-bad">{errors[f.name]}</p>}
         </div>
       ))}
-      <p className="text-[13px] text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Al menos 8 caracteres, con letras y números. No uses tu usuario ni contraseñas obvias.
       </p>
       <button
         type="button"
         onClick={() => setShow((v) => !v)}
-        className="flex w-fit items-center gap-2 text-sm font-semibold text-primary"
+        className="flex min-h-touch w-fit items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline dsk:min-h-8"
       >
         {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
         {show ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
       </button>
       {errors.form && (
-        <p role="alert" className="text-[13px] font-semibold text-destructive">
+        <p role="alert" className="rounded-md border border-bad-border bg-bad-soft px-3 py-2 text-sm text-foreground">
           {errors.form}
         </p>
       )}
-      <Button type="submit" disabled={busy} className="h-11">
+      <Button type="submit" disabled={busy} className="dsk:justify-self-start">
         {busy ? <Loader2 className="animate-spin" /> : <KeyRound />} Guardar contraseña
       </Button>
     </form>
@@ -93,7 +92,7 @@ export function ChangePasswordPage() {
   return (
     <div>
       <PageHeader title="Cambiar contraseña" back={paths.profile} />
-      <PageBody className="dsk:max-w-[520px]">
+      <PageBody className="dsk:max-w-lg">
         <Section>
           <PasswordForm onDone={() => navigate(paths.profile)} />
         </Section>

@@ -1,4 +1,4 @@
-import { BarChart3, Calendar, Check, Pencil, Plus, ShoppingCart, Tag } from 'lucide-react'
+import { Pencil, Plus, ShoppingCart } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router'
 import { paths } from '@/app/routes'
 import { dDM, dDow, dFull, dShort, today } from '@/shared/domain/dates'
@@ -9,8 +9,8 @@ import { isoDateSchema } from '@/shared/domain/schemas'
 import { useCatalog } from '@/features/catalog'
 import { useMyDays, useWindowData } from '@/features/projections/ui/hooks'
 import { CountUp } from '@/shared/ui/components/charts'
-import { EmptyState, Note, StatusBadge } from '@/shared/ui/components/feedback'
-import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
+import { EmptyState, Note, StatusBadge, StatusDot } from '@/shared/ui/components/feedback'
+import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { tableCls } from '@/shared/ui/lib/table-styles'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
@@ -44,7 +44,7 @@ export function DayDetailPage() {
                   : 'Este día ya pasó sin proyección.'}
               {editable && (
                 <div className="mt-4">
-                  <Button asChild className="h-[46px] font-bold">
+                  <Button asChild>
                     <Link to={editLink}>
                       <Plus /> Registrar {dShort(date)}
                     </Link>
@@ -73,7 +73,7 @@ export function DayDetailPage() {
         back={paths.mine}
         actions={
           editable && (
-            <Button asChild variant="outline" className="h-[46px] border-[1.5px] border-primary font-bold text-primary">
+            <Button asChild variant="outline">
               <Link to={editLink}>
                 <Pencil /> Editar
               </Link>
@@ -82,8 +82,8 @@ export function DayDetailPage() {
         }
         mobileActions={
           editable && (
-            <Button asChild variant="ghost" size="icon" aria-label="Editar">
-              <Link to={editLink}>
+            <Button asChild variant="ghost" size="icon">
+              <Link to={editLink} aria-label="Editar">
                 <Pencil />
               </Link>
             </Button>
@@ -91,63 +91,56 @@ export function DayDetailPage() {
         }
       />
       <PageBody>
-        <div className="mb-4 flex flex-wrap items-center gap-3 dsk:gap-[18px]">
-          <div className="flex items-center gap-3">
-            <Calendar className="size-[30px]" />
-            <div>
-              <b className="block text-[19px] font-extrabold">
-                {dDow(date)} {dFull(date)}
-              </b>
-              <small className="text-muted-foreground">Fecha de proyección</small>
-            </div>
-          </div>
-          <span className="h-[38px] w-px bg-border" />
-          <div className="flex items-center gap-3">
-            <Tag className="size-7" />
-            <div>
-              <b className="block text-[19px] font-extrabold">{catalog.dayLabel(day.category, day.units)}</b>
-              <small className="text-muted-foreground">Categoría</small>
-            </div>
-          </div>
-          <span className="flex-1" />
-          <StatusBadge kind={day.sync === 'ok' ? 'synced' : 'queued'} />
+        <div className="mb-4">
+          <p className="text-sm text-muted-foreground">Fecha de proyección</p>
+          <h2 className="text-xl font-semibold hc:text-2xl hc:font-extrabold">
+            {dDow(date)} {dFull(date)} · {catalog.dayLabel(day.category, day.units)}
+          </h2>
         </div>
-        <div className="mb-4 grid grid-cols-2 gap-3">
-          <Section className="flex flex-col items-start gap-2.5 p-3.5 dsk:flex-row dsk:gap-3.5 dsk:p-[18px]">
-            <span className="grid size-[46px] flex-none place-items-center rounded-xl bg-secondary text-primary">
-              <BarChart3 className="size-6" />
-            </span>
-            <div>
-              <span className="block text-sm font-semibold text-ink-2">Total proyectado</span>
-              <b className="block text-xl font-extrabold dsk:text-2xl">
-                <CountUp value={units} /> {UNITS_SHORT}
-              </b>
-              <small className="text-muted-foreground">{kgAmount(kg)}</small>
-            </div>
-          </Section>
-          <Section className="flex flex-col items-start gap-2.5 p-3.5 dsk:flex-row dsk:gap-3.5 dsk:p-[18px]">
-            <span className="grid size-[46px] flex-none place-items-center rounded-full bg-ok text-white">
-              <Check className="size-6" strokeWidth={3} />
-            </span>
-            <div>
-              <span className="block text-sm font-semibold text-ink-2">Estado</span>
-              <b className="block text-xl font-extrabold text-ok dsk:text-2xl">{STATUS_LABEL.confirmed}</b>
-              <small className="text-muted-foreground">
+        <KpiStrip className="mb-4 dsk:grid-cols-3">
+          <Kpi
+            label="Total proyectado"
+            value={
+              <>
+                <CountUp value={units} />{' '}
+                <span className="font-sans text-md font-normal text-muted-foreground">{UNITS_SHORT}</span>
+              </>
+            }
+            foot={<span className="num">{kgAmount(kg)}</span>}
+          />
+          <Kpi
+            label="Estado"
+            value={
+              <span className="flex items-center gap-2 font-sans text-xl">
+                <StatusDot tone="ok" />
+                {STATUS_LABEL.confirmed}
+              </span>
+            }
+            foot={
+              <span className="num">
                 {dDM(day.submittedAt.slice(0, 10))} {sent.toTimeString().slice(0, 5)}
-              </small>
-            </div>
-          </Section>
-        </div>
+              </span>
+            }
+          />
+          <Kpi
+            label="Envío"
+            value={
+              <span className="font-sans text-md">
+                <StatusBadge kind={day.sync === 'ok' ? 'synced' : 'queued'} />
+              </span>
+            }
+          />
+        </KpiStrip>
         {real && (
           <Note icon={<ShoppingCart />} className="mb-4">
-            <div>
-              Venta real (ERP): <b>{kgAmount(realKg)}</b>, {pct1(((realKg - kg) / kg) * 100)} frente a lo proyectado.
+            <div className="min-w-0 flex-1">
+              Venta real (ERP): <b className="num">{kgAmount(realKg)}</b>,{' '}
+              <span className="num">{pct1(((realKg - kg) / kg) * 100)}</span> frente a lo proyectado.
             </div>
           </Note>
         )}
-        <h2 className="mb-2.5 text-xl font-extrabold">Detalle por producto</h2>
-        <Section>
-          <div className="overflow-x-auto p-2.5">
+        <Section title="Detalle por producto">
+          <div className="overflow-x-auto">
             <table className={tableCls.table}>
               <thead>
                 <tr>
@@ -170,12 +163,12 @@ export function DayDetailPage() {
                   return (
                     <tr key={p.id} className={tableCls.row}>
                       <td className={tableCls.td}>{p.name}</td>
-                      <td className={tableCls.td}>{u}</td>
-                      <td className={tableCls.td}>{nf1(u * p.kg_per_unit)}</td>
+                      <td className={cn(tableCls.td, 'num', !u && 'text-faint')}>{u}</td>
+                      <td className={cn(tableCls.td, 'num', !u && 'text-faint')}>{nf1(u * p.kg_per_unit)}</td>
                       {real && (
                         <>
-                          <td className={tableCls.td}>{r}</td>
-                          <td className={cn(tableCls.td, 'font-bold', diff < 0 ? 'text-destructive' : 'text-ok')}>
+                          <td className={cn(tableCls.td, 'num')}>{r}</td>
+                          <td className={cn(tableCls.td, 'num font-medium', diff < 0 ? 'text-bad' : 'text-ok')}>
                             {pct1(diff)}
                           </td>
                         </>
@@ -184,13 +177,13 @@ export function DayDetailPage() {
                   )
                 })}
                 <tr className={tableCls.total}>
-                  <td>Total</td>
-                  <td className="text-center">{nf0(units)}</td>
-                  <td className="text-center">{nf1(kg)}</td>
+                  <td className={tableCls.td}>Total</td>
+                  <td className={cn(tableCls.td, 'num')}>{nf0(units)}</td>
+                  <td className={cn(tableCls.td, 'num')}>{nf1(kg)}</td>
                   {real && (
                     <>
-                      <td className="text-center">{nf0(sumUnits(real))}</td>
-                      <td className={cn('text-center', realKg < kg ? 'text-destructive' : 'text-ok')}>
+                      <td className={cn(tableCls.td, 'num')}>{nf0(sumUnits(real))}</td>
+                      <td className={cn(tableCls.td, 'num', realKg < kg ? 'text-bad' : 'text-ok')}>
                         {pct1(((sumUnits(real) - units) / units) * 100)}
                       </td>
                     </>

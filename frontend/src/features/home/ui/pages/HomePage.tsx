@@ -1,35 +1,31 @@
-import { AlertCircle, BarChart3, Bell, Box, ChevronRight, Clock, Check, Package, Plus, ShoppingBag } from 'lucide-react'
+import { Check, ChevronRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import { paths } from '@/app/routes'
 import {
   dDM,
   dDow,
+  dDowLong,
+  dFull,
   dShort,
-  greeting,
   relativeDay,
   today,
   weekDates,
   weekStart,
   type IsoDate,
 } from '@/shared/domain/dates'
-import { closesLabel, useEditingWindow } from '@/features/editing'
+import { closesLabel, useEditingWindow, MY_REQUESTS_SUBTITLE, MY_REQUESTS_TITLE } from '@/features/editing'
 import { sumUnits } from '@/shared/domain/products'
 import { roleLabel } from '@/shared/domain/session'
 import { useRequiredSession } from '@/features/auth'
 import { useCatalog } from '@/features/catalog'
 import { useMyDays } from '@/features/projections'
 import { useUnreadCount } from '@/features/notifications'
-import { BrandMark } from '@/shared/ui/components/brand'
-import { BRANDS } from '@/shared/types/brands'
-import { useBrand } from '@/shared/ui/hooks/use-brand'
 import { CountUp } from '@/shared/ui/components/charts'
-import { Note } from '@/shared/ui/components/feedback'
+import { Note, StatusDot } from '@/shared/ui/components/feedback'
 import { Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
 import { UNITS_SHORT } from '@/shared/types/labels'
-
-/** Hora límite para confirmar la proyección del día (mensaje informativo del mockup). */
 
 /** "de mañana", "de pasado mañana" o "del Jue 05/11". */
 function dayPhrase(date: IsoDate, ref: IsoDate): string {
@@ -37,9 +33,9 @@ function dayPhrase(date: IsoDate, ref: IsoDate): string {
   return rel ? `de ${rel.toLowerCase()}` : `del ${dShort(date)}`
 }
 
+/** Inicio del vendedor: primero lo que falta (la proyección pendiente), después su semana. */
 export function HomePage() {
   const { seller } = useRequiredSession()
-  const { brand } = useBrand()
   const navigate = useNavigate()
   const { days } = useMyDays()
   const { catalog } = useCatalog()
@@ -52,152 +48,148 @@ export function HomePage() {
   const weekUnits = week.reduce((s, d) => s + sumUnits(days.get(d)?.units), 0)
   const weekKg = catalog ? week.reduce((s, d) => s + catalog.kg(days.get(d)?.units ?? {}), 0) : 0
 
-  const menu = [
-    { to: paths.register, icon: Plus, color: 'bg-t-blue', title: 'Nueva proyección', sub: 'Proyecta por producto' },
-    { to: paths.mine, icon: Clock, color: 'bg-t-green', title: 'Mis proyecciones', sub: 'Proyecciones confirmadas' },
-    {
-      to: paths.dashVersus,
-      icon: BarChart3,
-      color: 'bg-t-purple',
-      title: 'Historial y seguimiento',
-      sub: 'Ventas reales vs. proyección',
-    },
-    { to: paths.products, icon: Box, color: 'bg-t-amber', title: 'Productos', sub: 'Información y conversiones' },
-    {
-      to: paths.notifications,
-      icon: Bell,
-      color: 'bg-t-red',
-      title: 'Notificaciones',
-      sub: unread ? `${unread} sin leer` : 'Alertas y mensajes',
-    },
+  const links = [
+    { to: paths.mine, title: 'Mis proyecciones', sub: 'Lo que ya confirmaste, día por día' },
+    { to: paths.requests, title: MY_REQUESTS_TITLE, sub: MY_REQUESTS_SUBTITLE },
+    { to: paths.dashVersus, title: 'Historial y seguimiento', sub: 'Ventas reales vs. proyección' },
+    { to: paths.products, title: 'Productos', sub: 'Presentaciones y conversión a kilos' },
+    { to: paths.notifications, title: 'Notificaciones', sub: unread ? `${unread} sin leer` : 'Alertas y mensajes' },
   ]
 
   return (
-    <div>
-      <section className="relative overflow-hidden bg-head px-[18px] pt-[18px] pb-[54px] text-white dsk:hidden">
-        <div className="absolute -top-[70px] -right-[60px] size-[220px] rounded-full border-[30px] border-white/5" />
-        <div className="relative z-10 flex items-center gap-3">
-          <BrandMark size={48} onDark />
-          <span className="text-[30px] font-extrabold tracking-[-0.04em]">{BRANDS[brand].name}</span>
-          <Link
-            to={paths.notifications}
-            aria-label="Notificaciones"
-            className="relative ml-auto grid size-[42px] place-items-center rounded-xl"
-          >
-            <Bell className={cn('size-[26px]', unread && 'animate-ring')} />
-            {unread > 0 && (
-              <span className="absolute top-2 right-[9px] size-[9px] rounded-full border-2 border-head bg-destructive" />
-            )}
-          </Link>
-        </div>
-      </section>
-      <div className="relative -mt-[30px] rounded-t-3xl bg-background px-4 pt-5 pb-1 dsk:m-0 dsk:mb-1 dsk:rounded-none dsk:bg-transparent dsk:p-0">
-        <h1 className="text-[27px] font-extrabold">
-          {greeting()}, {seller.name.split(' ')[0]}!
+    <div className="px-4 pt-5 dsk:p-0">
+      <header className="mb-4 dsk:mb-6">
+        <p className="text-sm text-muted-foreground">
+          {seller.name} · {roleLabel(seller)}
+        </p>
+        <h1 className="text-2xl font-semibold hc:text-3xl hc:font-extrabold">
+          {dDowLong(now)} {dFull(now)}
         </h1>
-        <p className="mt-1 text-base text-muted-foreground">{roleLabel(seller)}</p>
-      </div>
+      </header>
 
-      <div className="mt-3.5 px-4 dsk:px-0">
-        {next && !days.has(next.date) && (
-          <Note tone="warn" icon={<AlertCircle />} className="mb-3.5">
-            <div className="min-w-0 flex-1">
-              <b>Tu proyección {dayPhrase(next.date, now)} está pendiente.</b>
-              <br />
-              {closesLabel(next.closes_at, true, now)}. Confírmala para que entre a la planificación.
-            </div>
-            <Button
-              className="h-10 w-full font-bold dsk:w-auto"
-              onClick={() => navigate(`${paths.register}?dia=${next.date}`)}
+      <div className="grid gap-4 @4xl/main:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] @4xl/main:items-start">
+        <div className="grid gap-4">
+          {next && !days.has(next.date) && (
+            <section
+              aria-label="Pendiente"
+              className="grid gap-3 rounded-md border border-warn-border bg-warn-soft p-4 hc:p-5"
             >
-              Completar
-            </Button>
-          </Note>
-        )}
-
-        <div className="grid gap-3 dsk:gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
-          {menu.map((m, i) => (
-            <Link
-              key={m.to}
-              to={m.to}
-              className="flex animate-rise items-center gap-4 rounded-2xl bg-card px-4 py-3.5 text-left shadow-card transition hover:-translate-y-0.5 hover:shadow-lift dsk:p-5"
-              style={{ animationDelay: `${i * 0.05}s` }}
-            >
-              <span className={cn('grid size-[58px] flex-none place-items-center rounded-[14px] text-white', m.color)}>
-                <m.icon className="size-7" strokeWidth={2.2} />
+              <div>
+                <b className="block font-semibold hc:text-lg hc:font-extrabold">
+                  Falta tu proyección {dayPhrase(next.date, now)}
+                </b>
+                <span className="text-sm text-warn-foreground hc:text-md">
+                  {closesLabel(next.closes_at, true, now)}. Confírmala para que entre a la planificación.
+                </span>
+              </div>
+              <Button
+                className="w-full dsk:w-auto dsk:justify-self-start"
+                onClick={() => navigate(`${paths.register}?dia=${next.date}`)}
+              >
+                Registrar proyección
+              </Button>
+            </section>
+          )}
+          {next && days.has(next.date) && (
+            <Note tone="ok" icon={<Check />}>
+              <span>
+                Tu proyección {dayPhrase(next.date, now)} ya está confirmada.{' '}
+                <Link to={paths.day(next.date)} className="font-medium text-primary underline-offset-4 hover:underline">
+                  Ver detalle
+                </Link>
               </span>
-              <span className="min-w-0 flex-1">
-                <b className="block text-[17.5px] font-extrabold">{m.title}</b>
-                <small className="mt-0.5 block text-[14.5px] text-muted-foreground">{m.sub}</small>
-              </span>
-              <ChevronRight className="size-[22px] text-ink-2" />
-            </Link>
-          ))}
-        </div>
+            </Note>
+          )}
 
-        <div className="mt-3 grid gap-3 dsk:mt-4 dsk:gap-4 @4xl/main:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <Section
             title="Tu semana"
-            aside={<span className="text-muted-foreground">{confirmed} de 7 días confirmados</span>}
+            aside={
+              <span>
+                <span className="num">{confirmed}/7</span> confirmados
+              </span>
+            }
           >
-            <div className="grid grid-cols-7 gap-1 px-4 pt-1.5 pb-4 dsk:gap-2 dsk:px-5 dsk:pb-5">
-              {week.map((d, i) => {
+            <ol className="grid grid-cols-7 px-1 py-2 text-center">
+              {week.map((d) => {
                 const ok = days.has(d)
+                const due = !ok && d === next?.date
+                const state = ok ? 'confirmado' : due ? 'pendiente' : 'sin registrar'
                 return (
-                  <Link
-                    key={d}
-                    to={paths.day(d)}
-                    className={cn(
-                      'flex flex-col items-center gap-1 rounded-[10px] bg-card px-0.5 py-2 text-center shadow-card transition hover:-translate-y-0.5 dsk:rounded-[14px] dsk:px-1 dsk:py-3',
-                      d === now && 'outline-2 -outline-offset-2 outline-primary',
-                    )}
-                  >
-                    <b className="text-xs dsk:text-sm">{dDow(d)}</b>
-                    <small className="text-[10.5px] text-muted-foreground dsk:text-xs">{dDM(d)}</small>
-                    <span
+                  <li key={d}>
+                    <Link
+                      to={paths.day(d)}
+                      aria-label={`${dShort(d)}: ${state}`}
                       className={cn(
-                        'mt-1 grid size-6 animate-popin place-items-center rounded-full text-white dsk:size-[30px]',
-                        ok ? 'bg-ok' : 'bg-pend',
+                        'flex min-h-touch flex-col items-center gap-1 rounded-md py-2 text-sm transition-colors hover:bg-muted',
+                        due && 'font-semibold text-warn hc:bg-warn-soft hc:text-foreground',
+                        d === now && 'ring-1 ring-border-strong ring-inset',
                       )}
-                      style={{ animationDelay: `${0.2 + i * 0.06}s` }}
                     >
-                      {ok ? (
-                        <Check className="size-4" strokeWidth={2.6} />
-                      ) : (
-                        <Clock className="size-4" strokeWidth={2.6} />
-                      )}
-                    </span>
-                  </Link>
+                      <span className={cn('text-xs', !due && 'text-muted-foreground')}>{dDow(d)}</span>
+                      <span className="num">{dDM(d).slice(0, 2)}</span>
+                      {/* Punto en A; en alto contraste, texto (el estado no depende del color). */}
+                      <span className="hc:hidden">
+                        {ok ? (
+                          <StatusDot tone="ok" />
+                        ) : due ? (
+                          <StatusDot tone="warn" />
+                        ) : (
+                          <span aria-hidden className="block size-2 rounded-full bg-control-line" />
+                        )}
+                      </span>
+                      <span aria-hidden className="hidden text-xs font-bold hc:block">
+                        {ok ? '✓' : due ? 'falta' : '—'}
+                      </span>
+                    </Link>
+                  </li>
                 )
               })}
-            </div>
+            </ol>
           </Section>
+
           <Section
             title="Esta semana"
             aside={
-              <Link to={paths.dashSummary} className="font-bold text-primary hover:underline">
+              <Link to={paths.dashSummary} className="font-medium text-primary underline-offset-4 hover:underline">
                 Ver resumen
               </Link>
             }
           >
-            <div className="grid px-4 pb-4 dsk:px-5 dsk:pb-5">
-              <div className="grid grid-cols-[24px_1fr_auto] items-center gap-3 border-b border-muted py-[13px]">
-                <Package className="size-5" />
-                <span className="text-ink-2">Total proyectado</span>
-                <b>
+            <dl className="grid">
+              <div className="flex items-baseline justify-between gap-3 border-b border-rule px-4 py-3 dsk:px-5">
+                <dt className="text-ink-2">Proyectado</dt>
+                <dd className="num font-medium hc:text-lg hc:font-extrabold">
                   <CountUp value={weekUnits} /> {UNITS_SHORT}
-                </b>
+                </dd>
               </div>
-              <div className="grid grid-cols-[24px_1fr_auto] items-center gap-3 py-[13px]">
-                <ShoppingBag className="size-5" />
-                <span className="text-ink-2">Total en kilos</span>
-                <b>
+              <div className="flex items-baseline justify-between gap-3 px-4 py-3 dsk:px-5">
+                <dt className="text-ink-2">Kilos aprox.</dt>
+                <dd className="num font-medium hc:text-lg hc:font-extrabold">
                   <CountUp value={weekKg} decimals={1} /> kg
-                </b>
+                </dd>
               </div>
-            </div>
+            </dl>
           </Section>
         </div>
+
+        <Section title="Accesos">
+          <ul>
+            {links.map((l) => (
+              <li key={l.to} className="border-b border-rule last:border-0">
+                <Link
+                  to={l.to}
+                  className="flex min-h-touch items-center gap-3 px-4 py-3 transition-colors hover:bg-muted dsk:px-5"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">{l.title}</span>
+                    <small className="block text-sm text-muted-foreground">{l.sub}</small>
+                  </span>
+                  <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Section>
       </div>
     </div>
   )

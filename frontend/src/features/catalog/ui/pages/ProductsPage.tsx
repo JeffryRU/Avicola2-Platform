@@ -8,6 +8,7 @@ import { Input } from '@/shared/ui/components/shadcn/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
 import { kgAmount } from '@/shared/types/labels'
+import { cn } from '@/shared/ui/lib/utils'
 
 export function ProductsPage() {
   const { catalog } = useCatalog()
@@ -25,7 +26,7 @@ export function ProductsPage() {
       <PageHeader title="Productos" subtitle="Presentaciones y conversión de unidades a kilos." />
       <PageBody>
         <Segmented
-          className="mb-3.5"
+          className="mb-4"
           value={cat}
           onChange={(c) => {
             setCategory(c)
@@ -35,17 +36,14 @@ export function ProductsPage() {
         />
         <div className="grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
           <Section title="Calculadora">
-            <div className="px-4 pt-1.5 pb-4 dsk:px-5 dsk:pb-5">
+            <div className="px-4 pt-3 pb-4 dsk:px-5 dsk:pb-5">
               <div className="flex flex-wrap items-end gap-3">
                 <div>
-                  <label id="calc-p" className="mb-1.5 block font-bold">
+                  <label id="calc-p" className="mb-1 block text-sm font-medium text-ink-2">
                     Producto
                   </label>
                   <Select value={selected.id} onValueChange={setProductId}>
-                    <SelectTrigger
-                      aria-labelledby="calc-p"
-                      className="!h-11 w-[170px] rounded-[10px] border-[1.5px] bg-white font-semibold"
-                    >
+                    <SelectTrigger aria-labelledby="calc-p" className="w-44">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -58,7 +56,7 @@ export function ProductsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label htmlFor="calc-u" className="mb-1.5 block font-bold">
+                  <label htmlFor="calc-u" className="mb-1 block text-sm font-medium text-ink-2">
                     Unidades
                   </label>
                   <Input
@@ -66,26 +64,30 @@ export function ProductsPage() {
                     inputMode="numeric"
                     value={units ?? ''}
                     onChange={(e) => setUnits(parseCell(e.target.value))}
-                    className="h-11 w-[140px] rounded-[14px] border-[1.5px] bg-white text-base font-semibold"
+                    className="num w-32"
                   />
                 </div>
                 <div>
-                  <small className="font-semibold text-muted-foreground">Equivale a</small>
-                  <div className="text-[26px] font-extrabold" data-testid="calc-result">
+                  <small className="text-sm text-muted-foreground">Equivale a</small>
+                  <div className="num text-2xl font-medium hc:font-extrabold" data-testid="calc-result">
                     {kgAmount((units ?? 0) * selected.kg_per_unit)}
                   </div>
                 </div>
               </div>
-              <p className="mt-3.5 text-[13px] text-muted-foreground">
+              <p className="mt-3 text-sm text-muted-foreground">
                 {selected.name}: {kgPerUnitLabel(selected.kg_per_unit)}, en promedio.
               </p>
             </div>
           </Section>
           <Section
             title={`Catálogo ${cat}`}
-            aside={<span className="text-muted-foreground">{products.length} productos</span>}
+            aside={
+              <span>
+                <span className="num">{products.length}</span> productos
+              </span>
+            }
           >
-            <div className="overflow-x-auto px-3 pb-3.5">
+            <div className="overflow-x-auto">
               <table className={tableCls.table}>
                 <thead>
                   <tr>
@@ -98,13 +100,13 @@ export function ProductsPage() {
                   {products.map((p) => (
                     <tr key={p.id} className={tableCls.row}>
                       <td className={tableCls.td}>
-                        {p.name}
+                        <span className="font-medium">{p.name}</span>
                         {p.subcategory && (
-                          <small className="block text-[11.5px] text-muted-foreground">{p.subcategory}</small>
+                          <small className="block text-xs text-muted-foreground">{p.subcategory}</small>
                         )}
                       </td>
-                      <td className={tableCls.td}>{p.kg_per_unit.toFixed(2)}</td>
-                      <td className={tableCls.td}>{kgAmount(p.kg_per_unit * 10)}</td>
+                      <td className={cn(tableCls.td, 'num')}>{p.kg_per_unit.toFixed(2)}</td>
+                      <td className={cn(tableCls.td, 'num')}>{kgAmount(p.kg_per_unit * 10)}</td>
                     </tr>
                   ))}
                 </tbody>

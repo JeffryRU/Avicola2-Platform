@@ -43,28 +43,25 @@ export function DayStrip({
             aria-label={`${note ? `${note}, ` : ''}${dDow(d)} ${dDM(d)}${isMarked && markedLabel ? `, ${markedLabel}` : ''}`}
             onClick={() => onChange(d)}
             className={cn(
-              'relative flex min-w-[68px] flex-none snap-start flex-col items-center rounded-[14px] border-[1.5px] px-3 pt-2 pb-2.5 transition-colors',
-              active
-                ? 'border-primary bg-primary text-white shadow-[0_6px_16px_var(--primary-ring)]'
-                : 'border-border bg-card text-foreground hover:border-primary/50',
+              'relative flex min-w-16 flex-none snap-start flex-col items-center rounded-md border border-border bg-surface px-3 pt-2 pb-2 text-foreground transition-colors hover:border-border-strong',
+              active &&
+                'border-primary bg-selected text-selected-foreground ring-1 ring-primary hover:border-primary hc:border-foreground hc:bg-nav-active hc:text-nav-active-foreground hc:ring-foreground',
             )}
           >
             <span
               className={cn(
-                'text-[11px] leading-4 font-bold tracking-[0.04em] uppercase',
-                active ? 'text-white/85' : note ? 'text-primary' : 'text-muted-foreground',
+                'text-2xs font-medium tracking-wide uppercase',
+                active
+                  ? 'text-selected-foreground hc:text-nav-active-foreground'
+                  : note
+                    ? 'text-primary'
+                    : 'text-muted-foreground',
               )}
             >
               {note ?? dDow(d)}
             </span>
-            <span className="text-[17px] leading-6 font-extrabold tabular-nums">{dDM(d)}</span>
-            <span
-              aria-hidden
-              className={cn(
-                'mt-1 size-1.5 rounded-full',
-                isMarked ? (active ? 'bg-white' : 'bg-ok') : 'bg-transparent',
-              )}
-            />
+            <span className="num text-md font-medium hc:font-bold">{dDM(d)}</span>
+            <span aria-hidden className={cn('mt-1 size-1.5 rounded-full', isMarked ? 'bg-ok' : 'bg-transparent')} />
           </button>
         )
       })}

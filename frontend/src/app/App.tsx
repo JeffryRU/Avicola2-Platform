@@ -15,6 +15,14 @@ import { useSession, useVerifySession } from '@/features/auth'
 import { VersionProvider } from '@/features/versions'
 import { useFlushQueue } from '@/features/projections'
 import { BrandProvider } from '@/shared/ui/components/brand'
+import { AppearanceProvider } from '@/shared/ui/components/appearance'
+import {
+  CONTRAST_KEY,
+  CONTRAST_PREFERENCES,
+  THEME_KEY,
+  THEME_PREFERENCES,
+  type AppearancePreference,
+} from '@/shared/domain/appearance'
 import { BRAND_IDS, DEFAULT_BRAND, type BrandId } from '@/shared/types/brands'
 import { ErrorBoundary } from '@/shared/ui/components/error-boundary'
 import { Splash } from '@/shared/ui/components/feedback'
@@ -228,13 +236,26 @@ function Routed() {
 }
 
 const brandSchema = z.enum(BRAND_IDS)
-/** Marca elegida en este equipo (KeyValueStore). */
+/** Marca elegida en este equipo (KeyValueStore). La lee también public/appearance-boot.js. */
 const BRAND_KEY = 'nv_brand'
+const themeSchema = z.enum(THEME_PREFERENCES)
+const contrastSchema = z.enum(CONTRAST_PREFERENCES)
 
 export function App({ container }: { container: Container }) {
   // Uno por app (useState lo crea una vez): sus valores por defecto están en query-client.ts.
   const [queryClient] = useState(() => createQueryClient(container.errors))
   const persistBrand = useCallback((b: BrandId) => container.preferences.set(BRAND_KEY, b), [container])
+  const persistAppearance = useCallback(
+    (p: AppearancePreference) => {
+      container.preferences.set(THEME_KEY, p.theme)
+      container.preferences.set(CONTRAST_KEY, p.contrast)
+    },
+    [container],
+  )
+  const [appearance] = useState<AppearancePreference>(() => ({
+    theme: container.preferences.get(THEME_KEY, themeSchema) ?? 'system',
+    contrast: container.preferences.get(CONTRAST_KEY, contrastSchema) ?? 'system',
+  }))
   const reportCrash = useCallback(
     (error: unknown, componentStack: string) => {
       const crash = error instanceof Error ? error : new Error(String(error))
@@ -252,17 +273,19 @@ Componentes:${componentStack}`
             initial={container.preferences.get(BRAND_KEY, brandSchema) ?? DEFAULT_BRAND}
             persist={persistBrand}
           >
-            <BrowserRouter>
-              <Routed />
-            </BrowserRouter>
-            {/* Avisos arriba a la derecha; en el celular, arriba (respetando la muesca). */}
-            <Toaster
-              position="top-right"
-              offset={{ top: 20, right: 20 }}
-              mobileOffset={{ top: 'calc(10px + env(safe-area-inset-top))', left: 12, right: 12 }}
-              closeButton
-              visibleToasts={4}
-            />
+            <AppearanceProvider initial={appearance} persist={persistAppearance}>
+              <BrowserRouter>
+                <Routed />
+              </BrowserRouter>
+              {/* Avisos arriba a la derecha; en el celular, arriba (respetando la muesca). */}
+              <Toaster
+                position="top-right"
+                offset={{ top: 20, right: 20 }}
+                mobileOffset={{ top: 'calc(10px + env(safe-area-inset-top))', left: 12, right: 12 }}
+                closeButton
+                visibleToasts={4}
+              />
+            </AppearanceProvider>
           </BrandProvider>
         </QueryClientProvider>
       </ContainerContext>

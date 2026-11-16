@@ -1,32 +1,12 @@
-import { useEffect, useState } from 'react'
-import {
-  BarChart3,
-  Bell,
-  Bird,
-  Box,
-  ChevronDown,
-  ClipboardList,
-  Factory,
-  History,
-  Home,
-  LockOpen,
-  LogOut,
-  PackageCheck,
-  Plus,
-  Settings,
-  User,
-  Users,
-  TrendingUp,
-} from 'lucide-react'
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { useEffect } from 'react'
+import { Bell, LogOut } from 'lucide-react'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { InstallBanner } from '@/app/install'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
-import { initials } from '@/shared/domain/format'
-import { can, hasTeamView, roleLabel } from '@/shared/domain/session'
+import { can, hasTeamView, roleLabel, type Session } from '@/shared/domain/session'
 import { useLogout, useRequiredSession } from '@/features/auth'
-import { VersionChip } from '@/features/versions'
 import { useUnreadCount } from '@/features/notifications'
-import { useUnlocks, MY_REQUESTS_NAV, MY_REQUESTS_TITLE, UNLOCKS_TITLE } from '@/features/editing'
+import { useUnlocks, MY_REQUESTS_TITLE, UNLOCKS_TITLE } from '@/features/editing'
 import { Logo } from '@/shared/ui/components/brand'
 import { cn } from '@/shared/ui/lib/utils'
 import { LOGOUT_LABEL } from '@/shared/types/labels'
@@ -34,32 +14,115 @@ import { STOCK_TITLE } from '@/features/stock'
 import { FORECAST_NAV_LABEL, PRODUCTION_TITLE } from '@/features/production'
 import { SACA_TITLE } from '@/features/saca'
 
-const itemCls = (active: boolean) =>
+interface NavItem {
+  to: string
+  label: string
+  /** Solo activo en la ruta exacta (Inicio). */
+  end?: boolean
+  /** Cifra a la derecha (pendientes, no leídas). */
+  count?: number
+}
+interface NavGroup {
+  title?: string
+  items: NavItem[]
+}
+
+/** Menú lateral por rol: grupos con título, sin iconos (docs/diseno/sistema.md). */
+function navGroups(session: Session, counts: { unread: number; unlocks: number }): NavGroup[] {
+  const production = can(session, 'view_production')
+  const bell: NavItem = { to: paths.notifications, label: 'Notificaciones', count: counts.unread }
+  // El jefe de despacho solo ve el stock: no proyecta ni tiene dashboards.
+  if (!hasTeamView(session) && can(session, 'view_stock')) {
+    return [
+      {
+        items: [
+          { to: paths.home, label: STOCK_TITLE, end: true },
+          ...(production
+            ? [
+                { to: paths.production, label: PRODUCTION_TITLE },
+                { to: paths.forecast, label: FORECAST_NAV_LABEL },
+              ]
+            : []),
+          bell,
+        ],
+      },
+    ]
+  }
+  const dashboards: NavGroup = { title: 'Dashboards', items: DASHBOARDS.map((d) => ({ to: d.to, label: d.label })) }
+  const operation: NavItem[] = [
+    ...(can(session, 'view_saca') ? [{ to: paths.saca, label: SACA_TITLE }] : []),
+    ...(can(session, 'view_stock') ? [{ to: paths.stock, label: STOCK_TITLE }] : []),
+    ...(production
+      ? [
+          { to: paths.production, label: PRODUCTION_TITLE },
+          { to: paths.forecast, label: FORECAST_NAV_LABEL },
+        ]
+      : []),
+  ]
+  if (hasTeamView(session)) {
+    // El supervisor no registra proyecciones propias: administra el equipo y ve sus dashboards.
+    return [
+      {
+        items: [
+          { to: paths.home, label: 'Inicio', end: true },
+          { to: paths.register, label: 'Registrar' },
+        ],
+      },
+      ...(operation.length ? [{ title: 'Operación', items: operation }] : []),
+      dashboards,
+      {
+        title: 'Equipo',
+        items: [
+          { to: paths.history, label: 'Historial' },
+          ...(can(session, 'manage_editing')
+            ? [{ to: paths.unlocks, label: UNLOCKS_TITLE, count: counts.unlocks }]
+            : []),
+          ...(can(session, 'manage_accounts') ? [{ to: paths.accounts, label: 'Usuarios' }] : []),
+        ],
+      },
+      { title: 'Consultas', items: [{ to: paths.products, label: 'Productos' }, bell] },
+    ]
+  }
+  return [
+    {
+      items: [
+        { to: paths.home, label: 'Inicio', end: true },
+        { to: paths.register, label: 'Registrar' },
+        { to: paths.mine, label: 'Mis proyecciones' },
+        { to: paths.requests, label: MY_REQUESTS_TITLE },
+      ],
+    },
+    ...(operation.length ? [{ title: 'Operación', items: operation }] : []),
+    dashboards,
+    {
+      title: 'Consultas',
+      items: [{ to: paths.history, label: 'Historial' }, { to: paths.products, label: 'Productos' }, bell],
+    },
+  ]
+}
+
+const sideItemCls = (active: boolean) =>
   cn(
-    'flex w-full items-center gap-3 rounded-xl px-3 py-[11px] text-left font-semibold text-ink-2 transition-colors hover:bg-muted hover:text-foreground [&>svg]:size-5',
-    active && 'bg-primary text-white shadow-[0_6px_16px_var(--primary-ring)] hover:bg-primary hover:text-white',
+    'flex min-h-8 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-base text-ink-2 transition-colors hover:bg-muted hover:text-foreground',
+    'hc:min-h-9 hc:text-md hc:font-semibold hc:text-foreground',
+    active &&
+      'bg-nav-active font-semibold text-nav-active-foreground hover:bg-nav-active hover:text-nav-active-foreground hc:font-extrabold',
   )
 
-function SideItem({
-  to,
-  icon,
-  label,
-  extra,
-  end,
-}: {
-  to: string
-  icon: React.ReactNode
-  label: string
-  extra?: React.ReactNode
-  end?: boolean
-}) {
+function SideItem({ to, label, end, count }: NavItem) {
   const { pathname } = useLocation()
   // "Registrar" sigue activo en la pantalla de éxito y "Mis proyecciones" en el detalle.
   return (
-    <NavLink to={to} end={end} className={({ isActive }) => itemCls(isActive || (!end && pathname.startsWith(to)))}>
-      {icon}
-      <span>{label}</span>
-      {extra}
+    <NavLink to={to} end={end} className={({ isActive }) => sideItemCls(isActive || (!end && pathname.startsWith(to)))}>
+      <span className="min-w-0 flex-1">{label}</span>
+      {!!count && (
+        <span
+          className={cn('num text-sm font-medium hc:font-bold', to === paths.notifications ? 'text-bad' : 'text-warn')}
+          aria-label={to === paths.notifications ? `${count} sin leer` : `${count} pendientes`}
+        >
+          {count}
+        </span>
+      )}
     </NavLink>
   )
 }
@@ -68,173 +131,113 @@ function Sidebar() {
   const logout = useLogout()
   const session = useRequiredSession()
   const { seller } = session
-  const { pathname } = useLocation()
   const unread = useUnreadCount()
-  const inDash = pathname.startsWith(paths.dashboards)
-  const [expanded, setExpanded] = useState(true)
-  // El supervisor no registra proyecciones: administra usuarios y ve los dashboards del equipo.
-  const supervisor = hasTeamView(session)
   const editing = can(session, 'manage_editing')
-  const pending = (useUnlocks(editing).data ?? []).filter((u) => u.status === 'requested').length
-  // El jefe de despacho solo ve el stock: no proyecta ni tiene dashboards.
-  const dispatch = !supervisor && can(session, 'view_stock')
-  const bell = (
-    <SideItem
-      to={paths.notifications}
-      icon={<Bell />}
-      label="Notificaciones"
-      extra={
-        unread > 0 && (
-          <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1.5 text-[11px] font-extrabold text-white not-italic">
-            {unread}
-          </em>
-        )
-      }
-    />
-  )
-  const footer = (
-    <div className="mt-auto grid gap-0.5 pt-4">
-      <VersionChip className="mb-2" />
-      <div className="mb-2 flex items-center gap-3 px-3 py-2.5">
-        <div className="grid size-10 flex-none place-items-center rounded-full bg-secondary text-sm font-extrabold text-primary">
-          {initials(seller.name)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <b className="block text-sm">{seller.name}</b>
-          <small className="text-muted-foreground">{roleLabel(seller)}</small>
-        </div>
-      </div>
-      <SideItem to={paths.profile} icon={<Settings />} label="Configuración" />
-      <button type="button" className={itemCls(false)} onClick={() => logout.mutate()}>
-        <LogOut />
-        <span>{LOGOUT_LABEL}</span>
-      </button>
-    </div>
-  )
-  const asideCls =
-    'sticky top-0 hidden h-dvh w-[268px] flex-none flex-col overflow-y-auto border-r bg-side px-3.5 pt-[22px] pb-4 dsk:flex'
-  if (dispatch) {
-    return (
-      <aside className={asideCls}>
-        <div className="px-2.5 pb-[22px]">
+  const unlocks = (useUnlocks(editing).data ?? []).filter((u) => u.status === 'requested').length
+  const groups = navGroups(session, { unread, unlocks })
+  return (
+    // El fondo y el borde van en el contenedor que se estira a todo el alto de la página;
+    // lo de adentro se queda fijo al hacer scroll (antes el fondo se cortaba).
+    <aside className="hidden w-60 flex-none border-r border-border bg-side dsk:block hc:border-r-2 hc:border-foreground">
+      <div className="sticky top-0 flex max-h-dvh min-h-dvh flex-col overflow-y-auto px-3 pt-5 pb-4 hc:top-14 hc:max-h-[calc(100dvh-3.5rem)] hc:min-h-[calc(100dvh-3.5rem)]">
+        <div className="px-2.5 pb-4 hc:hidden">
           <Logo />
         </div>
-        <nav className="grid gap-0.5" aria-label="Principal">
-          <SideItem to={paths.home} end icon={<PackageCheck />} label={STOCK_TITLE} />
-          {can(session, 'view_production') && (
-            <SideItem to={paths.production} icon={<Factory />} label={PRODUCTION_TITLE} />
-          )}
-          {can(session, 'view_production') && (
-            <SideItem to={paths.forecast} icon={<TrendingUp />} label={FORECAST_NAV_LABEL} />
-          )}
-          {bell}
+        <nav aria-label="Principal" className="grid gap-0.5">
+          {groups.map((g, i) => (
+            <div key={g.title ?? i} className={cn('grid gap-px', i > 0 && 'mt-3.5')}>
+              {g.title && <div className="eyebrow mb-1 px-2.5 hc:text-xs hc:text-foreground">{g.title}</div>}
+              {g.items.map((item) => (
+                <SideItem key={item.to} {...item} />
+              ))}
+            </div>
+          ))}
         </nav>
-        {footer}
-      </aside>
-    )
-  }
-  return (
-    <aside className={asideCls}>
-      <div className="px-2.5 pb-[22px]">
-        <Logo />
-      </div>
-      <nav className="grid gap-0.5" aria-label="Principal">
-        <SideItem to={paths.home} end icon={<Home />} label="Inicio" />
-        <SideItem to={paths.register} icon={<Plus />} label="Registrar" />
-        <button
-          type="button"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((v) => !v)}
-          className={cn(itemCls(false), inDash && 'bg-secondary text-primary hover:bg-secondary hover:text-primary')}
-        >
-          <BarChart3 />
-          <span>Dashboards</span>
-          <ChevronDown className={cn('ml-auto !size-[18px] transition-transform', expanded && 'rotate-180')} />
-        </button>
-        {expanded && (
-          <div className="grid gap-0.5 py-1 pl-[22px]">
-            {DASHBOARDS.map((d) => (
-              <NavLink
-                key={d.to}
-                to={d.to}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-sm font-semibold text-muted-foreground before:size-1.5 before:rounded-full hover:text-foreground',
-                    isActive && 'bg-secondary text-primary before:bg-primary',
-                  )
-                }
-              >
-                {d.label}
-              </NavLink>
-            ))}
+        {/* Pie compacto: la versión ya está en la franja de arriba y en Perfil. */}
+        <div className="mt-auto grid gap-px pt-5">
+          <div className="flex items-center gap-2 border-t border-border pt-2.5 pb-1 pl-2.5 hc:border-t-heavy hc:border-foreground">
+            <div className="min-w-0 flex-1">
+              <b className="block truncate text-base font-medium">{seller.name}</b>
+              <small className="text-xs text-muted-foreground">{roleLabel(seller)}</small>
+            </div>
+            <button
+              type="button"
+              aria-label={LOGOUT_LABEL}
+              title={LOGOUT_LABEL}
+              onClick={() => logout.mutate()}
+              className="grid size-control flex-none place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <LogOut className="size-4" />
+            </button>
           </div>
-        )}
-        {supervisor ? (
-          <>
-            {can(session, 'manage_accounts') && <SideItem to={paths.accounts} icon={<Users />} label="Usuarios" />}
-            {editing && (
-              <SideItem
-                to={paths.unlocks}
-                icon={<LockOpen />}
-                label={UNLOCKS_TITLE}
-                extra={
-                  pending > 0 && (
-                    <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-warn px-1.5 text-[11px] font-extrabold text-white not-italic">
-                      {pending}
-                    </em>
-                  )
-                }
-              />
-            )}
-          </>
-        ) : (
-          <>
-            <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
-            <SideItem to={paths.requests} icon={<LockOpen />} label={MY_REQUESTS_TITLE} />
-          </>
-        )}
-        {can(session, 'view_saca') && <SideItem to={paths.saca} icon={<Bird />} label={SACA_TITLE} />}
-        {can(session, 'view_production') && (
-          <SideItem to={paths.production} icon={<Factory />} label={PRODUCTION_TITLE} />
-        )}
-        {can(session, 'view_production') && (
-          <SideItem to={paths.forecast} icon={<TrendingUp />} label={FORECAST_NAV_LABEL} />
-        )}
-        {can(session, 'view_stock') && <SideItem to={paths.stock} icon={<PackageCheck />} label={STOCK_TITLE} />}
-        <SideItem to={paths.history} icon={<History />} label="Historial" />
-        <SideItem to={paths.products} icon={<Box />} label="Productos" />
-        {bell}
-      </nav>
-      {footer}
+          <SideItem to={paths.profile} label="Perfil y apariencia" />
+        </div>
+      </div>
     </aside>
   )
 }
 
-const BOTTOM = [
-  { to: paths.home, icon: Home, label: 'Inicio', end: true },
-  { to: paths.register, icon: Plus, label: 'Registrar' },
-  { to: paths.mine, icon: ClipboardList, label: 'Proyecciones' },
-  { to: paths.requests, icon: LockOpen, label: MY_REQUESTS_NAV },
-  { to: paths.profile, icon: User, label: 'Perfil' },
-]
-const BOTTOM_SUPERVISOR = [
-  { to: paths.home, icon: Home, label: 'Inicio', end: true },
-  { to: paths.dashSummary, icon: BarChart3, label: 'Dashboards', end: false },
-  { to: paths.accounts, icon: Users, label: 'Usuarios', end: false },
-  { to: paths.notifications, icon: Bell, label: 'Avisos', end: false },
-  { to: paths.profile, icon: User, label: 'Perfil', end: false },
-]
+/**
+ * Barra superior. En celular: marca y campana. En escritorio solo aparece en alto contraste
+ * (barra de la marca, como en la dirección B), con el nombre de quien entró.
+ */
+function TopBar() {
+  const { seller } = useRequiredSession()
+  const unread = useUnreadCount()
+  return (
+    <header className="flex h-14 items-center gap-3 border-b border-border bg-side pr-1 pl-4 dsk:hidden hc:border-0 hc:bg-head hc:dsk:sticky hc:dsk:top-0 hc:dsk:z-30 hc:dsk:flex hc:dsk:px-7">
+      <Link to={paths.home} aria-label="Inicio" className="flex min-w-0 flex-1 items-center">
+        <span className="hc:hidden">
+          <Logo compact />
+        </span>
+        <span className="hidden hc:block">
+          <Logo onDark compact />
+        </span>
+      </Link>
+      <span className="hidden text-sm text-head-muted hc:dsk:inline">{seller.name}</span>
+      <Link
+        to={paths.notifications}
+        aria-label={unread > 0 ? `Notificaciones: ${unread} sin leer` : 'Notificaciones'}
+        className="relative grid size-touch place-items-center rounded-md text-foreground hover:bg-muted dsk:hidden hc:text-head-foreground hc:hover:bg-transparent"
+      >
+        <Bell className="size-5" aria-hidden />
+        {unread > 0 && (
+          <i className="absolute top-2.5 right-2.5 size-2 rounded-full bg-bad ring-2 ring-side hc:ring-head" />
+        )}
+      </Link>
+    </header>
+  )
+}
 
-const BOTTOM_DISPATCH = [
-  { to: paths.home, icon: PackageCheck, label: 'Stock', end: true },
-  { to: paths.production, icon: Factory, label: PRODUCTION_TITLE, end: false },
-  { to: paths.forecast, icon: TrendingUp, label: FORECAST_NAV_LABEL, end: false },
-  { to: paths.notifications, icon: Bell, label: 'Avisos', end: false },
-  { to: paths.profile, icon: User, label: 'Perfil', end: false },
+interface BottomItem {
+  to: string
+  label: string
+  end?: boolean
+}
+const BOTTOM: BottomItem[] = [
+  { to: paths.home, label: 'Inicio', end: true },
+  { to: paths.register, label: 'Registrar' },
+  { to: paths.mine, label: 'Proyecciones' },
+  { to: paths.profile, label: 'Perfil' },
+]
+const BOTTOM_SUPERVISOR: BottomItem[] = [
+  { to: paths.home, label: 'Inicio', end: true },
+  { to: paths.dashSummary, label: 'Dashboards' },
+  { to: paths.accounts, label: 'Usuarios' },
+  { to: paths.notifications, label: 'Avisos' },
+  { to: paths.profile, label: 'Perfil' },
+]
+const BOTTOM_DISPATCH: BottomItem[] = [
+  { to: paths.home, label: 'Stock', end: true },
+  { to: paths.production, label: PRODUCTION_TITLE },
+  { to: paths.forecast, label: FORECAST_NAV_LABEL },
+  { to: paths.notifications, label: 'Avisos' },
+  { to: paths.profile, label: 'Perfil' },
 ]
 
 function BottomNav() {
   const session = useRequiredSession()
+  const { pathname } = useLocation()
   const items = hasTeamView(session)
     ? BOTTOM_SUPERVISOR.filter((i) => i.to !== paths.accounts || can(session, 'manage_accounts'))
     : can(session, 'view_stock')
@@ -245,27 +248,28 @@ function BottomNav() {
     <nav
       aria-label="Navegación"
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
-      className="fixed inset-x-0 bottom-0 z-30 grid border-t bg-white/95 px-1.5 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))] backdrop-blur-md dsk:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-side pb-[env(safe-area-inset-bottom)] dsk:hidden hc:border-t-heavy hc:border-foreground hc:bg-surface"
     >
-      {items.map(({ to, icon: Icon, label, end }) => (
+      {items.map(({ to, label, end }) => (
         <NavLink
           key={to}
           to={to}
           end={end}
-          className={({ isActive }) =>
-            cn(
-              'flex flex-col items-center gap-[3px] py-1 text-[11.5px] font-semibold text-faint transition-colors',
-              isActive && 'text-primary [&>svg]:animate-pop',
+          className={({ isActive: exact }) => {
+            // «Dashboards» sigue activo en Vs. venta, Estado y el detalle del día.
+            const isActive = exact || (to === paths.dashSummary && pathname.startsWith(paths.dashboards))
+            return cn(
+              'relative flex h-14 items-center justify-center gap-1 px-0.5 text-center text-xs leading-tight text-ink-2 transition-colors',
+              'hc:h-15 hc:text-xs hc:font-semibold hc:text-foreground',
+              isActive &&
+                'font-semibold text-selected-foreground before:absolute before:inset-x-2 before:top-0 before:h-0.5 before:bg-primary hc:bg-nav-active hc:font-extrabold hc:text-nav-active-foreground hc:before:hidden',
             )
-          }
+          }}
         >
-          <span className="relative">
-            <Icon className="size-[22px]" />
-            {to === paths.notifications && unread > 0 && (
-              <i className="absolute -top-0.5 -right-1 size-[9px] rounded-full border-2 border-white bg-destructive" />
-            )}
-          </span>
           {label}
+          {to === paths.notifications && unread > 0 && (
+            <i aria-label={`${unread} sin leer`} className="size-1.5 flex-none rounded-full bg-bad" />
+          )}
         </NavLink>
       ))}
     </nav>
@@ -281,19 +285,19 @@ export function AppShell() {
     window.scrollTo({ top: 0 })
   }, [pathname])
   return (
-    <div className="flex min-h-dvh">
-      <Sidebar />
-      <main className="@container/main min-w-0 flex-1">
-        <div
-          key={pathname}
-          className={cn(
-            'mx-auto max-w-[1360px] animate-enter dsk:px-[30px] dsk:pt-[26px] dsk:pb-12',
-            flow ? 'pb-6' : 'pb-24',
-          )}
-        >
-          <Outlet />
-        </div>
-      </main>
+    <div className="min-h-dvh">
+      {!flow && <TopBar />}
+      <div className="flex min-h-dvh">
+        <Sidebar />
+        <main className="@container/main min-w-0 flex-1">
+          <div
+            key={pathname}
+            className={cn('mx-auto max-w-7xl animate-enter dsk:px-9 dsk:pt-7 dsk:pb-12', flow ? 'pb-6' : 'pb-24')}
+          >
+            <Outlet />
+          </div>
+        </main>
+      </div>
       {!flow && <BottomNav />}
       {/* Aviso de instalación solo en la pantalla de entrada de cada rol. */}
       {(pathname === paths.home || pathname === paths.dashSummary) && <InstallBanner />}

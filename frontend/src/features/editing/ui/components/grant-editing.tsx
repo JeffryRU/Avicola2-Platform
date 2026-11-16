@@ -78,7 +78,7 @@ function GrantForm({
         <DialogDescription>{GRANT_HINT}</DialogDescription>
       </DialogHeader>
       <fieldset className="grid gap-2">
-        <legend className="mb-2 text-sm font-bold">{GRANT_DAYS_LABEL}</legend>
+        <legend className="mb-2 text-sm font-semibold">{GRANT_DAYS_LABEL}</legend>
         {window.days.map((d) => {
           const closed = pastCutoff(window, d)
           const checked = chosen.includes(d.date)
@@ -86,18 +86,18 @@ function GrantForm({
             <label
               key={d.date}
               className={cn(
-                'flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] px-3.5 py-2.5',
-                checked ? 'border-primary bg-secondary/60' : 'border-border bg-white',
+                'flex min-h-touch cursor-pointer items-center gap-3 rounded-md border border-border bg-surface px-3 py-2 dsk:min-h-11',
+                checked && 'border-primary bg-selected hc:border-foreground',
               )}
             >
               <input
                 type="checkbox"
-                className="size-[18px] accent-primary"
+                className="size-4.5 accent-primary"
                 checked={checked}
                 onChange={() => toggle(d.date)}
               />
-              <b className="flex-1">{dShort(d.date)}</b>
-              <small className={cn('font-semibold', closed ? 'text-destructive' : 'text-muted-foreground')}>
+              <b className="flex-1 font-medium">{dShort(d.date)}</b>
+              <small className={cn('text-sm', closed ? 'font-medium text-bad' : 'text-muted-foreground')}>
                 {closed ? PAST_CUTOFF_LABEL : closesLabel(d.closes_at, true, now)}
               </small>
             </label>
@@ -108,7 +108,7 @@ function GrantForm({
         <Button type="button" variant="outline" onClick={onClose}>
           {CANCEL_LABEL}
         </Button>
-        <Button type="button" disabled={!chosen.length || grant.isPending} onClick={submit} className="font-bold">
+        <Button type="button" disabled={!chosen.length || grant.isPending} onClick={submit}>
           {grant.isPending ? <Loader2 className="animate-spin" /> : <LockOpen />} {GRANT_LABEL}
         </Button>
       </DialogFooter>

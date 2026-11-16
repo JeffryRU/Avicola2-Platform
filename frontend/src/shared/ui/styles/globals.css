@@ -1,96 +1,382 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-/* ===== Tokens del mockup (marca Noraves). shadcn usa los nombres estándar ===== */
-:root {
-  --radius: 0.75rem;
-  --background: #f0f5fc;
-  --foreground: #0b2c61;
-  --card: #ffffff;
-  --card-foreground: #0b2c61;
-  --popover: #ffffff;
-  --popover-foreground: #0b2c61;
-  --primary: #1570ef;
-  --primary-600: #0f5bd1;
-  --primary-foreground: #ffffff;
-  --primary-ring: rgb(21 112 239 / 0.22);
-  --secondary: #e8f1fe;
-  --secondary-foreground: #1570ef;
-  --muted: #eaf1fa;
-  --muted-foreground: #6b7f9e;
-  --accent: #e8f1fe;
-  --accent-foreground: #0b2c61;
-  --destructive: #dc3b3f;
-  --border: #dce7f5;
-  --input: #dce7f5;
-  --ring: #1570ef;
+/* Fuentes locales (la PWA funciona sin conexión): solo el subconjunto latino y los pesos usados. */
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+@import '@fontsource/public-sans/latin-400.css';
+@import '@fontsource/public-sans/latin-600.css';
+@import '@fontsource/public-sans/latin-700.css';
+@import '@fontsource/public-sans/latin-800.css';
 
-  --ink-2: #36507a;
-  --faint: #9aaac2;
-  --side: #f6f9fe;
+/*
+ * Sistema visual de AviPlanner (docs/diseno/sistema.md, ADR 0018).
+ * Una sola fuente de colores, tipografía, radios y bordes. <html> lleva tres atributos:
+ *   data-theme     light | dark      (lo resuelve shared/domain/appearance.ts antes del primer pintado)
+ *   data-contrast  normal | high     (alto contraste = dirección B)
+ *   data-brand     noraves | rocio   (la marca solo cambia el acento)
+ * Los bloques van de menos a más específicos: cada uno pisa solo lo que cambia.
+ */
+
+/* Variantes: dark: y hc: siguen a los atributos de <html>, no a la media query. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+@custom-variant hc (&:where([data-contrast='high'], [data-contrast='high'] *));
+
+/* ===== A · claro (Noraves) ===== */
+:root {
+  color-scheme: light;
+
+  /* Superficies */
+  --background: #f6f6f3;
+  --surface: #ffffff;
+  --side: #fbfbf9;
+  --muted: #f3f2ee;
+  --overlay: rgb(20 35 61 / 0.4);
+
+  /* Texto */
+  --foreground: #14233d;
+  --ink-2: #3a4558;
+  --muted-foreground: #5d6676;
+  --faint: #656c79;
+
+  /* Bordes */
+  --border: #e3e2dc;
+  --border-strong: #c9c8c0;
+  --rule: #ecebe6;
+  --rule-strong: #d6d5ce;
+  --control-line: #8a8e96;
+  --rule-width: 1px;
+  --rule-heavy: 1px;
+  --control-border: 1px;
+
+  /* Acento de la marca: solo acciones y selección */
+  --primary: #1557c0;
+  --primary-hover: #0f4699;
+  --primary-foreground: #ffffff;
+  --selected: #e8eef9;
+  --selected-foreground: #0b2c61;
+  --ring: #1557c0;
   --head: #0b2c61;
+  --head-foreground: #ffffff;
+  --head-muted: #c9d4e8;
   --brand-accent: #fbbb21;
-  --ok: #12a150;
-  --ok-soft: #e3f6ea;
-  --warn: #d97706;
-  --warn-soft: #fef3c7;
-  --pend: #94a3b8;
-  --pend-soft: #eef2f7;
-  --bad-soft: #fdecec;
-  --series-2: #f97316;
-  --t-blue: #1570ef;
-  --t-green: #16a34a;
-  --t-purple: #7c3aed;
-  --t-amber: #f5a70b;
-  --t-red: #ef4444;
+  --nav-active: var(--selected);
+  --nav-active-foreground: var(--selected-foreground);
+
+  /* Estados */
+  --ok: #18774a;
+  --ok-soft: #eaf4ee;
+  --warn: #a2560a;
+  --warn-soft: #fff8ec;
+  --warn-border: #e8c48a;
+  --warn-foreground: #5a4520;
+  --bad: #b42318;
+  --bad-soft: #fdf1f0;
+  --bad-border: #efc2bd;
+  --bad-foreground: #ffffff;
+  --draft: #5d6676;
+
+  /* Gráficos */
+  --chart-1: var(--primary);
+  --chart-2: #b0640f;
+  --chart-grid: #e3e2dc;
+  --chart-zero: #d6d5ce;
+
+  /* Tipografía */
+  --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-figures: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 600;
+  --fw-extrabold: 600;
+  --fs-2xs: 0.6875rem; /* 11 */
+  --fs-xs: 0.75rem; /* 12 */
+  --fs-sm: 0.8125rem; /* 13 */
+  --fs-base: 0.875rem; /* 14 */
+  --fs-md: 0.9375rem; /* 15 */
+  --fs-lg: 1.0625rem; /* 17 */
+  --fs-xl: 1.25rem; /* 20 */
+  --fs-2xl: 1.5rem; /* 24 */
+  --fs-3xl: 1.75rem; /* 28 */
+  --fs-4xl: 2.125rem; /* 34 */
+  --fs-body: var(--fs-md);
+  --tracking-title: -0.01em;
+
+  /* Forma */
+  --radius: 6px;
+  --radius-small: 4px;
+  --radius-large: 8px;
+  --touch: 2.75rem; /* 44 px */
+  --control: 2.25rem; /* 36 px en escritorio */
+  --shadow-pop: 0 6px 16px rgb(20 35 61 / 0.1);
+
+  /* Compatibilidad con los nombres de shadcn */
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface);
+  --popover-foreground: var(--foreground);
+  --secondary: var(--selected);
+  --secondary-foreground: var(--selected-foreground);
+  --accent: var(--muted);
+  --accent-foreground: var(--foreground);
+  --destructive: var(--bad);
+  --input: var(--control-line);
+
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* Marca alternativa (Grupo Rocío), igual que en el mockup */
+/* Grupo Rocío: su rojo, oscurecido para pasar contraste con texto blanco */
 [data-brand='rocio'] {
-  --primary: #e2231a;
-  --primary-600: #b81b14;
-  --primary-ring: rgb(226 35 26 / 0.2);
-  --secondary: #fdecec;
-  --secondary-foreground: #e2231a;
-  --accent: #fdecec;
-  --foreground: #1f1d1b;
-  --card-foreground: #1f1d1b;
-  --popover-foreground: #1f1d1b;
-  --accent-foreground: #1f1d1b;
-  --ink-2: #4a4541;
-  --muted-foreground: #7a736d;
-  --faint: #a8a19b;
-  --border: #e7e3df;
-  --input: #e7e3df;
-  --muted: #f1eeeb;
-  --background: #f6f5f3;
-  --side: #fbfaf9;
+  --primary: #c41e15;
+  --primary-hover: #9e170f;
+  --selected: #fbeceb;
+  --selected-foreground: #8a150e;
+  --ring: #c41e15;
   --head: #1f1d1b;
-  --series-2: #78716c;
-  --t-blue: #e2231a;
-  --ring: #e2231a;
+  --head-muted: #d6d1cc;
+  --brand-accent: #e2231a;
+}
+
+/* ===== A · oscuro ===== */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #111317;
+  --surface: #181b20;
+  --side: #14171b;
+  --muted: #1f232a;
+  --overlay: rgb(0 0 0 / 0.6);
+
+  --foreground: #e6e8eb;
+  --ink-2: #c5cad2;
+  --muted-foreground: #9ba3ae;
+  --faint: #8a929e;
+
+  --border: #2b3038;
+  --border-strong: #454c57;
+  --rule: #23272e;
+  --rule-strong: #353b44;
+  --control-line: #6f7783;
+
+  --primary: #78a9ff;
+  --primary-hover: #a1c3ff;
+  --primary-foreground: #0b1530;
+  --selected: #1c2a44;
+  --selected-foreground: #cfe0ff;
+  --ring: #78a9ff;
+  --head: #0b2c61;
+
+  --ok: #5cc98f;
+  --ok-soft: #15281e;
+  --warn: #f2a65a;
+  --warn-soft: #2a2015;
+  --warn-border: #6e4a1e;
+  --warn-foreground: #f3dcbc;
+  --bad: #ff8a80;
+  --bad-soft: #2e1a19;
+  --bad-border: #6b2c27;
+  --bad-foreground: #2a0705;
+  --draft: #9ba3ae;
+
+  --chart-2: #e9a35c;
+  --chart-grid: #2b3038;
+  --chart-zero: #3a404a;
+  --shadow-pop: 0 6px 16px rgb(0 0 0 / 0.45);
+}
+[data-theme='dark'][data-brand='rocio'] {
+  --primary: #ff8378;
+  --primary-hover: #ffa79f;
+  --primary-foreground: #2a0705;
+  --selected: #3a1b19;
+  --selected-foreground: #ffd3cf;
+  --ring: #ff8378;
+  --head: #1f1d1b;
+}
+
+/* ===== B · alto contraste (claro) ===== */
+[data-contrast='high'] {
+  --background: #ffffff;
+  --surface: #ffffff;
+  --side: #ffffff;
+  --muted: #f1f2f4;
+
+  --foreground: #111418;
+  --ink-2: #111418;
+  --muted-foreground: #4a515c;
+  --faint: #5b626d;
+
+  --border: #111418;
+  --border-strong: #111418;
+  --rule: #d5d8dd;
+  --rule-strong: #111418;
+  --control-line: #111418;
+  --rule-heavy: 3px;
+  --control-border: 2px;
+
+  --primary: #0d5ad6;
+  --primary-hover: #0b2c61;
+  --primary-foreground: #ffffff;
+  --selected: #fbbb21;
+  --selected-foreground: #111418;
+  --ring: #111418;
+  --head: #0b2c61;
+  --nav-active: #fbbb21;
+  --nav-active-foreground: #111418;
+
+  --ok: #0f6a3b;
+  --ok-soft: #e6f2eb;
+  --warn: #111418;
+  --warn-soft: #fff3cc;
+  --warn-border: #fff3cc;
+  --warn-foreground: #111418;
+  --bad: #a3150c;
+  --bad-soft: #fde8e6;
+  --bad-border: #a3150c;
+  --bad-foreground: #ffffff;
+  --draft: #111418;
+
+  --chart-2: #8a4a00;
+  --chart-grid: #d5d8dd;
+  --chart-zero: #9aa0a8;
+
+  --font-ui: 'Public Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-figures: var(--font-ui);
+  --fw-medium: 600;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+  --fs-2xs: 0.75rem; /* 12 */
+  --fs-xs: 0.8125rem; /* 13 */
+  --fs-sm: 0.875rem; /* 14 */
+  --fs-base: 0.9375rem; /* 15 */
+  --fs-md: 1rem; /* 16 */
+  --fs-lg: 1.125rem; /* 18 */
+  --fs-xl: 1.375rem; /* 22 */
+  --fs-2xl: 1.75rem; /* 28 */
+  --fs-3xl: 2rem; /* 32 */
+  --fs-4xl: 2.375rem; /* 38 */
+  --tracking-title: -0.02em;
+
+  --radius: 0px;
+  --radius-small: 0px;
+  --radius-large: 0px;
+  --touch: 3rem; /* 48 px */
+  --control: 3rem;
+  --shadow-pop: 0 0 0 2px #111418;
+}
+[data-contrast='high'][data-brand='rocio'] {
+  --primary: #b01b12;
+  --primary-hover: #7d120c;
+  --head: #1f1d1b;
+}
+
+/* ===== B · alto contraste oscuro ===== */
+[data-contrast='high'][data-theme='dark'] {
+  --background: #000000;
+  --surface: #0b0d10;
+  --side: #000000;
+  --muted: #1a1d22;
+
+  --foreground: #ffffff;
+  --ink-2: #ffffff;
+  --muted-foreground: #d0d4da;
+  --faint: #b9bec6;
+
+  --border: #ffffff;
+  --border-strong: #ffffff;
+  --rule: #4a515c;
+  --rule-strong: #ffffff;
+  --control-line: #ffffff;
+
+  --primary: #9cc2ff;
+  --primary-hover: #c8dcff;
+  --primary-foreground: #000000;
+  --selected: #fbbb21;
+  --selected-foreground: #000000;
+  --ring: #fbbb21;
+  --head: #0b2c61;
+  --nav-active: #fbbb21;
+  --nav-active-foreground: #000000;
+
+  --ok: #7ee2a8;
+  --ok-soft: #0f2a1b;
+  --warn: #ffd466;
+  --warn-soft: #3a2e00;
+  --warn-border: #3a2e00;
+  --warn-foreground: #ffffff;
+  --bad: #ffa199;
+  --bad-soft: #3a1210;
+  --bad-border: #ffa199;
+  --bad-foreground: #000000;
+  --draft: #ffffff;
+
+  --chart-2: #ffc46b;
+  --chart-grid: #4a515c;
+  --chart-zero: #6b727d;
+  --shadow-pop: 0 0 0 2px #ffffff;
+}
+[data-contrast='high'][data-theme='dark'][data-brand='rocio'] {
+  --primary: #ff9c94;
+  --primary-hover: #ffc2bd;
+  --primary-foreground: #000000;
+  --head: #1f1d1b;
 }
 
 @theme inline {
-  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
-  --breakpoint-dsk: 60rem; /* 960 px: el corte celular/escritorio del mockup */
+  --font-sans: var(--font-ui);
+  --font-num: var(--font-figures);
+  --breakpoint-dsk: 60rem; /* 960 px: corte celular/escritorio */
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 6px);
+  /* Escala tipográfica: en alto contraste crece un paso */
+  --text-2xs: var(--fs-2xs);
+  --text-2xs--line-height: 1.35;
+  --text-xs: var(--fs-xs);
+  --text-xs--line-height: 1.4;
+  --text-sm: var(--fs-sm);
+  --text-sm--line-height: 1.45;
+  --text-base: var(--fs-base);
+  --text-base--line-height: 1.5;
+  --text-md: var(--fs-md);
+  --text-md--line-height: 1.5;
+  --text-lg: var(--fs-lg);
+  --text-lg--line-height: 1.35;
+  --text-xl: var(--fs-xl);
+  --text-xl--line-height: 1.25;
+  --text-2xl: var(--fs-2xl);
+  --text-2xl--line-height: 1.2;
+  --text-3xl: var(--fs-3xl);
+  --text-3xl--line-height: 1.15;
+  --text-4xl: var(--fs-4xl);
+  --text-4xl--line-height: 1.1;
+
+  --font-weight-medium: var(--fw-medium);
+  --font-weight-semibold: var(--fw-semibold);
+  --font-weight-bold: var(--fw-bold);
+  --font-weight-extrabold: var(--fw-extrabold);
+  --font-weight-black: var(--fw-extrabold);
+
+  --radius-xs: var(--radius-small);
+  --radius-sm: var(--radius-small);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-large);
+  --radius-xl: var(--radius-large);
+  --radius-2xl: var(--radius-large);
+  --radius-3xl: var(--radius-large);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
-  --color-primary-600: var(--primary-600);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
-  --color-primary-ring: var(--primary-ring);
+  --color-selected: var(--selected);
+  --color-selected-foreground: var(--selected-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -99,108 +385,75 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
   --color-input: var(--input);
+  --color-control-line: var(--control-line);
   --color-ring: var(--ring);
   --color-ink-2: var(--ink-2);
   --color-faint: var(--faint);
   --color-side: var(--side);
   --color-head: var(--head);
+  --color-head-foreground: var(--head-foreground);
+  --color-head-muted: var(--head-muted);
   --color-brand-accent: var(--brand-accent);
+  --color-nav-active: var(--nav-active);
+  --color-nav-active-foreground: var(--nav-active-foreground);
+  --color-overlay: var(--overlay);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
-  --color-pend: var(--pend);
-  --color-pend-soft: var(--pend-soft);
+  --color-warn-border: var(--warn-border);
+  --color-warn-foreground: var(--warn-foreground);
+  --color-bad: var(--bad);
   --color-bad-soft: var(--bad-soft);
-  --color-series-2: var(--series-2);
-  --color-t-blue: var(--t-blue);
-  --color-t-green: var(--t-green);
-  --color-t-purple: var(--t-purple);
-  --color-t-amber: var(--t-amber);
-  --color-t-red: var(--t-red);
+  --color-bad-border: var(--bad-border);
+  --color-bad-foreground: var(--bad-foreground);
+  --color-draft: var(--draft);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-zero: var(--chart-zero);
+  --color-chart-grid: var(--chart-grid);
 
-  --shadow-card: 0 1px 2px rgb(11 44 97 / 0.05), 0 10px 30px rgb(11 44 97 / 0.06);
-  --shadow-lift: 0 14px 34px rgb(11 44 97 / 0.1);
-  --shadow-sheet: 0 24px 60px rgb(11 44 97 / 0.18);
+  --shadow-pop: var(--shadow-pop);
 
-  --animate-rise: rise 0.45s var(--ease) both;
-  --animate-enter: enter 0.28s var(--ease) both;
-  --animate-popin: popin 0.45s var(--ease) both;
+  --animate-enter: enter 0.2s var(--ease) both;
   --animate-hop: hop 1.1s var(--ease) infinite;
   --animate-shad: shad 1.1s var(--ease) infinite;
   --animate-shake: shake 0.4s;
-  --animate-ring: ring 1.4s ease 0.6s 2;
-  --animate-pop: pop 0.3s var(--ease);
-  --animate-float: float 7s ease-in-out infinite;
-  --animate-float-slow: float 9s ease-in-out -3s infinite;
+  --animate-popin: popin 0.35s var(--ease) both;
 }
 
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
 @keyframes enter {
   from {
     opacity: 0;
-    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 @keyframes popin {
   0% {
-    transform: scale(0);
-  }
-  70% {
-    transform: scale(1.15);
+    transform: scale(0.6);
+    opacity: 0;
   }
   100% {
     transform: scale(1);
-  }
-}
-@keyframes pop {
-  0% {
-    transform: scale(0.7);
-  }
-  60% {
-    transform: scale(1.15);
-  }
-  100% {
-    transform: scale(1);
+    opacity: 1;
   }
 }
 @keyframes hop {
   0%,
   100% {
-    transform: translateY(0) rotate(0);
+    transform: translateY(0);
   }
-  30% {
-    transform: translateY(-16px) rotate(-6deg);
+  35% {
+    transform: translateY(-10px);
   }
-  55% {
-    transform: translateY(0) rotate(3deg);
-  }
-  70% {
-    transform: translateY(-4px) rotate(0);
+  60% {
+    transform: translateY(0);
   }
 }
 @keyframes shad {
@@ -209,59 +462,19 @@
     transform: scaleX(1);
     opacity: 1;
   }
-  30% {
-    transform: scaleX(0.6);
-    opacity: 0.45;
-  }
-  55% {
-    transform: scaleX(1);
+  35% {
+    transform: scaleX(0.7);
+    opacity: 0.5;
   }
 }
 @keyframes shake {
   20%,
   60% {
-    transform: translateX(-6px);
+    transform: translateX(-5px);
   }
   40%,
   80% {
-    transform: translateX(6px);
-  }
-}
-@keyframes ring {
-  0%,
-  100% {
-    transform: rotate(0);
-  }
-  10%,
-  30% {
-    transform: rotate(14deg);
-  }
-  20%,
-  40% {
-    transform: rotate(-12deg);
-  }
-  50% {
-    transform: rotate(0);
-  }
-}
-@keyframes grow {
-  from {
-    transform: scaleY(0);
-  }
-}
-@keyframes fadein {
-  from {
-    opacity: 0;
-  }
-}
-@keyframes draw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes donut {
-  from {
-    stroke-dasharray: 0 100;
+    transform: translateX(5px);
   }
 }
 @keyframes load {
@@ -269,62 +482,107 @@
     transform: scaleX(0);
   }
 }
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.7);
-    opacity: 0;
-  }
-  30% {
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1.1);
-    opacity: 0;
-  }
+
+/* Borde de los controles (1 px; 2 px en alto contraste) y regla gruesa de bloques (1 px; 3 px). */
+@utility border-control {
+  border-width: var(--control-border);
 }
-@keyframes fall {
-  to {
-    transform: translate(var(--x), 105vh) rotate(var(--r));
-    opacity: 0.9;
-  }
+@utility border-t-heavy {
+  border-top-width: var(--rule-heavy);
 }
-@keyframes tick {
-  to {
-    stroke-dashoffset: 0;
-  }
+@utility border-b-heavy {
+  border-bottom-width: var(--rule-heavy);
 }
-@keyframes spin3 {
-  to {
-    transform: rotate(120deg);
-  }
+/* Alto mínimo táctil: 44 px (48 en alto contraste); en escritorio, el control compacto (36 px). */
+@utility h-touch {
+  height: var(--touch);
+}
+@utility min-h-touch {
+  min-height: var(--touch);
+}
+@utility size-touch {
+  width: var(--touch);
+  height: var(--touch);
+}
+@utility h-control {
+  height: var(--control);
+}
+@utility size-control {
+  width: var(--control);
+  height: var(--control);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   html {
     -webkit-tap-highlight-color: transparent;
+    background: var(--background);
   }
   body {
     @apply bg-background font-sans text-foreground antialiased;
-    font-size: 15px;
-    line-height: 1.45;
+    font-size: var(--fs-body);
+    line-height: 1.5;
     font-variant-numeric: tabular-nums;
+  }
+  @media (min-width: 60rem) {
+    :root:not([data-contrast='high']) {
+      --fs-body: var(--fs-base);
+    }
   }
   h1,
   h2,
   h3 {
-    letter-spacing: -0.02em;
-    line-height: 1.15;
+    letter-spacing: var(--tracking-title);
+    line-height: 1.2;
   }
   button {
     cursor: pointer;
   }
+  a {
+    text-underline-offset: 3px;
+  }
+  /* Foco visible y uniforme en todo lo que se enfoca con teclado */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  [data-contrast='high'] :focus-visible {
+    outline-width: 3px;
+  }
+  ::selection {
+    background: var(--selected);
+    color: var(--selected-foreground);
+  }
 }
 
-/* ===== Gráficos SVG (animaciones del mockup) ===== */
 @layer components {
+  /* Cifras: tabulares, en Plex Mono (A) o Public Sans (B) */
+  .num {
+    font-family: var(--font-figures);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+  }
+  /* Panel: superficie blanca con borde de 1 px (3 px arriba y abajo en alto contraste) */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  [data-contrast='high'] .panel {
+    border-width: var(--rule-heavy) 0;
+  }
+  /* Etiqueta de sección del menú y de los grupos */
+  .eyebrow {
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* ===== Gráficos SVG ===== */
   .chart svg {
     display: block;
     width: 100%;
@@ -332,38 +590,31 @@
     overflow: visible;
   }
   .chart .gl {
-    stroke: var(--border);
-    stroke-dasharray: 3 4;
+    stroke: var(--chart-grid);
   }
   .chart .ax {
     fill: var(--muted-foreground);
-    font-size: 12px;
-    font-weight: 500;
+    font-size: var(--fs-xs);
   }
   .chart .ax2 {
     fill: var(--ink-2);
-    font-size: 12.5px;
-    font-weight: 600;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-semibold);
   }
   .chart .val {
     fill: var(--foreground);
-    font-size: 13px;
-    font-weight: 800;
-    animation: fadein 0.4s ease both;
-    animation-delay: calc(var(--d, 0s) + 0.45s);
+    font-family: var(--font-figures);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-medium);
   }
   .chart .bar {
-    fill: var(--primary);
-    transform-box: fill-box;
-    transform-origin: 50% 100%;
-    animation: grow 0.7s var(--ease) both;
-    animation-delay: var(--d, 0s);
+    fill: var(--chart-1);
   }
   .chart .bar.zero {
-    fill: var(--border);
+    fill: var(--chart-zero);
   }
-  .chart .col:hover .bar {
-    fill: var(--primary-600);
+  .chart .col:hover .bar:not(.zero) {
+    fill: var(--primary-hover);
   }
   .chart .guide {
     stroke: var(--ink-2);
@@ -375,58 +626,40 @@
   }
   .chart .ln {
     fill: none;
-    stroke-width: 2.5;
+    stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    animation: draw 1.2s var(--ease) forwards;
+  }
+  [data-contrast='high'] .chart .ln {
+    stroke-width: 3;
   }
   .chart .ln.s1 {
-    stroke: var(--primary);
+    stroke: var(--chart-1);
   }
   .chart .ln.s2 {
-    stroke: var(--series-2);
-    animation-delay: 0.2s;
+    stroke: var(--chart-2);
+    stroke-dasharray: 5 4;
   }
   .chart .area {
-    fill: var(--primary);
-    opacity: 0.08;
-    animation: fadein 0.8s ease both 0.5s;
+    fill: var(--chart-1);
+    opacity: 0.06;
   }
   .chart .pt {
-    stroke: #fff;
+    stroke: var(--surface);
     stroke-width: 2;
-    animation: fadein 0.3s ease both;
-    animation-delay: var(--d, 0s);
   }
   .chart .pt.s1 {
-    fill: var(--primary);
+    fill: var(--chart-1);
   }
   .chart .pt.s2 {
-    fill: var(--series-2);
-  }
-  .donut-value {
-    animation: donut 1.1s var(--ease) both 0.15s;
+    fill: var(--chart-2);
   }
   .splash-bar {
     transform-origin: left;
     animation: load var(--dur, 2s) var(--ease) both;
   }
-  .splash-ring {
-    animation: pulse-ring 3s ease-out infinite;
-  }
-  .confetti-piece {
-    animation: fall 1.6s cubic-bezier(0.3, 0.6, 0.4, 1) forwards;
-  }
-  .tick-path {
-    stroke-dasharray: 30;
-    stroke-dashoffset: 30;
-    animation: tick 0.45s var(--ease) forwards 0.45s;
-  }
   .iso-anim .spin {
     transform-origin: 50px 52px;
-    animation: spin3 1.8s var(--ease) infinite;
   }
   .no-scrollbar {
     scrollbar-width: none;
@@ -447,8 +680,6 @@
     animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-  .chart .ln {
-    stroke-dashoffset: 0;
+    scroll-behavior: auto !important;
   }
 }

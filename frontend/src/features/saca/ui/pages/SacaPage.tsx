@@ -1,5 +1,5 @@
 import { useState, type SyntheticEvent } from 'react'
-import { Check, Minus, Pencil, TriangleAlert } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { addDays, dDowLong, dShort, today, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
@@ -54,7 +54,8 @@ import {
 import { modelLabel } from '@/features/production'
 import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { DayStrip } from '@/shared/ui/components/day-strip'
-import { EmptyState } from '@/shared/ui/components/feedback'
+import { EmptyState, StatusDot } from '@/shared/ui/components/feedback'
+import { Button } from '@/shared/ui/components/shadcn/button'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgAmount, unitsCount } from '@/shared/types/labels'
@@ -84,11 +85,11 @@ export function SacaPage() {
         {
           // En pantallas anchas: resumen y detalle a la izquierda, datos de origen fijos a la derecha.
           // En angostas se apilan en este orden: resumen, datos de origen, detalle.
-          <div className="grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_21rem]">
             <Hero plan={plan} />
             {waiting ? (
               <Section title={SOURCES_TITLE} className="@4xl/main:sticky @4xl/main:top-6 @4xl/main:row-span-2">
-                <p className="px-4 pb-4 text-[13.5px] text-muted-foreground dsk:px-5">{WAITING_SOURCES}</p>
+                <p className="px-4 py-4 text-sm text-muted-foreground dsk:px-5">{WAITING_SOURCES}</p>
               </Section>
             ) : (
               <Sources plan={plan} />
@@ -113,7 +114,7 @@ const isEmpty = (p: Saca) => p.stock === 0 && p.ordered === 0 && p.projected ===
 /** «jueves 12» */
 const dayText = (d: IsoDate) => `${dDowLong(d)} ${dShort(d).split(' ')[1] ?? ''}`
 
-/** El número que importa, grande; lo demás, al lado. */
+/** El número que importa, grande; lo demás, al lado. Superficie neutra: el acento queda para las acciones. */
 function Hero({ plan }: { plan: Saca }) {
   const used = [
     plan.stock_date ? stockAt(dayText(plan.stock_date)) : NO_STOCK_DATE,
@@ -121,43 +122,37 @@ function Hero({ plan }: { plan: Saca }) {
     projectionOf(dayText(plan.projection_date)),
   ]
   return (
-    <section className="rounded-[18px] bg-primary p-5 text-white shadow-card dsk:p-6">
-      <p className="text-[13px] font-bold tracking-[0.05em] text-white/80 uppercase">
-        {HERO_LABEL} · cálculo del {dayText(plan.date)}
-      </p>
-      <ul className="mt-2 flex flex-wrap gap-1.5">
-        {used.map((u) => (
-          <li key={u} className="rounded-full bg-white/15 px-2.5 py-1 text-[12.5px] font-semibold">
-            {u}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-4">
-        <p className="flex items-baseline gap-2">
-          <b className="text-[52px] leading-none font-extrabold tracking-[-0.04em] tabular-nums dsk:text-[64px]">
-            {nf0(plan.farm_order)}
-          </b>
-          <span className="text-[17px] font-semibold text-white/85">{BIRDS_LABEL}</span>
+    <section className="panel" aria-label={HERO_LABEL}>
+      <div className="px-4 pt-4 pb-4 dsk:px-5">
+        <p className="eyebrow hc:text-xs hc:text-foreground">
+          {HERO_LABEL} · cálculo del {dayText(plan.date)}
         </p>
-        <dl className="flex flex-wrap gap-x-6 gap-y-2 pb-1.5">
-          <div>
-            <dd className="text-[20px] leading-tight font-extrabold tabular-nums">{nf0(plan.request)}</dd>
-            <dt className="text-[12.5px] text-white/80">{NEED_LABEL}</dt>
-          </div>
-          <div>
-            <dd className="text-[20px] leading-tight font-extrabold tabular-nums">{nf1(plan.request_kg)}</dd>
-            <dt className="text-[12.5px] text-white/80">{KG_LABEL}</dt>
-          </div>
-          <div>
-            <dd className="text-[20px] leading-tight font-extrabold tabular-nums">{nf1(plan.live_kg)}</dd>
-            <dt className="text-[12.5px] text-white/80">
-              {LIVE_LABEL} · rend. {nf0(plan.yield_factor * 100)} %
-            </dt>
-          </div>
-        </dl>
+        <p className="mt-1 text-sm text-muted-foreground">{used.join(' · ')}</p>
+        <div className="mt-3 flex flex-wrap items-end gap-x-8 gap-y-3">
+          <p className="flex items-baseline gap-2">
+            <b className="num text-4xl leading-none font-medium hc:font-extrabold">{nf0(plan.farm_order)}</b>
+            <span className="text-md text-ink-2">{BIRDS_LABEL}</span>
+          </p>
+          <dl className="flex flex-wrap gap-x-6 gap-y-2 pb-0.5">
+            <div className="flex flex-col-reverse">
+              <dt className="text-xs text-muted-foreground">{NEED_LABEL}</dt>
+              <dd className="num text-lg leading-tight font-medium hc:font-bold">{nf0(plan.request)}</dd>
+            </div>
+            <div className="flex flex-col-reverse">
+              <dt className="text-xs text-muted-foreground">{KG_LABEL}</dt>
+              <dd className="num text-lg leading-tight font-medium hc:font-bold">{nf1(plan.request_kg)}</dd>
+            </div>
+            <div className="flex flex-col-reverse">
+              <dt className="text-xs text-muted-foreground">
+                {LIVE_LABEL} · rend. {nf0(plan.yield_factor * 100)} %
+              </dt>
+              <dd className="num text-lg leading-tight font-medium hc:font-bold">{nf1(plan.live_kg)}</dd>
+            </div>
+          </dl>
+        </div>
       </div>
       {plan.groups.length > 0 && <FarmOrder plan={plan} />}
-      <p className="mt-3 text-[12.5px] text-white/85">{FORMULA}</p>
+      <p className="border-t border-rule px-4 py-2.5 text-xs text-muted-foreground dsk:px-5">{FORMULA}</p>
     </section>
   )
 }
@@ -195,30 +190,26 @@ function FarmOrder({ plan }: { plan: Saca }) {
         aria-label={`Plus de ${name}`}
         value={draft[name] ?? ''}
         onChange={(e) => setDraft({ ...draft, [name]: e.target.value.replace(/[^\d., ]/g, '').slice(0, 8) })}
-        className="h-8 w-full min-w-0 rounded-[8px] border border-white/40 bg-white/15 px-2 text-right text-[14.5px] font-bold text-white tabular-nums outline-none focus:border-white"
+        className="num h-touch w-full min-w-0 rounded-sm border-control border-input bg-surface px-2 text-right text-base text-foreground outline-none focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring dsk:h-8"
       />
     ) : (
-      <span className="text-right tabular-nums">+{nf0(value)}</span>
+      <span className="num text-right">+{nf0(value)}</span>
     )
 
   return (
-    <form onSubmit={submit} className="relative mt-4 rounded-[14px] bg-white/12 px-3.5 py-3">
+    <form onSubmit={submit} className="border-t border-rule px-4 py-3 dsk:px-5">
       {!draft && can(session, 'manage_editing') && (
-        <button
-          type="button"
-          onClick={start}
-          aria-label={EDIT_PLUS_LABEL}
-          title={EDIT_PLUS_LABEL}
-          className="absolute -top-4 -right-2 grid size-8 place-items-center rounded-full bg-white text-primary shadow-card"
-        >
-          <Pencil className="size-4" />
-        </button>
+        <div className="mb-1 flex justify-end">
+          <Button type="button" variant="outline" size="sm" onClick={start} title={EDIT_PLUS_LABEL}>
+            <Pencil /> {EDIT_PLUS_LABEL}
+          </Button>
+        </div>
       )}
       {/* Ancho: tabla en el orden de la fórmula. Angosto: el tipo, la cuenta debajo y lo que se pide. */}
       <div
         className={cn(
           farmCols,
-          'hidden pb-1 text-[11.5px] font-bold tracking-[0.04em] text-white/75 uppercase sm:grid',
+          'hidden border-b border-rule-strong pb-1.5 text-xs font-medium text-muted-foreground sm:grid hc:border-b-heavy hc:font-bold hc:text-foreground',
         )}
       >
         <span>{FARM_COLUMNS.type}</span>
@@ -229,26 +220,26 @@ function FarmOrder({ plan }: { plan: Saca }) {
         <span className="text-right">{FARM_COLUMNS.order}</span>
       </div>
       {plan.groups.map((g) => (
-        <div key={g.name} className="border-t border-white/15 py-1.5 text-[15px] first:border-t-0 sm:first:border-t">
+        <div key={g.name} className="border-t border-rule py-2 text-base first:border-t-0">
           <div className={cn(farmCols, 'hidden sm:grid')}>
-            <b className="truncate">{g.name}</b>
-            <span className="text-right tabular-nums">
+            <b className="truncate font-medium">{g.name}</b>
+            <span className="num text-right">
               {nf0(g.stock)}
               {g.stock_b > 0 && (
-                <small className="block text-[11.5px] text-white/75">{groupStockBNote(g.stock_b)}</small>
+                <small className="block text-2xs text-muted-foreground">{groupStockBNote(g.stock_b)}</small>
               )}
             </span>
-            <span className="text-right tabular-nums">−{nf0(g.ordered)}</span>
-            <span className="text-right tabular-nums">+{nf0(g.projected)}</span>
+            <span className="num text-right">{g.ordered ? `−${nf0(g.ordered)}` : 0}</span>
+            <span className="num text-right">+{nf0(g.projected)}</span>
             {plusCell(g.name, g.plus)}
-            <b className="text-right text-[17px] tabular-nums">{nf0(g.farm_order)}</b>
+            <b className="num text-right text-lg font-semibold hc:font-extrabold">{nf0(g.farm_order)}</b>
           </div>
           <div className="sm:hidden">
             <div className="flex items-baseline gap-2">
-              <b className="min-w-0 flex-1 truncate">{g.name}</b>
-              <b className="min-w-[2.5rem] text-right text-[17px] tabular-nums">{nf0(g.farm_order)}</b>
+              <b className="min-w-0 flex-1 truncate font-medium">{g.name}</b>
+              <b className="num min-w-10 text-right text-lg font-semibold hc:font-extrabold">{nf0(g.farm_order)}</b>
             </div>
-            <div className="flex items-center gap-2 text-[12.5px] text-white/85 tabular-nums">
+            <div className="num flex items-center gap-2 text-xs text-muted-foreground">
               <span className="min-w-0 flex-1">
                 {nf0(g.stock)} − {nf0(g.ordered)} + {nf0(g.projected)} {draft ? '+' : `+ ${nf0(g.plus)}`}
                 {g.stock_b > 0 && ` · ${groupStockBNote(g.stock_b)}`}
@@ -261,25 +252,17 @@ function FarmOrder({ plan }: { plan: Saca }) {
       {draft && (
         <>
           {error && (
-            <p role="alert" className="pt-1 text-[13px] font-semibold text-white">
+            <p role="alert" className="pt-1 text-sm font-medium text-bad">
               {error}
             </p>
           )}
           <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setDraft(null)}
-              className="h-9 rounded-[8px] px-3 text-[13.5px] font-bold"
-            >
+            <Button type="button" variant="ghost" onClick={() => setDraft(null)}>
               {CANCEL}
-            </button>
-            <button
-              type="submit"
-              disabled={save.isPending}
-              className="h-9 rounded-[8px] bg-white px-4 text-[13.5px] font-bold text-primary disabled:opacity-60"
-            >
+            </Button>
+            <Button type="submit" disabled={save.isPending}>
               {SAVE_PLUS}
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -290,11 +273,7 @@ function FarmOrder({ plan }: { plan: Saca }) {
 const farmCols = 'grid items-baseline gap-x-2 grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,5.5rem))_minmax(0,6.5rem)]'
 
 type Tone = 'ok' | 'warn' | 'off'
-const toneCls: Record<Tone, string> = {
-  ok: 'bg-ok-soft text-ok',
-  warn: 'bg-warn-soft text-warn',
-  off: 'bg-muted text-muted-foreground',
-}
+const toneDot: Record<Tone, 'ok' | 'warn' | 'draft'> = { ok: 'ok', warn: 'warn', off: 'draft' }
 
 function SourceRow({
   tone,
@@ -307,16 +286,15 @@ function SourceRow({
   value?: string
   children?: React.ReactNode
 }) {
-  const Icon = tone === 'ok' ? Check : tone === 'warn' ? TriangleAlert : Minus
   return (
-    <li className="flex gap-3 border-b border-muted py-3 first:pt-1 last:border-0 last:pb-0">
-      <span className={cn('mt-0.5 grid size-7 flex-none place-items-center rounded-full', toneCls[tone])}>
-        <Icon className="size-4" strokeWidth={2.6} />
-      </span>
+    <li className="flex gap-2.5 border-b border-rule py-3 last:border-0">
+      <StatusDot tone={toneDot[tone]} className="mt-1.5" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <b className="text-[14.5px]">{label}</b>
-          {value && <span className="ml-auto text-[14px] font-semibold tabular-nums">{value}</span>}
+          <b className={cn('text-base font-medium', tone === 'warn' && 'text-warn hc:font-bold hc:text-foreground')}>
+            {label}
+          </b>
+          {value && <span className="ml-auto text-base font-medium">{value}</span>}
         </div>
         {children}
       </div>
@@ -328,10 +306,10 @@ function SourceRow({
 function Sources({ plan }: { plan: Saca }) {
   const missing = missingSellers(plan)
   const share = plan.sellers_total ? plan.sellers_registered / plan.sellers_total : 0
-  const small = 'mt-0.5 block text-[13px] text-muted-foreground'
+  const small = 'mt-0.5 block text-sm text-muted-foreground'
   return (
     <Section title={SOURCES_TITLE} className="@4xl/main:sticky @4xl/main:top-6 @4xl/main:row-span-2">
-      <ul className="px-4 pb-4 dsk:px-5">
+      <ul className="px-4 dsk:px-5">
         <SourceRow
           tone={missing ? 'warn' : 'ok'}
           label={`${SOURCE.projections} (${dayText(plan.projection_date)})`}
@@ -343,7 +321,7 @@ function Sources({ plan }: { plan: Saca }) {
             aria-valuemax={plan.sellers_total}
             aria-valuenow={plan.sellers_registered}
             aria-label={SOURCE.projections}
-            className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
+            className="mt-2 h-1.5 overflow-hidden rounded-full bg-chart-zero"
           >
             <div
               className={cn('h-full rounded-full', missing ? 'bg-warn' : 'bg-ok')}
@@ -379,7 +357,7 @@ function Sources({ plan }: { plan: Saca }) {
           {plan.forecast && <small className={small}>Modelo en uso: {modelLabel(plan.forecast.method)}.</small>}
         </SourceRow>
       </ul>
-      <p className="border-t border-muted px-4 py-3 text-[12.5px] text-muted-foreground dsk:px-5">
+      <p className="border-t border-rule px-4 py-3 text-xs text-muted-foreground dsk:px-5">
         {FORMULA}
         <span className="mt-1.5 block">{FARM_ORDER_HINT}</span>
         {plan.forecast && <span className="mt-1.5 block">{ARRIVAL_HINT}</span>}
@@ -396,7 +374,7 @@ const colsCls = (arrival: boolean) =>
       ? 'sm:grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,0.7fr))_minmax(0,0.9fr)_repeat(3,minmax(0,0.7fr))]'
       : 'sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,0.7fr))_minmax(0,1fr)_minmax(0,0.7fr)]',
   )
-const numCls = 'hidden text-right text-[14px] tabular-nums sm:block'
+const numCls = 'num hidden text-right text-base sm:block'
 /** Aves que se espera que lleguen en calidad B: las que llegan menos las de calidad A. */
 const qualityB = (l: SacaLine) => Math.max(0, (l.expected ?? 0) - (l.expected_a ?? 0))
 
@@ -413,8 +391,13 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
       return s + (line ? pick(line) : 0)
     }, 0)
   return (
-    <div className="px-3 pt-2 pb-4 dsk:px-4">
-      <div className={cn(cols, 'px-3 pb-1.5 text-[12px] font-bold tracking-[0.04em] text-muted-foreground uppercase')}>
+    <div className="pb-1">
+      <div
+        className={cn(
+          cols,
+          'border-b border-rule-strong px-4 py-2.5 text-xs font-medium text-muted-foreground dsk:px-5 hc:border-b-heavy hc:font-bold hc:text-foreground',
+        )}
+      >
         <span>{COLUMNS.product}</span>
         <span className="hidden text-right sm:block">{COLUMNS.stock}</span>
         <span className="hidden text-right sm:block">{COLUMNS.ordered}</span>
@@ -430,13 +413,13 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
           <span className="hidden text-right sm:block">{COLUMNS.kg}</span>
         )}
       </div>
-      <div className="grid gap-3">
+      <div className="grid">
         {bySubcategory(products).map((g) => (
           <div key={g.name ?? '-'}>
-            <div className="flex items-baseline gap-3 rounded-[10px] bg-muted/70 px-3 py-2">
-              <b className="min-w-0 flex-1 text-[13px] tracking-[0.02em] text-ink-2 uppercase">{g.name ?? 'Otros'}</b>
-              <span className="text-[13px] text-muted-foreground tabular-nums">
-                <b className="text-foreground">{nf0(sum(g.products, (l) => l.request))}</b> en total
+            <div className="flex items-baseline gap-3 border-b border-rule bg-muted px-4 py-2 dsk:px-5">
+              <b className="eyebrow min-w-0 flex-1 hc:text-foreground">{g.name ?? 'Otros'}</b>
+              <span className="text-sm text-muted-foreground">
+                <b className="num font-medium text-foreground">{nf0(sum(g.products, (l) => l.request))}</b> en total
               </span>
             </div>
             {g.products.map((p) => {
@@ -446,12 +429,16 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
               return (
                 <div
                   key={p.id}
-                  className={cn(cols, 'border-b border-muted px-3 py-2.5 last:border-0', idle && 'opacity-45')}
+                  className={cn(
+                    cols,
+                    'border-b border-rule px-4 py-2.5 last:border-0 dsk:px-5',
+                    idle && 'text-muted-foreground',
+                  )}
                 >
                   <span className="min-w-0">
-                    <b className="block truncate text-[15px]">{p.name}</b>
+                    <b className="block truncate font-medium">{p.name}</b>
                     {/* En angosto, el desglose va bajo el nombre en vez de en columnas. */}
-                    <small className="block text-[12.5px] text-muted-foreground tabular-nums sm:hidden">
+                    <small className="block text-xs text-muted-foreground sm:hidden">
                       {nf0(l.stock)} stock − {nf0(l.ordered)} ped. + {nf0(l.projected)} proy.
                     </small>
                   </span>
@@ -459,23 +446,28 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
                   <span className={numCls}>{l.ordered ? `−${nf0(l.ordered)}` : '0'}</span>
                   <span className={numCls}>{l.projected ? `+${nf0(l.projected)}` : '0'}</span>
                   <span className="text-right">
-                    <b className={cn('block text-[16px] tabular-nums', l.request ? 'text-primary' : 'text-faint')}>
+                    <b
+                      className={cn(
+                        'num block text-md font-semibold hc:font-extrabold',
+                        !l.request && 'font-normal text-faint',
+                      )}
+                    >
                       {nf0(l.request)}
                     </b>
-                    <span aria-hidden className="mt-1 ml-auto block h-1 w-full max-w-[7rem] rounded-full bg-muted">
+                    <span aria-hidden className="mt-1 ml-auto block h-1 w-full max-w-28 bg-chart-zero">
                       <span
-                        className="ml-auto block h-full rounded-full bg-primary"
+                        className="ml-auto block h-full bg-chart-1"
                         style={{ width: `${String(Math.round((l.request / max) * 100))}%` }}
                       />
                     </span>
                     {arrival ? (
-                      <small className="mt-0.5 block text-[12px] text-muted-foreground tabular-nums sm:hidden">
+                      <small className="mt-0.5 block text-xs text-muted-foreground sm:hidden">
                         llegarán {nf0(l.expected ?? 0)}
                         {qualityB(l) > 0 && <span className="block">{nf0(qualityB(l))} en B</span>}
                       </small>
                     ) : (
                       l.request > 0 && (
-                        <small className="mt-0.5 block text-[12px] text-muted-foreground tabular-nums sm:hidden">
+                        <small className="num mt-0.5 block text-xs text-muted-foreground sm:hidden">
                           {kgAmount(l.request_kg)}
                         </small>
                       )
@@ -483,7 +475,7 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
                   </span>
                   {arrival ? (
                     <>
-                      <span className={cn(numCls, 'font-bold', !l.expected && 'font-normal text-faint')}>
+                      <span className={cn(numCls, 'font-semibold', !l.expected && 'font-normal text-faint')}>
                         {nf0(l.expected ?? 0)}
                       </span>
                       <span className={cn(numCls, 'text-muted-foreground')}>{nf0(l.expected_a ?? 0)}</span>
@@ -502,20 +494,25 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
           </div>
         ))}
       </div>
-      <div className={cn(cols, 'mt-3 rounded-[12px] bg-secondary px-3 py-3 text-[15px] font-extrabold')}>
+      <div
+        className={cn(
+          cols,
+          'border-t border-rule-strong bg-muted px-4 py-3 text-md font-semibold dsk:px-5 hc:border-t-heavy hc:border-foreground',
+        )}
+      >
         <span>{COLUMNS.total}</span>
-        <span className={cn(numCls, '!text-[15px]')}>{nf0(plan.stock)}</span>
-        <span className={cn(numCls, '!text-[15px]')}>{plan.ordered ? `−${nf0(plan.ordered)}` : '0'}</span>
-        <span className={cn(numCls, '!text-[15px]')}>{plan.projected ? `+${nf0(plan.projected)}` : '0'}</span>
-        <span className="text-right tabular-nums">{nf0(plan.request)}</span>
+        <span className={cn(numCls, 'text-md')}>{nf0(plan.stock)}</span>
+        <span className={cn(numCls, 'text-md')}>{plan.ordered ? `−${nf0(plan.ordered)}` : '0'}</span>
+        <span className={cn(numCls, 'text-md')}>{plan.projected ? `+${nf0(plan.projected)}` : '0'}</span>
+        <span className="num text-right">{nf0(plan.request)}</span>
         {arrival ? (
           <>
-            <span className={cn(numCls, '!text-[15px]')}>{nf0(expectedTotal)}</span>
-            <span className={cn(numCls, '!text-[15px]')}>{nf0(expectedATotal)}</span>
-            <span className={cn(numCls, '!text-[15px]')}>{nf0(expectedTotal - expectedATotal)}</span>
+            <span className={cn(numCls, 'text-md')}>{nf0(expectedTotal)}</span>
+            <span className={cn(numCls, 'text-md')}>{nf0(expectedATotal)}</span>
+            <span className={cn(numCls, 'text-md')}>{nf0(expectedTotal - expectedATotal)}</span>
           </>
         ) : (
-          <span className={cn(numCls, '!text-[15px]')}>{nf1(plan.request_kg)}</span>
+          <span className={cn(numCls, 'text-md')}>{nf1(plan.request_kg)}</span>
         )}
       </div>
     </div>

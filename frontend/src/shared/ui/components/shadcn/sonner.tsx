@@ -6,11 +6,13 @@ import {
   TriangleAlertIcon,
 } from "lucide-react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { useAppearance } from "@/shared/ui/hooks/use-appearance"
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const { resolved } = useAppearance()
   return (
     <Sonner
-      theme="light"
+      theme={resolved.theme}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,
@@ -25,6 +27,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
+          "--success-text": "var(--ok)",
+          "--error-text": "var(--bad)",
+          "--warning-text": "var(--warn)",
+          fontFamily: "var(--font-ui)",
         } as React.CSSProperties
       }
       {...props}

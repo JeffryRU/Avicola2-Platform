@@ -1,4 +1,3 @@
-import { Check } from 'lucide-react'
 import { dateOf, dShort, clockTime } from '@/shared/domain/dates'
 import { nf0 } from '@/shared/domain/format'
 import type { StockDay, StockTotals } from '@/features/stock/domain/stock'
@@ -11,10 +10,9 @@ import {
   unitsLabel,
 } from '@/features/stock/types/stock'
 import { kgAmount } from '@/shared/types/labels'
+import { StatusDot } from '@/shared/ui/components/feedback'
 import { Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
-
-const labelCls = 'mb-1 block text-[12px] font-bold tracking-[0.04em] text-muted-foreground uppercase'
 
 export function Summary({
   totals,
@@ -32,61 +30,64 @@ export function Summary({
   action?: React.ReactNode
 }) {
   const status = dirty ? STATUS_EDITING : record ? STATUS_SAVED : STATUS_PENDING
+  const tone = dirty ? 'warn' : record ? 'ok' : 'draft'
   return (
-    <Section>
-      <div className="p-4 dsk:p-5">
-        <div className="flex items-center gap-2">
-          <h2 className="min-w-0 flex-1 text-[15px] font-extrabold">{SUMMARY_TITLE}</h2>
-          <span
-            className={cn(
-              'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-bold',
-              dirty ? 'bg-warn-soft text-warn' : record ? 'bg-ok-soft text-ok' : 'bg-muted text-ink-2',
-            )}
-          >
-            {record && !dirty && <Check className="size-3.5" strokeWidth={3} />}
-            {status}
-          </span>
-        </div>
-        <div className="mt-3">
-          <b className="block text-[34px] leading-none font-extrabold tracking-[-0.03em] tabular-nums">
-            {nf0(totals.units)}
-          </b>
-          <small className="mt-1 block text-[13px] text-muted-foreground">
-            {unitsLabel(totals.units)} · {kgAmount(totals.kg)}
-          </small>
-        </div>
-        <dl className="mt-3.5 grid grid-cols-2 gap-2 border-t border-muted pt-3 text-[13px]">
-          <div>
-            <dd className="text-[16px] font-extrabold tabular-nums">{nf0(totals.unitsA)}</dd>
-            <dt className="text-muted-foreground">calidad A</dt>
-          </div>
-          <div>
-            <dd className="text-[16px] font-extrabold tabular-nums">{nf0(totals.unitsB)}</dd>
-            <dt className="text-muted-foreground">calidad B</dt>
-          </div>
-        </dl>
-        {byPlace && byPlace.length > 0 && (
-          <div className="mt-3.5 border-t border-muted pt-3">
-            <h3 className={labelCls}>{BY_LOCATION_TITLE}</h3>
-            <ul className="grid gap-1 text-[13.5px]">
-              {byPlace.map((p) => (
-                <li key={p.location} className="flex gap-2">
-                  <span className="min-w-0 flex-1 truncate">{p.location}</span>
-                  <b className="tabular-nums">{nf0(p.units)}</b>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {record && (
-          <p className="mt-3.5 border-t border-muted pt-3 text-[13px] text-muted-foreground">
-            Registró <b className="text-foreground">{record.recorded_by}</b> · {dShort(dateOf(record.recorded_at))},{' '}
-            {clockTime(record.recorded_at)}
-          </p>
-        )}
-        {note && <p className="mt-2 text-[13px] text-muted-foreground">{note}</p>}
-        {action}
+    <Section
+      title={SUMMARY_TITLE}
+      aside={
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 text-sm',
+            tone === 'warn' && 'font-medium text-warn hc:font-bold',
+            tone === 'ok' && 'text-foreground',
+          )}
+        >
+          <StatusDot tone={tone} />
+          {status}
+        </span>
+      }
+    >
+      <div className="px-4 py-4 dsk:px-5">
+        <b className="num block text-3xl leading-none font-medium hc:font-extrabold">{nf0(totals.units)}</b>
+        <small className="mt-1.5 block text-sm text-muted-foreground">
+          {unitsLabel(totals.units)} · {kgAmount(totals.kg)}
+        </small>
       </div>
+      <dl className="grid grid-cols-2 gap-px border-t border-rule bg-rule">
+        <div className="flex flex-col-reverse bg-surface px-4 py-3 dsk:px-5">
+          <dt className="text-xs text-muted-foreground">calidad A</dt>
+          <dd className="num text-lg font-medium hc:font-bold">{nf0(totals.unitsA)}</dd>
+        </div>
+        <div className="flex flex-col-reverse bg-surface px-4 py-3 dsk:px-5">
+          <dt className="text-xs text-muted-foreground">calidad B</dt>
+          <dd className="num text-lg font-medium hc:font-bold">{nf0(totals.unitsB)}</dd>
+        </div>
+      </dl>
+      {byPlace && byPlace.length > 0 && (
+        <div className="border-t border-rule px-4 py-3 dsk:px-5">
+          <h3 className="eyebrow mb-1.5">{BY_LOCATION_TITLE}</h3>
+          <ul className="grid gap-1 text-sm">
+            {byPlace.map((p) => (
+              <li key={p.location} className="flex gap-2">
+                <span className="min-w-0 flex-1 truncate">{p.location}</span>
+                <b className="num font-medium">{nf0(p.units)}</b>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {(record ?? note) && (
+        <div className="border-t border-rule px-4 py-3 dsk:px-5">
+          {record && (
+            <p className="text-sm text-muted-foreground">
+              Registró <b className="font-medium text-foreground">{record.recorded_by}</b> ·{' '}
+              {dShort(dateOf(record.recorded_at))}, {clockTime(record.recorded_at)}
+            </p>
+          )}
+          {note && <p className="mt-1 text-sm text-muted-foreground">{note}</p>}
+        </div>
+      )}
+      {action}
     </Section>
   )
 }

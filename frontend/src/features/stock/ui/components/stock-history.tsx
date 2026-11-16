@@ -21,9 +21,9 @@ export function History({
   return (
     <Section title={RECORDED_TITLE}>
       {pending ? null : days.length === 0 ? (
-        <p className="px-4 pt-1 pb-5 text-[14px] text-muted-foreground dsk:px-5">{RECORDED_EMPTY}</p>
+        <p className="px-4 py-4 text-base text-muted-foreground dsk:px-5">{RECORDED_EMPTY}</p>
       ) : (
-        <ul className="px-2 pt-1 pb-2.5">
+        <ul className="p-1.5">
           {days.map((d) => (
             <li key={d.date}>
               <button
@@ -31,19 +31,20 @@ export function History({
                 aria-current={d.date === selected}
                 onClick={() => onSelect(d.date)}
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left transition-colors hover:bg-muted/70',
-                  d.date === selected && 'bg-secondary hover:bg-secondary',
+                  'flex min-h-touch w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted',
+                  d.date === selected &&
+                    'bg-nav-active text-nav-active-foreground hover:bg-nav-active hc:font-semibold',
                 )}
               >
                 <span className="min-w-0 flex-1">
-                  <b className="block text-[14.5px]">{dShort(d.date)}</b>
-                  <small className="block truncate text-[12.5px] text-muted-foreground">
+                  <b className="block text-base font-medium">{dShort(d.date)}</b>
+                  <small className="block truncate text-xs text-muted-foreground">
                     {d.recorded_by} · {clockTime(d.recorded_at)}
                   </small>
                 </span>
-                <span className="text-right tabular-nums">
-                  <b className="block text-[14.5px]">{nf0(d.total_units)}</b>
-                  <small className="block text-[12.5px] text-muted-foreground">{kgAmount(d.total_kg)}</small>
+                <span className="num text-right">
+                  <b className="block text-base font-medium">{nf0(d.total_units)}</b>
+                  <small className="block text-xs text-muted-foreground">{kgAmount(d.total_kg)}</small>
                 </span>
               </button>
             </li>

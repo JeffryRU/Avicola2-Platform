@@ -10,7 +10,6 @@ import {
   UNLOCKS_TITLE,
   UNLOCK_ACTION_DONE,
   UNLOCK_ACTION_LABEL,
-  UNLOCK_STATUS_LABEL,
 } from '@/features/editing/types/editing'
 import { useDecideUnlock, useEditingWindow, useUnlocks } from '@/features/editing/ui/hooks'
 import { CutoffForm } from '@/features/editing/ui/components/cutoff-form'
@@ -18,14 +17,7 @@ import { useSellers } from '@/features/sellers'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
-import { cn } from '@/shared/ui/lib/utils'
-
-const STATUS_TONE: Record<Unlock['status'], string> = {
-  requested: 'bg-warn-soft text-warn',
-  approved: 'bg-ok-soft text-ok',
-  rejected: 'bg-bad-soft text-destructive',
-  closed: 'bg-muted text-ink-2',
-}
+import { UnlockStatus } from '@/features/editing/ui/components/unlock-status'
 
 /** Supervisor: horario de corte y solicitudes de habilitación de los vendedores. */
 export function UnlocksPage() {
@@ -38,16 +30,20 @@ export function UnlocksPage() {
     <div>
       <PageHeader title={UNLOCKS_TITLE} subtitle={UNLOCKS_SUBTITLE} back={paths.home} />
       <PageBody>
-        <div className="grid gap-4 @5xl/main:grid-cols-[minmax(0,380px)_minmax(0,1fr)] @5xl/main:items-start">
+        <div className="grid gap-4 @5xl/main:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] @5xl/main:items-start">
           <Section title={CUTOFF_TITLE}>{policy && <CutoffForm key={policyKey(policy)} policy={policy} />}</Section>
           <Section
             title={REQUESTS_TITLE}
-            aside={<span className="text-muted-foreground">{list.filter((u) => u.status === 'requested').length}</span>}
+            aside={
+              <span>
+                <span className="num">{list.filter((u) => u.status === 'requested').length}</span> por decidir
+              </span>
+            }
           >
             {unlocks.isPending ? null : list.length === 0 ? (
               <EmptyState title={NO_REQUESTS_LABEL} />
             ) : (
-              <ul className="grid gap-2 px-4 pb-4 dsk:px-5 dsk:pb-5">
+              <ul>
                 {list.map((u) => (
                   <UnlockRow key={u.id} unlock={u} name={names.get(u.seller) ?? u.seller} />
                 ))}
@@ -73,17 +69,15 @@ function UnlockRow({ unlock, name }: { unlock: Unlock; name: string }) {
   const actions: UnlockAction[] =
     unlock.status === 'requested' ? ['reject', 'approve'] : unlock.status === 'approved' ? ['close'] : []
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border-[1.5px] border-border bg-white px-3.5 py-3">
-      <div className="min-w-0 flex-1 basis-[14rem]">
-        <div className="flex flex-wrap items-center gap-2">
-          <b>{name}</b>
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-rule px-4 py-3 last:border-0 dsk:px-5">
+      <div className="min-w-0 flex-1 basis-56">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <b className="font-medium">{name}</b>
           <span className="text-muted-foreground">· {dShort(unlock.date)}</span>
-          <span className={cn('rounded-full px-2.5 py-0.5 text-[12px] font-bold', STATUS_TONE[unlock.status])}>
-            {UNLOCK_STATUS_LABEL[unlock.status]}
-          </span>
+          <UnlockStatus status={unlock.status} />
         </div>
-        <p className="mt-1 text-[14px]">{unlock.reason}</p>
-        <small className="text-muted-foreground">
+        <p className="mt-1 text-base">{unlock.reason}</p>
+        <small className="text-xs text-muted-foreground">
           Pedida el {dShort(dateOf(unlock.requested_at))} a las {clockTime(unlock.requested_at)}
         </small>
       </div>
@@ -96,7 +90,6 @@ function UnlockRow({ unlock, name }: { unlock: Unlock; name: string }) {
               size="sm"
               variant={a === 'approve' ? 'default' : 'outline'}
               disabled={decide.isPending}
-              className="font-bold"
               onClick={() => act(a)}
             >
               {UNLOCK_ACTION_LABEL[a]}

@@ -50,7 +50,9 @@ export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onC
           {nf0(units)} unidades<small>{kgAmount(kg, true)}</small>
         </SummaryRow>
       </div>
-      <table className={`${tableCls.table} mt-2.5 mb-[18px]`}>
+      <table
+        className={`${tableCls.table} mt-2 mb-4 [&_td:first-child]:pl-0 [&_td:last-child]:pr-0 [&_th:first-child]:pl-0 [&_th:last-child]:pr-0`}
+      >
         <thead>
           <tr>
             <th className={tableCls.th}>Fecha</th>
@@ -62,26 +64,22 @@ export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onC
           {dates.map((d) => (
             <tr key={d}>
               <td className={tableCls.td}>{dShort(d)}</td>
-              <td className={tableCls.td}>{unitsCount(sumUnits(dayUnits(d)))}</td>
-              <td className={tableCls.td}>{kgAmount(catalog.kg(dayUnits(d)))}</td>
+              <td className={`${tableCls.td} num`}>{unitsCount(sumUnits(dayUnits(d)))}</td>
+              <td className={`${tableCls.td} num`}>{kgAmount(catalog.kg(dayUnits(d)))}</td>
             </tr>
           ))}
         </tbody>
       </table>
       {kept > 0 && (
-        <p className="-mt-2 mb-[18px] text-[13px] text-muted-foreground">
+        <p className="-mt-2 mb-4 text-sm text-muted-foreground">
           Se mantienen {nf0(kept)} unidades que ya registraste de otros tamaños.
         </p>
       )}
       <div className="grid gap-2.5">
-        <Button autoFocus className="h-[54px] rounded-[14px] text-[16.5px] font-bold" onClick={onConfirm}>
+        <Button autoFocus className="h-12 text-md" onClick={onConfirm}>
           <Send /> Confirmar y enviar
         </Button>
-        <Button
-          variant="outline"
-          className="h-[54px] rounded-[14px] border-[1.5px] border-primary text-[16.5px] font-bold text-primary"
-          onClick={onClose}
-        >
+        <Button variant="outline" className="h-12 text-md" onClick={onClose}>
           Seguir editando
         </Button>
       </div>
@@ -94,10 +92,10 @@ export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onC
       <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
         <SheetContent
           side="bottom"
-          className="max-h-[88vh] overflow-y-auto rounded-t-3xl px-5 pb-[calc(20px+env(safe-area-inset-bottom))]"
+          className="max-h-[88vh] overflow-y-auto rounded-t-lg border-t border-border px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] hc:border-t-heavy hc:border-foreground"
         >
-          <SheetHeader className="px-0">
-            <SheetTitle className="text-[22px] font-extrabold">{title}</SheetTitle>
+          <SheetHeader className="px-0 pr-10">
+            <SheetTitle className="text-xl font-semibold hc:font-extrabold">{title}</SheetTitle>
             <SheetDescription>{description}</SheetDescription>
           </SheetHeader>
           {body}
@@ -107,9 +105,9 @@ export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onC
   }
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-[560px] rounded-3xl p-6">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-[22px] font-extrabold">{title}</DialogTitle>
+          <DialogTitle className="text-xl font-semibold hc:font-extrabold">{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         {body}

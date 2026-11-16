@@ -10,7 +10,7 @@ export function useTooltip() {
   const node = tip && (
     <div
       role="tooltip"
-      className="pointer-events-none fixed z-[80] -translate-x-1/2 -translate-y-[calc(100%+12px)] rounded-[10px] bg-head px-[11px] py-2 text-[13px] leading-snug whitespace-nowrap text-white shadow-lg [&_b]:font-extrabold"
+      className="pointer-events-none fixed z-[80] -translate-x-1/2 -translate-y-[calc(100%+0.75rem)] rounded-md border border-border bg-popover px-3 py-2 text-sm leading-snug whitespace-nowrap text-popover-foreground shadow-pop [&_b]:font-semibold"
       style={{ left: tip.x, top: tip.y }}
     >
       {tip.content}

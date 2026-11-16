@@ -1,5 +1,4 @@
 import { SyncStatus } from '@/shared/ui/components/sync-status'
-import { BarChart3, ShoppingCart, Target, TrendingDown } from 'lucide-react'
 import { dDM, dDow, dShort } from '@/shared/domain/dates'
 import { nf0, nf1, pct1 } from '@/shared/domain/format'
 import { periodAgg, versusReal } from '@/features/projections'
@@ -10,23 +9,42 @@ import { kgPerUnitLabel, useCatalog } from '@/features/catalog'
 import { usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
 import { CountUp, LineChart } from '@/shared/ui/components/charts'
 import { EmptyState } from '@/shared/ui/components/feedback'
-import { Kpi, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
+import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgAmount } from '@/shared/types/labels'
 
-const tone = (v: number) => (v < 0 ? 'text-destructive' : 'text-ok')
+const tone = (v: number) => (v < 0 ? 'text-bad' : 'text-ok')
+
+/** Muestra de una serie: línea continua (proyección) o discontinua (venta real), no solo color. */
+function SeriesKey({ dashed }: { dashed?: boolean }) {
+  return (
+    <svg aria-hidden width="20" height="8" viewBox="0 0 20 8" className="inline-block flex-none">
+      <line
+        x1="0"
+        x2="20"
+        y1="4"
+        y2="4"
+        strokeWidth="2.5"
+        stroke={dashed ? 'var(--chart-2)' : 'var(--chart-1)'}
+        strokeDasharray={dashed ? '5 3' : undefined}
+      />
+    </svg>
+  )
+}
 
 export function DashboardVersusPage() {
   const { period, sellers } = useDashboardFilters()
   const { catalog } = useCatalog()
   const data = usePeriodData(period)
-  const title = 'Proyección vs Venta Real'
+  const title = 'Proyección vs venta real'
   const subtitle = 'Comparativo de proyección y ventas reales por producto'
   const source = data.data ?? { projections: [], sales: [] }
 
   const days = periodAgg(period.dates, sellers, source.projections, source.sales, catalog)
   const vs = versusReal(days, catalog)
   const withReal = days.filter((d) => d.real)
+  // Sin ventas del ERP no hay desviación ni exactitud que mostrar (0 % sería engañoso).
+  const noReal = vs.daysWithReal === 0
   const points = days
     .filter((d) => d.confirmed)
     .map((d) => {
@@ -37,76 +55,68 @@ export function DashboardVersusPage() {
   return (
     <div>
       <PageHeader title={title} subtitle={subtitle} sticky={false} />
-      <SyncStatus queries={[data]} className="mx-4 mt-3 dsk:mx-8" />
       <DashboardFilterBar />
       <DashboardTabs />
       <PageBody>
-        <div className="mb-3 grid grid-cols-2 gap-2.5 dsk:mb-4 dsk:gap-4 @4xl/main:grid-cols-4">
+        <SyncStatus queries={[data]} />
+        <KpiStrip className="mb-4">
           <Kpi
-            icon={<BarChart3 />}
-            tone="bg-secondary text-primary"
             label="Proyección"
             value={
               <>
-                <CountUp value={vs.projected} /> kg
+                <CountUp value={vs.projected} />{' '}
+                <span className="font-sans text-md font-normal text-muted-foreground">kg</span>
               </>
             }
             foot={`${vs.daysWithReal} días con venta registrada`}
-            index={0}
           />
           <Kpi
-            icon={<ShoppingCart />}
-            tone="bg-ok-soft text-ok"
             label="Venta real (ERP)"
             value={
               <>
-                <CountUp value={vs.real} /> kg
+                <CountUp value={vs.real} />{' '}
+                <span className="font-sans text-md font-normal text-muted-foreground">kg</span>
               </>
             }
-            index={1}
           />
           <Kpi
-            icon={<TrendingDown />}
-            tone={vs.deviationPct < 0 ? 'bg-bad-soft text-destructive' : 'bg-ok-soft text-ok'}
             label="Desviación"
             value={
-              <span className={tone(vs.deviationPct)}>
-                <CountUp value={vs.deviationPct} decimals={1} suffix="%" />
-              </span>
+              noReal ? (
+                <span className="text-faint">—</span>
+              ) : (
+                <span className={tone(vs.deviationPct)}>
+                  <CountUp value={vs.deviationPct} decimals={1} suffix="%" />
+                </span>
+              )
             }
-            foot={`${nf0(vs.real - vs.projected)} kg`}
-            index={2}
+            foot={noReal ? 'sin ventas del ERP' : `${nf0(vs.real - vs.projected)} kg`}
           />
           <Kpi
-            icon={<Target />}
-            tone="bg-ok-soft text-ok"
             label="Exactitud"
             value={
-              <span className="text-ok">
+              noReal ? (
+                <span className="text-faint">—</span>
+              ) : (
                 <CountUp value={vs.accuracyPct} decimals={1} suffix="%" />
-              </span>
+              )
             }
             foot="según días con venta"
-            index={3}
           />
-        </div>
+        </KpiStrip>
         <div className="grid gap-4 @7xl/main:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-          <Section
-            title="Evolución semanal (kg)"
-            aside={
-              <div className="flex w-full items-center gap-[18px] text-[13px] font-semibold text-ink-2 dsk:w-auto dsk:text-sm">
-                <span>
-                  <i className="mr-[7px] inline-block size-[11px] rounded-full bg-primary align-[-1px]" />
+          <Section title="Evolución semanal (kg)">
+            <div className="px-4 pt-3 pb-4 dsk:px-5">
+              <div className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-ink-2">
+                <span className="flex items-center gap-1.5">
+                  <SeriesKey />
                   Proyección
                 </span>
-                <span>
-                  <i className="mr-[7px] inline-block size-[11px] rounded-full bg-series-2 align-[-1px]" />
+                <span className="flex items-center gap-1.5">
+                  <SeriesKey dashed />
                   Venta real (ERP)
                 </span>
               </div>
-            }
-          >
-            <div className="px-4 pt-1.5 pb-4 dsk:px-5 dsk:pb-5">
               {points.length > 1 ? (
                 <LineChart
                   label="Kilogramos proyectados y vendidos por día"
@@ -141,16 +151,18 @@ export function DashboardVersusPage() {
                 </EmptyState>
               )}
               {points.length > 0 && (
-                <div className="mt-2.5 overflow-x-auto">
-                  <table className={cn(tableCls.table, 'text-[13.5px]')}>
+                <div className="-mx-4 mt-3 overflow-x-auto dsk:-mx-5">
+                  <table className={cn(tableCls.table, 'text-sm')}>
                     <thead>
                       <tr>
-                        <th className={tableCls.th} />
+                        <th className={tableCls.th}>
+                          <span className="sr-only">Serie</span>
+                        </th>
                         {points.map((p) => (
                           <th key={p.date} className={tableCls.th}>
                             {dDow(p.date)}
                             <br />
-                            <span className="font-medium">{dDM(p.date)}</span>
+                            <span className="num">{dDM(p.date)}</span>
                           </th>
                         ))}
                       </tr>
@@ -158,31 +170,38 @@ export function DashboardVersusPage() {
                     <tbody>
                       <tr>
                         <td className={tableCls.td}>
-                          <i className="mr-2 inline-block size-2.5 rounded-full bg-primary" />
-                          Proyección (kg)
+                          <span className="flex items-center gap-2">
+                            <SeriesKey />
+                            Proyección (kg)
+                          </span>
                         </td>
                         {points.map((p) => (
-                          <td key={p.date} className={tableCls.td}>
+                          <td key={p.date} className={cn(tableCls.td, 'num')}>
                             {nf0(p.pk)}
                           </td>
                         ))}
                       </tr>
                       <tr>
                         <td className={tableCls.td}>
-                          <i className="mr-2 inline-block size-2.5 rounded-full bg-series-2" />
-                          Venta real (kg)
+                          <span className="flex items-center gap-2">
+                            <SeriesKey dashed />
+                            Venta real (kg)
+                          </span>
                         </td>
                         {points.map((p) => (
-                          <td key={p.date} className={cn(tableCls.td, p.rk == null && 'text-faint')}>
-                            {p.rk == null ? '-' : nf0(p.rk)}
+                          <td key={p.date} className={cn(tableCls.td, 'num', p.rk == null && 'text-faint')}>
+                            {p.rk == null ? '—' : nf0(p.rk)}
                           </td>
                         ))}
                       </tr>
                       <tr className={tableCls.total}>
-                        <td>Dif. (%)</td>
+                        <td className={tableCls.td}>Dif. (%)</td>
                         {points.map((p) => (
-                          <td key={p.date} className={cn('text-center', p.rk != null && tone(p.rk - p.pk))}>
-                            {p.rk == null ? '-' : pct1(((p.rk - p.pk) / p.pk) * 100)}
+                          <td
+                            key={p.date}
+                            className={cn(tableCls.td, 'num', p.rk == null ? 'text-faint' : tone(p.rk - p.pk))}
+                          >
+                            {p.rk == null ? '—' : pct1(((p.rk - p.pk) / p.pk) * 100)}
                           </td>
                         ))}
                       </tr>
@@ -193,9 +212,9 @@ export function DashboardVersusPage() {
             </div>
           </Section>
           <Section title="Desviación por producto (semana)">
-            <div className="overflow-x-auto px-3 pb-3.5">
+            <div className="overflow-x-auto">
               {withReal.length ? (
-                <table className={cn(tableCls.table, 'text-[13.5px]')}>
+                <table className={cn(tableCls.table, 'text-sm')}>
                   <thead>
                     <tr>
                       <th className={tableCls.th}>Producto</th>
@@ -226,24 +245,26 @@ export function DashboardVersusPage() {
                         return (
                           <tr key={p.id} className={tableCls.row}>
                             <td className={tableCls.td}>
-                              <b className="font-bold">{p.name}</b>
+                              <span className="block font-medium">{p.name}</span>
                               <small className="block text-xs text-muted-foreground">
                                 {kgPerUnitLabel(p.kg_per_unit)}
                               </small>
                             </td>
-                            <td className={tableCls.td}>{nf1(pk)}</td>
-                            <td className={tableCls.td}>{nf1(rk)}</td>
-                            <td className={cn(tableCls.td, tone(rk - pk))}>{nf1(rk - pk)}</td>
-                            <td className={cn(tableCls.td, 'font-bold', tone(dp))}>{pct1(dp)}</td>
+                            <td className={cn(tableCls.td, 'num')}>{nf1(pk)}</td>
+                            <td className={cn(tableCls.td, 'num')}>{nf1(rk)}</td>
+                            <td className={cn(tableCls.td, 'num', tone(rk - pk))}>{nf1(rk - pk)}</td>
+                            <td className={cn(tableCls.td, 'num font-medium', tone(dp))}>{pct1(dp)}</td>
                           </tr>
                         )
                       })}
                     <tr className={tableCls.total}>
-                      <td>Total</td>
-                      <td className="text-center">{nf1(vs.projected)}</td>
-                      <td className="text-center">{nf1(vs.real)}</td>
-                      <td className={cn('text-center', tone(vs.real - vs.projected))}>{nf1(vs.real - vs.projected)}</td>
-                      <td className={cn('text-center', tone(vs.deviationPct))}>{pct1(vs.deviationPct)}</td>
+                      <td className={tableCls.td}>Total</td>
+                      <td className={cn(tableCls.td, 'num')}>{nf1(vs.projected)}</td>
+                      <td className={cn(tableCls.td, 'num')}>{nf1(vs.real)}</td>
+                      <td className={cn(tableCls.td, 'num', tone(vs.real - vs.projected))}>
+                        {nf1(vs.real - vs.projected)}
+                      </td>
+                      <td className={cn(tableCls.td, 'num', tone(vs.deviationPct))}>{pct1(vs.deviationPct)}</td>
                     </tr>
                   </tbody>
                 </table>

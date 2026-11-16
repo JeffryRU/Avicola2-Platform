@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Loader2, UserPlus } from 'lucide-react'
 import type { AdminAccount, NewCredentials } from '@/features/accounts/domain/accounts'
-import { EmptyState } from '@/shared/ui/components/feedback'
+import { ErrorState } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { activeUnlocks, GrantEditingDialog, useEditingWindow, useUnlocks } from '@/features/editing'
@@ -47,11 +47,15 @@ export function AccountsPage() {
         <div className="grid gap-4">
           <Section>
             {list.isPending ? (
-              <div className="grid place-items-center p-10">
-                <Loader2 className="animate-spin text-muted-foreground" />
+              <div role="status" className="flex items-center justify-center gap-2 p-10 text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" /> Cargando usuarios…
               </div>
             ) : list.isError ? (
-              <EmptyState title="No se pudo cargar">{list.error.message}</EmptyState>
+              <ErrorState
+                title="No se pudo cargar la lista de usuarios"
+                detail={list.error.message}
+                onRetry={() => void list.refetch()}
+              />
             ) : (
               <ul>
                 {list.data.map((a) => (

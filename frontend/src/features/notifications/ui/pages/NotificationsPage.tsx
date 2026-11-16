@@ -8,20 +8,21 @@ import {
   type NotificationKind,
 } from '@/features/notifications/domain/notifications'
 import { useMarkRead, useNotifications } from '@/features/notifications/ui/hooks'
-import { EmptyState } from '@/shared/ui/components/feedback'
+import { EmptyState, ErrorState } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
 
+/** Ícono pequeño por tipo; solo lo que pide acción lleva color (ámbar). */
 const LOOK: Record<NotificationKind, { icon: typeof Bell; cls: string }> = {
-  projection_reminder: { icon: AlertCircle, cls: 'bg-bad-soft text-destructive' },
-  projection_submitted: { icon: ClipboardCheck, cls: 'bg-secondary text-primary' },
-  announcement: { icon: Megaphone, cls: 'bg-ok-soft text-ok' },
-  edit_requested: { icon: LockOpen, cls: 'bg-warn-soft text-warn' },
-  edit_decided: { icon: LockOpen, cls: 'bg-secondary text-primary' },
-  projection_missed: { icon: CalendarX, cls: 'bg-bad-soft text-destructive' },
+  projection_reminder: { icon: AlertCircle, cls: 'text-warn' },
+  projection_submitted: { icon: ClipboardCheck, cls: 'text-muted-foreground' },
+  announcement: { icon: Megaphone, cls: 'text-muted-foreground' },
+  edit_requested: { icon: LockOpen, cls: 'text-warn' },
+  edit_decided: { icon: LockOpen, cls: 'text-muted-foreground' },
+  projection_missed: { icon: CalendarX, cls: 'text-warn' },
 }
-const GENERIC = { icon: Bell, cls: 'bg-muted text-ink-2' }
+const GENERIC = { icon: Bell, cls: 'text-muted-foreground' }
 
 export function NotificationsPage() {
   const { items, unread, isPending, error } = useNotifications()
@@ -37,7 +38,7 @@ export function NotificationsPage() {
     markRead.mutate(undefined, { onSuccess: () => toast.success('Notificaciones marcadas como leídas') })
 
   const readAllButton = unread > 0 && (
-    <Button variant="ghost" className="h-10 font-bold text-ink-2" onClick={readAll}>
+    <Button variant="outline" onClick={readAll}>
       <Check /> Marcar todo como leído
     </Button>
   )
@@ -59,11 +60,11 @@ export function NotificationsPage() {
       <PageBody>
         <Section className="grid overflow-hidden">
           {isPending ? (
-            <div className="grid place-items-center p-10">
-              <Loader2 className="animate-spin text-muted-foreground" />
+            <div role="status" className="flex items-center justify-center gap-2 p-10 text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" /> Cargando notificaciones…
             </div>
           ) : error ? (
-            <EmptyState title="No se pudieron cargar">{error.message}</EmptyState>
+            <ErrorState title="No se pudieron cargar las notificaciones" detail={error.message} />
           ) : items.length === 0 ? (
             <EmptyState title="No tienes notificaciones">
               Aquí aparecerán los recordatorios de proyección, los envíos de tu equipo y los avisos de la empresa,
@@ -78,27 +79,21 @@ export function NotificationsPage() {
                   key={n.id}
                   type="button"
                   onClick={() => open(n)}
-                  className={cn(
-                    'grid w-full grid-cols-[42px_1fr_auto] items-start gap-3.5 border-b border-muted px-5 py-4 text-left last:border-0',
-                    isUnread && 'bg-[#F8FBFF]',
-                  )}
+                  className="grid w-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-start gap-3 border-b border-rule px-4 py-3.5 text-left transition-colors last:border-0 hover:bg-muted dsk:px-5"
                 >
-                  <span className={cn('grid size-[42px] place-items-center rounded-xl', cls)}>
-                    <Icon className="size-5" />
-                  </span>
+                  <Icon className={cn('mt-0.5 size-4.5', cls)} aria-hidden />
                   <span className="min-w-0">
-                    <b className="block">
+                    <b className={cn('flex items-center gap-2', isUnread ? 'font-semibold' : 'font-normal text-ink-2')}>
                       {n.title}
                       {isUnread && (
-                        <i
-                          className="ml-2 inline-block size-2 rounded-full bg-primary align-[2px]"
-                          aria-label="sin leer"
-                        />
+                        <i className="size-2 flex-none rounded-full bg-primary" aria-label="sin leer" role="img" />
                       )}
                     </b>
-                    <p className="mt-0.5 text-sm text-ink-2">{n.body}</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">{n.body}</p>
                   </span>
-                  <small className="whitespace-nowrap text-muted-foreground">{whenLabel(n.created_at)}</small>
+                  <small className="num text-xs whitespace-nowrap text-muted-foreground">
+                    {whenLabel(n.created_at)}
+                  </small>
                 </button>
               )
             })

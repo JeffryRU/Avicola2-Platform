@@ -63,7 +63,7 @@ export function ChangeRoleDialog({ account, onClose }: { account: AdminAccount |
           />
         )}
         {change.isError && (
-          <p role="alert" className="text-[13px] font-semibold text-destructive">
+          <p role="alert" className="text-sm font-medium text-bad">
             {change.error instanceof Error ? change.error.message : 'No se pudo cambiar el rol.'}
           </p>
         )}

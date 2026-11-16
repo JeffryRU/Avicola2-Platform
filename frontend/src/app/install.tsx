@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react'
-import { Download, Globe, PlusSquare, Share, Smartphone, X } from 'lucide-react'
+import { Download, Globe, PlusSquare, Share, Smartphone } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
@@ -83,8 +83,9 @@ function AndroidInstallDialog({
   onInstallWeb: () => void
 }) {
   const { brand } = useBrand()
-  const optionCls = 'flex w-full items-start gap-3 rounded-2xl border bg-card p-3.5 text-left hover:bg-secondary/60'
-  const iconCls = 'grid size-10 flex-none place-items-center rounded-xl bg-secondary text-primary [&>svg]:size-5'
+  const optionCls =
+    'flex w-full items-start gap-3 rounded-md border border-border bg-surface p-3.5 text-left hover:bg-muted hc:border-control hc:border-foreground'
+  const iconCls = 'mt-0.5 flex-none text-muted-foreground [&>svg]:size-4.5'
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -144,11 +145,11 @@ function IosInstallDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
         <ol className="grid gap-3">
           {steps.map(({ icon: Icon, text }, i) => (
             <li key={text} className="flex items-start gap-3">
-              <span className="grid size-9 flex-none place-items-center rounded-xl bg-secondary text-primary">
-                <Icon className="size-[18px]" />
+              <span className="num grid size-7 flex-none place-items-center rounded-full border border-border-strong text-sm font-medium">
+                {i + 1}
               </span>
-              <span className="pt-1.5 text-sm">
-                <b>{i + 1}.</b> {text}
+              <span className="pt-0.5 text-base">
+                {text} <Icon aria-hidden className="ml-0.5 inline size-4 align-[-0.15em] text-muted-foreground" />
               </span>
             </li>
           ))}
@@ -185,24 +186,23 @@ export function InstallBanner() {
     <>
       <aside
         aria-label="Instalar la app"
-        className="fixed inset-x-3 bottom-[calc(80px+env(safe-area-inset-bottom))] z-30 flex animate-rise items-center gap-3 rounded-2xl border bg-card p-3.5 pr-10 shadow-sheet dsk:hidden"
+        className="fixed inset-x-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-30 grid gap-3 rounded-md border border-border bg-surface p-3.5 shadow-pop dsk:hidden hc:border-2 hc:border-foreground"
       >
-        <BrandMark size={44} />
-        <div className="min-w-0 flex-1">
-          <b className="block text-[15px]">Instala {BRANDS[brand].name} en tu celular</b>
-          <small className="text-ink-2">Más rápida y funciona sin señal.</small>
+        <div className="flex items-center gap-3">
+          <BrandMark size={36} />
+          <div className="min-w-0 flex-1">
+            <b className="block font-semibold">Instala {BRANDS[brand].name} en tu celular</b>
+            <small className="text-sm text-muted-foreground">Más rápida y funciona sin señal.</small>
+          </div>
         </div>
-        <Button type="button" size="sm" onClick={install} className="flex-none">
-          <Download /> Instalar
-        </Button>
-        <button
-          type="button"
-          onClick={later}
-          aria-label="Ahora no"
-          className="absolute top-2 right-2 grid size-7 place-items-center rounded-lg text-muted-foreground"
-        >
-          <X className="size-4" />
-        </button>
+        <div className="flex gap-2">
+          <Button type="button" variant="ghost" onClick={later} className="flex-1">
+            Ahora no
+          </Button>
+          <Button type="button" onClick={install} className="flex-1">
+            <Download /> Instalar
+          </Button>
+        </div>
       </aside>
       {dialog}
     </>
@@ -219,13 +219,13 @@ export function InstallOption({ className }: { className: string }) {
   return (
     <>
       <button type="button" className={className} onClick={install}>
-        <span className="grid size-10 flex-none place-items-center rounded-xl bg-secondary text-primary [&>svg]:size-5">
-          <Download />
-        </span>
         <span className="min-w-0 flex-1">
-          <b className="block">Instalar la app</b>
-          <small className="text-muted-foreground">Ábrela desde tu pantalla de inicio, como cualquier app</small>
+          <b className="block font-medium">Instalar la app</b>
+          <small className="block text-sm text-muted-foreground">
+            Ábrela desde tu pantalla de inicio, como cualquier app
+          </small>
         </span>
+        <Download className="size-4 flex-none text-muted-foreground" aria-hidden />
       </button>
       {dialog}
     </>

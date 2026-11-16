@@ -1,27 +1,19 @@
 import { dateOf, dShort, clockTime } from '@/shared/domain/dates'
 import { paths } from '@/app/routes'
-import { sortUnlocks, type Unlock } from '@/features/editing/domain/editing'
+import { sortUnlocks } from '@/features/editing/domain/editing'
 import {
   MY_REQUESTS_EMPTY,
   MY_REQUESTS_HINT,
   MY_REQUESTS_LIST_TITLE,
   MY_REQUESTS_SUBTITLE,
   MY_REQUESTS_TITLE,
-  UNLOCK_STATUS_LABEL,
   decidedByLabel,
 } from '@/features/editing/types/editing'
 import { EditingDays } from '@/features/editing/ui/components/editing-days'
 import { useUnlocks } from '@/features/editing/ui/hooks'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { cn } from '@/shared/ui/lib/utils'
-
-const STATUS_CLS: Record<Unlock['status'], string> = {
-  requested: 'bg-warn-soft text-warn',
-  approved: 'bg-ok-soft text-ok',
-  rejected: 'bg-bad-soft text-destructive',
-  closed: 'bg-muted text-ink-2',
-}
+import { UnlockStatus } from '@/features/editing/ui/components/unlock-status'
 
 /** Vendedor: pedir que le abran un día cerrado y ver qué pasó con lo que ya pidió. */
 export function MyRequestsPage() {
@@ -35,24 +27,22 @@ export function MyRequestsPage() {
           <Section>
             <div className="px-4 pt-4 pb-4 dsk:px-5 dsk:pb-5">
               <EditingDays />
-              <p className="mt-3 text-[13px] text-muted-foreground">{MY_REQUESTS_HINT}</p>
+              <p className="mt-3 text-sm text-muted-foreground">{MY_REQUESTS_HINT}</p>
             </div>
           </Section>
-          <Section title={MY_REQUESTS_LIST_TITLE} aside={<span className="text-muted-foreground">{list.length}</span>}>
+          <Section title={MY_REQUESTS_LIST_TITLE} aside={<span className="num">{list.length}</span>}>
             {unlocks.isPending ? null : list.length === 0 ? (
               <EmptyState title={MY_REQUESTS_EMPTY} />
             ) : (
-              <ul className="grid gap-2 px-4 pb-4 dsk:px-5 dsk:pb-5">
+              <ul>
                 {list.map((u) => (
-                  <li key={u.id} className="rounded-[14px] border-[1.5px] border-border px-3.5 py-2.5">
+                  <li key={u.id} className="border-b border-rule px-4 py-3 last:border-0 dsk:px-5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <b className="min-w-0 flex-1">{dShort(u.date)}</b>
-                      <span className={cn('rounded-full px-2.5 py-1 text-[12.5px] font-bold', STATUS_CLS[u.status])}>
-                        {UNLOCK_STATUS_LABEL[u.status]}
-                      </span>
+                      <b className="min-w-0 flex-1 font-medium">{dShort(u.date)}</b>
+                      <UnlockStatus status={u.status} />
                     </div>
-                    <p className="mt-1 text-[14px] break-words text-ink-2">{u.reason}</p>
-                    <small className="mt-1 block text-[12.5px] text-muted-foreground">
+                    <p className="mt-1 text-base break-words text-ink-2">{u.reason}</p>
+                    <small className="mt-1 block text-xs text-muted-foreground">
                       Pedida el {dShort(dateOf(u.requested_at))}, {clockTime(u.requested_at)}
                       {u.decided_by && u.decided_at && ` · ${decidedByLabel(u.status, u.decided_by)}`}
                     </small>

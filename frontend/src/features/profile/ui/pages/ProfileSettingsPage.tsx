@@ -49,11 +49,14 @@ export function ProfileSettingsPage() {
   return (
     <div>
       <PageHeader title="Configuración de perfil" subtitle="Tu nombre y los datos de tu cuenta." back={paths.profile} />
-      <PageBody className="dsk:max-w-[560px]">
+      <PageBody className="dsk:max-w-xl">
         <Section>
-          <form onSubmit={submit} noValidate aria-label="Configuración de perfil" className="grid gap-4 p-5">
+          <form onSubmit={submit} noValidate aria-label="Configuración de perfil" className="grid gap-4 p-4 dsk:p-5">
             <div className="flex items-center gap-4">
-              <div className="grid size-14 flex-none place-items-center rounded-full bg-secondary text-lg font-extrabold text-primary">
+              <div
+                aria-hidden
+                className="grid size-12 flex-none place-items-center rounded-full bg-selected text-md font-semibold text-selected-foreground"
+              >
                 {initials(seller.name)}
               </div>
               <p className="text-sm text-muted-foreground">
@@ -69,35 +72,29 @@ export function ProfileSettingsPage() {
                 autoComplete="name"
                 maxLength={100}
                 aria-invalid={!!error}
-                className="h-11"
               />
               {error && (
-                <p role="alert" className="text-[13px] font-semibold text-destructive">
+                <p role="alert" className="text-sm font-medium text-bad">
                   {error}
                 </p>
               )}
             </div>
-            <dl className="grid gap-2.5 rounded-[14px] bg-muted/60 p-4 text-sm">
+            <dl className="grid border-t border-rule pt-1 text-base">
               {readOnly.map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between gap-3">
+                <div key={label} className="flex items-center justify-between gap-3 border-b border-rule py-2.5">
                   <dt className="text-muted-foreground">{label}</dt>
-                  <dd className="text-right font-semibold">{value}</dd>
+                  <dd className="text-right font-medium">{value}</dd>
                 </div>
               ))}
-              <p className="text-[12.5px] text-muted-foreground">
+              <p className="pt-2.5 text-sm text-muted-foreground">
                 El usuario no se puede cambiar. {isSupervisor(seller) ? '' : 'La zona la asigna tu supervisor.'}
               </p>
             </dl>
             <div className="flex flex-wrap justify-end gap-2.5">
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-11 font-bold"
-                onClick={() => void navigate(paths.profile)}
-              >
+              <Button type="button" variant="ghost" onClick={() => void navigate(paths.profile)}>
                 {CANCEL_LABEL}
               </Button>
-              <Button type="submit" disabled={busy} className="h-11 font-bold">
+              <Button type="submit" disabled={busy}>
                 {busy ? <Loader2 className="animate-spin" /> : <Save />} Guardar cambios
               </Button>
             </div>

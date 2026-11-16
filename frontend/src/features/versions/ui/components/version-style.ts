@@ -1,7 +1,7 @@
 import type { AppVersion, VersionCatalog } from '@/features/versions/domain/versions'
 
-/** Un color por versión, en el orden del catálogo. */
-export const TONES = ['bg-sky-700', 'bg-violet-700', 'bg-emerald-700', 'bg-amber-700', 'bg-rose-700']
+/** Un punto de color por versión, en el orden del catálogo (solo distingue; el nombre va al lado). */
+export const TONES = ['bg-chart-1', 'bg-chart-2', 'bg-ok', 'bg-warn', 'bg-draft']
 export const toneOf = (catalog: VersionCatalog | undefined, v: AppVersion | null) =>
   TONES[Math.max(0, catalog?.versions.findIndex((x) => x.id === v?.id) ?? 0) % TONES.length]
 

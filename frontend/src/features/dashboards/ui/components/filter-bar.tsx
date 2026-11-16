@@ -59,11 +59,13 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
   const toggle = (username: string) => setSellers(toggleIn(sellers, username))
 
   return (
-    <div className="sticky top-0 z-20 border-b border-border/60 bg-background/95 px-4 py-2.5 backdrop-blur-md dsk:-mx-[30px] dsk:mb-4 dsk:px-[30px] dsk:py-3">
-      <div className="flex [scrollbar-width:none] items-center gap-2 overflow-x-auto dsk:flex-wrap dsk:overflow-visible">
-        <span className="grid size-9 flex-none place-items-center rounded-full bg-primary text-white" aria-hidden>
-          <SlidersHorizontal className="size-4" />
-        </span>
+    <div
+      role="group"
+      aria-label="Filtros"
+      className="sticky top-0 z-20 border-b border-border bg-background px-4 py-2 dsk:-mx-9 dsk:mb-4 dsk:px-9 dsk:py-2.5 hc:border-b-2 hc:border-foreground"
+    >
+      <div className="no-scrollbar flex items-center gap-2 overflow-x-auto dsk:flex-wrap dsk:overflow-visible">
+        <SlidersHorizontal className="size-4 flex-none text-muted-foreground" aria-hidden />
         <FilterMenu
           icon={period.custom ? <CalendarRange /> : <Calendar />}
           label={rangeLabel(period.from, period.to)}
@@ -81,7 +83,7 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
           <DropdownMenuItem
             // Se abre después de que el menú termine de cerrarse (si no, el foco queda atrapado).
             onSelect={() => setTimeout(() => setCustomOpen(true), 0)}
-            className={cn('font-semibold', period.custom && 'text-primary')}
+            className={cn(period.custom && 'font-semibold text-primary')}
           >
             <CalendarRange /> {CUSTOM_PERIOD_LABEL}
           </DropdownMenuItem>
@@ -110,8 +112,8 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
             ))}
           </FilterMenu>
         ) : (
-          <span className="flex h-9 flex-none items-center gap-1.5 rounded-full bg-card px-3 text-[13.5px] font-semibold shadow-card">
-            <Users className="size-4 text-ink-2" />
+          <span className="flex h-touch flex-none items-center gap-1.5 px-1 text-sm text-ink-2 dsk:h-control">
+            <Users className="size-4 text-muted-foreground" aria-hidden />
             {ONLY_MINE_LABEL}
           </span>
         )}
@@ -122,7 +124,7 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
           <button
             type="button"
             onClick={clearAll}
-            className="h-9 flex-none px-2 text-[13.5px] font-bold text-ink-2 hover:text-primary"
+            className="h-touch flex-none px-2 text-sm font-medium text-primary underline-offset-4 hover:underline dsk:h-control"
           >
             {CLEAR_FILTERS_LABEL}
           </button>
@@ -171,9 +173,7 @@ function ExportPeriod() {
     }
   }
 
-  return (
-    <ExportMenu onExport={run} disabled={!catalog || !data || !team.length} className="h-9 flex-none rounded-full" />
-  )
+  return <ExportMenu onExport={run} disabled={!catalog || !data || !team.length} className="flex-none" />
 }
 
 /** Un filtro de la barra: botón con el valor actual que abre su menú. `active` = distinto del valor por defecto. */
@@ -195,16 +195,19 @@ export function FilterMenu({
       <DropdownMenuTrigger
         aria-label={`${title}: ${label}`}
         className={cn(
-          'flex h-9 flex-none items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold shadow-card outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4',
-          active ? 'bg-secondary text-primary' : 'bg-card',
+          'flex h-touch flex-none items-center gap-1.5 rounded-md border-control border-border-strong bg-surface px-3 text-sm whitespace-nowrap text-foreground transition-colors hover:bg-muted dsk:h-control [&_svg]:size-4',
+          active &&
+            'border-primary bg-selected font-medium text-selected-foreground hover:bg-selected hc:border-foreground',
         )}
       >
-        {icon && <span className={cn('grid', active ? 'text-primary' : 'text-ink-2')}>{icon}</span>}
+        {icon && (
+          <span className={cn('grid', active ? 'text-selected-foreground' : 'text-muted-foreground')}>{icon}</span>
+        )}
         {label}
-        <ChevronDown className="text-ink-2" />
+        <ChevronDown className="text-muted-foreground" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-[min(70dvh,420px)] min-w-[14rem] overflow-y-auto">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">{title}</DropdownMenuLabel>
+      <DropdownMenuContent align="start" className="max-h-[min(70dvh,26rem)] min-w-56 overflow-y-auto">
+        <DropdownMenuLabel>{title}</DropdownMenuLabel>
         {children}
       </DropdownMenuContent>
     </DropdownMenu>

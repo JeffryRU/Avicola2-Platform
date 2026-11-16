@@ -1,14 +1,13 @@
 import { SyncStatus } from '@/shared/ui/components/sync-status'
-import { Calendar, Layers, Package, ShoppingBag } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { dDM, dDow, dShort } from '@/shared/domain/dates'
+import { dDM, dDow, dShort, rangeLabel } from '@/shared/domain/dates'
 import { nf0 } from '@/shared/domain/format'
 import { periodAgg } from '@/features/projections'
 import { previousDates } from '@/features/dashboards/domain/period'
 import { DashboardTabs, Delta } from '@/features/dashboards/ui/components/dashboard'
 import { useCatalog } from '@/features/catalog'
-import { BarChart, CountUp, Donut } from '@/shared/ui/components/charts'
-import { Kpi, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
+import { BarChart, CountUp } from '@/shared/ui/components/charts'
+import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { STATUS_LABEL, kgAmount, UNITS_SHORT } from '@/shared/types/labels'
 import { useDayPath, useDetailSelection, usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
 import { DetailFilterMenus, ProductDetail } from '@/features/dashboards/ui/components/product-detail'
@@ -37,61 +36,48 @@ export function DashboardSummaryPage() {
 
   return (
     <div>
-      <PageHeader title="Planificación de Demanda" subtitle={subtitle} sticky={false} />
-      <SyncStatus queries={[data]} className="mx-4 mt-3 dsk:mx-8" />
+      <PageHeader title={subtitle} subtitle={rangeLabel(period.from, period.to, true)} sticky={false} />
       <DashboardFilterBar
         extra={<DetailFilterMenus dates={period.dates} custom={period.custom} catalog={catalog} />}
         chips={detail.chips}
       />
       <DashboardTabs />
       <PageBody>
-        <div className="mb-3 grid grid-cols-2 gap-2.5 dsk:mb-4 dsk:gap-4 @4xl/main:grid-cols-4">
+        <SyncStatus queries={[data]} />
+        <KpiStrip className="mb-4">
           <Kpi
-            icon={<Package />}
-            tone="bg-secondary text-primary"
             label="Total proyectado"
             value={
               <>
-                <CountUp value={units} /> {UNITS_SHORT}
+                <CountUp value={units} />{' '}
+                <span className="font-sans text-md font-normal text-muted-foreground">{UNITS_SHORT}</span>
               </>
             }
             foot={<Delta current={units} previous={same.reduce((s, d) => s + d.u, 0)} />}
-            index={0}
           />
           <Kpi
-            icon={<ShoppingBag />}
-            tone="bg-ok-soft text-ok"
             label="Total en kilos (aprox.)"
             value={
               <>
-                <CountUp value={kg} decimals={1} /> kg
+                <CountUp value={kg} decimals={1} />{' '}
+                <span className="font-sans text-md font-normal text-muted-foreground">kg</span>
               </>
             }
             foot={<Delta current={kg} previous={same.reduce((s, d) => s + d.kg, 0)} />}
-            index={1}
           />
           <Kpi
-            icon={<Calendar />}
             label="Días confirmados"
-            value={`${String(confirmed)} de ${String(days.length)}`}
-            extra={<Donut pct={(confirmed / days.length) * 100} />}
-            index={2}
+            value={
+              <>
+                {confirmed}{' '}
+                <span className="font-sans text-md font-normal text-muted-foreground">de {days.length}</span>
+              </>
+            }
           />
-          <Kpi
-            icon={<Layers />}
-            tone="bg-[#EDE9FE] text-[#6D28D9]"
-            label={`Productos ${cat}`}
-            value={products.length}
-            foot="en la proyección"
-            index={3}
-          />
-        </div>
-        <Section
-          title="Proyección por día (unidades)"
-          aside={<span className="hidden text-muted-foreground dsk:inline">Toca una barra para ver el día</span>}
-          className="mb-4"
-        >
-          <div className="px-4 pt-1.5 pb-4 dsk:px-5 dsk:pb-5">
+          <Kpi label={`Productos ${cat}`} value={products.length} foot="en la proyección" />
+        </KpiStrip>
+        <Section title="Proyección por día (unidades)" aside="Elige una barra para ver el día" className="mb-4">
+          <div className="px-4 pt-3 pb-4 dsk:px-5">
             <BarChart
               label="Unidades proyectadas por día"
               onSelect={(d) => void navigate(dayPath(d))}

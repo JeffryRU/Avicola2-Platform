@@ -1,17 +1,11 @@
 import type { ReactNode } from 'react'
 import { nf0, nf1 } from '@/shared/domain/format'
-import { useCountUp } from '@/shared/ui/hooks/use-count-up'
+import { niceMax } from '@/shared/domain/chart-scale'
 import { useTooltip } from '@/shared/ui/hooks/use-tooltip'
 import { useElementWidth } from '@/shared/ui/hooks/use-element-width'
 
 /** Por debajo de este ancho (px) el gráfico usa su versión compacta. */
 const COMPACT = 560
-
-function niceMax(m: number) {
-  if (m <= 0) return 10
-  const p = Math.pow(10, Math.floor(Math.log10(m)))
-  return ([1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((s) => m / p <= s) ?? 10) * p
-}
 
 export interface Bar {
   key: string
@@ -21,7 +15,7 @@ export interface Bar {
   tip: ReactNode
 }
 
-/** Barras animadas (unidades por día). */
+/** Barras (unidades por día). */
 export function BarChart({
   bars,
   onSelect,
@@ -45,7 +39,7 @@ export function BarChart({
   const R = 8
   const T = 26
   const B = mob ? 40 : 46
-  const max = niceMax(Math.max(...bars.map((b) => b.value), 0) * 1.08)
+  const max = niceMax(Math.max(...bars.map((b) => b.value), 0) * 1.08, 4)
   const iw = W - L - R
   const ih = H - T - B
   const step = iw / bars.length
@@ -65,15 +59,13 @@ export function BarChart({
             </text>
           </g>
         ))}
-        <line x1={L} x2={W - R} y1={T + ih} y2={T + ih} stroke="var(--border)" />
+        <line x1={L} x2={W - R} y1={T + ih} y2={T + ih} stroke="var(--rule-strong)" />
         {bars.map((b, i) => {
           const cx = L + step * i + step / 2
           const h = Math.max((b.value / max) * ih, 3)
           const x = cx - bw / 2
           const top = T + ih - h
-          const r = Math.min(6, h)
-          const d = `M${x} ${T + ih} V${top + r} Q${x} ${top} ${x + r} ${top} H${x + bw - r} Q${x + bw} ${top} ${x + bw} ${top + r} V${T + ih} Z`
-          const delay = { '--d': `${i * Math.min(0.06, 0.9 / bars.length)}s` } as React.CSSProperties
+          const d = `M${x} ${T + ih} V${top} H${x + bw} V${T + ih} Z`
           return (
             <g
               key={b.key}
@@ -83,9 +75,9 @@ export function BarChart({
               {...bind(b.tip)}
             >
               <rect fill="transparent" x={L + step * i} y={T} width={step} height={ih} />
-              <path className={b.value ? 'bar' : 'bar zero'} style={delay} d={d} />
+              <path className={b.value ? 'bar' : 'bar zero'} d={d} />
               {showValues && (
-                <text className="val" style={delay} x={cx} y={top - 8} textAnchor="middle">
+                <text className="val" x={cx} y={top - 8} textAnchor="middle">
                   {nf0(b.value)}
                 </text>
               )}
@@ -117,7 +109,7 @@ export interface LinePoint {
   tip: ReactNode
 }
 
-/** Dos series (proyección vs venta real) con área y puntos animados. */
+/** Dos series (proyección vs venta real): línea continua y línea discontinua, para no depender del color. */
 export function LineChart({ points, label }: { points: LinePoint[]; label: string }) {
   const [ref, measured] = useElementWidth<HTMLDivElement>()
   const { bind, node } = useTooltip()
@@ -128,7 +120,7 @@ export function LineChart({ points, label }: { points: LinePoint[]; label: strin
   const R = 14
   const T = 16
   const B = 44
-  const max = niceMax(Math.max(...points.flatMap((p) => [p.a, p.b ?? 0]), 1) * 1.05)
+  const max = niceMax(Math.max(...points.flatMap((p) => [p.a, p.b ?? 0]), 1) * 1.05, 5)
   const iw = W - L - R
   const ih = H - T - B
   const step = iw / Math.max(points.length - 1, 1)
@@ -163,27 +155,13 @@ export function LineChart({ points, label }: { points: LinePoint[]; label: strin
             </text>
           </g>
         ))}
-        <path className="ln s1" pathLength={1} d={path(p1)} />
-        {p2.length > 1 && <path className="ln s2" pathLength={1} d={path(p2)} />}
+        <path className="ln s1" d={path(p1)} />
+        {p2.length > 1 && <path className="ln s2" d={path(p2)} />}
         {p1.map((p, i) => (
-          <circle
-            key={`a${i}`}
-            className="pt s1"
-            style={{ '--d': `${0.25 + i * 0.12}s` } as React.CSSProperties}
-            cx={p[0]}
-            cy={p[1]}
-            r={5}
-          />
+          <circle key={`a${i}`} className="pt s1" cx={p[0]} cy={p[1]} r={4} />
         ))}
         {p2.map((p, i) => (
-          <circle
-            key={`b${i}`}
-            className="pt s2"
-            style={{ '--d': `${0.25 + i * 0.12}s` } as React.CSSProperties}
-            cx={p[0]}
-            cy={p[1]}
-            r={5}
-          />
+          <rect key={`b${i}`} className="pt s2" x={p[0] - 3.5} y={p[1] - 3.5} width={7} height={7} />
         ))}
       </svg>
       {node}
@@ -191,38 +169,11 @@ export function LineChart({ points, label }: { points: LinePoint[]; label: strin
   )
 }
 
-export function Donut({ pct }: { pct: number }) {
-  return (
-    <div className="relative size-[60px] flex-none dsk:size-[68px]">
-      <svg viewBox="0 0 84 84" className="size-full -rotate-90">
-        <circle cx="42" cy="42" r="34" fill="none" stroke="var(--border)" strokeWidth="9" />
-        <circle
-          className="donut-value"
-          cx="42"
-          cy="42"
-          r="34"
-          fill="none"
-          stroke="var(--primary)"
-          strokeWidth="9"
-          strokeLinecap="round"
-          pathLength={100}
-          strokeDasharray={`${pct} 100`}
-        />
-      </svg>
-      <b className="absolute inset-0 grid place-items-center text-[13px] font-extrabold dsk:text-base">
-        {Math.round(pct)}%
-      </b>
-    </div>
-  )
-}
-
-/** Número que cuenta hacia arriba al aparecer. */
+/** Cifra formateada (sin animación: el dato se lee al instante). */
 export function CountUp({ value, decimals = 0, suffix = '' }: { value: number; decimals?: number; suffix?: string }) {
-  const v = useCountUp(value)
-  const text = decimals ? nf1(v) : nf0(v)
   return (
     <span>
-      {text}
+      {decimals ? nf1(value) : nf0(value)}
       {suffix}
     </span>
   )

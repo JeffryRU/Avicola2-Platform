@@ -48,7 +48,6 @@ import { EmptyState } from '@/shared/ui/components/feedback'
 import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
-import { cn } from '@/shared/ui/lib/utils'
 import { Filters } from '@/features/stock/ui/components/stock-filters'
 import { Grid } from '@/features/stock/ui/components/stock-grid'
 import { Summary } from '@/features/stock/ui/components/stock-summary'
@@ -57,7 +56,7 @@ import { readOnlyDayLabel } from '@/shared/types/daily-record'
 
 const FORM_ID = 'stock-form'
 /** Dos columnas desde ~900 px de contenido: el detalle a la izquierda y el resumen fijo a la derecha. */
-const splitCls = 'grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_320px]'
+const splitCls = 'grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_20rem]'
 const asideCls = 'grid gap-4 @4xl/main:sticky @4xl/main:top-6'
 
 /** Stock de despacho: el jefe de despacho lo registra por artículo y lote; el supervisor lo consulta. */
@@ -155,7 +154,7 @@ function Board({
     )
   }
   const save = (className: string) => (
-    <Button type="submit" form={FORM_ID} disabled={register.isPending} className={cn('h-12 font-bold', className)}>
+    <Button type="submit" form={FORM_ID} disabled={register.isPending} className={className}>
       {register.isPending ? <Loader2 className="animate-spin" /> : <Save />} {lines.length ? UPDATE_LABEL : SAVE_LABEL}
     </Button>
   )
@@ -178,7 +177,7 @@ function Board({
                 unit={view.unit}
                 onChange={writing ? (key, raw) => setDraft((d) => ({ ...d, [key]: raw })) : undefined}
               />
-              <p className="px-4 pb-4 text-[13px] text-muted-foreground dsk:px-5">
+              <p className="px-4 pb-4 text-sm text-muted-foreground dsk:px-5">
                 {writing ? UNITS_ONLY_HINT : editable ? PICK_LOCATION : null}
                 <span className="block">{lotCountsNote(options.lot_days)}</span>
               </p>
@@ -192,19 +191,23 @@ function Board({
             dirty={dirty}
             note={readOnlyNote}
             byPlace={location === ALL ? byLocation(record) : undefined}
-            action={writing && <div className="mt-4 hidden @4xl/main:grid">{save('w-full')}</div>}
+            action={
+              writing && (
+                <div className="hidden border-t border-rule px-4 py-3 dsk:px-5 @4xl/main:grid">{save('w-full')}</div>
+              )
+            }
           />
           {history}
         </aside>
       </div>
       {writing && (
-        <div className="sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-10 mt-4 flex items-center gap-3 rounded-[16px] border bg-white/95 p-3 shadow-card backdrop-blur-md dsk:bottom-4 @4xl/main:hidden">
-          <span className="min-w-0 flex-1 pl-1 tabular-nums">
-            <b className="block text-[17px] leading-tight">
+        <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 -mx-4 mt-4 flex items-center gap-3 border-t border-border bg-surface px-4 py-3 dsk:bottom-0 dsk:mx-0 @4xl/main:hidden hc:border-t-heavy hc:border-foreground">
+          <span className="min-w-0 flex-1">
+            <b className="num block text-lg leading-tight font-medium hc:font-bold">
               {nf0(totals.units)}{' '}
-              <span className="text-[13px] font-semibold text-muted-foreground">{unitsLabel(totals.units)}</span>
+              <span className="font-sans text-sm font-normal text-muted-foreground">{unitsLabel(totals.units)}</span>
             </b>
-            <small className="block text-[12.5px] text-muted-foreground">{kgAmount(totals.kg)}</small>
+            <small className="num block text-xs text-muted-foreground">{kgAmount(totals.kg)}</small>
           </span>
           {save('flex-none px-5')}
         </div>
@@ -214,9 +217,5 @@ function Board({
 }
 
 function Scope({ location }: { location: string }) {
-  return (
-    <span className="rounded-full bg-muted px-2.5 py-1 text-[12.5px] font-bold text-ink-2">
-      {location === ALL ? ALL_LOCATIONS : location}
-    </span>
-  )
+  return <span className="text-sm text-muted-foreground">{location === ALL ? ALL_LOCATIONS : location}</span>
 }

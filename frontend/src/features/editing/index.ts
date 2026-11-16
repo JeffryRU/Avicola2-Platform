@@ -7,6 +7,7 @@ export {
   GRANT_LABEL,
   grantedLabel,
   MY_REQUESTS_NAV,
+  MY_REQUESTS_SUBTITLE,
   MY_REQUESTS_TITLE,
   REVOKE_LABEL,
   revokeDone,

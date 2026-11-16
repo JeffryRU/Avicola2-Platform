@@ -1,18 +1,87 @@
-import { Bird, ChevronRight, History, KeyRound, LockOpen, LogOut, PackageCheck, UserCog } from 'lucide-react'
+import { useId, type ReactNode } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router'
 import { InstallOption } from '@/app/install'
 import { paths } from '@/app/routes'
+import { contrastFromSwitch, type ThemePreference } from '@/shared/domain/appearance'
 import { initials } from '@/shared/domain/format'
 import { can, hasTeamView, roleLabel } from '@/shared/domain/session'
 import { useLogout, useRequiredSession } from '@/features/auth'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { cn } from '@/shared/ui/lib/utils'
+import { Segmented } from '@/shared/ui/components/segmented'
+import { Switch } from '@/shared/ui/components/shadcn/switch'
+import { useAppearance } from '@/shared/ui/hooks/use-appearance'
 import { VersionChip } from '@/features/versions'
 import { LOGOUT_LABEL } from '@/shared/types/labels'
 
 const optCls =
-  'flex w-full flex-wrap items-center gap-3.5 border-b border-muted px-5 py-4 text-left last:border-0 dsk:flex-nowrap'
-const tileCls = 'grid size-10 flex-none place-items-center rounded-xl [&>svg]:size-5'
+  'flex min-h-touch w-full items-center gap-3 border-b border-rule px-4 py-3 text-left transition-colors last:border-0 hover:bg-muted dsk:px-5'
+
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: 'system', label: 'Sistema' },
+  { value: 'light', label: 'Claro' },
+  { value: 'dark', label: 'Oscuro' },
+]
+
+/** Una opción del perfil: título, descripción y chevron. */
+function Option({ to, title, sub }: { to: string; title: string; sub: string }) {
+  return (
+    <Link to={to} className={optCls}>
+      <OptionText title={title} sub={sub} />
+      <ChevronRight className="size-4 flex-none text-muted-foreground" aria-hidden />
+    </Link>
+  )
+}
+
+function OptionText({ title, sub }: { title: ReactNode; sub: ReactNode }) {
+  return (
+    <span className="min-w-0 flex-1">
+      <b className="block font-medium">{title}</b>
+      <small className="block text-sm text-muted-foreground">{sub}</small>
+    </span>
+  )
+}
+
+/** Tema (sistema, claro u oscuro) y alto contraste. Se guardan en este equipo. */
+function AppearanceSection() {
+  const { preference, resolved, system, setPreference } = useAppearance()
+  const contrastId = useId()
+  const high = resolved.contrast === 'high'
+  return (
+    <Section title="Apariencia" className="mb-4">
+      <div className="grid gap-2 border-b border-rule px-4 py-3.5 dsk:px-5">
+        <span className="font-medium">Tema</span>
+        <Segmented
+          value={preference.theme}
+          options={THEME_OPTIONS}
+          onChange={(theme) => setPreference({ ...preference, theme })}
+          className="w-full dsk:w-96"
+          full
+        />
+        <small className="text-sm text-muted-foreground">
+          «Sistema» sigue el modo claro u oscuro de tu equipo
+          {preference.theme === 'system' ? ` (ahora: ${system.prefersDark ? 'oscuro' : 'claro'})` : ''}.
+        </small>
+      </div>
+      <div className="flex items-start gap-4 px-4 py-3.5 dsk:px-5">
+        <label htmlFor={contrastId} className="min-w-0 flex-1 cursor-pointer">
+          <b className="block font-medium">Alto contraste</b>
+          <small className="block text-sm text-muted-foreground">
+            Letra más grande, más contraste y bordes marcados. Útil a pleno sol.
+            {system.prefersMoreContrast &&
+              ' Tu equipo pide más contraste, por eso viene activado; puedes apagarlo aquí.'}
+          </small>
+        </label>
+        <Switch
+          id={contrastId}
+          checked={high}
+          onCheckedChange={(on) => setPreference({ ...preference, contrast: contrastFromSwitch(on, system) })}
+          className="mt-1"
+        />
+      </div>
+    </Section>
+  )
+}
 
 export function ProfilePage() {
   const logout = useLogout()
@@ -23,98 +92,45 @@ export function ProfilePage() {
   return (
     <div>
       <PageHeader title="Perfil" />
-      <PageBody className="dsk:max-w-[720px]">
-        <VersionChip className="mb-3.5" />
-        <Section className="mb-3.5 flex items-center gap-4 p-5">
-          <div className="grid size-16 flex-none place-items-center rounded-full bg-secondary text-[22px] font-extrabold text-primary">
+      <PageBody className="dsk:max-w-2xl">
+        <Section className="mb-4 flex items-center gap-4 p-4 dsk:p-5">
+          <div
+            aria-hidden
+            className="grid size-12 flex-none place-items-center rounded-full bg-selected text-md font-semibold text-selected-foreground"
+          >
             {initials(seller.name)}
           </div>
-          <div>
-            <b className="block text-xl">{seller.name}</b>
+          <div className="min-w-0">
+            <b className="block text-lg font-semibold hc:font-extrabold">{seller.name}</b>
             <span className="text-muted-foreground">{roleLabel(seller)}</span>
           </div>
         </Section>
-        <Section>
-          <Link to={paths.profileSettings} className={optCls}>
-            <span className={cn(tileCls, 'bg-secondary text-primary')}>
-              <UserCog />
-            </span>
-            <span className="min-w-0 flex-1">
-              <b className="block">Configuración de perfil</b>
-              <small className="text-muted-foreground">Tu nombre y los datos de tu cuenta</small>
-            </span>
-            <ChevronRight className="size-[18px]" />
-          </Link>
+        <AppearanceSection />
+        <Section title="Cuenta y herramientas" className="mb-4">
+          <Option to={paths.profileSettings} title="Configuración de perfil" sub="Tu nombre y los datos de tu cuenta" />
           {can(session, 'manage_editing') && (
-            <Link to={paths.unlocks} className={optCls}>
-              <span className={cn(tileCls, 'bg-ok-soft text-ok')}>
-                <LockOpen />
-              </span>
-              <span className="min-w-0 flex-1">
-                <b className="block">Habilitaciones</b>
-                <small className="text-muted-foreground">Horario de corte y solicitudes de edición</small>
-              </span>
-              <ChevronRight className="size-[18px]" />
-            </Link>
+            <Option to={paths.unlocks} title="Habilitaciones" sub="Horario de corte y solicitudes de edición" />
           )}
           {can(session, 'view_saca') && (
-            <Link to={paths.saca} className={optCls}>
-              <span className={cn(tileCls, 'bg-secondary text-primary')}>
-                <Bird />
-              </span>
-              <span className="min-w-0 flex-1">
-                <b className="block">Cálculo de saca</b>
-                <small className="text-muted-foreground">Cuánto pedir a granja cada día</small>
-              </span>
-              <ChevronRight className="size-[18px]" />
-            </Link>
+            <Option to={paths.saca} title="Cálculo de saca" sub="Cuánto pedir a granja cada día" />
           )}
           {hasTeamView(session) && can(session, 'view_stock') && (
-            <Link to={paths.stock} className={optCls}>
-              <span className={cn(tileCls, 'bg-ok-soft text-ok')}>
-                <PackageCheck />
-              </span>
-              <span className="min-w-0 flex-1">
-                <b className="block">Stock de despacho</b>
-                <small className="text-muted-foreground">Lo que quedó en despacho cada día</small>
-              </span>
-              <ChevronRight className="size-[18px]" />
-            </Link>
+            <Option to={paths.stock} title="Stock de despacho" sub="Lo que quedó en despacho cada día" />
           )}
           {projects && (
-            <Link to={paths.history} className={optCls}>
-              <span className={cn(tileCls, 'bg-secondary text-primary')}>
-                <History />
-              </span>
-              <span className="min-w-0 flex-1">
-                <b className="block">Historial de cambios</b>
-                <small className="text-muted-foreground">Quién creó o modificó cada proyección</small>
-              </span>
-              <ChevronRight className="size-[18px]" />
-            </Link>
+            <Option to={paths.history} title="Historial de cambios" sub="Quién creó o modificó cada proyección" />
           )}
+          <Option to={paths.connection} title="Conexión" sub="Dónde se guardan las proyecciones" />
           <InstallOption className={optCls} />
-          <Link to={paths.password} className={optCls}>
-            <span className={cn(tileCls, 'bg-warn-soft text-warn')}>
-              <KeyRound />
-            </span>
-            <span className="min-w-0 flex-1">
-              <b className="block">Cambiar contraseña</b>
-              <small className="text-muted-foreground">Cierra tus sesiones en otros equipos</small>
-            </span>
-            <ChevronRight className="size-[18px]" />
-          </Link>
+          <Option to={paths.password} title="Cambiar contraseña" sub="Cierra tus sesiones en otros equipos" />
           <button type="button" className={optCls} onClick={() => logout.mutate()}>
-            <span className={cn(tileCls, 'bg-bad-soft text-destructive')}>
-              <LogOut />
-            </span>
-            <span className="min-w-0 flex-1">
-              <b className="block">{LOGOUT_LABEL}</b>
-              <small className="text-muted-foreground">Volver a la pantalla de inicio de sesión</small>
-            </span>
-            <ChevronRight className="size-[18px]" />
+            <OptionText
+              title={<span className="text-bad">{LOGOUT_LABEL}</span>}
+              sub="Volver a la pantalla de inicio de sesión"
+            />
           </button>
         </Section>
+        <VersionChip className="min-h-touch border border-border bg-surface px-4 dsk:px-5" />
       </PageBody>
     </div>
   )

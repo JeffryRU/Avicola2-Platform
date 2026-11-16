@@ -26,8 +26,8 @@ import { Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
 
 const selectCls =
-  'h-11 w-full min-w-0 rounded-[10px] border-[1.5px] border-border bg-white px-3 text-[14.5px] font-semibold outline-none focus:border-primary focus:ring-4 focus:ring-primary-ring'
-const labelCls = 'mb-1 block text-[12px] font-bold tracking-[0.04em] text-muted-foreground uppercase'
+  'h-touch w-full min-w-0 rounded-md border-control border-input bg-surface px-3 text-md text-foreground outline-none focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring dsk:h-control dsk:text-base'
+const labelCls = 'mb-1 block text-xs font-medium text-ink-2 hc:text-sm hc:font-semibold'
 
 /** Qué se ve: ubicación, tipo, calidad, unidad y los lotes que van como columnas. */
 export function Filters({
@@ -99,8 +99,10 @@ export function Filters({
                 title={lotAgeLabel(offset)}
                 onClick={() => setView({ lots: toggleLot(view.lots, offset) })}
                 className={cn(
-                  'h-9 rounded-full border-[1.5px] px-3 text-[13px] font-bold tabular-nums transition-colors',
-                  on ? 'border-primary bg-primary text-white' : 'border-border bg-white text-ink-2',
+                  'h-touch rounded-md border-control px-3 text-sm transition-colors dsk:h-8',
+                  on
+                    ? 'border-primary bg-selected font-medium text-selected-foreground hc:border-foreground hc:bg-nav-active hc:text-nav-active-foreground'
+                    : 'border-border-strong bg-surface text-ink-2 hover:bg-muted',
                 )}
               >
                 {dDow(lot)} {dDM(lot)}
@@ -108,7 +110,7 @@ export function Filters({
             )
           })}
         </div>
-        <p className="mt-2 text-[12.5px] text-muted-foreground">{LOTS_HINT}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{LOTS_HINT}</p>
       </div>
     </Section>
   )

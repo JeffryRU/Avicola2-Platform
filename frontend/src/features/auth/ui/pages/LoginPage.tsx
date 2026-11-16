@@ -1,5 +1,5 @@
 import { useState, type SyntheticEvent } from 'react'
-import { Eye, EyeOff, Loader2, Lock, User } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { credentialsSchema } from '@/features/auth/domain/credentials'
@@ -50,36 +50,29 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
     }
   }
 
-  const fieldCls = (bad?: string) =>
-    cn(
-      'h-[50px] rounded-xl border-[1.5px] bg-white px-11 text-[15px] focus-visible:ring-4 focus-visible:ring-primary-ring',
-      bad && 'border-destructive',
-    )
+  const errorCls = 'mt-1 text-sm font-medium text-bad'
 
   return (
-    <div className="grid min-h-dvh bg-background dsk:grid-cols-[1.1fr_1fr]">
+    <div className="grid min-h-dvh bg-background dsk:grid-cols-[1fr_1fr]">
       <LoginShowcase />
-      <div className="flex items-start justify-center px-5 pt-24 pb-8 dsk:items-center dsk:pt-8">
+      <div className="flex items-start justify-center px-5 pt-14 pb-8 dsk:items-center dsk:pt-8">
         <form
           key={shakeKey}
           onSubmit={submit}
           noValidate
           aria-label="Inicio de sesión"
-          className={cn(
-            'w-full max-w-[400px] animate-rise rounded-3xl bg-card px-6 pt-7 pb-[22px] text-center shadow-sheet',
-            shakeKey > 0 && 'animate-shake',
-          )}
+          className={cn('w-full max-w-sm', shakeKey > 0 && 'animate-shake')}
         >
-          <div className={brand === 'rocio' ? '-mt-[70px] mb-1.5' : '-mt-[82px] mb-1.5'}>
-            <BrandMark size={112} />
+          <div className="mb-8 flex items-center gap-3 dsk:mb-10">
+            <BrandMark size={48} />
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold hc:font-extrabold">{BRANDS[brand].name}</h1>
+              <p className="text-sm text-muted-foreground">AviPlanner · Planificación de Demanda</p>
+            </div>
           </div>
-          <h1 className="text-4xl font-extrabold tracking-[-0.04em]">{BRANDS[brand].name}</h1>
-          <div className="mt-1 text-[19px] font-extrabold text-primary">Planificación de Demanda</div>
-          <p className="mt-1.5 mb-5 text-ink-2">{BRANDS[brand].tag}</p>
 
-          <div className="relative mb-3 text-left">
-            <User className="absolute top-[15px] left-3.5 size-5 text-muted-foreground" />
-            <Label htmlFor="lu" className="sr-only">
+          <div className="mb-4">
+            <Label htmlFor="lu" className="mb-1.5">
               Usuario
             </Label>
             <Input
@@ -89,45 +82,45 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               autoComplete="username"
               defaultValue={DEMO ? 'rnavarro' : undefined}
               aria-invalid={!!errors.username}
-              className={fieldCls(errors.username)}
+              className="dsk:h-touch"
             />
-            {errors.username && <p className="mt-1 text-[13px] font-semibold text-destructive">{errors.username}</p>}
+            {errors.username && <p className={errorCls}>{errors.username}</p>}
           </div>
-          <div className="relative mb-3 text-left">
-            <Lock className="absolute top-[15px] left-3.5 size-5 text-muted-foreground" />
-            <Label htmlFor="lp" className="sr-only">
+          <div className="mb-4">
+            <Label htmlFor="lp" className="mb-1.5">
               Contraseña
             </Label>
-            <Input
-              id="lp"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Contraseña"
-              autoComplete="current-password"
-              aria-invalid={!!errors.password}
-              className={fieldCls(errors.password)}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              className="absolute top-[7px] right-2 grid size-9 place-items-center rounded-lg text-muted-foreground"
-            >
-              {showPassword ? <Eye className="size-5" /> : <EyeOff className="size-5" />}
-            </button>
-            {errors.password && <p className="mt-1 text-[13px] font-semibold text-destructive">{errors.password}</p>}
+            <div className="relative">
+              <Input
+                id="lp"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Contraseña"
+                autoComplete="current-password"
+                aria-invalid={!!errors.password}
+                className="pr-12 dsk:h-touch"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                className="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-md text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <Eye className="size-4.5" /> : <EyeOff className="size-4.5" />}
+              </button>
+            </div>
+            {errors.password && <p className={errorCls}>{errors.password}</p>}
           </div>
           {errors.form && (
-            <p role="alert" className="mb-2.5 text-left text-[13px] font-semibold text-destructive">
+            <p
+              role="alert"
+              className="mb-4 rounded-md border border-bad-border bg-bad-soft px-3 py-2 text-sm text-foreground"
+            >
               {errors.form}
             </p>
           )}
 
-          <Button
-            type="submit"
-            disabled={busy}
-            className="h-[54px] w-full rounded-[14px] text-[16.5px] font-bold shadow-[0_8px_18px_var(--primary-ring)]"
-          >
+          <Button type="submit" disabled={busy} className="w-full dsk:h-touch">
             {busy ? (
               <>
                 <Loader2 className="animate-spin" /> Ingresando
@@ -136,13 +129,13 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               'Iniciar sesión'
             )}
           </Button>
-          <div className="mx-0.5 mt-3.5 flex items-center justify-between text-sm text-ink-2">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input type="checkbox" name="remember" defaultChecked className="size-[18px] accent-primary" /> Recordarme
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 text-sm text-ink-2">
+            <label className="flex min-h-touch cursor-pointer items-center gap-2">
+              <input type="checkbox" name="remember" defaultChecked className="size-4.5 accent-primary" /> Recordarme
             </label>
             <button
               type="button"
-              className="font-bold text-primary hover:underline"
+              className="min-h-touch font-medium text-primary underline-offset-4 hover:underline"
               onClick={() =>
                 toast('Pide a tu supervisor que restablezca tu contraseña: te dará una nueva para entrar.')
               }
@@ -151,7 +144,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
             </button>
           </div>
           {DEMO && (
-            <p className="mt-4 text-[12.5px] text-muted-foreground">
+            <p className="mt-6 border-t border-rule pt-4 text-xs text-muted-foreground">
               Usuarios de prueba: rnavarro, hdias, mcordova, supervisor y general (contraseña demo1234).
             </p>
           )}
