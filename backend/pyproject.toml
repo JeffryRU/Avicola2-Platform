@@ -9,6 +9,7 @@ dependencies = [
     "fastapi[standard]>=0.143.2",
     "fpdf2>=2.8",
     "holidays>=0.106",
+    "mcp>=2.3.0",
     "numpy>=2.5.4",
     "openpyxl>=3.1.5",
     "pandas>=3.0.6",
@@ -113,7 +114,7 @@ name = "Cada módulo: infraestructura → aplicación → dominio"
 type = "layers"
 containers = ["app.ingest", "app.planning"]
 # `bootstrap` (raíz de composición) e `infrastructure` van al mismo nivel: los adaptadores de
-# entrada (HTTP, consola, tareas periódicas) piden a bootstrap los casos de uso ya cableados.
+# entrada (HTTP, MCP, consola, tareas periódicas) piden a bootstrap los casos de uso ya cableados.
 # El contrato `bootstrap-solo-desde-entradas` limita quién puede hacerlo.
 layers = ["bootstrap : infrastructure", "application", "domain"]
 
@@ -125,7 +126,9 @@ protected_modules = ["app.ingest.bootstrap", "app.planning.bootstrap"]
 allowed_importers = [
     "app.main",
     "app.ingest.infrastructure.http",
+    "app.ingest.infrastructure.mcp",
     "app.planning.infrastructure.http",
+    "app.planning.infrastructure.mcp",
     "app.planning.infrastructure.cli",
     "app.planning.infrastructure.scheduler",
 ]
@@ -173,6 +176,7 @@ forbidden_modules = [
     "httpx",
     "jinja2",
     "jwt",
+    "mcp",
     "multipart",
     "numpy",
     "openpyxl",
@@ -198,7 +202,7 @@ forbidden_modules = [
 
 [[tool.importlinter.contracts]]
 id = "adaptadores-de-salida"
-name = "Los adaptadores de salida no dependen de los de entrada (HTTP, consola, tareas)"
+name = "Los adaptadores de salida no dependen de los de entrada (HTTP, MCP, consola, tareas)"
 type = "forbidden"
 source_modules = [
     "app.ingest.infrastructure.persistence",
@@ -208,7 +212,9 @@ source_modules = [
 ]
 forbidden_modules = [
     "app.ingest.infrastructure.http",
+    "app.ingest.infrastructure.mcp",
     "app.planning.infrastructure.http",
+    "app.planning.infrastructure.mcp",
     "app.planning.infrastructure.cli",
     "app.planning.infrastructure.scheduler",
 ]

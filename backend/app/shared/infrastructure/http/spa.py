@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
 # Rutas que nunca deben caer en index.html.
-API_PREFIXES = ("api/", "ingest/", "health", "docs", "redoc", "openapi.json")
+API_PREFIXES = ("api/", "ingest/", "mcp", "health", "docs", "redoc", "openapi.json")
 # El service worker y el manifest no se cachean: así la PWA detecta las versiones nuevas.
 NO_CACHE = {"sw.js", "registerSW.js", "manifest.webmanifest", "index.html"}
 

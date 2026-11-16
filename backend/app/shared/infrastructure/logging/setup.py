@@ -26,7 +26,19 @@ UVICORN_LOGGERS = ("uvicorn", "uvicorn.error")
 # El middleware ya registra cada petición (con id y duración); el access log se duplicaría.
 SILENCED = ("uvicorn.access",)
 # Librerías muy verbosas en INFO.
-QUIET = ("httpx", "httpcore", "urllib3", "botocore", "google", "numba", "alembic.runtime")
+# `mcp`: el SDK registra cada petición; la auditoría propia (logger app.mcp) ya lo cubre.
+QUIET = (
+    "httpx",
+    "httpcore",
+    "httpx2",
+    "httpcore2",
+    "mcp",
+    "urllib3",
+    "botocore",
+    "google",
+    "numba",
+    "alembic.runtime",
+)
 
 
 # Handlers creados aquí: al reconfigurar se reemplazan en vez de duplicarse.

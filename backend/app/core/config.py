@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_AUTH_SECRET = "cambiar-en-produccion"  # noqa: S105 (marcador: fuera de local se rechaza)
 MIN_SECRET_LENGTH = 32
+# Un secreto de `openssl rand -hex 32` usa casi los 16 dígitos hexadecimales.
+MIN_DISTINCT_CHARS = 10
 # Carpetas del repositorio: las rutas relativas de la configuración se resuelven desde aquí.
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKEND_DIR.parent
@@ -103,6 +105,14 @@ class Settings(BaseSettings):
     # Token que n8n envía en X-Api-Token a /ingest/* (vacío = sin control; provisional hasta JWT).
     ingest_api_token: str | None = None
 
+    # Servidor MCP para agentes de IA (/mcp, ADR 0017). Token de servicio del agente de n8n:
+    # quien lo presente actúa con el rol de solo lectura `ai_agent`. Vacío = sin agente de
+    # servicio (el MCP acepta igual el token de sesión de cada usuario). 32+ caracteres.
+    mcp_agent_token: str | None = None
+    # Llamadas a herramientas permitidas por usuario en cada ventana de MCP_RATE_WINDOW_SECONDS.
+    mcp_rate_limit: int = Field(30, ge=1)
+    mcp_rate_window_seconds: int = Field(60, ge=1)
+
     # Carpeta con catalog.yaml, schemas.yaml, tables.yaml y planning_seed.yaml.
     config_dir: Path = BACKEND_DIR / "config"
 
@@ -141,6 +151,16 @@ class Settings(BaseSettings):
     def is_local(self) -> bool:
         return self.app_env == "local"
 
+    def rate_limit_options(self) -> dict[str, Any]:
+        """Argumentos de `build_rate_limiter` (mismo backend y prefijo que la caché)."""
+        return {
+            "backend": self.cache_backend,
+            "limit": self.mcp_rate_limit,
+            "window_seconds": self.mcp_rate_window_seconds,
+            "redis_url": self.redis_url,
+            "namespace": self.cache_options()["namespace"],
+        }
+
     def cache_options(self) -> dict[str, Any]:
         """Argumentos de `build_cache` según la configuración."""
         return {
@@ -158,6 +178,15 @@ class Settings(BaseSettings):
     def cookie_secure(self) -> bool:
         return not self.is_local if self.auth_cookie_secure is None else self.auth_cookie_secure
 
+    def _strong_agent_token(self) -> bool:
+        token = self.mcp_agent_token or ""
+        return (
+            len(token) >= MIN_SECRET_LENGTH
+            and token == token.strip()
+            and len(set(token)) >= MIN_DISTINCT_CHARS
+            and token not in (self.auth_secret, self.ingest_api_token)
+        )
+
     def security_problems(self) -> list[str]:
         """Configuración insegura que impide arrancar la API fuera de APP_ENV=local."""
         problems = []
@@ -168,6 +197,11 @@ class Settings(BaseSettings):
             )
         if not self.ingest_api_token:
             problems.append("INGEST_API_TOKEN está vacío: /ingest quedaría sin control de acceso.")
+        if self.mcp_agent_token and not self._strong_agent_token():
+            problems.append(
+                f"MCP_AGENT_TOKEN debe tener al menos {MIN_SECRET_LENGTH} caracteres aleatorios "
+                "(`openssl rand -hex 32`), distinto de AUTH_SECRET y de INGEST_API_TOKEN."
+            )
         if not self.cookie_secure:
             problems.append("AUTH_COOKIE_SECURE=false: la cookie de sesión viajaría sin HTTPS.")
         return problems

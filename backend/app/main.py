@@ -8,16 +8,21 @@ from fastapi import FastAPI
 
 from app.core.config import get_settings
 from app.ingest.infrastructure.http import router as ingest
+from app.ingest.infrastructure.mcp import tools as ingest_mcp
 from app.planning.infrastructure.http import events as planning_events
 from app.planning.infrastructure.http import router as planning
+from app.planning.infrastructure.mcp import tools as planning_mcp
 from app.planning.infrastructure.scheduler import periodic_tasks
 from app.shared.infrastructure.http import health
 from app.shared.infrastructure.http.errors import register_error_handlers
+from app.shared.infrastructure.http.paths import MCP_PATH
 from app.shared.infrastructure.http.security import install_security
 from app.shared.infrastructure.http.spa import mount_spa
 from app.shared.infrastructure.logging import client as client_logs
 from app.shared.infrastructure.logging.middleware import install_request_logging
 from app.shared.infrastructure.logging.setup import configure_from_settings
+from app.shared.infrastructure.mcp.limits import build_rate_limiter
+from app.shared.infrastructure.mcp.server import BearerVerifier, McpEndpoint, build_server
 
 settings = get_settings()
 configure_from_settings(settings)
@@ -33,9 +38,25 @@ for problem in problems:
 docs = {} if settings.is_local else {"docs_url": None, "redoc_url": None, "openapi_url": None}
 
 
+# Servidor MCP para agentes de IA (ADR 0017): solo lectura, con los mismos casos de uso.
+MCP_INSTRUCTIONS = (
+    "Datos reales de AviPlanner (planificación de saca de Avícola 2): proyecciones de venta, "
+    "quién registró, saca sugerida, stock, producción y cargas de archivos. Solo lectura. "
+    "Fechas en AAAA-MM-DD, hora de Lima. Cada usuario ve solo lo que su rol permite. "
+    "Si una herramienta devuelve una lista vacía, no hay datos: no los inventes."
+)
+mcp_verifier = BearerVerifier(planning_mcp.identify)
+mcp_server = build_server(
+    mcp_verifier, build_rate_limiter(**settings.rate_limit_options()), MCP_INSTRUCTIONS
+)
+planning_mcp.register(mcp_server)
+ingest_mcp.register(mcp_server, may_view=planning_mcp.sees_team)
+mcp_endpoint = McpEndpoint(mcp_server, MCP_PATH, mcp_verifier)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    async with periodic_tasks(settings):
+    async with periodic_tasks(settings), mcp_endpoint.lifespan():
         yield
 
 
@@ -57,5 +78,6 @@ app.include_router(planning.production)
 app.include_router(planning.internal)
 app.include_router(planning_events.router)
 app.include_router(client_logs.router)
+app.add_route(MCP_PATH, mcp_endpoint, include_in_schema=False)
 # Al final: captura las rutas que no son de la API y sirve la app de React.
 mount_spa(app, settings.frontend_dist_dir)

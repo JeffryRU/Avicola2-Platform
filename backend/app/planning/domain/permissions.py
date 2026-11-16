@@ -14,6 +14,9 @@ SELLER, SUPERVISOR, GENERAL_SUPERVISOR = "seller", "supervisor", "general_superv
 # Jefe de despacho: registra el stock que queda en despacho; no proyecta ni ve al equipo.
 DISPATCH_CHIEF = "dispatch_chief"
 ROLES = (SELLER, DISPATCH_CHIEF, SUPERVISOR, GENERAL_SUPERVISOR)
+# Agente de IA por MCP (ADR 0017): rol de servicio, no de una cuenta. No está en ROLES, así que
+# nadie lo crea ni lo asigna. Solo lectura: ve lo mismo que un supervisor, sin gestionar nada.
+AI_AGENT = "ai_agent"
 
 ROLE_LABELS = {
     SELLER: "vendedor",
@@ -75,6 +78,14 @@ ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
         Permission.MANAGE_STOCK,
         Permission.MANAGE_PRODUCTION,
     },
+    AI_AGENT: frozenset(
+        {
+            Permission.VIEW_TEAM,
+            Permission.VIEW_SACA,
+            Permission.VIEW_STOCK,
+            Permission.VIEW_PRODUCTION,
+        }
+    ),
 }
 
 # Cuentas que cada rol crea y gestiona: el supervisor, solo vendedores; el supervisor general,
@@ -84,6 +95,7 @@ MANAGEABLE_ROLES: dict[str, tuple[str, ...]] = {
     DISPATCH_CHIEF: (),
     SUPERVISOR: (SELLER,),
     GENERAL_SUPERVISOR: ROLES,
+    AI_AGENT: (),
 }
 
 

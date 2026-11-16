@@ -17,6 +17,7 @@ from hypothesis.stateful import RuleBasedStateMachine, invariant, rule
 from app.core.config import get_settings
 from app.main import app
 from app.planning.domain.permissions import (
+    AI_AGENT,
     ROLES,
     Permission,
     assignable_roles,
@@ -38,10 +39,23 @@ ANY_ROLE = st.one_of(st.sampled_from(ROLES), st.text(max_size=25))
 
 # --- 1. Propiedades de la tabla ------------------------------------------------------
 
+# Especificación del agente de IA (ADR 0017): lee lo que ve un supervisor y no gestiona nada.
+AGENT_READS = {"view_team", "view_saca", "view_stock", "view_production"}
+
+
+def test_ai_agent_is_a_read_only_service_role():
+    assert {p.value for p in permissions_of(AI_AGENT)} == AGENT_READS
+    assert manageable_roles(AI_AGENT) == ()
+    # No es un rol de cuenta: nadie lo crea, lo asigna ni recibe avisos por él.
+    assert AI_AGENT not in ROLES
+    assert all(AI_AGENT not in manageable_roles(r) for r in ROLES)
+    assert all(AI_AGENT not in roles_with(p) for p in Permission)
+
 
 @given(ANY_ROLE)
 def test_unknown_roles_have_nothing(role):
-    if role not in ROLES:
+    # `ai_agent` no es de ninguna cuenta, pero es conocido (rol de servicio del MCP, ADR 0017).
+    if role not in ROLES and role != AI_AGENT:
         assert permissions_of(role) == frozenset()
         assert manageable_roles(role) == ()
         assert all(assignable_roles(role, t) == () for t in ROLES)

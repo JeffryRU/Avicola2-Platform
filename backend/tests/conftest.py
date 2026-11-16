@@ -114,3 +114,11 @@ def _fresh_cache():
     from app.planning.bootstrap import planning_cache
 
     planning_cache.invalidate()
+
+
+@pytest.fixture
+def mcp_db(monkeypatch):
+    """Servidor MCP (ADR 0017) sobre una base nueva: ver tests/mcp_support.py."""
+    from mcp_support import fresh_mcp_db
+
+    return fresh_mcp_db(monkeypatch)

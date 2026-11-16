@@ -240,7 +240,7 @@ LLM configurable con `LLM_PROVIDER=anthropic|ollama`. En la nube y en la laptop 
 
 1. **Captura de proyecciones (F1).** Telegram → el LLM extrae un JSON validado con esquema (fecha, cliente, producto, kg) → si falta información, repregunta → bronze → `POST /ingest/message` → silver `projections` con `source=message`.
 2. **Normalización de Excel heterogéneos (F2).** Si las columnas no coinciden, el LLM propone un mapeo → se guarda en `column_mappings` como pendiente → una persona lo confirma en la app → las siguientes cargas con la misma firma se mapean solas.
-3. **Asistente de consulta (fase 2).** Chat → agente de n8n → `POST /analytics/query` del backend. El backend **impone** una lista blanca de tablas gold, el modo de solo lectura y un límite de filas; no confía en el LLM para eso.
+3. **Asistente de consulta.** Chat de n8n → AI Agent → servidor MCP del backend (`/mcp`), con herramientas de solo lectura que llaman a los mismos casos de uso que la API. El backend **impone** los permisos del rol, el límite de llamadas y la auditoría; no confía en el LLM para eso ([ADR 0017](adr/0017-agente-de-ia-con-mcp-y-n8n.md)).
 4. **Resumen diario (fase 2).** El LLM redacta el forecast, las desviaciones y la saca sugerida, y se envía a Producción y Comercial.
 
 ---
@@ -253,7 +253,8 @@ Se exportan como JSON en `n8n/workflows/`.
 |---|---|---|
 | `01_ingesta_excel` | Local: Local File Trigger **con polling** sobre `/data/inbox`. GCP: Google Drive Trigger (opcional) | Lee el archivo → `POST /ingest/upload` (el backend escribe bronze, silver y gold) → arma un aviso si el estado no es `ok` ([ADR 0003](adr/0003-ingesta-el-backend-escribe-bronze.md)) |
 | `02_captura_mensajes` | Telegram Trigger | LLM extrae → valida → bronze → `POST /ingest/message` → confirma al remitente |
-| `03_forecast_diario` | Cron diario (madrugada) | `POST /ml/predict` → desviaciones → alertas → notifica |
+| `03_agente_chatbot` | Chat Trigger (Basic Auth, supervisores) | AI Agent con Claude → herramientas del MCP del backend (`/mcp`) → respuesta con datos reales ([ADR 0017](adr/0017-agente-de-ia-con-mcp-y-n8n.md)) |
+| `04_forecast_diario` (planeado) | Cron diario (madrugada) | `POST /ml/predict` → desviaciones → alertas → notifica |
 | `04_reentrenamiento` | Cron semanal | `POST /ml/train` → notifica métricas |
 | `05_resumen_diario` (fase 2) | Cron diario | Consulta gold → el LLM redacta → envía |
 | `06_agente_consultas` (fase 2) | Webhook desde la app | Agente IA con herramienta SQL de solo lectura |

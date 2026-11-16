@@ -71,6 +71,9 @@ services:
       BACKEND_URL: http://backend:8000
       # Token para llamar a /ingest/*; el workflow lo lee con $env (por eso se permite el acceso a env).
       INGEST_API_TOKEN: ${INGEST_API_TOKEN:-}
+      # Modelo del agente 03_agente_chatbot (ADR 0017). La clave de Anthropic va en una
+      # credencial de n8n, no aquí.
+      AGENT_MODEL: ${AGENT_MODEL:-claude-sonnet-5-5}
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:
       - n8n_data:/home/node/.n8n
@@ -118,6 +121,10 @@ services:
       CACHE_BACKEND: ${CACHE_BACKEND:-redis}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       INGEST_API_TOKEN: ${INGEST_API_TOKEN:-}
+      # Servidor MCP para el agente de IA (ADR 0017). Vacío = sin agente de servicio.
+      MCP_AGENT_TOKEN: ${MCP_AGENT_TOKEN:-}
+      MCP_RATE_LIMIT: ${MCP_RATE_LIMIT:-30}
+      MCP_RATE_WINDOW_SECONDS: ${MCP_RATE_WINDOW_SECONDS:-60}
       DB_SCHEMA: ${DB_SCHEMA:-}
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_TOKEN_TTL_HOURS: ${AUTH_TOKEN_TTL_HOURS:-12}

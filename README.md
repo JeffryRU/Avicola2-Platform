@@ -92,6 +92,7 @@
   - Llegan al instante por SSE (`/api/events`) y se guardan en la base, con "leído" sincronizado entre dispositivos.
   - El supervisor recibe cada proyección enviada; los vendedores, el recordatorio diario de n8n.
   - n8n puede enviar avisos con `POST /api/internal/notifications`.
+- **Agente de IA** ([ADR 0017](docs/adr/0017-agente-de-ia-con-mcp-y-n8n.md)): servidor MCP de solo lectura en `/mcp` (proyecciones, quién registró, saca, stock, producción y cargas), con los permisos de cada rol, límite de llamadas y auditoría. El workflow `n8n/workflows/03_agente_chatbot.json` lo usa desde un chat de supervisores.
 - **En producción** (`APP_ENV` distinto de `local`):
   - La API no arranca sin un `AUTH_SECRET` de al menos 32 caracteres, sin `INGEST_API_TOKEN` o sin HTTPS para la cookie.
   - El primer supervisor se crea con `cli supervisor <usuario> "<nombre>" --general` (supervisor general, [ADR 0010](docs/adr/0010-roles-y-permisos.md)).

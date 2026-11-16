@@ -5,6 +5,7 @@ Se versionan como JSON exportado. Para importarlos en el n8n del compose, ejecut
 ```bash
 docker compose exec n8n n8n import:workflow --input=/data/workflows/01_ingesta_excel.json
 docker compose exec n8n n8n import:workflow --input=/data/workflows/02_recordatorio_proyeccion.json
+docker compose exec n8n n8n import:workflow --input=/data/workflows/03_agente_chatbot.json
 docker compose exec n8n n8n publish:workflow --id=avicola2IngestaExcel01
 docker compose exec n8n n8n publish:workflow --id=avicola2Recordatorio02
 docker compose restart n8n
@@ -42,6 +43,66 @@ Schedule (lun–sáb 9:00, America/Lima) → POST /api/internal/notifications/pr
 - **Antes del corte** tampoco hace falta n8n: la API avisa a quien aún no registró con `PLANNING_CLOSING_REMINDER_MINUTES` de anticipación (30 por defecto) sobre la hora de corte vigente. Con la revisión apagada, n8n puede llamar a `POST /api/internal/notifications/closing-soon` cada minuto.
 - **Pasado el corte** no hace falta n8n: la API revisa cada minuto y avisa a quien no registró y al supervisor (`PLANNING_SCHEDULER_SECONDS`). Si se apaga esa revisión (`0`), n8n puede llamar a `POST /api/internal/notifications/missed-projections` con la misma frecuencia.
 - **Reintentos:** 3 intentos, separados 5 s, si el backend no responde.
+
+## 03_agente_chatbot
+
+```
+Chat de supervisores (Basic Auth) → Agente AviPlanner ← Claude (Anthropic)
+                                                     ← Memoria (8 mensajes)
+                                                     ← AviPlanner MCP (POST {{ $env.BACKEND_URL }}/mcp)
+```
+
+Chatbot que responde preguntas de negocio con datos reales: proyecciones por vendedor y día, quién registró, saca sugerida, stock, producción y cargas de archivos. Solo lee: no registra ni cambia nada. Decisión, permisos y costo en el [ADR 0017](../../docs/adr/0017-agente-de-ia-con-mcp-y-n8n.md).
+
+### Antes de importarlo
+
+1. **Token del agente en el backend.** Genera uno (`openssl rand -hex 32`) y ponlo en `MCP_AGENT_TOKEN` del `.env` (en producción, en el panel o en el `.env` del servidor). Reinicia el backend: `docker compose up -d backend`. Ese token actúa con el rol de solo lectura `ai_agent` (ve lo mismo que un supervisor).
+2. **Modelo (opcional).** `AGENT_MODEL` en el `.env`: `claude-sonnet-5-5` por defecto; `claude-haiku-5-5` es la opción barata. Después, `docker compose up -d n8n`.
+3. **Credenciales en n8n** (*Overview → Credentials → Create*). Usa exactamente estos nombres; los valores nunca van al repositorio:
+
+   | Nombre | Tipo | Valor |
+   |---|---|---|
+   | `Anthropic (AviPlanner)` | Anthropic | La clave de la API de Anthropic (consola de Anthropic). |
+   | `AviPlanner MCP (agente)` | Bearer Auth | El mismo valor de `MCP_AGENT_TOKEN`. |
+   | `AviPlanner chat (supervisores)` | Basic Auth | Usuario y contraseña del chat. Entrégalos **solo a supervisores**. |
+
+### Importar y activar
+
+```bash
+docker compose exec n8n n8n import:workflow --input=/data/workflows/03_agente_chatbot.json
+docker compose exec n8n n8n publish:workflow --id=aviplannerAgente03
+docker compose restart n8n
+```
+
+Abre el workflow en el editor y, en cada nodo con un aviso de credencial (*Claude (Anthropic)*, *AviPlanner MCP* y *Chat de supervisores*), elige la credencial creada arriba y guarda.
+
+### Probarlo
+
+1. En el nodo *Chat de supervisores*, copia la **Chat URL** y ábrela en el navegador. Entra con el usuario y la contraseña del chat. En el editor también sirve el botón *Open chat*.
+2. Haz al menos estas tres preguntas y compara con la app:
+   - «¿Cuánto proyectó Roberto Navarro para mañana?» (pantalla de proyecciones del supervisor).
+   - «¿Qué saca se sugiere para hoy?» (pantalla Saca).
+   - «¿Qué cargas de archivos fallaron hoy?» (`GET /ingest/log?status=failed`).
+3. Pregunta algo sin datos, por ejemplo la producción de hace dos años: debe decir que no hay datos, sin inventar cifras.
+4. Revisa la auditoría en `logs/app.log`: una línea `app.mcp` por herramienta, con usuario `agente:n8n`, herramienta, argumentos y resultado.
+
+Para probar el MCP sin n8n:
+
+```bash
+curl -s http://localhost:8000/mcp -H "Authorization: Bearer $MCP_AGENT_TOKEN" \
+  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"listar_vendedores","arguments":{}}}'
+```
+
+Sin la cabecera `Authorization`, o con un token inválido, responde 401.
+
+### Notas
+
+- **Quién puede usar el chat:** solo supervisores. El agente ve todo el equipo; un vendedor con acceso al chat vería datos de otros. Para eso no se usa «n8n User Auth»: daría acceso al editor de n8n.
+- **Sin `temperature`:** `claude-sonnet-5-5` y `claude-haiku-5-5` rechazan valores distintos al predeterminado. No la agregues en las opciones del nodo.
+- **Límite:** 30 llamadas a herramientas por minuto para el agente (`MCP_RATE_LIMIT`), compartidas por todos los que usan el chat. Si se pasa, el agente dice que espere un minuto.
+- **Fecha de hoy:** el system prompt la toma de `$now` en hora de Lima, para entender «hoy», «mañana» y «el jueves».
+- **Otro cliente MCP** (por ejemplo Claude Desktop): usa la misma URL con el token de la persona (`POST /api/auth/token`). Así ve solo lo que su rol permite.
 
 ## Avisos propios desde n8n
 

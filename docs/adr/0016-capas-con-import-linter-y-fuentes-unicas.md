@@ -26,6 +26,7 @@ Viven en `backend/pyproject.toml` (`[tool.importlinter]`). CI corre `uv run lint
 | `dominio-puro` | `domain` y `application` (de los módulos y de `shared`) no importan `core`, `db`, `shared.infrastructure` ni frameworks: FastAPI, Starlette, uvicorn, httpx, SQLAlchemy, pydantic, pandas, numpy, pyarrow, deltalake, DuckDB, openpyxl, YAML, JWT, Alembic, holidays, Redis, fpdf, scikit-learn, psycopg, pymssql, entre otros. Tampoco la E/S de la biblioteca estándar (`sqlite3`, `socket`, `subprocess`, `http`, `urllib`). También por vías indirectas. |
 | `adaptadores-de-salida` | Persistencia, archivos y lakehouse no importan los adaptadores de entrada (HTTP, consola, tareas periódicas). |
 
+- **Actualización (2026-11-16, [ADR 0017](0017-agente-de-ia-con-mcp-y-n8n.md)):** los adaptadores MCP (`ingest/infrastructure/mcp`, `planning/infrastructure/mcp`) son adaptadores de entrada: pueden usar `bootstrap` y ningún adaptador de salida los importa. `mcp` se suma a los frameworks prohibidos en el dominio y la aplicación.
 - `bootstrap` e `infrastructure` están al mismo nivel (`"bootstrap : infrastructure"`): el router HTTP pide a `bootstrap` los casos de uso ya cableados. El contrato `bootstrap-solo-desde-entradas` impide que un adaptador de salida haga lo mismo.
 - No hay `ignore_imports`: no hizo falta ninguna excepción.
 - `app.db` (ORM de las tablas de la ingesta y migraciones de Alembic) no entra en las capas de la plataforma: `migrations/env.py` importa las tablas de `planning` para registrarlas. Sí está prohibido en `domain` y `application`.

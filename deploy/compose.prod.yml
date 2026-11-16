@@ -40,6 +40,10 @@ services:
       # Fuera de local la API no arranca sin estos dos (ver docs/adr/0005).
       AUTH_SECRET: ${AUTH_SECRET:?Falta AUTH_SECRET (openssl rand -hex 32)}
       INGEST_API_TOKEN: ${INGEST_API_TOKEN:?Falta INGEST_API_TOKEN (openssl rand -hex 24)}
+      # Servidor MCP para el agente de IA (ADR 0017). Vacío = sin agente de servicio.
+      MCP_AGENT_TOKEN: ${MCP_AGENT_TOKEN:-}
+      MCP_RATE_LIMIT: ${MCP_RATE_LIMIT:-30}
+      MCP_RATE_WINDOW_SECONDS: ${MCP_RATE_WINDOW_SECONDS:-60}
       AUTH_TOKEN_TTL_HOURS: ${AUTH_TOKEN_TTL_HOURS:-12}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-}
       # Frontend servido aparte (Vercel reenviando /api aquí): su dominio, para no bloquearlo.
@@ -122,6 +126,8 @@ services:
       NODES_EXCLUDE: '["n8n-nodes-base.executeCommand"]'
       BACKEND_URL: http://backend:8000
       INGEST_API_TOKEN: ${INGEST_API_TOKEN}
+      # Modelo del agente 03_agente_chatbot (ADR 0017); la clave va en una credencial de n8n.
+      AGENT_MODEL: ${AGENT_MODEL:-claude-sonnet-5-5}
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:
       - n8n_data:/home/node/.n8n
