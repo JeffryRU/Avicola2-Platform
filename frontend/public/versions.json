@@ -1,0 +1,62 @@
+{
+  "repo": "JeffryRU/Avicola2-Platform",
+  "versions": [
+    {
+      "id": "mvp1",
+      "name": "MVP 1",
+      "version": "1.0.0",
+      "ref": "mvp1",
+      "branches": ["mvp1"],
+      "date": "2026-11-04",
+      "url": "https://avicola2-platform-git-mvp1-jeffry25ru-gmailcoms-projects.vercel.app",
+      "summary": "Primera versión: los vendedores proyectan su demanda diaria por producto y el supervisor la sigue en dashboards.",
+      "highlights": [
+        "Proyección diaria por producto (web instalable como app, funciona sin señal)",
+        "Dashboards: resumen semanal, proyección vs. venta real y estado por día",
+        "Inicio del supervisor con el día del equipo y detalle por vendedor",
+        "Cuentas seguras: supervisor, bloqueo por intentos y sesión con cookie",
+        "Notificaciones en tiempo real y exportar a Excel, PDF o CSV",
+        "Catálogo y vendedores de la tabla maestra"
+      ],
+      "apk": null
+    },
+    {
+      "id": "mvp2",
+      "name": "MVP 2",
+      "version": "2.0.0",
+      "ref": "mvp2",
+      "branches": ["mvp2"],
+      "date": "2026-11-12",
+      "url": "https://avicola2-platform-git-mvp2-jeffry25ru-gmailcoms-projects.vercel.app",
+      "summary": "Planificación de la operación: stock de despacho, producción, pronóstico de llegada y cálculo de saca, con app Android e iOS.",
+      "highlights": [
+        "App móvil Android e iOS (Kotlin Multiplatform)",
+        "Hora de corte, habilitaciones de edición y solicitudes de apertura",
+        "Stock de despacho por lote, ubicación y calidad A/B",
+        "Producción diaria, peso de la parvada y pronóstico de llegada por rango",
+        "Cálculo de saca con forma de cálculo elegible y factor por tipo",
+        "Supervisor general, roles y permisos; historial de cambios"
+      ],
+      "apk": "https://github.com/JeffryRU/Avicola2-Platform/releases/download/v2.0.0/noraves.apk"
+    },
+    {
+      "id": "mvp3",
+      "name": "MVP 3",
+      "version": "3.0.0",
+      "ref": "fedb1efd4004c007110b84e7fd73d5c115f850f3",
+      "branches": ["develop", "main"],
+      "moving": true,
+      "date": "2026-11-12",
+      "url": "https://avicola2-platform-git-develop-jeffry25ru-gmailcoms-projects.vercel.app",
+      "summary": "Versión en curso: nueva regla de saca (stock − pedidos de mañana + proyección de pasado mañana + plus) y la app funciona aunque el servidor no responda.",
+      "highlights": [
+        "Saca: stock − pedidos de mañana + proyección de pasado mañana + plus por tipo",
+        "Backend más estable: pool de conexiones y caché en memoria o Redis",
+        "Las pantallas se ven sin backend y se llenan solas al volver (web y móvil)",
+        "Sin cambio de contraseña obligatorio al primer inicio",
+        "Selector de versiones con novedades y comparación"
+      ],
+      "apk": "https://github.com/JeffryRU/Avicola2-Platform/releases/latest/download/noraves.apk"
+    }
+  ]
+}

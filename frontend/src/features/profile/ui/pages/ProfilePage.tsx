@@ -8,6 +8,7 @@ import { useLogout } from '@/features/auth/ui/hooks'
 import { useRequiredSession } from '@/features/auth/ui/use-session'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
+import { VersionChip } from '@/features/versions/ui/versions'
 
 const optCls =
   'flex w-full flex-wrap items-center gap-3.5 border-b border-muted px-5 py-4 text-left last:border-0 dsk:flex-nowrap'
@@ -23,6 +24,7 @@ export function ProfilePage() {
     <div>
       <PageHeader title="Perfil" />
       <PageBody className="dsk:max-w-[720px]">
+        <VersionChip className="mb-3.5" />
         <Section className="mb-3.5 flex items-center gap-4 p-5">
           <div className="grid size-16 flex-none place-items-center rounded-full bg-secondary text-[22px] font-extrabold text-primary">
             {initials(seller.name)}
