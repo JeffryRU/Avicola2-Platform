@@ -25,6 +25,8 @@ from app.planning.domain.production import ArrivalEstimate
 STOCK_MAX_AGE_DAYS = 3
 # Forma de cálculo (una sola): se informa en la respuesta para que el cliente la muestre.
 METHOD = "stock_orders_projection_plus"
+# Plus máximo (aves extra) de un tipo.
+MAX_PLUS = 100_000
 
 
 @dataclass(frozen=True)

@@ -13,7 +13,10 @@ from app.planning.application.ports import (
     UnlockRepository,
 )
 from app.planning.domain.editing import (
+    APPROVE,
     APPROVED,
+    CLOSE,
+    REJECT,
     REQUESTED,
     CutoffPolicy,
     EditUnlock,
@@ -25,6 +28,8 @@ from app.planning.domain.notifications import (
     EDIT_DECIDED,
     EDIT_REQUESTED,
     EDITING_CHANGED,
+    REGISTER_LINK,
+    UNLOCKS_LINK,
     Audience,
     Event,
 )
@@ -38,16 +43,15 @@ CUTOFF_DAYS_BEFORE_KEY = "cutoff_days_before"
 CUTOFF_ENABLED_KEY = "cutoff_enabled"
 # Cuántos días atrás se listan las solicitudes.
 HISTORY_DAYS = 30
-UNLOCKS_LINK = "/habilitaciones"
 DECIDED_TITLE = {
-    "approve": "Edición habilitada",
-    "reject": "Solicitud rechazada",
-    "close": "Edición cerrada",
+    APPROVE: "Edición habilitada",
+    REJECT: "Solicitud rechazada",
+    CLOSE: "Edición cerrada",
 }
 
 
 def _require_supervisor(actor: Seller) -> None:
-    require(actor.role, Permission.MANAGE_EDITING, "Solo un supervisor puede hacer esto.")
+    require(actor.role, Permission.MANAGE_EDITING)
 
 
 class EditingSettings:
@@ -243,7 +247,7 @@ class DecideUnlock:
                 EDIT_DECIDED,
                 DECIDED_TITLE[action],
                 _decided_body(action, decided.date),
-                link="/registrar",
+                link=REGISTER_LINK,
             )
         _publish_change(self.events, self.sellers, decided)
         logger.info("%s: %s la habilitación %s", actor.username, action, unlock_id)
@@ -327,9 +331,9 @@ class GrantEditing:
         self.notifier.notify(
             [seller],
             EDIT_DECIDED,
-            DECIDED_TITLE["approve"],
+            DECIDED_TITLE[APPROVE],
             f"Ya puedes editar tu proyección del {_dates_text(chosen)}.",
-            link="/registrar",
+            link=REGISTER_LINK,
         )
         logger.info("%s habilitó la edición de %s: %s", actor.username, username, chosen)
         return granted
@@ -370,9 +374,9 @@ class RevokeEditing:
             self.notifier.notify(
                 [seller],
                 EDIT_DECIDED,
-                DECIDED_TITLE["close"],
+                DECIDED_TITLE[CLOSE],
                 f"La edición del {_dates_text([u.date for u in closed])} volvió a cerrarse.",
-                link="/registrar",
+                link=REGISTER_LINK,
             )
         logger.info("%s cerró %d habilitación(es) de %s", actor.username, len(closed), username)
         return closed
@@ -392,9 +396,9 @@ def _dates_text(days: list[date]) -> str:
 
 
 def _decided_body(action: str, day: date) -> str:
-    if action == "approve":
+    if action == APPROVE:
         return f"Ya puedes editar tu proyección del {day:%d/%m}."
-    if action == "reject":
+    if action == REJECT:
         return f"El supervisor no habilitó la edición del {day:%d/%m}."
     return f"La edición del {day:%d/%m} volvió a cerrarse."
 

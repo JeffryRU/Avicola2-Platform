@@ -9,11 +9,11 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from statistics import median
 
-from app.planning.domain.models import Product
+from app.planning.domain.models import BRASA_CATEGORY, Product
 
 # Solo el pollo entero para brasa: los marinados y macerados son otros productos.
 ORDER_MATERIAL_PREFIX = "POLLO ENTERO BRASA"
-ORDER_CATEGORY = "BRASA"
+ORDER_CATEGORY = BRASA_CATEGORY
 # Semanas del mismo día de la semana que se miran. La mediana de 4 fue la mejor regla simple en
 # la validación con pedidos reales (ADR 0012): 53,1 % de error contra 56,9 % del promedio.
 MEDIAN_WEEKS = 4

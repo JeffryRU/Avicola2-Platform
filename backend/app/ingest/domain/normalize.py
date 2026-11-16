@@ -52,9 +52,10 @@ def parse_date(value: Any) -> date:
     if isinstance(value, str):
         text = value.strip()
         for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d/%m/%y", "%Y/%m/%d"):
+            candidate = text[:10] if fmt == "%Y-%m-%d" else text
             try:
-                parsed = datetime.strptime(text[:10] if fmt == "%Y-%m-%d" else text, fmt)  # noqa: DTZ007
-                return parsed.date()  # solo la fecha: la zona horaria no aplica
+                # Solo se usa la fecha: la zona horaria no aplica.
+                return datetime.strptime(candidate, fmt).date()  # noqa: DTZ007
             except ValueError:
                 continue
     raise CellError(f"fecha no válida: {value!r}")

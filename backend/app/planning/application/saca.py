@@ -22,6 +22,7 @@ from app.planning.domain.models import CONFIRMED, Seller
 from app.planning.domain.permissions import Permission, require
 from app.planning.domain.production import LOOKBACK, estimate_from
 from app.planning.domain.saca import (
+    MAX_PLUS,
     SacaPlan,
     build_plan,
     orders_day,
@@ -34,7 +35,6 @@ from app.shared.domain.errors import DomainError
 logger = logging.getLogger(__name__)
 
 SACA_PLUS_KEY = "saca_group_plus"
-MAX_PLUS = 100_000
 
 
 class SacaPlus:
@@ -63,7 +63,7 @@ class SetSacaPlus:
         self.products, self.settings, self.clock = products, settings, clock
 
     def __call__(self, actor: Seller, plus: dict[str, int]) -> dict[str, int]:
-        require(actor.role, Permission.MANAGE_EDITING, "Solo un supervisor puede hacer esto.")
+        require(actor.role, Permission.MANAGE_EDITING)
         groups = list(
             dict.fromkeys(product_group(p) for p in Catalog(self.products.list_active()).products)
         )
@@ -107,7 +107,7 @@ class CalculateSaca:
     def __call__(self, viewer: Seller, day: date) -> SacaPlan:
         """Saca calculada el día `day`: stock hasta ese día − pedidos de mañana + proyección de
         pasado mañana + plus por tipo."""
-        require(viewer.role, Permission.VIEW_SACA, "No tienes permiso para ver el cálculo de saca.")
+        require(viewer.role, Permission.VIEW_SACA)
         products = Catalog(self.products.list_active()).products
         team = {s.username for s in self.sellers.list_active() if s.is_seller}
         projected: Counter[str] = Counter()
@@ -124,7 +124,7 @@ class CalculateSaca:
         fresh = latest.units_by_product(self.stock_lot_days) if latest else {}
         quality_b: Counter[str] = Counter()
         for item in self.products.list_stock_items():
-            if item.quality != "A" and fresh.get(item.id):
+            if not item.is_projectable and fresh.get(item.id):
                 quality_b[product_group(item)] += fresh[item.id]
         plan = build_plan(
             day,

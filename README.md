@@ -154,6 +154,7 @@ uv run alembic upgrade head          # aplica migraciones a DATABASE_URL
 uv run alembic revision --autogenerate -m "descripción"   # nueva migración
 uv run uvicorn app.main:app --reload
 uv run ruff check . && uv run ruff format .
+uv run lint-imports                  # capas hexagonales (ADR 0016)
 uv run pytest
 ```
 

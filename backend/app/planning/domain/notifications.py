@@ -1,7 +1,7 @@
 """Notificaciones por usuario y eventos en tiempo real (Python puro)."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from app.planning.domain.permissions import ROLES, SELLER, Permission, roles_with
@@ -28,6 +28,24 @@ NOTIFICATION_CREATED = "notification"
 PROJECTIONS_CHANGED = "projections.changed"
 EDITING_CHANGED = "editing.changed"  # hora de corte o habilitaciones
 SESSION_REVOKED = "session.revoked"
+
+# Pantallas de la app a las que lleva un aviso (rutas del frontend y de la app móvil).
+REGISTER_LINK = "/registrar"
+UNLOCKS_LINK = "/habilitaciones"
+HISTORY_LINK = "/historial"
+TEAM_STATUS_LINK = "/dashboards/estado"
+DAY_DASHBOARD_LINK = "/dashboards/dia"
+
+
+def register_day_link(day: date) -> str:
+    """Pantalla de registro abierta en ese día."""
+    return f"{REGISTER_LINK}?dia={day.isoformat()}"
+
+
+def day_dashboard_link(day: date) -> str:
+    """Tablero del equipo para ese día."""
+    return f"{DAY_DASHBOARD_LINK}/{day.isoformat()}"
+
 
 # A quién va un aviso general.
 AUDIENCES = {

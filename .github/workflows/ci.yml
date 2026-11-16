@@ -30,6 +30,8 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      # Arquitectura hexagonal: contratos de import-linter en pyproject.toml (ADR 0016).
+      - run: uv run lint-imports
       - run: uv run pytest -q -m "not fuzz"
 
   backend-fuzz:

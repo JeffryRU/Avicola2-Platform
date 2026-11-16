@@ -6,6 +6,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.planning.domain.accounts import MAX_NAME
+from app.planning.domain.editing import CUTOFF_PATTERN, MAX_DAYS_BEFORE, MAX_REASON, Decision
+from app.planning.domain.models import QUALITY_A
+from app.planning.domain.permissions import SELLER
+from app.planning.domain.production import MAX_BIRDS
+from app.planning.domain.saca import MAX_PLUS
+from app.planning.domain.stock import MAX_UNITS
 from app.shared.infrastructure.http.params import DbId
 
 
@@ -77,9 +84,9 @@ class AdminAccountOut(BaseModel):
 
 class CreateAccountIn(BaseModel):
     username: str = Field(min_length=3, max_length=30)
-    name: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=MAX_NAME)
     zone: str | None = Field(None, max_length=50)
-    role: str = Field("seller", max_length=20)
+    role: str = Field(SELLER, max_length=20)
 
 
 class NewCredentialsOut(BaseModel):
@@ -104,7 +111,7 @@ class ProductOut(BaseModel):
     kg_per_unit: float
     sort_order: int
     subcategory: str | None = None
-    quality: str = Field(default="A", description="A, o B (calidad B: solo en el stock).")
+    quality: str = Field(default=QUALITY_A, description="A, o B (calidad B: solo en el stock).")
 
 
 class ProjectionOut(BaseModel):
@@ -234,16 +241,16 @@ class EditingWindowOut(BaseModel):
 
 class UnlockRequestIn(BaseModel):
     date: date
-    reason: str = Field(min_length=1, max_length=300)
+    reason: str = Field(min_length=1, max_length=MAX_REASON)
 
 
 class UnlockDecisionIn(BaseModel):
-    action: Literal["approve", "reject", "close"]
+    action: Decision
 
 
 class CutoffIn(BaseModel):
-    cutoff_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
-    days_before: int = Field(ge=0, le=7)
+    cutoff_time: str = Field(pattern=CUTOFF_PATTERN)
+    days_before: int = Field(ge=0, le=MAX_DAYS_BEFORE)
     enabled: bool = True
 
 
@@ -274,7 +281,7 @@ class ChangeOut(BaseModel):
 
 class StockLineIn(BaseModel):
     product_id: str = Field(min_length=1, max_length=10)
-    units: int = Field(ge=0, le=1_000_000)
+    units: int = Field(ge=0, le=MAX_UNITS)
     lot_date: date | None = Field(
         default=None, description="Fecha de beneficio del lote; sin ella, el día del stock."
     )
@@ -364,7 +371,7 @@ class SacaGroupOut(BaseModel):
 
 
 class SacaPlusIn(BaseModel):
-    plus: dict[str, Annotated[int, Field(ge=0, le=100_000)]] = Field(
+    plus: dict[str, Annotated[int, Field(ge=0, le=MAX_PLUS)]] = Field(
         min_length=1,
         max_length=20,
         description="Aves extra por tipo, p. ej. {'Brasa chica': 4000}. Lo que falte queda en 0.",
@@ -413,9 +420,9 @@ class SacaOut(BaseModel):
 
 class ProductionLineIn(BaseModel):
     product_id: str = Field(min_length=1, max_length=10)
-    ordered: float = Field(default=0, ge=0, le=1_000_000)
-    produced: int = Field(ge=0, le=1_000_000)
-    quality_b: int = Field(default=0, ge=0, le=1_000_000)
+    ordered: float = Field(default=0, ge=0, le=MAX_BIRDS)
+    produced: int = Field(ge=0, le=MAX_BIRDS)
+    quality_b: int = Field(default=0, ge=0, le=MAX_BIRDS)
 
 
 class ProductionIn(BaseModel):

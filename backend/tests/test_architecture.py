@@ -1,65 +1,58 @@
-"""Reglas de la arquitectura hexagonal: el dominio y la aplicación no conocen la infraestructura."""
+"""Reglas de la arquitectura hexagonal (ADR 0004 y 0016).
 
-import ast
+La fuente única de las reglas de imports son los contratos de import-linter en pyproject.toml
+(`uv run lint-imports`, también en CI). Aquí se corren dentro de pytest y se verifica que los
+contratos cubran todos los contextos.
+"""
+
+import subprocess
+import sys
+import tomllib
 from pathlib import Path
 
 import pytest
 
-APP = Path(__file__).resolve().parents[1] / "app"
+BACKEND = Path(__file__).resolve().parents[1]
+APP = BACKEND / "app"
+PYPROJECT = BACKEND / "pyproject.toml"
 # Contextos con capas hexagonales (más `shared`, que solo tiene domain e infrastructure).
 CONTEXTS = ("planning", "ingest")
-FRAMEWORKS = (
-    "sqlalchemy",
-    "fastapi",
-    "pydantic",
-    "jwt",
-    "yaml",
-    "alembic",
-    "starlette",
-    "pandas",
-    "numpy",
-    "pyarrow",
-    "deltalake",
-    "duckdb",
-    "openpyxl",
-    "holidays",
-)
-# capa → segmentos de un módulo de la app que esa capa no puede importar
-OUTER_LAYERS = {
-    "domain": {"application", "infrastructure", "bootstrap"},
-    "application": {"infrastructure", "bootstrap"},
-}
-# app.core (configuración) y app.db (ORM) son infraestructura de la plataforma.
-PLATFORM = ("app.core", "app.db")
 
 
-def _imports(path: Path) -> set[str]:
-    names: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-        if isinstance(node, ast.Import):
-            names |= {a.name for a in node.names}
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            names.add(node.module)
-    return names
+def _contracts() -> dict[str, dict]:
+    config = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+    return {c["id"]: c for c in config["tool"]["importlinter"]["contracts"]}
 
 
-def _forbidden(layer: str, module: str) -> bool:
-    if module.startswith(FRAMEWORKS) or module.startswith(PLATFORM):
-        return True
-    return module.startswith("app.") and bool(OUTER_LAYERS[layer] & set(module.split(".")))
+def test_import_contracts_pass() -> None:
+    # En otro proceso: import-linter reconfigura el logging y afectaría a las demás pruebas.
+    result = subprocess.run(  # noqa: S603 (comando fijo, sin entrada externa)
+        [Path(sys.executable).with_name("lint-imports"), "--no-cache", "--config", str(PYPROJECT)],
+        cwd=BACKEND,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
-CASES = [
-    (layer, f)
-    for layer in OUTER_LAYERS
-    for f in sorted([*APP.glob(f"*/{layer}/**/*.py"), *APP.glob(f"*/{layer}/*.py")])
-]
+@pytest.mark.parametrize("context", CONTEXTS)
+def test_contracts_cover_context(context: str) -> None:
+    contracts = _contracts()
+    assert f"app.{context}" in contracts["capas-de-cada-modulo"]["containers"]
+    assert f"app.{context}" in contracts["modulos-independientes"]["modules"]
+    assert (
+        f"app.{context}.bootstrap"
+        in contracts["bootstrap-solo-desde-entradas"]["protected_modules"]
+    )
+    pure = contracts["dominio-puro"]["source_modules"]
+    assert {f"app.{context}.domain", f"app.{context}.application"} <= set(pure)
 
 
-@pytest.mark.parametrize(("layer", "path"), CASES, ids=lambda v: str(v)[-50:])
-def test_layer_does_not_import_outer_layers(layer: str, path: Path) -> None:
-    bad = {m for m in _imports(path) if _forbidden(layer, m)}
-    assert not bad, f"{path.relative_to(APP)} importa {bad}"
+def test_every_context_is_in_the_contracts() -> None:
+    """Un contexto nuevo (carpeta con bootstrap.py) se suma a CONTEXTS y a los contratos."""
+    found = {p.parent.name for p in APP.glob("*/bootstrap.py")}
+    assert found == set(CONTEXTS)
 
 
 @pytest.mark.parametrize("context", CONTEXTS)
@@ -70,12 +63,9 @@ def test_context_has_all_layers(context: str) -> None:
     assert (root / "bootstrap.py").is_file(), f"{context} sin raíz de composición"
 
 
-@pytest.mark.parametrize(("context", "layer"), [(c, la) for c in CONTEXTS for la in OUTER_LAYERS])
-def test_rules_cover_files(context: str, layer: str) -> None:
-    assert any(f.is_relative_to(APP / context / layer) for la, f in CASES if la == layer)
-
-
-@pytest.mark.parametrize("legacy", ["api", "lakehouse", "synthetic", "ml", "core/catalog.py"])
-def test_legacy_ingest_layout_is_gone(legacy: str) -> None:
+@pytest.mark.parametrize(
+    "legacy", ["api", "lakehouse", "synthetic", "ml", "core/catalog.py", "db/session.py"]
+)
+def test_legacy_layout_is_gone(legacy: str) -> None:
     """La ingesta vive en app/ingest (ADR 0004); no volver a la estructura anterior."""
     assert not (APP / legacy).exists()

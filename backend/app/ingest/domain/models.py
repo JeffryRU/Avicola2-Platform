@@ -3,12 +3,47 @@
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal
+from enum import StrEnum
+from typing import Any
 
 from app.shared.domain.errors import DomainError
 
-Status = Literal["ok", "partial", "failed", "needs_mapping"]
 Row = dict[str, Any]
+
+# Tabla silver que alimenta gold.daily_demand (sus nombres están en config/schemas.yaml).
+ORDERS_TABLE = "orders"
+DAILY_DEMAND_TABLE = "daily_demand"
+
+
+class IngestStatus(StrEnum):
+    """Resultado de una carga (columna `status` de ingestion_log; varchar, no ENUM)."""
+
+    OK = "ok"
+    PARTIAL = "partial"  # se cargaron filas, pero otras tienen errores
+    FAILED = "failed"  # no se cargó ninguna fila (o el archivo no se pudo leer)
+    NEEDS_MAPPING = "needs_mapping"  # faltan columnas obligatorias: hay que confirmar un mapeo
+
+    @classmethod
+    def of_rows(cls, rows_ok: int, errors: int) -> "IngestStatus":
+        """Estado de una carga que ya pasó el mapeo: según las filas cargadas y los errores."""
+        if rows_ok == 0:
+            return cls.FAILED
+        return cls.PARTIAL if errors else cls.OK
+
+
+class MappingStatus(StrEnum):
+    """Estado de un mapeo de columnas (column_mappings.status)."""
+
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+
+
+class ProposedBy(StrEnum):
+    """Quién propuso el mapeo (column_mappings.proposed_by)."""
+
+    ALIAS = "alias"  # automático, por los alias de schemas.yaml
+    LLM = "llm"  # el flujo de IA de n8n
+    USER = "user"  # una persona, al confirmar
 
 
 class UnreadableFileError(DomainError):
@@ -54,7 +89,7 @@ class RowError:
 
 @dataclass
 class ParseOutcome:
-    status: Status
+    status: IngestStatus
     signature: str
     source_columns: list[str]
     mapping: dict[str, str]  # encabezado normalizado → campo
@@ -71,7 +106,7 @@ class LogEntry:
 
     file_name: str
     source: str
-    status: str
+    status: IngestStatus
     rows_ok: int
     rows_error: int
     errors: list[dict[str, Any]]
@@ -97,7 +132,7 @@ class LogRecord:
     created_at: datetime
     file_name: str
     source: str
-    status: str
+    status: str  # IngestStatus
     rows_ok: int
     rows_error: int
     bronze_path: str | None
@@ -115,7 +150,7 @@ class MappingRecord:
     source_columns: list[str] | None
     mapping_json: dict[str, str] | None
     missing_fields: list[str] | None
-    status: str  # pending | confirmed
-    proposed_by: str | None  # alias | llm | user
+    status: str  # MappingStatus
+    proposed_by: str | None  # ProposedBy
     sample_file: str | None
     updated_at: datetime

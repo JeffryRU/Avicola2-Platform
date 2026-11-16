@@ -7,7 +7,7 @@ La registra el jefe de despacho. Con esa historia se estima en qué rango llegar
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
-from app.shared.domain.errors import DomainError
+from app.planning.domain.dates import check_recent_day
 
 # Días hacia atrás que se pueden registrar o corregir (hoy incluido). Nunca días futuros.
 PRODUCTION_BACK_DAYS = 7
@@ -62,13 +62,7 @@ class DailyProduction:
 
 
 def check_production_date(day: date, today: date) -> None:
-    if day > today:
-        raise DomainError("No se puede registrar la producción de un día que aún no llega.")
-    if day < today - timedelta(days=PRODUCTION_BACK_DAYS):
-        raise DomainError(
-            "Solo se puede registrar o corregir la producción de los últimos "
-            f"{PRODUCTION_BACK_DAYS} días."
-        )
+    check_recent_day(day, today, PRODUCTION_BACK_DAYS, "la producción")
 
 
 @dataclass(frozen=True)

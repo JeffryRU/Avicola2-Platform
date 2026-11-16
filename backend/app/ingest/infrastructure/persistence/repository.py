@@ -8,7 +8,15 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.db.models import ColumnMapping, IngestionLog
-from app.ingest.domain.models import LogEntry, LogRecord, MappingRecord, PendingMapping
+from app.ingest.domain.models import (
+    IngestStatus,
+    LogEntry,
+    LogRecord,
+    MappingRecord,
+    MappingStatus,
+    PendingMapping,
+    ProposedBy,
+)
 
 
 def _log_record(row: IngestionLog) -> LogRecord:
@@ -51,7 +59,8 @@ class SqlIngestRepository:
     def confirmed_mapping(self, signature: str) -> dict[str, str] | None:
         row = self.session.scalar(
             select(ColumnMapping).where(
-                ColumnMapping.source_signature == signature, ColumnMapping.status == "confirmed"
+                ColumnMapping.source_signature == signature,
+                ColumnMapping.status == MappingStatus.CONFIRMED,
             )
         )
         return row.mapping_json if row else None
@@ -63,15 +72,15 @@ class SqlIngestRepository:
         if row is None:
             row = ColumnMapping(source_signature=pending.signature)
             self.session.add(row)
-        if row.status != "confirmed":
-            row.status = "pending"
+        if row.status != MappingStatus.CONFIRMED:
+            row.status = MappingStatus.PENDING
             row.source_columns = pending.source_columns
             row.missing_fields = pending.missing_fields
             row.sample_file = pending.sample_file
             # No pisar una propuesta del LLM con la automática (que es más pobre).
-            if row.proposed_by in (None, "alias"):
+            if row.proposed_by in (None, ProposedBy.ALIAS):
                 row.mapping_json = pending.proposal
-                row.proposed_by = "alias"
+                row.proposed_by = ProposedBy.ALIAS
         self.session.commit()
         return row.id
 
@@ -104,7 +113,7 @@ class SqlIngestRepository:
                 select(IngestionLog.bronze_path)
                 .where(
                     IngestionLog.source_signature == signature,
-                    IngestionLog.status == "needs_mapping",
+                    IngestionLog.status == IngestStatus.NEEDS_MAPPING,
                     IngestionLog.bronze_path.is_not(None),
                 )
                 .distinct()

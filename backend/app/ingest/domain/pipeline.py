@@ -6,12 +6,13 @@ el LLM.
 """
 
 import math
+from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any
 
 from app.ingest.domain.catalog import Catalog
 from app.ingest.domain.mapping import IGNORE, split_mapping
-from app.ingest.domain.models import ParseOutcome, RawTable, Row, RowError
+from app.ingest.domain.models import IngestStatus, ParseOutcome, RawTable, Row, RowError
 from app.ingest.domain.normalize import (
     CellError,
     is_blank,
@@ -150,7 +151,87 @@ def _aggregate(rows: list[Row], spec: TableSpec) -> list[Row]:
     return merged
 
 
-def parse(  # noqa: PLR0912, PLR0915 (recorrido único de la tabla; se lee de arriba abajo)
+def _resolve_mapping(
+    headers: list[str],
+    schema: IngestSchema,
+    table: str | None,
+    confirmed_mapping: dict[str, str] | None,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Mapeo automático (alias) corregido por el confirmado; y las constantes del confirmado."""
+    candidate_tables = [table] if table else schema.routed_tables()
+    mapping = auto_mapping(headers, schema, candidate_tables)
+    confirmed_columns, constants = split_mapping(confirmed_mapping or {})
+    for header, target in confirmed_columns.items():
+        if header not in headers:
+            continue
+        mapping = {h: t for h, t in mapping.items() if t != target or h == header}
+        if target == IGNORE:
+            mapping.pop(header, None)
+        else:
+            mapping[header] = target
+    return mapping, constants
+
+
+@dataclass(frozen=True)
+class _Rows:
+    """Lo necesario para validar cada fila del archivo, ya resuelto el mapeo."""
+
+    raw: RawTable
+    schema: IngestSchema
+    catalog: Catalog
+    header_of: dict[str, str]  # campo → encabezado normalizado
+    constants: dict[str, str]  # campo → valor fijo para todo el archivo
+    filename_channel: str | None
+
+    def table_of(self, record: Row, excel_row: int, forced: str | None) -> str | RowError:
+        """Tabla destino de la fila (por la columna tipo), o el error si el tipo no vale."""
+        if forced is not None:
+            return forced
+        routing = self.schema.routing
+        route_header = self.header_of.get(routing.field)
+        value = record.get(route_header) if route_header else self.constants.get(routing.field)
+        if is_blank(value):
+            return routing.tables[routing.default]
+        target = _route(self.schema, str(value))
+        if target is not None:
+            return target
+        return RowError(
+            excel_row,
+            self.raw.display_name(route_header) if route_header else "tipo",
+            value,
+            f"tipo no válido ({', '.join(routing.tables)})",
+        )
+
+    def _value(self, record: Row, name: str, col: ColumnSpec) -> Any:
+        header = self.header_of.get(name)
+        if header is not None:
+            value = record.get(header)
+            return col.default if is_blank(value) else value
+        if name in self.constants:
+            return self.constants[name]
+        return self.filename_channel if col.from_filename else col.default
+
+    def clean(self, record: Row, excel_row: int, spec: TableSpec) -> tuple[Row, list[RowError]]:
+        """Fila convertida a los tipos de la tabla, y sus errores (vacío si es válida)."""
+        clean: Row = {}
+        errors: list[RowError] = []
+        for name, col in spec.columns.items():
+            header = self.header_of.get(name)
+            label = self.raw.display_name(header) if header else name
+            value = self._value(record, name, col)
+            if is_blank(value):
+                if col.required:
+                    errors.append(RowError(excel_row, label, None, f"falta {label}"))
+                clean[name] = None
+                continue
+            try:
+                clean[name] = _convert(label, col, value, self.catalog)
+            except CellError as exc:
+                errors.append(RowError(excel_row, label, value, str(exc)))
+        return clean, errors
+
+
+def parse(
     raw: RawTable,
     filename: str,
     schema: IngestSchema,
@@ -158,89 +239,33 @@ def parse(  # noqa: PLR0912, PLR0915 (recorrido único de la tabla; se lee de ar
     confirmed_mapping: dict[str, str] | None = None,
     table: str | None = None,
 ) -> ParseOutcome:
-    """Convierte la tabla cruda en DataFrames validados por tabla silver."""
+    """Convierte la tabla cruda en filas validadas por tabla silver."""
     if table is not None and table not in schema.tables:
         raise ValueError(f"tabla desconocida: {table}")
-    headers = list(raw.columns)
-    candidate_tables = [table] if table else schema.routed_tables()
-    mapping = auto_mapping(headers, schema, candidate_tables)
-    confirmed_columns, constants = split_mapping(confirmed_mapping or {})
-    if confirmed_columns:
-        for header, target in confirmed_columns.items():
-            if header not in headers:
-                continue
-            mapping = {h: t for h, t in mapping.items() if t != target or h == header}
-            if target == IGNORE:
-                mapping.pop(header, None)
-            else:
-                mapping[header] = target
-
+    mapping, constants = _resolve_mapping(list(raw.columns), schema, table, confirmed_mapping)
     filename_channel = channel_from_filename(filename, catalog)
     targets = _target_tables(schema, table, mapping, constants)
-    outcome = ParseOutcome("ok", raw.signature, raw.source_columns, mapping)
+    outcome = ParseOutcome(IngestStatus.OK, raw.signature, raw.source_columns, mapping)
     outcome.missing_fields = _missing_required(
         [schema.tables[t] for t in targets], mapping, constants, filename_channel
     )
     if outcome.missing_fields:
-        outcome.status = "needs_mapping"
+        outcome.status = IngestStatus.NEEDS_MAPPING
         return outcome
 
     header_of = {target: header for header, target in mapping.items()}
+    rows_of = _Rows(raw, schema, catalog, header_of, constants, filename_channel)
     rows: dict[str, list[Row]] = {t: [] for t in targets}
-
     for i, record in enumerate(raw.rows):
         if all(is_blank(v) for v in record.values()):
             continue
         outcome.rows_total += 1
         excel_row = raw.excel_row(i)
-        errors: list[RowError] = []
-
-        target = table
-        if target is None:
-            route_header = header_of.get(schema.routing.field)
-            route_value = (
-                record.get(route_header) if route_header else constants.get(schema.routing.field)
-            )
-            if is_blank(route_value):
-                target = schema.routing.tables[schema.routing.default]
-            else:
-                target = _route(schema, str(route_value))
-                if target is None:
-                    errors.append(
-                        RowError(
-                            excel_row,
-                            raw.display_name(route_header) if route_header else "tipo",
-                            route_value,
-                            f"tipo no válido ({', '.join(schema.routing.tables)})",
-                        )
-                    )
-
-        clean: Row = {}
-        if target is not None:
-            for name, col in schema.tables[target].columns.items():
-                header = header_of.get(name)
-                label = raw.display_name(header) if header else name
-                if header is None:
-                    if name in constants:
-                        value = constants[name]
-                    elif col.from_filename:
-                        value = filename_channel
-                    else:
-                        value = col.default
-                else:
-                    value = record.get(header)
-                    if is_blank(value):
-                        value = col.default
-                if is_blank(value):
-                    if col.required:
-                        errors.append(RowError(excel_row, label, None, f"falta {label}"))
-                    clean[name] = None
-                    continue
-                try:
-                    clean[name] = _convert(label, col, value, catalog)
-                except CellError as exc:
-                    errors.append(RowError(excel_row, label, value, str(exc)))
-
+        target = rows_of.table_of(record, excel_row, table)
+        if isinstance(target, RowError):
+            outcome.errors.append(target)
+            continue
+        clean, errors = rows_of.clean(record, excel_row, schema.tables[target])
         if errors:
             outcome.errors.extend(errors)
             continue
@@ -250,9 +275,5 @@ def parse(  # noqa: PLR0912, PLR0915 (recorrido único de la tabla; se lee de ar
     for name, records in rows.items():
         if records:
             outcome.tables[name] = _aggregate(records, schema.tables[name])
-
-    if outcome.rows_ok == 0:
-        outcome.status = "failed"
-    elif outcome.errors:
-        outcome.status = "partial"
+    outcome.status = IngestStatus.of_rows(outcome.rows_ok, len(outcome.errors))
     return outcome

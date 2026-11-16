@@ -7,9 +7,9 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
-from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
+from app.planning.application.editing import EditingRules
 from app.planning.application.ports import (
     ChangeLog,
     Clock,
@@ -20,17 +20,13 @@ from app.planning.application.ports import (
     SellerRepository,
 )
 from app.planning.domain.catalog import Catalog
+from app.planning.domain.dates import check_range
 from app.planning.domain.history import CREATED, UPDATED, ProjectionChange
 from app.planning.domain.models import SELLER, DailyUnits, Product, Projection, Seller
 from app.planning.domain.permissions import Permission
 from app.shared.domain.errors import DomainError, ForbiddenError, NotFoundError
 
-if TYPE_CHECKING:
-    from app.planning.application.editing import EditingRules
-
 logger = logging.getLogger(__name__)
-
-MAX_RANGE_DAYS = 400
 
 
 class GetCatalog:
@@ -56,13 +52,6 @@ class ListSellers:
         return [s for s in self.sellers.list_active() if s.role == SELLER]
 
 
-def _check_range(date_from: date, date_to: date) -> None:
-    if date_to < date_from:
-        raise DomainError("El rango de fechas está invertido.")
-    if (date_to - date_from).days > MAX_RANGE_DAYS:
-        raise DomainError(f"El rango no puede superar {MAX_RANGE_DAYS} días.")
-
-
 class ListProjections:
     def __init__(self, projections: ProjectionRepository):
         self.projections = projections
@@ -70,7 +59,7 @@ class ListProjections:
     def __call__(
         self, viewer: Seller, date_from: date, date_to: date, seller: str | None
     ) -> list[Projection]:
-        _check_range(date_from, date_to)
+        check_range(date_from, date_to)
         return self.projections.find(date_from, date_to, visible_seller(viewer, seller))
 
 
@@ -91,7 +80,7 @@ class SubmitProjection:
         clock: Clock,
         max_days: int,
         on_submitted: Callable[[Seller, list[Projection], Seller], None] | None = None,
-        rules: "EditingRules | None" = None,
+        rules: EditingRules | None = None,
         sellers: SellerRepository | None = None,
         history: ChangeLog | None = None,
     ):
@@ -220,7 +209,7 @@ class GetSales:
     def __call__(
         self, viewer: Seller, date_from: date, date_to: date, seller: str | None
     ) -> list[DailyUnits]:
-        _check_range(date_from, date_to)
+        check_range(date_from, date_to)
         return self.sales.daily_units(date_from, date_to, visible_seller(viewer, seller))
 
 
@@ -249,5 +238,5 @@ class ListChanges:
     def __call__(
         self, viewer: Seller, date_from: date, date_to: date, seller: str | None
     ) -> list[ProjectionChange]:
-        _check_range(date_from, date_to)
+        check_range(date_from, date_to)
         return self.history.list(date_from, date_to, visible_seller(viewer, seller))

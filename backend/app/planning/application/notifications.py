@@ -18,14 +18,18 @@ from app.planning.domain.models import SELLER, Projection, Seller, SellerAccount
 from app.planning.domain.notifications import (
     ANNOUNCEMENT,
     AUDIENCES,
+    HISTORY_LINK,
     NOTIFICATION_CREATED,
     PROJECTION_MISSED,
     PROJECTION_REMINDER,
     PROJECTION_SUBMITTED,
     PROJECTIONS_CHANGED,
+    TEAM_STATUS_LINK,
     Audience,
     Event,
     Notification,
+    day_dashboard_link,
+    register_day_link,
 )
 from app.planning.domain.permissions import Permission
 from app.shared.domain.errors import DomainError, NotFoundError
@@ -134,7 +138,7 @@ class NotifyProjectionSubmitted:
                 PROJECTION_SUBMITTED,
                 f"{author.name} actualizó tu proyección",
                 what[0].upper() + what[1:],
-                link="/historial",
+                link=HISTORY_LINK,
             )
         else:
             supervisors = [s for s in self.sellers.list_active() if s.can(Permission.VIEW_TEAM)]
@@ -143,7 +147,7 @@ class NotifyProjectionSubmitted:
                 PROJECTION_SUBMITTED,
                 f"Proyección de {seller.name}",
                 f"Registró {what}",
-                link="/dashboards/estado",
+                link=TEAM_STATUS_LINK,
             )
         # El propio vendedor también: sus otros dispositivos actualizan su historial.
         audience = team_audience(self.sellers, Permission.VIEW_TEAM, seller.username)
@@ -187,7 +191,7 @@ class SendProjectionReminders:
             PROJECTION_REMINDER,
             "Proyección pendiente",
             f"Aún no registras tu proyección del {day:%d/%m}. Cierra {when} a las {closes:%H:%M}.",
-            link=f"/registrar?dia={day.isoformat()}",
+            link=register_day_link(day),
             dedupe_key=f"reminder-{day.isoformat()}",
         )
         logger.info(
@@ -232,7 +236,7 @@ class NotifyClosingSoon:
                 "Tu proyección cierra pronto",
                 f"Aún no registras tu proyección del {day:%d/%m}. Cierra a las {closes:%H:%M} "
                 f"(en {minutes} min).",
-                link=f"/registrar?dia={day.isoformat()}",
+                link=register_day_link(day),
                 dedupe_key=f"closing-{day.isoformat()}-{closes:%H%M}",
             )
             if sent:
@@ -293,7 +297,7 @@ class NotifyMissedProjections:
                 PROJECTION_MISSED,
                 "No registraste tu proyección",
                 f"La del {day:%d/%m} cerró el {closes:%d/%m} a las {closes:%H:%M}. {hint}",
-                link=f"/registrar?dia={day.isoformat()}",
+                link=register_day_link(day),
                 dedupe_key=key,
             )
         names = _names([s.name for s in missing])
@@ -305,7 +309,7 @@ class NotifyMissedProjections:
             f"{count} {'vendedor' if count == 1 else 'vendedores'} sin proyección del {day:%d/%m}",
             f"Pasó la hora de corte ({closes:%H:%M}) y {'falta' if count == 1 else 'faltan'}: "
             f"{names}.",
-            link=f"/dashboards/dia/{day.isoformat()}",
+            link=day_dashboard_link(day),
             dedupe_key=key,
         )
         logger.info("Sin proyección del %s pasado el corte: %d vendedor(es)", day, count)

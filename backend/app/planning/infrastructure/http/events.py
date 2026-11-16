@@ -20,8 +20,9 @@ from app.planning.infrastructure.events import Subscription, event_bus
 from app.planning.infrastructure.http.router import SessionToken
 from app.shared.domain.errors import AuthenticationError, ForbiddenError
 from app.shared.infrastructure.database.session import SessionLocal
+from app.shared.infrastructure.http.paths import API_PREFIX
 
-router = APIRouter(prefix="/api", tags=["events"])
+router = APIRouter(prefix=API_PREFIX, tags=["events"])
 
 # Comentario cada 20 s: los proxies no cierran la conexión por inactividad y el servidor
 # detecta antes a los navegadores que se fueron.

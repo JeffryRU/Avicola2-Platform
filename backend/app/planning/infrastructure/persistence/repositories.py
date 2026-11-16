@@ -7,7 +7,14 @@ from sqlalchemy import delete, insert, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.planning.domain.accounts import AccountChange, ChangeOutcome
-from app.planning.domain.models import Product, Projection, ProjectionLine, Seller, SellerAccount
+from app.planning.domain.models import (
+    Product,
+    Projection,
+    ProjectionLine,
+    Seller,
+    SellerAccount,
+    projectable,
+)
 from app.planning.infrastructure.persistence.tables import (
     products,
     projection_lines,
@@ -23,7 +30,7 @@ class SqlProductRepository:
 
     def list_active(self) -> list[Product]:
         """Lo que se proyecta y se pide: productos activos de calidad A."""
-        return [p for p in self.list_stock_items() if p.quality == "A"]
+        return projectable(self.list_stock_items())
 
     def list_stock_items(self) -> list[Product]:
         """Todo lo que se cuenta en el stock: los de calidad A y también los de calidad B."""

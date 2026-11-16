@@ -16,6 +16,7 @@ from app.planning.application.ports import (
 )
 from app.planning.application.use_cases import visible_seller
 from app.planning.domain.catalog import Catalog
+from app.planning.domain.dates import check_order
 from app.planning.domain.models import CONFIRMED, SELLER, Seller
 from app.planning.domain.permissions import Permission
 from app.shared.domain.errors import DomainError
@@ -89,8 +90,7 @@ class ExportProjections:
         seller: str | None,
     ) -> ExportTable:
         generated_at = self.clock.now()
-        if date_to < date_from:
-            raise DomainError("El rango de fechas está invertido.")
+        check_order(date_from, date_to)
         if (date_to - date_from).days >= MAX_EXPORT_DAYS:
             raise DomainError(f"Exporta como máximo {MAX_EXPORT_DAYS} días a la vez.")
         only = visible_seller(viewer, seller)

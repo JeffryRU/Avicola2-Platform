@@ -7,6 +7,7 @@ granja solo cuenta el stock de lotes recientes: lo más antiguo se troza y ya no
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
+from app.planning.domain.dates import check_recent_day
 from app.shared.domain.errors import DomainError
 
 # Días hacia atrás que se pueden registrar o corregir (hoy incluido). Nunca días futuros:
@@ -15,6 +16,8 @@ STOCK_BACK_DAYS = 7
 MAX_UNITS = 1_000_000
 # Un lote no puede ser posterior al día del stock ni más antiguo que esto (el pollo dura ~8 días).
 MAX_LOT_AGE_DAYS = 15
+# Ubicación del stock cuando no se configuran otras (STOCK_LOCATIONS) y en datos antiguos.
+DEFAULT_LOCATION = "General"
 
 
 @dataclass(frozen=True)
@@ -22,7 +25,7 @@ class StockLine:
     product_id: str
     units: int
     kg: float
-    location: str = "General"
+    location: str = DEFAULT_LOCATION
     # Fecha de beneficio del lote (None en datos antiguos: se toma el día del stock).
     lot_date: date | None = None
 
@@ -57,12 +60,7 @@ class DailyStock:
 
 
 def check_stock_date(day: date, today: date) -> None:
-    if day > today:
-        raise DomainError("No se puede registrar el stock de un día que aún no llega.")
-    if day < today - timedelta(days=STOCK_BACK_DAYS):
-        raise DomainError(
-            f"Solo se puede registrar o corregir el stock de los últimos {STOCK_BACK_DAYS} días."
-        )
+    check_recent_day(day, today, STOCK_BACK_DAYS, "el stock")
 
 
 def check_lot_date(lot: date, day: date) -> None:

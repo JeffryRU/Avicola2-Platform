@@ -7,7 +7,7 @@
     uv run python -m app.planning.infrastructure.cli rol <usuario> <rol>
                         cambia el rol de una cuenta y cierra sus sesiones (p. ej., para
                         ascender a supervisor general a un supervisor que ya existe).
-                        Roles: seller, supervisor, general_supervisor
+                        Roles: seller, dispatch_chief, supervisor, general_supervisor
     uv run python -m app.planning.infrastructure.cli vendedores [--simple] [--reset]
                         vendedores de la tabla maestra con contraseña inicial
                         (--simple: <usuario>2026; --reset: también a los que ya existen)
@@ -26,22 +26,28 @@
 Las tablas las crea Alembic (`uv run alembic upgrade head`).
 """
 
-import os
 import random
 import sys
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
+from typing import Any
 
 import yaml
 from openpyxl import load_workbook
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
-from app.core.config import Settings, get_settings
+from app.core.config import REPO_ROOT, Settings, get_settings
 from app.planning.application.use_cases import DayUnits, SubmitProjection
 from app.planning.bootstrap import planning_cache
 from app.planning.domain.accounts import AccountChange, ChangeOutcome, check_username
-from app.planning.domain.models import SELLER, Seller, SellerAccount
+from app.planning.domain.models import (
+    BRASA_CATEGORY,
+    QUALITY_A,
+    SELLER,
+    Seller,
+    SellerAccount,
+)
 from app.planning.domain.permissions import (
     GENERAL_SUPERVISOR,
     GUARDIAN_ROLE,
@@ -90,10 +96,15 @@ SELLER_FACTOR = {
 }
 
 
+def load_seed(settings: Settings) -> dict[str, Any]:
+    """Datos maestros de config/planning_seed.yaml (productos y usuarios). Único lector."""
+    with (settings.config_dir / "planning_seed.yaml").open(encoding="utf-8") as fh:
+        return yaml.safe_load(fh)
+
+
 def init(session: Session, settings: Settings) -> None:
     """Carga o actualiza productos y vendedores desde config/planning_seed.yaml (idempotente)."""
-    with (settings.config_dir / "planning_seed.yaml").open(encoding="utf-8") as fh:
-        seed = yaml.safe_load(fh)
+    seed = load_seed(settings)
     order = 0
     for category, items in seed["products"].items():
         for item in items:
@@ -104,7 +115,7 @@ def init(session: Session, settings: Settings) -> None:
                 "kg_per_unit": item["kg_per_unit"],
                 "sort_order": order,
                 "is_active": True,
-                "quality": item.get("quality", "A"),
+                "quality": item.get("quality", QUALITY_A),
             }
             exists = session.scalar(select(products.c.id).where(products.c.id == item["id"]))
             if exists:
@@ -124,7 +135,7 @@ def init(session: Session, settings: Settings) -> None:
             '  python -m app.planning.infrastructure.cli supervisor <usuario> "<nombre>" --general'
         )
         return
-    password = os.environ.get("PLANNING_DEMO_PASSWORD", "demo1234")
+    password = settings.planning_demo_password
     hasher = ScryptPasswordHasher()
     for s in seed["users"]:
         if not session.scalar(select(sellers.c.id).where(sellers.c.username == s["username"])):
@@ -220,8 +231,7 @@ def create_sellers(
     cambiarla. `simple` usa <usuario>2026 (fácil de dictar en una entrevista); `reset` también
     restablece a los que ya existen y cierra sus sesiones abiertas.
     """
-    with (settings.config_dir / "planning_seed.yaml").open(encoding="utf-8") as fh:
-        seed = yaml.safe_load(fh)
+    seed = load_seed(settings)
     repo, hasher, passwords = (
         SqlSellerRepository(session),
         ScryptPasswordHasher(),
@@ -268,7 +278,7 @@ def seed_history(session: Session, settings: Settings) -> None:
     """Proyecciones BRASA de los últimos 21 días para cada vendedor (para ver los dashboards)."""
     today = ZoneClock(settings.tz).today()
     product_repo, projection_repo = SqlProductRepository(session), SqlProjectionRepository(session)
-    brasa = [p for p in product_repo.list_active() if p.category == "BRASA"]
+    brasa = [p for p in product_repo.list_active() if p.category == BRASA_CATEGORY]
     total = 0
     for seller in [s for s in SqlSellerRepository(session).list_active() if s.is_seller]:
         f = SELLER_FACTOR.get(seller.username, 1.0)
@@ -280,7 +290,7 @@ def seed_history(session: Session, settings: Settings) -> None:
             }
             # Reloj fijo en ese día: se guarda como si se hubiera enviado entonces.
             submit = SubmitProjection(product_repo, projection_repo, _DayClock(day), 1)
-            submit(seller, "BRASA", [DayUnits(day, units)], None)
+            submit(seller, BRASA_CATEGORY, [DayUnits(day, units)], None)
             total += 1
     print(f"OK: {total} proyecciones de ejemplo cargadas (últimos 21 días).")
 
@@ -300,7 +310,8 @@ def import_production(session: Session, settings: Settings, path: Path) -> int:
     if not path.is_file():
         print(f"No existe el archivo {path}.")
         return 1
-    brasa = [p for p in SqlProductRepository(session).list_active() if p.category == "BRASA"]
+    products = SqlProductRepository(session).list_active()
+    brasa = [p for p in products if p.category == BRASA_CATEGORY]
     days, skipped = read_production(path, brasa, ZoneClock(settings.tz).now())
     repo = SqlProductionRepository(session)
     for day in days:
@@ -443,9 +454,7 @@ def _run(argv: list[str], settings: Settings) -> int:
         elif cmd == "produccion" and len(argv) == 2:
             return import_production(session, settings, Path(argv[1]))
         elif cmd == "historia" and len(argv) <= 2:
-            folder = (
-                Path(argv[1]) if len(argv) == 2 else settings.config_dir.parents[1] / "data/inbox"
-            )
+            folder = Path(argv[1]) if len(argv) == 2 else REPO_ROOT / "data" / "inbox"
             return load_history(session, settings, folder)
         elif cmd == "show":
             show(session, int(argv[1]) if len(argv) > 1 else 20)

@@ -117,9 +117,25 @@ def roles_with(permission: Permission) -> tuple[str, ...]:
     return tuple(r for r in ROLES if can(r, permission))
 
 
-def require(role: str, permission: Permission, message: str) -> None:
+# Qué se responde cuando falta el permiso. La barrera del router responde siempre FORBIDDEN.
+FORBIDDEN = "No tienes permiso para hacer esto."
+_SUPERVISORS_ONLY = "Solo un supervisor puede hacer esto."
+DENIED: dict[Permission, str] = {
+    Permission.MANAGE_EDITING: _SUPERVISORS_ONLY,
+    Permission.MANAGE_ACCOUNTS: _SUPERVISORS_ONLY,
+    Permission.CHANGE_ROLES: "Solo el supervisor general puede cambiar roles.",
+    Permission.VIEW_STOCK: "No tienes permiso para ver el stock.",
+    Permission.MANAGE_STOCK: "No tienes permiso para registrar el stock.",
+    Permission.VIEW_SACA: "No tienes permiso para ver el cálculo de saca.",
+    Permission.VIEW_PRODUCTION: "No tienes permiso para ver la producción.",
+    Permission.MANAGE_PRODUCTION: "No tienes permiso para registrar la producción.",
+}
+
+
+def require(role: str, permission: Permission) -> None:
+    """Lanza ForbiddenError, con el mensaje de ese permiso, si el rol no lo tiene."""
     if not can(role, permission):
-        raise ForbiddenError(message)
+        raise ForbiddenError(DENIED.get(permission, FORBIDDEN))
 
 
 # Siempre debe quedar al menos una cuenta ACTIVA con este rol: si no, nadie podría volver a

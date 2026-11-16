@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from app.ingest.application.ports import IngestionLogRepository, MappingRepository
 from app.ingest.application.service import IngestResult, IngestService
 from app.ingest.domain.mapping import validate_mapping
-from app.ingest.domain.models import LogRecord, MappingRecord
+from app.ingest.domain.models import LogRecord, MappingRecord, MappingStatus, ProposedBy
 from app.ingest.domain.schema import IngestSchema
 from app.shared.domain.errors import ConflictError, DomainError, NotFoundError
 
@@ -63,10 +63,10 @@ class ProposeMapping:
 
     def __call__(self, mapping_id: int, mapping: dict[str, str]) -> MappingRecord:
         record = _get(self.mappings, mapping_id)
-        if record.status == "confirmed":
+        if record.status == MappingStatus.CONFIRMED:
             raise ConflictError("el mapeo ya está confirmado")
         clean = validate_mapping(self.schema, record.source_columns, mapping)
-        return self.mappings.update_mapping(mapping_id, clean, record.status, "llm")
+        return self.mappings.update_mapping(mapping_id, clean, record.status, ProposedBy.LLM)
 
 
 class ConfirmMapping:
@@ -88,7 +88,10 @@ class ConfirmMapping:
         if not final:
             raise DomainError("no hay mapeo para confirmar")
         record = self.mappings.update_mapping(
-            mapping_id, final, "confirmed", "user" if mapping is not None else None
+            mapping_id,
+            final,
+            MappingStatus.CONFIRMED,
+            ProposedBy.USER if mapping is not None else None,
         )
         pending = self.log.pending_bronze_paths(record.source_signature)
         results = [self.service.reprocess(path) for path in pending]

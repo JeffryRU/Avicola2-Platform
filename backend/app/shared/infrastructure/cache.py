@@ -54,7 +54,13 @@ class MemoryCache:
         self._items: dict[str, tuple[float, Any]] = {}
         self._lock = threading.Lock()
 
-    def get_or_load(self, key: str, load: Callable[[], T], codec: Codec[T] = IDENTITY) -> T:  # noqa: ARG002
+    # En memoria no se serializa: `codec` está por la interfaz común con RedisCache.
+    def get_or_load(
+        self,
+        key: str,
+        load: Callable[[], T],
+        codec: Codec[T] = IDENTITY,  # noqa: ARG002
+    ) -> T:
         if self.ttl <= 0:
             return load()
         now = self._clock()
@@ -106,7 +112,7 @@ class RedisCache:
         try:
             payload = json.dumps({"v": codec.dump(value)}, ensure_ascii=False)
             self.client.set(full, payload, px=max(1, int(self.ttl * 1000)))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 — sin guardar, la próxima lectura va a la base
             self._warn("guardar", exc)
         return value
 
@@ -115,7 +121,7 @@ class RedisCache:
             keys = list(self.client.scan_iter(match=self.namespace + prefix + "*", count=200))
             if keys:
                 self.client.delete(*keys)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 — cualquier fallo de Redis
             # Sin invalidar, lo viejo dura a lo sumo el TTL (el valor vence solo en Redis).
             self._warn("invalidar", exc)
 

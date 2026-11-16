@@ -9,6 +9,7 @@ supervisor le da directamente). El supervisor puede apagar el bloqueo por horari
 import re
 from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta, tzinfo
+from typing import Literal
 
 from app.shared.domain.errors import ConflictError, DomainError
 
@@ -16,23 +17,28 @@ from app.shared.domain.errors import ConflictError, DomainError
 REQUESTED, APPROVED, REJECTED, CLOSED = "requested", "approved", "rejected", "closed"
 UNLOCK_STATUSES = (REQUESTED, APPROVED, REJECTED, CLOSED)
 # Lo que puede hacer el supervisor con una habilitación y a qué estado la lleva.
-DECISIONS = {
-    "approve": (REQUESTED, APPROVED),
-    "reject": (REQUESTED, REJECTED),
-    "close": (APPROVED, CLOSED),
+# `Decision` es el tipo de la API; una prueba verifica que coincide con DECISIONS.
+Decision = Literal["approve", "reject", "close"]
+APPROVE, REJECT, CLOSE = "approve", "reject", "close"
+DECISIONS: dict[str, tuple[str, str]] = {
+    APPROVE: (REQUESTED, APPROVED),
+    REJECT: (REQUESTED, REJECTED),
+    CLOSE: (APPROVED, CLOSED),
 }
 
 MAX_REASON = 300
 MAX_DAYS_BEFORE = 7
-_HHMM = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
+# Hora de corte HH:MM (00:00 a 23:59). La API valida con el mismo patrón.
+CUTOFF_PATTERN = r"^([01]\d|2[0-3]):[0-5]\d$"
 
 
 def parse_cutoff(value: str) -> time:
     """Convierte "07:00" en time(7, 0). Lanza DomainError si no es una hora HH:MM válida."""
-    match = _HHMM.match(value.strip())
-    if not match:
+    text = value.strip()
+    if not re.match(CUTOFF_PATTERN, text):
         raise DomainError("La hora de corte debe tener el formato HH:MM (por ejemplo, 07:00).")
-    return time(int(match[1]), int(match[2]))
+    hours, minutes = text.split(":")
+    return time(int(hours), int(minutes))
 
 
 def clean_reason(reason: str) -> str:

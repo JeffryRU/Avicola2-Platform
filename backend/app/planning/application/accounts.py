@@ -60,7 +60,7 @@ class NewCredentials:
 
 
 def require_supervisor(actor: SellerAccount) -> None:
-    require(actor.seller.role, Permission.MANAGE_ACCOUNTS, "Solo un supervisor puede hacer esto.")
+    require(actor.seller.role, Permission.MANAGE_ACCOUNTS)
 
 
 def _check_role(role: str) -> None:
@@ -320,11 +320,7 @@ class ChangeRole(_ManageAccount):
         self.notifications = notifications
 
     def __call__(self, actor: SellerAccount, username: str, role: str) -> SellerAccount:
-        require(
-            actor.seller.role,
-            Permission.CHANGE_ROLES,
-            "Solo el supervisor general puede cambiar roles.",
-        )
+        require(actor.seller.role, Permission.CHANGE_ROLES)
         _check_role(role)
         target = self._target(actor, username)
         if role not in assignable_roles(actor.seller.role, target.seller.role):

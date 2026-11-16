@@ -12,16 +12,20 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.ingest.bootstrap import IngestUseCases, build_use_cases
-from app.ingest.domain.models import LogRecord, MappingRecord
+from app.ingest.domain.models import LogRecord, MappingRecord, MappingStatus
 from app.ingest.infrastructure.http.schemas import LogOut, MappingBody, MappingOut, TransformRequest
 from app.shared.infrastructure.database.session import get_session
 from app.shared.infrastructure.http.params import DbIdPath
+from app.shared.infrastructure.http.paths import INGEST_PREFIX
 from app.shared.infrastructure.http.service_token import require_service_token
 
-MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_UPLOAD_MB = 20
+MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 
 
-router = APIRouter(prefix="/ingest", tags=["ingest"], dependencies=[Depends(require_service_token)])
+router = APIRouter(
+    prefix=INGEST_PREFIX, tags=["ingest"], dependencies=[Depends(require_service_token)]
+)
 
 
 def get_use_cases(session: Annotated[Session, Depends(get_session)]) -> IngestUseCases:
@@ -44,7 +48,9 @@ async def upload(
     use_cases.schema.require_table(table)
     content = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "archivo de más de 20 MB")
+        raise HTTPException(
+            status.HTTP_413_CONTENT_TOO_LARGE, f"archivo de más de {MAX_UPLOAD_MB} MB"
+        )
     if not content:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "archivo vacío")
     return asdict(use_cases.service.ingest(content, file.filename or "archivo", source, table))
@@ -67,7 +73,8 @@ def ingestion_log(
 
 @router.get("/mappings", response_model=list[MappingOut])
 def list_mappings(
-    use_cases: UseCases, status_: Annotated[str | None, Query(alias="status")] = "pending"
+    use_cases: UseCases,
+    status_: Annotated[str | None, Query(alias="status")] = MappingStatus.PENDING.value,
 ) -> list[MappingRecord]:
     return use_cases.list_mappings(status_)
 

@@ -6,6 +6,8 @@ from typing import Any
 from sqlalchemy import JSON, Date, DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.ingest.domain.models import MappingStatus
+
 # Esquema y nombres de tabla salen de config/tables.yaml (fuente única).
 from app.shared.infrastructure.database.metadata import APP_SCHEMA, TABLES, Base
 
@@ -66,8 +68,7 @@ class IngestionLog(TimestampMixin, Base):
     rows_ok: Mapped[int] = mapped_column(default=0)
     rows_error: Mapped[int] = mapped_column(default=0)
     errors_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON)
-    # ok | partial | failed | needs_mapping
-    status: Mapped[str] = mapped_column(String(32), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)  # IngestStatus
     bronze_path: Mapped[str | None] = mapped_column(String(512))
     source_signature: Mapped[str | None] = mapped_column(String(64), index=True)
     # Filas cargadas por tabla y versión Delta resultante: {"orders": {"rows": 60, "version": 3}}
@@ -84,8 +85,8 @@ class ColumnMapping(TimestampMixin, Base):
     # Encabezado normalizado → campo. Mientras está pendiente, es la propuesta (alias o LLM).
     mapping_json: Mapped[dict[str, str] | None] = mapped_column(JSON)
     missing_fields: Mapped[list[str] | None] = mapped_column(JSON)
-    status: Mapped[str] = mapped_column(String(32), default="pending")  # pending | confirmed
-    proposed_by: Mapped[str | None] = mapped_column(String(16))  # alias | llm | user
+    status: Mapped[str] = mapped_column(String(32), default=MappingStatus.PENDING.value)
+    proposed_by: Mapped[str | None] = mapped_column(String(16))  # ProposedBy
     sample_file: Mapped[str | None] = mapped_column(String(255))
     confirmed_by: Mapped[int | None] = mapped_column(ForeignKey(TABLES.fk("users")))
     updated_at: Mapped[datetime] = mapped_column(

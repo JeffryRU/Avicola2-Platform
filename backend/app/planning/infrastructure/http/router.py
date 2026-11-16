@@ -23,6 +23,7 @@ from app.planning.bootstrap import PlanningUseCases, build_use_cases
 from app.planning.domain.editing import CutoffPolicy, EditUnlock
 from app.planning.domain.models import Projection, Seller, SellerAccount
 from app.planning.domain.permissions import (
+    FORBIDDEN,
     Permission,
     assignable_roles,
     can_manage,
@@ -41,10 +42,11 @@ from app.planning.infrastructure.http import schemas as s
 from app.shared.domain.errors import AuthenticationError, ForbiddenError
 from app.shared.infrastructure.database.session import get_session
 from app.shared.infrastructure.http.params import DbIdPath
+from app.shared.infrastructure.http.paths import API_PREFIX
 from app.shared.infrastructure.http.service_token import require_service_token
 
 SESSION_COOKIE = "nv_session"
-COOKIE_PATH = "/api"
+COOKIE_PATH = API_PREFIX
 
 
 def get_use_cases(session: Annotated[Session, Depends(get_session)]) -> PlanningUseCases:
@@ -100,28 +102,32 @@ def requires(permission: Permission):
 
     def check(account: ActiveAccount) -> SellerAccount:
         if not account.seller.can(permission):
-            raise ForbiddenError("No tienes permiso para hacer esto.")
+            raise ForbiddenError(FORBIDDEN)
         return account
 
     return Depends(check)
 
 
-public = APIRouter(prefix="/api", tags=["planning"])
-router = APIRouter(prefix="/api", tags=["planning"], dependencies=[Depends(active_account)])
+public = APIRouter(prefix=API_PREFIX, tags=["planning"])
+router = APIRouter(prefix=API_PREFIX, tags=["planning"], dependencies=[Depends(active_account)])
 admin = APIRouter(
-    prefix="/api/admin", tags=["admin"], dependencies=[requires(Permission.MANAGE_ACCOUNTS)]
+    prefix=f"{API_PREFIX}/admin",
+    tags=["admin"],
+    dependencies=[requires(Permission.MANAGE_ACCOUNTS)],
 )
 editing_admin = APIRouter(
-    prefix="/api/admin", tags=["admin"], dependencies=[requires(Permission.MANAGE_EDITING)]
+    prefix=f"{API_PREFIX}/admin", tags=["admin"], dependencies=[requires(Permission.MANAGE_EDITING)]
 )
 production = APIRouter(
-    prefix="/api/production",
+    prefix=f"{API_PREFIX}/production",
     tags=["production"],
     dependencies=[requires(Permission.VIEW_PRODUCTION)],
 )
-saca = APIRouter(prefix="/api/saca", tags=["saca"], dependencies=[requires(Permission.VIEW_SACA)])
+saca = APIRouter(
+    prefix=f"{API_PREFIX}/saca", tags=["saca"], dependencies=[requires(Permission.VIEW_SACA)]
+)
 stock = APIRouter(
-    prefix="/api/stock", tags=["stock"], dependencies=[requires(Permission.VIEW_STOCK)]
+    prefix=f"{API_PREFIX}/stock", tags=["stock"], dependencies=[requires(Permission.VIEW_STOCK)]
 )
 
 
@@ -443,7 +449,9 @@ def mark_notifications_read(
 # --- Llamadas de n8n (token de servicio) -----------------------------------------------
 
 internal = APIRouter(
-    prefix="/api/internal", tags=["internal"], dependencies=[Depends(require_service_token)]
+    prefix=f"{API_PREFIX}/internal",
+    tags=["internal"],
+    dependencies=[Depends(require_service_token)],
 )
 
 

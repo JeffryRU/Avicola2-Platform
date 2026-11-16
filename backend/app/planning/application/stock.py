@@ -5,10 +5,11 @@ from dataclasses import dataclass
 from datetime import date
 
 from app.planning.application.ports import Clock, ProductRepository, StockRepository
-from app.planning.application.use_cases import _check_range
+from app.planning.domain.dates import check_range
 from app.planning.domain.models import Product, Seller
 from app.planning.domain.permissions import Permission, require
 from app.planning.domain.stock import (
+    DEFAULT_LOCATION,
     MAX_UNITS,
     DailyStock,
     StockLine,
@@ -50,12 +51,12 @@ class RegisterStock:
         locations: list[str] | None = None,
     ):
         self.products, self.stock, self.clock = products, stock, clock
-        self.locations = locations or ["General"]
+        self.locations = locations or [DEFAULT_LOCATION]
 
     def __call__(
         self, actor: Seller, day: date, entries: list[StockEntry], location: str | None = None
     ) -> DailyStock:
-        require(actor.role, Permission.MANAGE_STOCK, "No tienes permiso para registrar el stock.")
+        require(actor.role, Permission.MANAGE_STOCK)
         check_stock_date(day, self.clock.today())
         place = location or self.locations[0]
         if place not in self.locations:
@@ -97,8 +98,8 @@ class ListStock:
         self.stock = stock
 
     def __call__(self, viewer: Seller, date_from: date, date_to: date) -> list[DailyStock]:
-        require(viewer.role, Permission.VIEW_STOCK, "No tienes permiso para ver el stock.")
-        _check_range(date_from, date_to)
+        require(viewer.role, Permission.VIEW_STOCK)
+        check_range(date_from, date_to)
         return self.stock.find(date_from, date_to)
 
 
@@ -107,7 +108,7 @@ class GetStockOptions:
         self.products, self.locations, self.lot_days = products, locations, lot_days
 
     def __call__(self, viewer: Seller) -> StockOptions:
-        require(viewer.role, Permission.VIEW_STOCK, "No tienes permiso para ver el stock.")
+        require(viewer.role, Permission.VIEW_STOCK)
         items = sorted(
             self.products.list_stock_items(), key=lambda p: (p.category, p.sort_order, p.id)
         )

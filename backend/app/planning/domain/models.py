@@ -8,6 +8,12 @@ from uuid import UUID
 from app.planning.domain.permissions import SELLER, Permission, can
 
 CONFIRMED = "confirmed"
+# Calidad de un producto (config/planning_seed.yaml). La A se proyecta y se pide a granja;
+# cualquier otra (la B) solo se cuenta en el stock, por tipo.
+QUALITY_A = "A"
+# Categoría de los pollos para brasa (clave de config/planning_seed.yaml): la de los pedidos
+# reales, la producción y los datos de ejemplo.
+BRASA_CATEGORY = "BRASA"
 
 
 @dataclass(frozen=True)
@@ -20,10 +26,20 @@ class Product:
     # Agrupa productos dentro de la categoría (p. ej. Brasa chica/mediana/grande); solo informativo.
     subcategory: str | None = None
     # «A»: producto normal. «B»: calidad B, que solo se cuenta en el stock (no se proyecta).
-    quality: str = "A"
+    quality: str = QUALITY_A
 
     def kg(self, units: int) -> float:
         return round(units * self.kg_per_unit, 2)
+
+    @property
+    def is_projectable(self) -> bool:
+        """Se proyecta y se pide a granja: solo la calidad A. El resto solo va al stock."""
+        return self.quality == QUALITY_A
+
+
+def projectable(products: list[Product]) -> list[Product]:
+    """Los productos que se proyectan y se piden, en el mismo orden."""
+    return [p for p in products if p.is_projectable]
 
 
 @dataclass(frozen=True)

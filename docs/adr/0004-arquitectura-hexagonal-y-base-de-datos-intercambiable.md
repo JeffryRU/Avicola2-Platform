@@ -36,7 +36,7 @@ backend/app/
     └── bootstrap.py                raíz de composición: el único que une puertos y adaptadores
 ```
 
-- **Dependencias hacia adentro:** `domain` no importa nada externo; `application` solo `domain` y sus puertos. `tests/test_architecture.py` lo verifica en cada `pytest`.
+- **Dependencias hacia adentro:** `domain` no importa nada externo; `application` solo `domain` y sus puertos. Lo verifican los contratos de import-linter (`uv run lint-imports`, en CI y dentro de `pytest`); ver [ADR 0016](0016-capas-con-import-linter-y-fuentes-unicas.md).
 - **Puertos de salida** (`application/ports.py`): repositorios, `SalesSource`, `DemandForecaster`, `PasswordHasher`, `TokenService`, `Clock`. Cambiar una fuente (ERP real, modelo de ML) es escribir otro adaptador y tocar solo `bootstrap.py`.
 - **La ingesta ya migró a esta estructura** (antes `app/ingest`, `app/lakehouse`, `app/api`, `app/synthetic` y `app/ml`); ver [Migración de la ingesta](#migración-de-la-ingesta).
 

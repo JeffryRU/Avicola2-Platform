@@ -14,10 +14,11 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Request, Response, status
 from pydantic import BaseModel, Field
 
+from app.shared.infrastructure.http.paths import API_PREFIX
 from app.shared.infrastructure.logging.setup import CLIENT_LOGGER
 
 logger = logging.getLogger(CLIENT_LOGGER)
-router = APIRouter(prefix="/api", tags=["logs"])
+router = APIRouter(prefix=API_PREFIX, tags=["logs"])
 
 MAX_ENTRIES_PER_MINUTE = 30
 LEVELS = {"error": logging.ERROR, "warning": logging.WARNING, "info": logging.INFO}

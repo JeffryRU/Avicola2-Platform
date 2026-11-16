@@ -10,8 +10,8 @@ from app.planning.application.ports import (
     ProductionRepository,
     ProductRepository,
 )
-from app.planning.application.use_cases import _check_range
 from app.planning.domain.catalog import Catalog
+from app.planning.domain.dates import check_range
 from app.planning.domain.models import Product, Seller
 from app.planning.domain.permissions import Permission, require
 from app.planning.domain.production import (
@@ -56,11 +56,7 @@ class RegisterProduction:
         entries: list[ProductionEntry],
         weights: dict[str, float] | None = None,
     ) -> DailyProduction:
-        require(
-            actor.role,
-            Permission.MANAGE_PRODUCTION,
-            "No tienes permiso para registrar la producción.",
-        )
+        require(actor.role, Permission.MANAGE_PRODUCTION)
         check_production_date(day, self.clock.today())
         if not entries:
             raise DomainError("Registra al menos un producto.")
@@ -106,10 +102,8 @@ class ListProduction:
         self.production = production
 
     def __call__(self, viewer: Seller, date_from: date, date_to: date) -> list[DailyProduction]:
-        require(
-            viewer.role, Permission.VIEW_PRODUCTION, "No tienes permiso para ver la producción."
-        )
-        _check_range(date_from, date_to)
+        require(viewer.role, Permission.VIEW_PRODUCTION)
+        check_range(date_from, date_to)
         return self.production.find(date_from, date_to)
 
 
@@ -142,9 +136,7 @@ class ForecastArrival:
     def __call__(self, viewer: Seller, weights: list[float] | None = None) -> ArrivalForecast:
         """`weights`: peso de la parvada que se espera de cada tipo, en el orden de los tipos
         (0 o ausente: se usa el último anotado)."""
-        require(
-            viewer.role, Permission.VIEW_PRODUCTION, "No tienes permiso para ver la producción."
-        )
+        require(viewer.role, Permission.VIEW_PRODUCTION)
         products = Catalog(self.products.list_active()).products
         group_of = {p.id: product_group(p) for p in products}
         groups: dict[str, list[Product]] = {}

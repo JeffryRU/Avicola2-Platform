@@ -22,6 +22,9 @@ from sqlalchemy import (
     func,
 )
 
+from app.planning.domain.models import QUALITY_A
+from app.planning.domain.permissions import SELLER
+from app.planning.domain.stock import DEFAULT_LOCATION
 from app.shared.infrastructure.database.metadata import TABLES, metadata
 
 sellers = Table(
@@ -33,7 +36,7 @@ sellers = Table(
     Column("zone", String(50)),
     Column("password_hash", String(200), nullable=False),
     # Rol: varchar validado por la app (domain/permissions.ROLES), no ENUM.
-    Column("role", String(20), nullable=False, server_default="seller"),
+    Column("role", String(20), nullable=False, server_default=SELLER),
     # Seguridad: cambio obligatorio (contraseña temporal), bloqueo por intentos y versión
     # de sesión (al subirla se invalidan los tokens emitidos antes).
     Column("must_change_password", Boolean, nullable=False, server_default=false()),
@@ -55,7 +58,7 @@ products = Table(
     Column("sort_order", Integer, nullable=False, default=0),
     Column("is_active", Boolean, nullable=False, default=True),
     # «A» o «B» (calidad B: solo para el stock de despacho).
-    Column("quality", String(1), nullable=False, default="A", server_default="A"),
+    Column("quality", String(1), nullable=False, default=QUALITY_A, server_default=QUALITY_A),
 )
 
 projections = Table(
@@ -167,7 +170,7 @@ dispatch_stock = Table(
     Column("units", Integer, nullable=False),
     Column("kg", Numeric(10, 2, asdecimal=False), nullable=False),
     # Dónde está el stock y de qué lote es (el lote es la fecha de beneficio).
-    Column("location", String(60), nullable=False, server_default="General"),
+    Column("location", String(60), nullable=False, server_default=DEFAULT_LOCATION),
     Column("lot_date", Date, nullable=False),
     Column("recorded_by", String(50), nullable=False),
     Column("recorded_at", DateTime(timezone=True), nullable=False),

@@ -14,7 +14,7 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 
-from app.planning.domain.models import Product, Seller
+from app.planning.domain.models import Product, Seller, projectable
 from app.planning.infrastructure.persistence.editing import SqlSettingsRepository
 from app.planning.infrastructure.persistence.repositories import (
     SqlProductRepository,
@@ -63,7 +63,7 @@ class CachedProductRepository:
         return list(found)
 
     def list_active(self) -> list[Product]:
-        return [p for p in self.list_stock_items() if p.quality == "A"]
+        return projectable(self.list_stock_items())
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.inner, name)

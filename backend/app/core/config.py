@@ -9,6 +9,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_AUTH_SECRET = "cambiar-en-produccion"  # noqa: S105 (marcador: fuera de local se rechaza)
 MIN_SECRET_LENGTH = 32
+# Carpetas del repositorio: las rutas relativas de la configuración se resuelven desde aquí.
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+REPO_ROOT = BACKEND_DIR.parent
+# Conversión de kg de producto a saca (pollo vivo). Valores de referencia por validar
+# (docs/assumptions.md). Los usan Settings y el generador de datos sintéticos.
+DEFAULT_YIELD_FACTOR = 0.75  # kg de producto por kg vivo
+DEFAULT_AVG_LIVE_WEIGHT_KG = 2.6  # peso vivo promedio por ave
 
 
 class Settings(BaseSettings):
@@ -75,16 +82,18 @@ class Settings(BaseSettings):
     # Minutos de anticipación con que se avisa, antes del corte, a quien aún no registró
     # (0 = sin aviso previo). El corte es el vigente: si el supervisor lo cambia, el aviso lo sigue.
     planning_closing_reminder_minutes: int = Field(30, ge=0, le=720)
+    # Contraseña de los usuarios de prueba que crea `cli init` (solo con APP_ENV=local).
+    planning_demo_password: str = "demo1234"  # noqa: S105 (solo local; la política la rechaza)
 
     # Build del frontend (React) que sirve FastAPI; si no existe, no se monta.
-    frontend_dist_dir: Path = Path(__file__).resolve().parents[3] / "frontend" / "dist"
+    frontend_dist_dir: Path = REPO_ROOT / "frontend" / "dist"
 
     # Logs: nivel (DEBUG|INFO|WARNING|ERROR), formato (text|json) y carpeta de archivos
     # (app.log y errors.log, rotativos). LOG_TO_FILES=false = solo consola.
     log_level: str = "INFO"
     log_format: str = "text"
     log_to_files: bool = True
-    log_dir: Path = Path(__file__).resolve().parents[3] / "logs"
+    log_dir: Path = REPO_ROOT / "logs"
     log_max_mb: int = Field(10, ge=1)
     log_backups: int = Field(5, ge=0)
 
@@ -94,15 +103,15 @@ class Settings(BaseSettings):
     # Token que n8n envía en X-Api-Token a /ingest/* (vacío = sin control; provisional hasta JWT).
     ingest_api_token: str | None = None
 
-    # Carpeta con catalog.yaml y schemas.yaml.
-    config_dir: Path = Path(__file__).resolve().parents[2] / "config"
+    # Carpeta con catalog.yaml, schemas.yaml, tables.yaml y planning_seed.yaml.
+    config_dir: Path = BACKEND_DIR / "config"
 
     # Estados permitidos para un plan de saca (configurables, ver ADR / docs/assumptions.md).
     saca_plan_statuses: list[str] = ["draft", "proposed", "approved", "rejected"]
 
     # Conversión de kg de producto a saca (pollo vivo). Valores de referencia por validar.
-    yield_factor: float = Field(0.75, gt=0, le=1)  # kg de producto por kg vivo
-    avg_live_weight_kg: float = Field(2.6, gt=0)  # peso vivo promedio por ave
+    yield_factor: float = Field(DEFAULT_YIELD_FACTOR, gt=0, le=1)
+    avg_live_weight_kg: float = Field(DEFAULT_AVG_LIVE_WEIGHT_KG, gt=0)
     # Ubicaciones donde se cuenta el stock de despacho (STOCK_LOCATIONS, JSON). SUPUESTO: las
     # zonas con más pedidos; falta la lista real del negocio.
     stock_locations: list[str] = Field(
