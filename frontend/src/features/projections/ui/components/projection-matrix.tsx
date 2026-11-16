@@ -89,7 +89,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
     const stk = 'sticky left-0 z-[2] min-w-24 max-w-28 border-r border-rule bg-surface pl-3 text-left'
     return (
       <div className="panel overflow-hidden">
-        <div className="overflow-x-auto overscroll-x-contain">
+        <div className="relative overflow-x-auto overscroll-x-contain">
           <table id="mx" className="min-w-full border-separate border-spacing-0 text-sm">
             <thead>
               <tr>
@@ -167,7 +167,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
   }
 
   return (
-    <div className="panel overflow-x-auto">
+    <div className="panel relative overflow-x-auto">
       <table id="mx" className="w-full border-separate border-spacing-0 text-base">
         <thead>
           <tr>

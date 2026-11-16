@@ -76,7 +76,7 @@ export function DashboardStatusPage() {
           ))}
         </section>
         {node}
-        <div className="grid gap-4 @6xl/main:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 @6xl/main:grid-cols-2">
           <Section title="Total proyectado por día (unidades)">
             <div className="px-4 pt-3 pb-4 dsk:px-5">
               <BarChart
@@ -101,7 +101,7 @@ export function DashboardStatusPage() {
             </div>
           </Section>
           <Section title="Detalle por día (unidades y kg)">
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className={tableCls.table}>
                 <thead>
                   <tr>

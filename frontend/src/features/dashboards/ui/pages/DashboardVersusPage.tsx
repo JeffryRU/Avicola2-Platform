@@ -104,7 +104,7 @@ export function DashboardVersusPage() {
             foot="según días con venta"
           />
         </KpiStrip>
-        <div className="grid gap-4 @7xl/main:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 @7xl/main:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
           <Section title="Evolución semanal (kg)">
             <div className="px-4 pt-3 pb-4 dsk:px-5">
               <div className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-ink-2">
@@ -151,7 +151,7 @@ export function DashboardVersusPage() {
                 </EmptyState>
               )}
               {points.length > 0 && (
-                <div className="-mx-4 mt-3 overflow-x-auto dsk:-mx-5">
+                <div className="relative -mx-4 mt-3 overflow-x-auto dsk:-mx-5">
                   <table className={cn(tableCls.table, 'text-sm')}>
                     <thead>
                       <tr>
@@ -212,7 +212,7 @@ export function DashboardVersusPage() {
             </div>
           </Section>
           <Section title="Desviación por producto (semana)">
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               {withReal.length ? (
                 <table className={cn(tableCls.table, 'text-sm')}>
                   <thead>

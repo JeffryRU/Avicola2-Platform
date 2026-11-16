@@ -37,12 +37,16 @@ function dayPhrase(date: IsoDate, ref: IsoDate): string {
 export function HomePage() {
   const { seller } = useRequiredSession()
   const navigate = useNavigate()
-  const { days } = useMyDays()
+  const { days, isLoading: daysLoading } = useMyDays()
   const { catalog } = useCatalog()
   const unread = useUnreadCount()
   const now = today()
+  const editingWindow = useEditingWindow()
   // El próximo día que todavía se puede registrar (mañana, salvo que ya haya pasado el corte).
-  const next = useEditingWindow().data?.days.find((d) => d.open)
+  const next = editingWindow.data?.days.find((d) => d.open)
+  // El aviso y la semana dependen de las dos consultas: hasta tenerlas no se dibujan, para no
+  // anunciar por un instante "falta" lo que ya está confirmado ni mover la página al llegar.
+  const ready = !daysLoading && !editingWindow.isPending
   const week = weekDates(weekStart(now))
   const confirmed = week.filter((d) => days.has(d)).length
   const weekUnits = week.reduce((s, d) => s + sumUnits(days.get(d)?.units), 0)
@@ -67,130 +71,139 @@ export function HomePage() {
         </h1>
       </header>
 
-      <div className="grid gap-4 @4xl/main:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] @4xl/main:items-start">
-        <div className="grid gap-4">
-          {next && !days.has(next.date) && (
-            <section
-              aria-label="Pendiente"
-              className="grid gap-3 rounded-md border border-warn-border bg-warn-soft p-4 hc:p-5"
-            >
-              <div>
-                <b className="block font-semibold hc:text-lg hc:font-extrabold">
-                  Falta tu proyección {dayPhrase(next.date, now)}
-                </b>
-                <span className="text-sm text-warn-foreground hc:text-md">
-                  {closesLabel(next.closes_at, true, now)}. Confírmala para que entre a la planificación.
-                </span>
-              </div>
-              <Button
-                className="w-full dsk:w-auto dsk:justify-self-start"
-                onClick={() => navigate(`${paths.register}?dia=${next.date}`)}
+      {!ready ? (
+        <p role="status" className="sr-only">
+          Cargando tu semana…
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 @4xl/main:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] @4xl/main:items-start">
+          <div className="grid gap-4">
+            {next && !days.has(next.date) && (
+              <section
+                aria-label="Pendiente"
+                className="grid gap-3 rounded-md border border-warn-border bg-warn-soft p-4 hc:p-5"
               >
-                Registrar proyección
-              </Button>
-            </section>
-          )}
-          {next && days.has(next.date) && (
-            <Note tone="ok" icon={<Check />}>
-              <span>
-                Tu proyección {dayPhrase(next.date, now)} ya está confirmada.{' '}
-                <Link to={paths.day(next.date)} className="font-medium text-primary underline-offset-4 hover:underline">
-                  Ver detalle
-                </Link>
-              </span>
-            </Note>
-          )}
+                <div>
+                  <b className="block font-semibold hc:text-lg hc:font-extrabold">
+                    Falta tu proyección {dayPhrase(next.date, now)}
+                  </b>
+                  <span className="text-sm text-warn-foreground hc:text-md">
+                    {closesLabel(next.closes_at, true, now)}. Confírmala para que entre a la planificación.
+                  </span>
+                </div>
+                <Button
+                  className="w-full dsk:w-auto dsk:justify-self-start"
+                  onClick={() => navigate(`${paths.register}?dia=${next.date}`)}
+                >
+                  Registrar proyección
+                </Button>
+              </section>
+            )}
+            {next && days.has(next.date) && (
+              <Note tone="ok" icon={<Check />}>
+                <span>
+                  Tu proyección {dayPhrase(next.date, now)} ya está confirmada.{' '}
+                  <Link
+                    to={paths.day(next.date)}
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    Ver detalle
+                  </Link>
+                </span>
+              </Note>
+            )}
 
-          <Section
-            title="Tu semana"
-            aside={
-              <span>
-                <span className="num">{confirmed}/7</span> confirmados
-              </span>
-            }
-          >
-            <ol className="grid grid-cols-7 px-1 py-2 text-center">
-              {week.map((d) => {
-                const ok = days.has(d)
-                const due = !ok && d === next?.date
-                const state = ok ? 'confirmado' : due ? 'pendiente' : 'sin registrar'
-                return (
-                  <li key={d}>
-                    <Link
-                      to={paths.day(d)}
-                      aria-label={`${dShort(d)}: ${state}`}
-                      className={cn(
-                        'flex min-h-touch flex-col items-center gap-1 rounded-md py-2 text-sm transition-colors hover:bg-muted',
-                        due && 'font-semibold text-warn hc:bg-warn-soft hc:text-foreground',
-                        d === now && 'ring-1 ring-border-strong ring-inset',
-                      )}
-                    >
-                      <span className={cn('text-xs', !due && 'text-muted-foreground')}>{dDow(d)}</span>
-                      <span className="num">{dDM(d).slice(0, 2)}</span>
-                      {/* Punto en A; en alto contraste, texto (el estado no depende del color). */}
-                      <span className="hc:hidden">
-                        {ok ? (
-                          <StatusDot tone="ok" />
-                        ) : due ? (
-                          <StatusDot tone="warn" />
-                        ) : (
-                          <span aria-hidden className="block size-2 rounded-full bg-control-line" />
+            <Section
+              title="Tu semana"
+              aside={
+                <span>
+                  <span className="num">{confirmed}/7</span> confirmados
+                </span>
+              }
+            >
+              <ol className="grid grid-cols-7 px-1 py-2 text-center">
+                {week.map((d) => {
+                  const ok = days.has(d)
+                  const due = !ok && d === next?.date
+                  const state = ok ? 'confirmado' : due ? 'pendiente' : 'sin registrar'
+                  return (
+                    <li key={d}>
+                      <Link
+                        to={paths.day(d)}
+                        aria-label={`${dShort(d)}: ${state}`}
+                        className={cn(
+                          'flex min-h-touch flex-col items-center gap-1 rounded-md py-2 text-sm transition-colors hover:bg-muted',
+                          due && 'font-semibold text-warn hc:bg-warn-soft hc:text-foreground',
+                          d === now && 'ring-1 ring-border-strong ring-inset',
                         )}
-                      </span>
-                      <span aria-hidden className="hidden text-xs font-bold hc:block">
-                        {ok ? '✓' : due ? 'falta' : '—'}
-                      </span>
-                    </Link>
-                  </li>
-                )
-              })}
-            </ol>
-          </Section>
+                      >
+                        <span className={cn('text-xs', !due && 'text-muted-foreground')}>{dDow(d)}</span>
+                        <span className="num">{dDM(d).slice(0, 2)}</span>
+                        {/* Punto en A; en alto contraste, texto (el estado no depende del color). */}
+                        <span className="hc:hidden">
+                          {ok ? (
+                            <StatusDot tone="ok" />
+                          ) : due ? (
+                            <StatusDot tone="warn" />
+                          ) : (
+                            <span aria-hidden className="block size-2 rounded-full bg-control-line" />
+                          )}
+                        </span>
+                        <span aria-hidden className="hidden text-xs font-bold hc:block">
+                          {ok ? '✓' : due ? 'falta' : '—'}
+                        </span>
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ol>
+            </Section>
 
-          <Section
-            title="Esta semana"
-            aside={
-              <Link to={paths.dashSummary} className="font-medium text-primary underline-offset-4 hover:underline">
-                Ver resumen
-              </Link>
-            }
-          >
-            <dl className="grid">
-              <div className="flex items-baseline justify-between gap-3 border-b border-rule px-4 py-3 dsk:px-5">
-                <dt className="text-ink-2">Proyectado</dt>
-                <dd className="num font-medium hc:text-lg hc:font-extrabold">
-                  <CountUp value={weekUnits} /> {UNITS_SHORT}
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-3 px-4 py-3 dsk:px-5">
-                <dt className="text-ink-2">Kilos aprox.</dt>
-                <dd className="num font-medium hc:text-lg hc:font-extrabold">
-                  <CountUp value={weekKg} decimals={1} /> kg
-                </dd>
-              </div>
-            </dl>
+            <Section
+              title="Esta semana"
+              aside={
+                <Link to={paths.dashSummary} className="font-medium text-primary underline-offset-4 hover:underline">
+                  Ver resumen
+                </Link>
+              }
+            >
+              <dl className="grid">
+                <div className="flex items-baseline justify-between gap-3 border-b border-rule px-4 py-3 dsk:px-5">
+                  <dt className="text-ink-2">Proyectado</dt>
+                  <dd className="num font-medium hc:text-lg hc:font-extrabold">
+                    <CountUp value={weekUnits} /> {UNITS_SHORT}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3 px-4 py-3 dsk:px-5">
+                  <dt className="text-ink-2">Kilos aprox.</dt>
+                  <dd className="num font-medium hc:text-lg hc:font-extrabold">
+                    <CountUp value={weekKg} decimals={1} /> kg
+                  </dd>
+                </div>
+              </dl>
+            </Section>
+          </div>
+
+          <Section title="Accesos">
+            <ul>
+              {links.map((l) => (
+                <li key={l.to} className="border-b border-rule last:border-0">
+                  <Link
+                    to={l.to}
+                    className="flex min-h-touch items-center gap-3 px-4 py-3 transition-colors hover:bg-muted dsk:px-5"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium">{l.title}</span>
+                      <small className="block text-sm text-muted-foreground">{l.sub}</small>
+                    </span>
+                    <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </Section>
         </div>
-
-        <Section title="Accesos">
-          <ul>
-            {links.map((l) => (
-              <li key={l.to} className="border-b border-rule last:border-0">
-                <Link
-                  to={l.to}
-                  className="flex min-h-touch items-center gap-3 px-4 py-3 transition-colors hover:bg-muted dsk:px-5"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-medium">{l.title}</span>
-                    <small className="block text-sm text-muted-foreground">{l.sub}</small>
-                  </span>
-                  <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      </div>
+      )}
     </div>
   )
 }

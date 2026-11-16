@@ -30,7 +30,7 @@ export function UnlocksPage() {
     <div>
       <PageHeader title={UNLOCKS_TITLE} subtitle={UNLOCKS_SUBTITLE} back={paths.home} />
       <PageBody>
-        <div className="grid gap-4 @5xl/main:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] @5xl/main:items-start">
+        <div className="grid grid-cols-1 gap-4 @5xl/main:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] @5xl/main:items-start">
           <Section title={CUTOFF_TITLE}>{policy && <CutoffForm key={policyKey(policy)} policy={policy} />}</Section>
           <Section
             title={REQUESTS_TITLE}

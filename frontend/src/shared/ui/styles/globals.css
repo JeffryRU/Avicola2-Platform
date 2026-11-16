@@ -482,6 +482,14 @@
     transform: scaleX(0);
   }
 }
+@keyframes sync {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
 
 /* Borde de los controles (1 px; 2 px en alto contraste) y regla gruesa de bloques (1 px; 3 px). */
 @utility border-control {
@@ -658,6 +666,11 @@
     transform-origin: left;
     animation: load var(--dur, 2s) var(--ease) both;
   }
+  /* Carga indeterminada (SyncStatus): un tramo que recorre la barra, solo con transform. */
+  .sync-bar {
+    width: 40%;
+    animation: sync 1.1s ease-in-out infinite;
+  }
   .iso-anim .spin {
     transform-origin: 50px 52px;
   }
@@ -681,5 +694,11 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  /* Sin movimiento, la carga se ve como una barra fija tenue. */
+  .sync-bar {
+    width: 100%;
+    opacity: 0.5;
+    animation: none !important;
   }
 }

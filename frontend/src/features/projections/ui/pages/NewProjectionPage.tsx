@@ -103,7 +103,7 @@ export function NewProjectionPage() {
       <div>
         <PageHeader title="Nueva proyección" mobileActions={<StepPill n={1} />} actions={<StepPill n={1} />} />
         <PageBody>
-          <div className="grid gap-4 @3xl/main:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 @3xl/main:grid-cols-2">
             <Section>
               <div className="grid gap-6 px-4 pt-5 pb-4 dsk:px-5 dsk:pb-5">
                 {supervisor && (
@@ -230,7 +230,7 @@ export function NewProjectionPage() {
               aside={<span className="num">{products.length}</span>}
               className="hidden @3xl/main:block"
             >
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className={tableCls.table}>
                   <thead>
                     <tr>

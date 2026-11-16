@@ -92,7 +92,7 @@ export function ProductDetail({
       {m.columns.length === 0 ? (
         <EmptyState title="Sin datos">{EMPTY_DETAIL_LABEL}</EmptyState>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className={tableCls.table}>
             <thead>
               <tr>

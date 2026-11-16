@@ -29,7 +29,7 @@ export function DayStrip({
     <div
       role="group"
       aria-label={label}
-      className="-mx-4 flex snap-x scroll-px-4 [scrollbar-width:none] gap-2 overflow-x-auto px-4 pt-1 pb-4 dsk:-mx-3 dsk:scroll-px-3 dsk:px-3 [&::-webkit-scrollbar]:hidden"
+      className="relative -mx-4 flex snap-x scroll-px-4 [scrollbar-width:none] gap-2 overflow-x-auto px-4 pt-1 pb-4 dsk:-mx-3 dsk:scroll-px-3 dsk:px-3 [&::-webkit-scrollbar]:hidden"
     >
       {days.map((d) => {
         const active = d === value

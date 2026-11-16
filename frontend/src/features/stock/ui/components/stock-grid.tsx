@@ -37,7 +37,7 @@ export function Grid({
     'border-b border-rule-strong px-1.5 pb-2 text-right align-bottom text-xs font-medium text-muted-foreground hc:border-b-heavy hc:font-bold hc:text-foreground'
   return (
     // La tabla se desplaza dentro de su marco; la página nunca se ensancha.
-    <div className="overflow-x-auto px-3 pt-3 pb-3 dsk:px-4">
+    <div className="relative overflow-x-auto px-3 pt-3 pb-3 dsk:px-4">
       <table className="w-full border-separate border-spacing-0 text-base">
         <thead>
           <tr>

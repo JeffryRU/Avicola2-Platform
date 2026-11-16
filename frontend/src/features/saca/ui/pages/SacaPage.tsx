@@ -85,7 +85,7 @@ export function SacaPage() {
         {
           // En pantallas anchas: resumen y detalle a la izquierda, datos de origen fijos a la derecha.
           // En angostas se apilan en este orden: resumen, datos de origen, detalle.
-          <div className="grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_21rem]">
+          <div className="grid grid-cols-1 items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_21rem]">
             <Hero plan={plan} />
             {waiting ? (
               <Section title={SOURCES_TITLE} className="@4xl/main:sticky @4xl/main:top-6 @4xl/main:row-span-2">

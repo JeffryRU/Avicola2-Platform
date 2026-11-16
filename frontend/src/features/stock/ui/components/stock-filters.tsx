@@ -45,7 +45,7 @@ export function Filters({
 }) {
   return (
     <Section className="mb-4">
-      <div className="grid gap-3 px-4 pt-4 sm:grid-cols-2 dsk:px-5 @4xl/main:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 px-4 pt-4 sm:grid-cols-2 dsk:px-5 @4xl/main:grid-cols-4">
         <Pick label={LOCATION_LABEL} value={view.location} onChange={(location) => setView({ location })}>
           <option value={ALL}>{ALL_LOCATIONS}</option>
           {locations.map((l) => (

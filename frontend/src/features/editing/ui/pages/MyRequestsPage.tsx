@@ -23,7 +23,7 @@ export function MyRequestsPage() {
     <div>
       <PageHeader title={MY_REQUESTS_TITLE} subtitle={MY_REQUESTS_SUBTITLE} back={paths.home} />
       <PageBody>
-        <div className="grid gap-4 @4xl/main:grid-cols-2 @4xl/main:items-start">
+        <div className="grid grid-cols-1 gap-4 @4xl/main:grid-cols-2 @4xl/main:items-start">
           <Section>
             <div className="px-4 pt-4 pb-4 dsk:px-5 dsk:pb-5">
               <EditingDays />

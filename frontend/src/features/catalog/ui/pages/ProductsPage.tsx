@@ -34,7 +34,7 @@ export function ProductsPage() {
           }}
           options={catalog.categories.map((c) => ({ value: c, label: c }))}
         />
-        <div className="grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <div className="grid grid-cols-1 items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
           <Section title="Calculadora">
             <div className="px-4 pt-3 pb-4 dsk:px-5 dsk:pb-5">
               <div className="flex flex-wrap items-end gap-3">
@@ -87,7 +87,7 @@ export function ProductsPage() {
               </span>
             }
           >
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className={tableCls.table}>
                 <thead>
                   <tr>

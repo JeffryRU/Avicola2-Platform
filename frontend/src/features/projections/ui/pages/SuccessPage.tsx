@@ -105,7 +105,7 @@ export function SuccessPage() {
             </div>
           </Section>
           <Section title="Total por día">
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className={tableCls.table}>
                 <thead>
                   <tr>

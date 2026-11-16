@@ -128,7 +128,7 @@ export function TeamDayView({
               </Note>
             )}
 
-            <div className="grid gap-4 @7xl/main:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-4 @7xl/main:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
               <Section title="Por vendedor" aside={`${day.confirmed} de ${day.rows.length} confirmaron`}>
                 {/* Celular: una fila por vendedor con lo esencial (la tabla no entra en 390 px). */}
                 <ul className="dsk:hidden">
@@ -172,7 +172,7 @@ export function TeamDayView({
                     </span>
                   </li>
                 </ul>
-                <div className="hidden overflow-x-auto dsk:block">
+                <div className="relative hidden overflow-x-auto dsk:block">
                   <table className={tableCls.table}>
                     <thead>
                       <tr>
@@ -250,7 +250,7 @@ export function TeamDayView({
 
               <Section title="Por producto" aside="Todo el equipo">
                 {products.length ? (
-                  <div className="overflow-x-auto">
+                  <div className="relative overflow-x-auto">
                     <table className={tableCls.table}>
                       <thead>
                         <tr>

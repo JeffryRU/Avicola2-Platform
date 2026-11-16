@@ -11,14 +11,27 @@ export interface SyncQuery {
 }
 
 /**
- * Aviso discreto de carga: un spinner mientras llegan los datos y, si el servidor no responde,
- * que se muestra la pantalla sin datos y se reintenta sola. La pantalla se dibuja igual.
+ * Aviso discreto de carga: una barra fina fija arriba mientras llegan los datos (no ocupa lugar,
+ * así la pantalla no salta al aparecer o irse) y, si el servidor no responde, un aviso en la
+ * página de que se muestra sin datos y se reintenta sola. La pantalla se dibuja igual.
  */
 export function SyncStatus({ queries, className }: { queries: SyncQuery[]; className?: string }) {
   const failed = queries.some((q) => q.isError)
   const detail = queries.find((q) => q.isError)?.error?.message
   const loading = queries.some((q) => q.isFetching)
   if (!failed && !loading) return null
+  if (!failed) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-none fixed inset-x-0 top-0 z-[80] h-0.5 overflow-hidden"
+      >
+        <span className="sr-only">Cargando datos…</span>
+        <i aria-hidden className="sync-bar block h-full bg-primary" />
+      </div>
+    )
+  }
   return (
     <div
       role="status"

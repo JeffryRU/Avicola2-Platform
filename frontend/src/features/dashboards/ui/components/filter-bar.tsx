@@ -64,7 +64,7 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
       aria-label="Filtros"
       className="sticky top-0 z-20 border-b border-border bg-background px-4 py-2 dsk:-mx-9 dsk:mb-4 dsk:px-9 dsk:py-2.5 hc:border-b-2 hc:border-foreground"
     >
-      <div className="no-scrollbar flex items-center gap-2 overflow-x-auto dsk:flex-wrap dsk:overflow-visible">
+      <div className="no-scrollbar relative flex items-center gap-2 overflow-x-auto dsk:flex-wrap dsk:overflow-visible">
         <SlidersHorizontal className="size-4 flex-none text-muted-foreground" aria-hidden />
         <FilterMenu
           icon={period.custom ? <CalendarRange /> : <Calendar />}

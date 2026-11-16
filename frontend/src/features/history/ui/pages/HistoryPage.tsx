@@ -94,7 +94,7 @@ export function HistoryPage() {
           {changes.isPending ? null : list.length === 0 ? (
             <EmptyState title={NO_CHANGES_LABEL} />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className={tableCls.table}>
                 <thead>
                   <tr>
