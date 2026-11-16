@@ -1,4 +1,5 @@
-# Publica una versión de la app al crear un tag (git tag v1.2.0 && git push origin v1.2.0):
+# Publica una versión de la app al crear un tag (git tag v1.2.0 && git push origin v1.2.0)
+# o al subir una rama release-v1.2.0:
 # - Android: APK firmado (noraves.apk). La web lo enlaza con releases/latest/download/noraves.apk.
 # - iOS: .ipa sin firmar (para instalar con Sideloadly/AltStore; ver mobile/README.md).
 # Requiere los Secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS y
@@ -8,6 +9,9 @@ name: Mobile release
 on:
   push:
     tags: ["v*"]
+    # También al subir una rama release-v1.2.3 (para publicar sin poder crear el tag a mano):
+    # el workflow crea el tag v1.2.3 y la Release.
+    branches: ["release-v*"]
   workflow_dispatch:
     inputs:
       version:
@@ -30,6 +34,7 @@ jobs:
           REF: ${{ github.ref_name }}
         run: |
           raw="${INPUT:-$REF}"
+          raw="${raw#release-}"
           name="${raw#v}"
           if ! [[ "$name" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Versión inválida '$raw'. Usa el formato v1.2.3."
