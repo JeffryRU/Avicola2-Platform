@@ -3,24 +3,10 @@ export const STOCK_TITLE = 'Stock de despacho'
 export const STOCK_SUBTITLE_MANAGE = 'Lo que quedó en despacho al cierre, por artículo y por lote.'
 export const STOCK_SUBTITLE_VIEW = 'Lo que quedó en despacho cada día, registrado por el jefe de despacho.'
 export const DAY_LABEL = 'Día del stock'
-export const TODAY_LABEL = 'Hoy'
-export const YESTERDAY_LABEL = 'Ayer'
-export const REGISTERED_LABEL = 'con registro'
 export const SAVE_LABEL = 'Guardar stock'
-export const UPDATE_LABEL = 'Guardar corrección'
 export const SAVED_MESSAGE = 'Stock guardado.'
-export const NOT_REGISTERED_TITLE = 'Sin registro'
 export const NOT_REGISTERED_BODY = 'Aún no se registró el stock de este día.'
-export const READ_ONLY_DAY_LABEL = 'Solo se corrigen los últimos 7 días.'
-export const SUMMARY_TITLE = 'Resumen del día'
-export const STATUS_SAVED = 'Registrado'
-export const STATUS_PENDING = 'Sin registrar'
-export const STATUS_EDITING = 'Con cambios sin guardar'
-export const RECORDED_TITLE = 'Últimos registros'
-export const RECORDED_EMPTY = 'Todavía no hay registros en los últimos 30 días.'
-export const HISTORY_DAYS = 30
 
-export const FILTERS_TITLE = 'Qué ver'
 export const LOCATION_LABEL = 'Ubicación'
 export const ALL_LOCATIONS = 'Todas las ubicaciones'
 export const TYPE_LABEL = 'Tipo'
@@ -48,3 +34,19 @@ export const COLUMNS = {
 } as const
 
 export const unitsLabel = (n: number) => (n === 1 ? 'unidad' : 'unidades')
+
+// Textos comunes con las otras pantallas de registro diario.
+export {
+  TODAY_LABEL,
+  YESTERDAY_LABEL,
+  REGISTERED_LABEL,
+  UPDATE_LABEL,
+  NOT_REGISTERED_TITLE,
+  SUMMARY_TITLE,
+  STATUS_SAVED,
+  STATUS_PENDING,
+  STATUS_EDITING,
+  RECORDED_TITLE,
+  RECORDED_EMPTY,
+  HISTORY_DAYS,
+} from '@/shared/types/daily-record'

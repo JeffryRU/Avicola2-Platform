@@ -3,18 +3,19 @@ import { Link, Navigate, useParams } from 'react-router'
 import { paths } from '@/app/routes'
 import { dDM, dDow, dFull, dShort, today } from '@/shared/domain/dates'
 import { nf0, nf1, pct1 } from '@/shared/domain/format'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { sumUnits } from '@/features/catalog/domain/catalog'
+import { useRequiredSession } from '@/features/auth'
+import { sumUnits } from '@/shared/domain/products'
 import { isoDateSchema } from '@/shared/domain/schemas'
-import { useCatalog } from '@/features/catalog/ui/hooks'
+import { useCatalog } from '@/features/catalog'
 import { useMyDays, useWindowData } from '@/features/projections/ui/hooks'
 import { CountUp } from '@/shared/ui/components/charts'
 import { EmptyState, Note, StatusBadge } from '@/shared/ui/components/feedback'
-import { PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
+import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
+import { tableCls } from '@/shared/ui/lib/table-styles'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
-import { STATUS_LABEL } from '@/shared/types/labels'
-import { useFirstEditableDay } from '@/features/editing/ui/hooks'
+import { STATUS_LABEL, kgAmount, UNITS_SHORT } from '@/shared/types/labels'
+import { useFirstEditableDay } from '@/features/editing'
 
 export function DayDetailPage() {
   const { date = '' } = useParams()
@@ -119,9 +120,9 @@ export function DayDetailPage() {
             <div>
               <span className="block text-sm font-semibold text-ink-2">Total proyectado</span>
               <b className="block text-xl font-extrabold dsk:text-2xl">
-                <CountUp value={units} /> unid.
+                <CountUp value={units} /> {UNITS_SHORT}
               </b>
-              <small className="text-muted-foreground">{nf1(kg)} kg</small>
+              <small className="text-muted-foreground">{kgAmount(kg)}</small>
             </div>
           </Section>
           <Section className="flex flex-col items-start gap-2.5 p-3.5 dsk:flex-row dsk:gap-3.5 dsk:p-[18px]">
@@ -140,7 +141,7 @@ export function DayDetailPage() {
         {real && (
           <Note icon={<ShoppingCart />} className="mb-4">
             <div>
-              Venta real (ERP): <b>{nf1(realKg)} kg</b>, {pct1(((realKg - kg) / kg) * 100)} frente a lo proyectado.
+              Venta real (ERP): <b>{kgAmount(realKg)}</b>, {pct1(((realKg - kg) / kg) * 100)} frente a lo proyectado.
             </div>
           </Note>
         )}

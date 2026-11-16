@@ -2,21 +2,22 @@ import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { ChevronLeft, ChevronRight, Package, Pencil, ShoppingBag, ShoppingCart, Users } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router'
 import { paths } from '@/app/routes'
-import { addDays, dDowLong, dFull, formatTime, hhmm, today, type IsoDate } from '@/shared/domain/dates'
+import { addDays, dDowLong, dFull, today, type IsoDate, clockTime } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
 import { isoDateSchema } from '@/shared/domain/schemas'
-import { sumUnits } from '@/features/catalog/domain/catalog'
-import { useCatalog } from '@/features/catalog/ui/hooks'
+import { sumUnits } from '@/shared/domain/products'
+import { useCatalog } from '@/features/catalog'
 import { teamDay } from '@/features/dashboards/domain/team-day'
-import { useSellers } from '@/features/dashboards/ui/hooks'
-import { dataWindow, useWindowData } from '@/features/projections/ui/hooks'
+import { useSellers } from '@/features/sellers'
+import { dataWindow, useWindowData } from '@/features/projections'
 import { CountUp, Donut } from '@/shared/ui/components/charts'
 import { Note, StatusBadge } from '@/shared/ui/components/feedback'
-import { Kpi, PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
+import { Kpi, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
+import { tableCls } from '@/shared/ui/lib/table-styles'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
-import { useFirstEditableDay } from '@/features/editing/ui/hooks'
-import { NOT_REGISTERED, UNITS_SHORT } from '@/shared/types/labels'
+import { useFirstEditableDay } from '@/features/editing'
+import { NOT_REGISTERED, UNITS_SHORT, kgAmount } from '@/shared/types/labels'
 
 /** Ruta /dashboards/dia/:date: detalle de un día para el supervisor. */
 export function TeamDayPage() {
@@ -104,7 +105,7 @@ export function TeamDayView({
             icon={<ShoppingCart />}
             tone="bg-warn-soft text-warn"
             label="Venta real (ERP)"
-            value={day.realKg === null ? '-' : `${nf1(day.realKg)} kg`}
+            value={day.realKg === null ? '-' : kgAmount(day.realKg)}
             foot={day.realKg === null ? 'aún sin datos' : 'de los vendedores con venta'}
             index={3}
           />
@@ -152,7 +153,7 @@ export function TeamDayView({
                       <td className={tableCls.td}>{r.confirmed ? nf1(r.kg) : '-'}</td>
                       <td className={tableCls.td}>{r.realKg === null ? '-' : nf1(r.realKg)}</td>
                       <td className={cn(tableCls.td, 'text-muted-foreground')}>
-                        {r.submittedAt ? formatTime(hhmm(r.submittedAt)) : '-'}
+                        {r.submittedAt ? clockTime(r.submittedAt) : '-'}
                       </td>
                       {editable && (
                         <td className={tableCls.td}>

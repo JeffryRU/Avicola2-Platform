@@ -1,17 +1,8 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import type { BrandId } from '@/shared/types/brands'
+import { BrandContext, useBrand } from '@/shared/ui/hooks/use-brand'
+import { BRANDS } from '@/shared/types/brands'
 import { cn } from '@/shared/ui/lib/utils'
-
-export type BrandId = 'noraves' | 'rocio'
-export const BRANDS: Record<BrandId, { name: string; tag: string }> = {
-  noraves: { name: 'Noraves', tag: 'Proyección inteligente para una mejor producción' },
-  rocio: { name: 'Grupo Rocío', tag: 'Transformamos realidades para mejorar vidas' },
-}
-
-interface BrandState {
-  brand: BrandId
-  setBrand: (b: BrandId) => void
-}
-const BrandContext = createContext<BrandState>({ brand: 'noraves', setBrand: () => {} })
 
 /** Marca activa (colores y logo); se guarda con la función `persist` que recibe. */
 export function BrandProvider({
@@ -30,9 +21,6 @@ export function BrandProvider({
   }, [brand, persist])
   return <BrandContext.Provider value={{ brand, setBrand }}>{children}</BrandContext.Provider>
 }
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const useBrand = () => useContext(BrandContext)
 
 /** Mascota de Noraves en un círculo con borde dorado (y salto opcional). */
 export function Mascot({ size, animated, shadow }: { size: number; animated?: boolean; shadow?: boolean }) {

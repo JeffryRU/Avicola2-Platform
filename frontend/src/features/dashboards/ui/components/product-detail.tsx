@@ -1,14 +1,14 @@
 import { useState, type ReactNode } from 'react'
 import { CalendarDays, Layers, MapPin } from 'lucide-react'
 import { dShort, type IsoDate } from '@/shared/domain/dates'
-import { nf0, nf1 } from '@/shared/domain/format'
-import { isSupervisor } from '@/features/auth/domain/session'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import type { Catalog } from '@/features/catalog/domain/catalog'
+import { nf0, nf1, toggleIn } from '@/shared/domain/format'
+import { isSupervisor } from '@/shared/domain/session'
+import { useRequiredSession } from '@/features/auth'
+import type { Catalog } from '@/features/catalog'
 import { dayColumns, productMatrix, sellerColumns } from '@/features/dashboards/domain/product-matrix'
 import { FilterMenu } from '@/features/dashboards/ui/components/filter-bar'
-import { choiceKey, toggleIn, useDetailSelection } from '@/features/dashboards/ui/hooks'
-import type { Projection } from '@/features/projections/domain/schemas'
+import { choiceKey, useDetailSelection } from '@/features/dashboards/ui/hooks'
+import type { Projection } from '@/features/projections'
 import {
   ALL_ZONES_LABEL,
   DAY_FILTER_LABEL,
@@ -27,7 +27,8 @@ import {
   sizesCount,
   type DetailView,
 } from '@/features/dashboards/types/product-detail'
-import { Section, tableCls } from '@/shared/ui/components/layout'
+import { Section } from '@/shared/ui/components/layout'
+import { tableCls } from '@/shared/ui/lib/table-styles'
 import { Segmented } from '@/shared/ui/components/segmented'
 import { DropdownMenuCheckboxItem, DropdownMenuSeparator } from '@/shared/ui/components/shadcn/dropdown-menu'
 import { daysCount } from '@/shared/types/labels'

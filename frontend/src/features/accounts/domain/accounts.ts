@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { roleSchema, type Role } from '@/features/auth/domain/session'
+import { type Role, roleSchema } from '@/shared/domain/session'
 import type { AccountState } from '@/features/accounts/types/accounts'
 
 export type { AccountState }

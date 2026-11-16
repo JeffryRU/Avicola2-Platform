@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
 import { queryKeys } from '@/shared/application/query-keys'
 import { addDays, today, weekStart } from '@/shared/domain/dates'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { useRequiredSession } from '@/features/auth'
 import { myDays } from '@/features/projections/domain/aggregation'
-import type { Catalog } from '@/features/catalog/domain/catalog'
+import type { Catalog } from '@/features/catalog'
 import type { Draft } from '@/features/projections/domain/draft'
 
 /** Ventana de datos que usa toda la app: 3 semanas atrás y 2 adelante (como el mockup). */

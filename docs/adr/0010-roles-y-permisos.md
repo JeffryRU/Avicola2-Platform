@@ -67,7 +67,7 @@
 
 - La sesión (`/auth/me`, login) trae `permissions` y `manageable_roles`.
 - Cada cuenta de `GET /api/admin/accounts` trae `can_manage` y `assignable_roles`, calculados para quien consulta.
-- La web solo muestra lo que el backend permite. Los textos de cada rol están en `frontend/src/features/auth/types/roles.ts`.
+- La web solo muestra lo que el backend permite. Los textos de cada rol están en `frontend/src/shared/types/roles.ts`.
 - La web decide por permiso la vista de supervisión (`view_team`) y los menús Usuarios (`manage_accounts`) y Habilitaciones (`manage_editing`). Un perfil guardado antes de este cambio, que no trae permisos, usa el rol hasta que `/auth/me` lo refresca.
 - La app móvil, por ahora, usa la vista de supervisión para todo rol que no es vendedor.
 - Una cuenta con un rol que el cliente no conoce se muestra tal cual en Usuarios, sin romper la pantalla.

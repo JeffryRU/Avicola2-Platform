@@ -3,7 +3,7 @@ import type { HttpClient } from '@/shared/application/ports'
 import { endpoints } from '@/shared/infrastructure/api/endpoints'
 import type { AccountsGateway } from '@/features/accounts/application/ports'
 import { adminAccountSchema, newCredentialsSchema, type NewAccount } from '@/features/accounts/domain/accounts'
-import type { Role } from '@/features/auth/domain/session'
+import type { Role } from '@/shared/domain/session'
 
 export class HttpAccountsGateway implements AccountsGateway {
   private readonly http: HttpClient

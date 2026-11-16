@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { addDays, type IsoDate } from '@/shared/domain/dates'
 import { isoDateSchema } from '@/shared/domain/schemas'
+import { productType } from '@/shared/domain/products'
 
 export const SACA_METHOD = 'stock_orders_projection_plus'
 
@@ -87,7 +88,7 @@ export function emptySaca(
   day: IsoDate,
   products: { id: string; subcategory?: string | null; category: string }[],
 ): Saca {
-  const groups = [...new Set(products.map((p) => p.subcategory ?? p.category))]
+  const groups = [...new Set(products.map(productType))]
   return {
     date: day,
     lines: products.map((p) => ({

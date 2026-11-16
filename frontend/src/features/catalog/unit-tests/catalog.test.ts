@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { bySubcategory, Catalog } from '@/features/catalog/domain/catalog'
+import { bySubcategory } from '@/shared/domain/products'
+import { Catalog } from '@/features/catalog/domain/catalog'
 
 const catalog = new Catalog([
   { id: 'B2', category: 'BRASA', name: 'Brasa 2', kg_per_unit: 1.5, sort_order: 1 },

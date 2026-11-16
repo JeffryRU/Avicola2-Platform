@@ -2,15 +2,23 @@ import { useState, type SyntheticEvent } from 'react'
 import { Check, Loader2, Save, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
-import { addDays, dDowLong, dShort, formatTime, hhmm, today, type IsoDate } from '@/shared/domain/dates'
-import { nf0, nf1 } from '@/shared/domain/format'
+import {
+  addDays,
+  dateOf,
+  dDowLongDM,
+  dShort,
+  recentDayStrip,
+  relativeDay,
+  today,
+  type IsoDate,
+  clockTime,
+} from '@/shared/domain/dates'
+import { nf0, nf1, parseUnits, keepDigits, RECORD_MAX_DIGITS } from '@/shared/domain/format'
 import { paths } from '@/app/routes'
-import { can } from '@/features/auth/domain/session'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { bySubcategory } from '@/features/catalog/domain/catalog'
-import type { Product } from '@/features/catalog/domain/schemas'
-import { useCatalog } from '@/features/catalog/ui/hooks'
-import { dateOf } from '@/features/editing/domain/editing'
+import { can } from '@/shared/domain/session'
+import { useRequiredSession } from '@/features/auth'
+import { bySubcategory, type Product } from '@/shared/domain/products'
+import { useCatalog } from '@/features/catalog'
 import {
   FIELDS,
   cleanKg,
@@ -21,6 +29,8 @@ import {
   type WeightDraft,
   draftOf,
   invalidQuality,
+  isEditableDay,
+  PRODUCTION_BACK_DAYS,
   toEntries,
   totals,
   type Field,
@@ -41,7 +51,6 @@ import {
   PRODUCTION_SUBTITLE_MANAGE,
   PRODUCTION_SUBTITLE_VIEW,
   PRODUCTION_TITLE,
-  READ_ONLY_DAY_LABEL,
   RECORDED_EMPTY,
   RECORDED_TITLE,
   REGISTERED_LABEL,
@@ -51,23 +60,21 @@ import {
   STATUS_PENDING,
   STATUS_SAVED,
   SUMMARY_TITLE,
-  TODAY_LABEL,
   UPDATE_LABEL,
   WEIGHTS_HINT,
   WEIGHTS_TITLE,
-  YESTERDAY_LABEL,
   qualityError,
   weightError,
 } from '@/features/production/types/production'
 import { FORECAST_NAV_LABEL } from '@/features/production/types/forecast'
 import { useProduction, useRegisterProduction } from '@/features/production/ui/hooks'
-import { editableDays, isEditableDay, parseUnits } from '@/features/stock/domain/stock'
 import { DayStrip } from '@/shared/ui/components/day-strip'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
+import { readOnlyDayLabel } from '@/shared/types/daily-record'
 
 const FORM_ID = 'production-form'
 /** Angosto: el nombre arriba y las tres cifras debajo. Ancho: todo en una fila. */
@@ -79,7 +86,6 @@ const cellCls =
 const splitCls = 'grid items-start gap-4 @4xl/main:grid-cols-[minmax(0,1fr)_340px]'
 const asideCls = 'grid gap-4 @4xl/main:sticky @4xl/main:top-6'
 const pct = (share: number) => `${nf1(share * 100)} %`
-const dayTitle = (day: IsoDate) => `${dDowLong(day)} ${dShort(day).split(' ')[1]}`
 
 type Totals = ReturnType<typeof totals>
 const totalsOf = (d: ProductionDay): Totals => ({
@@ -100,7 +106,7 @@ export function ProductionPage() {
   const days = query.data ?? []
   const record = days.find((d) => d.date === day)
   const products = catalog.products
-  const strip = editableDays(ref).includes(day) ? editableDays(ref) : [...editableDays(ref), day]
+  const strip = recentDayStrip(day, ref, PRODUCTION_BACK_DAYS)
   const editable = canManage && isEditableDay(day, ref)
   const forecastLink = (
     <Link
@@ -129,7 +135,7 @@ export function ProductionPage() {
           label={DAY_LABEL}
           marked={new Set(days.map((d) => d.date))}
           markedLabel={REGISTERED_LABEL}
-          caption={(d) => (d === ref ? TODAY_LABEL : d === addDays(ref, -1) ? YESTERDAY_LABEL : undefined)}
+          caption={(d) => relativeDay(d, ref) ?? undefined}
         />
         <SyncStatus queries={[query]} />
         {editable ? (
@@ -142,7 +148,7 @@ export function ProductionPage() {
           />
         ) : (
           <div className={splitCls}>
-            <Section title={dayTitle(day)}>
+            <Section title={dDowLongDM(day)}>
               {record ? (
                 <Rows products={products} read={(id, f) => readValue(record, id, f)} />
               ) : (
@@ -151,7 +157,11 @@ export function ProductionPage() {
             </Section>
             <aside className={asideCls}>
               {record && (
-                <Summary totals={totalsOf(record)} record={record} note={canManage ? READ_ONLY_DAY_LABEL : undefined} />
+                <Summary
+                  totals={totalsOf(record)}
+                  record={record}
+                  note={canManage ? readOnlyDayLabel(PRODUCTION_BACK_DAYS) : undefined}
+                />
               )}
               {history}
             </aside>
@@ -324,7 +334,7 @@ function Summary({
         {record && (
           <p className="mt-3 border-t border-muted pt-3 text-[13px] text-muted-foreground">
             Registró <b className="text-foreground">{record.recorded_by}</b> · {dShort(dateOf(record.recorded_at))},{' '}
-            {formatTime(hhmm(record.recorded_at))}
+            {clockTime(record.recorded_at)}
           </p>
         )}
         {record && Object.keys(record.weights).length > 0 && (
@@ -447,7 +457,7 @@ function Editor({
   return (
     <>
       <div className={splitCls}>
-        <Section title={dayTitle(day)}>
+        <Section title={dDowLongDM(day)}>
           <form id={FORM_ID} onSubmit={submit} noValidate>
             <Rows
               products={products}
@@ -458,7 +468,7 @@ function Editor({
                   aria-label={`${FIELD_LABEL[f]} de ${p.name}`}
                   placeholder="0"
                   value={draft[p.id]?.[f] ?? ''}
-                  onChange={(e) => set(p.id, f, e.target.value.replace(/\D/g, '').slice(0, 7))}
+                  onChange={(e) => set(p.id, f, keepDigits(e.target.value, RECORD_MAX_DIGITS))}
                   className={cn(cellCls, f === 'produced' && 'font-bold')}
                 />
               )}

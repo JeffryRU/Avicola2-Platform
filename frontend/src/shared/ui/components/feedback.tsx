@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Check, Clock, Package, RefreshCw } from 'lucide-react'
-import { BRANDS, BrandMark, useBrand } from '@/shared/ui/components/brand'
+import { BrandMark } from '@/shared/ui/components/brand'
+import { BRANDS } from '@/shared/types/brands'
+import { useBrand } from '@/shared/ui/hooks/use-brand'
 import { cn } from '@/shared/ui/lib/utils'
 import { STATUS_LABEL, type StatusKind } from '@/shared/types/labels'
 

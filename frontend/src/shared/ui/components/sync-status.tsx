@@ -1,5 +1,6 @@
 import { Loader2, RefreshCw, WifiOff } from 'lucide-react'
 import { cn } from '@/shared/ui/lib/utils'
+import { RETRY_LABEL } from '@/shared/types/labels'
 
 /** Estado de una consulta, en lo mínimo que hace falta para avisar. */
 export interface SyncQuery {
@@ -41,7 +42,7 @@ export function SyncStatus({ queries, className }: { queries: SyncQuery[]; class
           onClick={() => queries.forEach((q) => void q.refetch())}
           className="inline-flex flex-none items-center gap-1 rounded-[8px] px-2 py-1 font-bold hover:bg-white/60"
         >
-          {loading ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} Reintentar
+          {loading ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} {RETRY_LABEL}
         </button>
       )}
     </div>

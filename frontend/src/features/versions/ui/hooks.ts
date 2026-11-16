@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
+import { queryKeys } from '@/shared/application/query-keys'
 import { liveNumber, versionOfBranch, type AppVersion, type VersionCatalog } from '@/features/versions/domain/versions'
 
 /** Rama y commit de este despliegue (los pone Vercel al compilar). */
@@ -11,7 +12,7 @@ const NO_POLLING = { refetchInterval: false, retry: false } as const
 export function useVersionCatalog() {
   const { versions } = useContainer()
   return useQuery({
-    queryKey: ['versions', 'catalog'],
+    queryKey: queryKeys.versions.catalog,
     queryFn: () => versions.catalog(),
     staleTime: 60 * 60_000,
     ...NO_POLLING,
@@ -30,7 +31,7 @@ export function useCurrentVersion(): {
   const repo = catalog?.repo ?? ''
   const ref = version?.ref ?? ''
   const live = useQuery({
-    queryKey: ['versions', 'changes', repo, ref, BUILD.commit],
+    queryKey: queryKeys.versions.changes(repo, ref, BUILD.commit),
     queryFn: () => versions.changes(repo, ref, BUILD.commit),
     enabled: !!repo && !!ref && !!version?.moving && !!BUILD.commit,
     staleTime: 30 * 60_000,
@@ -44,7 +45,7 @@ export function useCurrentVersion(): {
 export function useChanges(repo: string, from: string | null, to: string | null) {
   const { versions } = useContainer()
   return useQuery({
-    queryKey: ['versions', 'changes', repo, from, to],
+    queryKey: queryKeys.versions.changes(repo, from, to),
     queryFn: () => versions.changes(repo, from ?? '', to ?? ''),
     enabled: !!repo && !!from && !!to && from !== to,
     staleTime: 30 * 60_000,

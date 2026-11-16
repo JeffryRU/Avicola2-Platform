@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { HttpClient } from '@/shared/application/ports'
 import { endpoints } from '@/shared/infrastructure/api/endpoints'
 import type { AuthGateway } from '@/features/auth/application/ports'
-import { sessionSchema } from '@/features/auth/domain/session'
+import { sessionSchema } from '@/shared/domain/session'
 
 /** La respuesta trae solo el perfil; el token llega en la cookie HttpOnly (Set-Cookie). */
 export class HttpAuthGateway implements AuthGateway {

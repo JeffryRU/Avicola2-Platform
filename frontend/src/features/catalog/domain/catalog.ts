@@ -1,4 +1,4 @@
-import type { Product, Units } from '@/features/catalog/domain/schemas'
+import type { Product, Units } from '@/shared/domain/products'
 import {
   allOfLabel,
   joinLabels,
@@ -88,24 +88,4 @@ export class Catalog {
   kg(units: Units): number {
     return Object.entries(units).reduce((s, [id, u]) => s + u * (this.byId.get(id)?.kg_per_unit ?? 0), 0)
   }
-}
-
-/** Productos agrupados por subcategoría (Brasa chica, mediana...), en el orden en que llegan. */
-export function bySubcategory(products: Product[]): { name: string | null; products: Product[] }[] {
-  const groups: { name: string | null; products: Product[] }[] = []
-  for (const p of products) {
-    const name = p.subcategory ?? null
-    const last = groups.at(-1)
-    if (last?.name === name) last.products.push(p)
-    else groups.push({ name, products: [p] })
-  }
-  return groups
-}
-
-export const sumUnits = (units: Units | undefined) => Object.values(units ?? {}).reduce((a, b) => a + b, 0)
-
-export function addUnits(a: Units, b: Units): Units {
-  const out = { ...a }
-  for (const [id, u] of Object.entries(b)) out[id] = (out[id] ?? 0) + u
-  return out
 }

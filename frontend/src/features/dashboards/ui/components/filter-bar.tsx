@@ -5,13 +5,13 @@ import { useContainer } from '@/app/di'
 import { rangeLabel, weekLabel } from '@/shared/domain/dates'
 import type { ExportFormat } from '@/shared/domain/export'
 import { ExportMenu } from '@/shared/ui/components/export-menu'
-import { useCatalog } from '@/features/catalog/ui/hooks'
+import { useCatalog } from '@/features/catalog'
 import { teamProjectionsTable } from '@/features/dashboards/domain/export'
-import { isSupervisor } from '@/features/auth/domain/session'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { isSupervisor } from '@/shared/domain/session'
+import { useRequiredSession } from '@/features/auth'
 import { weekOptions } from '@/features/dashboards/domain/weeks'
-import { useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
-import { usePeriodData, useSellers } from '@/features/dashboards/ui/hooks'
+import { usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
+import { useTeamSellers } from '@/features/sellers'
 import { CustomPeriodDialog } from '@/features/dashboards/ui/components/custom-period-dialog'
 import {
   ALL_SELLERS_LABEL,
@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from '@/shared/ui/components/shadcn/dropdown-menu'
 import { cn } from '@/shared/ui/lib/utils'
+import { toggleIn } from '@/shared/domain/format'
 
 /**
  * Barra de filtros fija arriba al hacer scroll: cada filtro es un menú desplegable.
@@ -45,7 +46,7 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
   const [customOpen, setCustomOpen] = useState(false)
   const me = useRequiredSession().seller
   const team = isSupervisor(me)
-  const list = (useSellers().data ?? []).filter((s) => !isSupervisor(s))
+  const list = useTeamSellers()
 
   const chosen = list.filter((s) => sellers.includes(s.username))
   const sellersLabel =
@@ -55,8 +56,7 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
   const clearAll = () => {
     update({ vendedor: null, desde: null, hasta: null, ...Object.fromEntries(chips.map((c) => [c.key, null])) })
   }
-  const toggle = (username: string) =>
-    setSellers(sellers.includes(username) ? sellers.filter((u) => u !== username) : [...sellers, username])
+  const toggle = (username: string) => setSellers(toggleIn(sellers, username))
 
   return (
     <div className="sticky top-0 z-20 border-b border-border/60 bg-background/95 px-4 py-2.5 backdrop-blur-md dsk:-mx-[30px] dsk:mb-4 dsk:px-[30px] dsk:py-3">
@@ -148,7 +148,7 @@ function ExportPeriod() {
   const data = usePeriodData(period).data
   const { exporter } = useContainer()
   const me = useRequiredSession().seller
-  const all = (useSellers().data ?? []).filter((s) => !isSupervisor(s))
+  const all = useTeamSellers()
   const team = isSupervisor(me) ? all.filter((s) => !sellers.length || sellers.includes(s.username)) : [me]
 
   async function run(format: ExportFormat) {

@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from '@/shared/ui/components/shadcn/dialog'
 import { cn } from '@/shared/ui/lib/utils'
+import { toggleIn } from '@/shared/domain/format'
 
 /** Supervisor: elige los días que un vendedor podrá editar aunque haya pasado el corte. */
 export function GrantEditingDialog({
@@ -55,7 +56,7 @@ function GrantForm({
   const grant = useGrantEditing()
   const [chosen, setChosen] = useState<IsoDate[]>(() => defaultGrantDays(window))
   const now = today()
-  const toggle = (d: IsoDate) => setChosen((list) => (list.includes(d) ? list.filter((x) => x !== d) : [...list, d]))
+  const toggle = (d: IsoDate) => setChosen((list) => toggleIn(list, d))
   const submit = () =>
     grant.mutate(
       { username: seller.username, dates: [...chosen].sort() },

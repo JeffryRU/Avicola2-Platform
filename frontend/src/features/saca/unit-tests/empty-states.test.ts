@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { emptySaca } from '@/features/saca/domain/saca'
-import { emptyForecast } from '@/features/production/domain/forecast'
-import { DEFAULT_PRODUCTS } from '@/features/catalog/domain/defaults'
+import { emptyForecast } from '@/features/production'
+import { DEFAULT_PRODUCTS } from '@/features/catalog'
 
 // Sin backend las pantallas se dibujan con estos valores en cero.
 describe('pantallas sin datos del servidor', () => {

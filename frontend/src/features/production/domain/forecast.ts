@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { parseUnits } from '@/features/stock/domain/stock'
+import { parseUnits } from '@/shared/domain/format'
+import { productType } from '@/shared/domain/products'
 
 /** Modelo de llegada por rango: de lo que se pide de cada tipo, cuánto llega en cada producto. */
 const forecastGroupSchema = z.object({
@@ -86,7 +87,7 @@ export function projectionTotals(groups: ProjectedGroup[]) {
 export function emptyForecast(
   products: { id: string; subcategory?: string | null; category: string }[],
 ): ArrivalForecast {
-  const names = [...new Set(products.map((p) => p.subcategory ?? p.category))]
+  const names = [...new Set(products.map(productType))]
   return {
     available: true,
     method: '',
@@ -101,7 +102,7 @@ export function emptyForecast(
       last_ordered: 0,
       last_weight: null,
       products: products
-        .filter((p) => (p.subcategory ?? p.category) === name)
+        .filter((p) => productType(p) === name)
         .map((p) => ({ product_id: p.id, share: 0, quality_a_rate: 1 })),
     })),
     accuracy: null,

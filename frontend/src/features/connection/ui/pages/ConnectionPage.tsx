@@ -1,11 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Check, Layers, RefreshCw, Send, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { paths } from '@/app/routes'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { SummaryRow } from '@/features/projections/ui/components/review-dialog'
-import { useFlushQueue, useQueue } from '@/features/projections/ui/hooks'
-import { useStatus } from '@/features/connection/ui/hooks'
+import { useRequiredSession } from '@/features/auth'
+import { SummaryRow } from '@/shared/ui/components/summary-row'
+import { useFlushQueue, useQueue } from '@/features/projections'
+import { useReloadAll, useStatus } from '@/features/connection/ui/hooks'
 import { Note } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
@@ -22,7 +21,7 @@ export function ConnectionPage() {
   const flushQueue = useFlushQueue()
   const { seller } = useRequiredSession()
   const pending = useQueue().filter((q) => q.seller === seller.username).length
-  const client = useQueryClient()
+  const reloadAll = useReloadAll()
   const s = status.data
   const ok = Boolean(s?.database) && s?.tables === true
 
@@ -35,7 +34,7 @@ export function ConnectionPage() {
     toast(r.sent ? `${r.sent} enviado(s)` : 'No se pudo sincronizar. Se intentará de nuevo.')
   }
   const reload = async () => {
-    await client.invalidateQueries()
+    await reloadAll()
     toast.success('Datos actualizados desde la base')
   }
 

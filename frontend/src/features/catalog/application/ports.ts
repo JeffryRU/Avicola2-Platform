@@ -1,4 +1,4 @@
-import type { Product } from '@/features/catalog/domain/schemas'
+import type { Product } from '@/shared/domain/products'
 
 /** Catálogo de productos activos (categorías, tamaños y peso por unidad). */
 export interface CatalogGateway {

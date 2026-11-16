@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { addDays, dShort, rangeDates, today, type IsoDate } from '@/shared/domain/dates'
-import { sumUnits } from '@/features/catalog/domain/catalog'
-import type { Units } from '@/features/catalog/domain/schemas'
+import { sumUnits, type Units } from '@/shared/domain/products'
 import { isoDateSchema } from '@/shared/domain/schemas'
+import type { Catalog } from '@/features/catalog'
+import type { MyDay } from '@/features/projections/domain/aggregation'
 
 export const MAX_DAYS = 7
 export const MAX_UNITS = 9999
@@ -102,4 +103,20 @@ export function copyPreviousSheets(draft: Draft, previous: PreviousSheet[], visi
     }
   }
   return { ...draft, units }
+}
+
+/** Abre la hoja nueva de cada día (INS-06): en blanco, sin precargar lo ya registrado. */
+export function withNewSheets(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): Draft {
+  const visible = new Set(catalog.selected(draft).map((p) => p.id))
+  return openNewSheets(draft, previousSheets(draft, days), visible)
+}
+
+/** Ajusta un borrador guardado al catálogo actual (categoría o tamaño que ya no existen) y abre las hojas nuevas. */
+export function normalizeDraft(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): Draft {
+  let d = draft
+  if (!catalog.categories.includes(d.category)) {
+    d = { ...d, category: days.get(d.start)?.category ?? catalog.categories[0], subcategory: null, units: {} }
+  }
+  if (d.subcategory && !catalog.subcategories(d.category).includes(d.subcategory)) d = { ...d, subcategory: null }
+  return d.step === 1 ? withNewSheets(d, catalog, days) : d
 }

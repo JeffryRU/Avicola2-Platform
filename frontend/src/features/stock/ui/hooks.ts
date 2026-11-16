@@ -1,15 +1,19 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
-import { queryKeys } from '@/shared/application/query-keys'
+import { queryKeys, REFERENCE_DATA_STALE_MS } from '@/shared/application/query-keys'
+import type { KeyValueStore } from '@/shared/application/ports'
 import type { IsoDate } from '@/shared/domain/dates'
+import { DEFAULT_PRODUCTS } from '@/features/catalog'
+import { DEFAULT_LOCATIONS, DEFAULT_LOT_DAYS, DEFAULT_QUALITY_B } from '@/features/stock/domain/defaults'
 import {
-  DEFAULT_LOCATIONS,
-  DEFAULT_LOT_DAYS,
-  DEFAULT_PRODUCTS,
-  DEFAULT_QUALITY_B,
-} from '@/features/catalog/domain/defaults'
-import { stockOptionsSchema, type StockEntry, type StockOptions } from '@/features/stock/domain/stock'
+  defaultView,
+  type StockEntry,
+  type StockOptions,
+  stockOptionsSchema,
+  type StockView,
+  stockViewSchema,
+} from '@/features/stock/domain/stock'
 
 export function useStock(from: IsoDate, to: IsoDate) {
   const { stock } = useContainer()
@@ -25,7 +29,7 @@ export function useStockOptions() {
   const q = useQuery({
     queryKey: queryKeys.stock.options,
     queryFn: () => stock.options(),
-    staleTime: 10 * 60_000,
+    staleTime: REFERENCE_DATA_STALE_MS,
   })
   useEffect(() => {
     if (q.data) preferences.set(OPTIONS_KEY, q.data)
@@ -55,4 +59,24 @@ export function useRegisterStock() {
       void client.invalidateQueries({ queryKey: queryKeys.saca.all })
     },
   })
+}
+
+/** Clave de la vista del stock en el equipo (KeyValueStore). */
+export const STOCK_VIEW_KEY = 'stock.view'
+
+/** La vista guardada en el equipo o, si no hay o no sirve, la de partida. */
+export const readStockView = (store: Pick<KeyValueStore, 'get'>, lotDays: number): StockView =>
+  store.get(STOCK_VIEW_KEY, stockViewSchema) ?? defaultView(lotDays)
+
+/** Cómo se mira el stock: se recuerda en este equipo hasta que se cambie. */
+export function useStockView(lotDays: number) {
+  const { preferences } = useContainer()
+  const [view, setViewState] = useState<StockView | null>(null)
+  const current = view ?? readStockView(preferences, lotDays)
+  const setView = (patch: Partial<StockView>) => {
+    const next = { ...current, ...patch }
+    preferences.set(STOCK_VIEW_KEY, next)
+    setViewState(next)
+  }
+  return [current, setView] as const
 }

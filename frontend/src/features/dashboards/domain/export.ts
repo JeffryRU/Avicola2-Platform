@@ -1,8 +1,10 @@
 import { dDow, type IsoDate } from '@/shared/domain/dates'
-import type { Seller } from '@/features/auth/domain/session'
-import type { Catalog } from '@/features/catalog/domain/catalog'
-import { CONFIRMED, type DailyUnits, type Projection } from '@/features/projections/domain/schemas'
+import type { Seller } from '@/shared/domain/session'
+import type { Catalog } from '@/features/catalog'
+import { CONFIRMED, STATUS_LABEL } from '@/shared/types/labels'
+import type { DailyUnits, Projection } from '@/features/projections'
 import type { ExportColumn, ExportTable } from '@/shared/domain/export'
+import { round2 } from '@/shared/domain/format'
 
 const COLUMNS: ExportColumn[] = [
   { label: 'Fecha', width: 11 },
@@ -21,8 +23,6 @@ const COLUMNS: ExportColumn[] = [
 ]
 
 export const MISSING_LABEL = 'Sin proyección'
-const STATUS: Record<string, string> = { [CONFIRMED]: 'Confirmada' }
-const round2 = (n: number) => Math.round(n * 100) / 100
 const sentAt = (iso: string) => iso.slice(0, 16).replace('T', ' ')
 
 /**
@@ -72,7 +72,7 @@ export function teamProjectionsTable({
             units,
             round2(units * product.kg_per_unit),
             sold ? (sold[product.id] ?? 0) : '',
-            STATUS[p.status] ?? p.status,
+            p.status === CONFIRMED ? STATUS_LABEL.confirmed : p.status,
             sentAt(p.submitted_at),
           ])
         }

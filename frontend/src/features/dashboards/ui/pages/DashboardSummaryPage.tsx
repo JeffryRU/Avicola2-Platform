@@ -2,18 +2,17 @@ import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { Calendar, Layers, Package, ShoppingBag } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { dDM, dDow, dShort } from '@/shared/domain/dates'
-import { nf0, nf1 } from '@/shared/domain/format'
-import { periodAgg } from '@/features/projections/domain/aggregation'
+import { nf0 } from '@/shared/domain/format'
+import { periodAgg } from '@/features/projections'
 import { previousDates } from '@/features/dashboards/domain/period'
-import { DashboardTabs, Delta, useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
-import { useCatalog } from '@/features/catalog/ui/hooks'
+import { DashboardTabs, Delta } from '@/features/dashboards/ui/components/dashboard'
+import { useCatalog } from '@/features/catalog'
 import { BarChart, CountUp, Donut } from '@/shared/ui/components/charts'
 import { Kpi, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { STATUS_LABEL } from '@/shared/types/labels'
-import { useDayPath } from '@/features/dashboards/ui/hooks'
+import { STATUS_LABEL, kgAmount, UNITS_SHORT } from '@/shared/types/labels'
+import { useDayPath, useDetailSelection, usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
 import { DetailFilterMenus, ProductDetail } from '@/features/dashboards/ui/components/product-detail'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
-import { useDetailSelection, usePeriodData } from '@/features/dashboards/ui/hooks'
 
 export function DashboardSummaryPage() {
   const { period, sellers } = useDashboardFilters()
@@ -53,7 +52,7 @@ export function DashboardSummaryPage() {
             label="Total proyectado"
             value={
               <>
-                <CountUp value={units} /> unid.
+                <CountUp value={units} /> {UNITS_SHORT}
               </>
             }
             foot={<Delta current={units} previous={same.reduce((s, d) => s + d.u, 0)} />}
@@ -105,7 +104,7 @@ export function DashboardSummaryPage() {
                   <>
                     <b>{dShort(d.date)}</b>
                     <br />
-                    {nf0(d.u)} unidades, {nf1(d.kg)} kg
+                    {nf0(d.u)} unidades, {kgAmount(d.kg)}
                     <br />
                     {STATUS_LABEL[d.confirmed ? 'confirmed' : 'pending']}
                   </>

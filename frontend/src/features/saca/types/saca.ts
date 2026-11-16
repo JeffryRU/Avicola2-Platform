@@ -2,8 +2,7 @@
 export const SACA_TITLE = 'Cálculo de saca'
 export const SACA_SUBTITLE = 'Cuánto pedir a granja cada día, por producto.'
 export const DAY_LABEL = 'Día del cálculo'
-export const TODAY_LABEL = 'Hoy'
-export const TOMORROW_LABEL = 'Mañana'
+export { TODAY_LABEL, TOMORROW_LABEL } from '@/shared/types/labels'
 export const HERO_LABEL = 'Pedido final a granja'
 export const BIRDS_LABEL = 'aves'
 export const KG_LABEL = 'kg de producto'
@@ -30,8 +29,7 @@ export const FARM_COLUMNS = {
 export const EDIT_PLUS_LABEL = 'Cambiar el plus de cada tipo'
 export const PLUS_SAVED = 'Plus guardado.'
 export const PLUS_INVALID = 'Escribe un número entero entre 0 y 100 000 en cada tipo (por ejemplo 4000).'
-export const SAVE_PLUS = 'Guardar'
-export const CANCEL = 'Cancelar'
+export { CANCEL_LABEL as CANCEL, SAVE_LABEL as SAVE_PLUS } from '@/shared/types/labels'
 export const NEED_LABEL = 'aves según los productos'
 export const groupStockBNote = (n: number) => `incl. ${n.toLocaleString('es-PE')} en B`
 
@@ -48,12 +46,6 @@ export const ARRIVAL_HINT =
   'A granja se pide por tipo y las aves llegan repartidas entre rangos. «Llegará» reparte lo pedido según la producción reciente (pesan más los últimos días).'
 export const arrivalNote = (days: number, from: string, to: string) =>
   `Con ${String(days)} días de producción, del ${from} al ${to}.`
-/** Nombre legible del modelo de llegada en uso (lo elige solo el backend). */
-export function modelLabel(method: string): string {
-  if (method === 'hybrid_weight') return 'Suavizado + árboles con el peso de la parvada'
-  const halfLife = /^ewma_(\d+(?:\.\d+)?)$/.exec(method)?.[1]
-  return halfLife ? `Suavizado exponencial, vida media ${halfLife} días` : method
-}
 export const stockBNote = (n: number) =>
   `Además, ${n.toLocaleString('es-PE')} de calidad B, que se suman al stock de su tipo.`
 export const stockOldNote = (n: number, days: number) =>

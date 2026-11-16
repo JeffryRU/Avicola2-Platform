@@ -5,13 +5,14 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { paths } from '@/app/routes'
 import { initials } from '@/shared/domain/format'
-import { isSupervisor, profileSchema, roleLabel } from '@/features/auth/domain/session'
-import { useUpdateProfile } from '@/features/auth/ui/hooks'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { isSupervisor, roleLabel } from '@/shared/domain/session'
+import { profileSchema } from '@/features/profile/domain/profile'
+import { useRequiredSession, useUpdateProfile } from '@/features/auth'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { Input } from '@/shared/ui/components/shadcn/input'
 import { Label } from '@/shared/ui/components/shadcn/label'
+import { CANCEL_LABEL } from '@/shared/types/labels'
 
 /** Datos de la cuenta: el nombre lo edita cada persona; usuario, rol y zona son de solo lectura. */
 export function ProfileSettingsPage() {
@@ -94,7 +95,7 @@ export function ProfileSettingsPage() {
                 className="h-11 font-bold"
                 onClick={() => void navigate(paths.profile)}
               >
-                Cancelar
+                {CANCEL_LABEL}
               </Button>
               <Button type="submit" disabled={busy} className="h-11 font-bold">
                 {busy ? <Loader2 className="animate-spin" /> : <Save />} Guardar cambios

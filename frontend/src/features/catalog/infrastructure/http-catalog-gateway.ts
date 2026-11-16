@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { CatalogGateway } from '@/features/catalog/application/ports'
-import { productSchema } from '@/features/catalog/domain/schemas'
+import { productSchema } from '@/shared/domain/products'
 import type { HttpClient } from '@/shared/application/ports'
 import { endpoints } from '@/shared/infrastructure/api/endpoints'
 

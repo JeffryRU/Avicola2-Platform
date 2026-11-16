@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Catalog } from '@/features/catalog/domain/catalog'
+import { Catalog } from '@/features/catalog'
 import { bySupervisor, changedLines, type ProjectionChange } from '@/features/history/domain/history'
 import { unitsChange } from '@/features/history/types/history'
 

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { addDays, daysText, weekStart } from '@/shared/domain/dates'
 import { myDays, versusReal, weekAgg, type MyDay } from '@/features/projections/domain/aggregation'
-import { Catalog } from '@/features/catalog/domain/catalog'
+import { Catalog } from '@/features/catalog'
 import {
   copyPreviousSheets,
   emptyDays,
   newDraft,
+  normalizeDraft,
   openNewSheets,
   previousSheets,
   submittableDraft,
@@ -172,5 +173,27 @@ describe('hojas de registro (INS-06)', () => {
     expect(copyPreviousSheets(blank, previous, visible).units[day]).toEqual({ B1: 10, B2: 4 })
     const typed = { ...blank, units: { ...blank.units, [day]: { B1: 7 } } }
     expect(copyPreviousSheets(typed, previous, visible).units[day]).toEqual({ B1: 7 })
+  })
+})
+
+describe('borrador guardado frente al catálogo actual (normalizeDraft)', () => {
+  const noDays = new Map<string, MyDay>()
+
+  it('una categoría que ya no existe pasa a la primera y se vacían las unidades', () => {
+    const stored = { ...newDraft('2026-11-03', 'YA NO EXISTE'), units: { '2026-11-03': { X: 4 } } }
+    const d = normalizeDraft(stored, catalog, noDays)
+    expect(d.category).toBe(catalog.categories[0])
+    expect(d.units).toEqual({})
+  })
+
+  it('un tamaño que ya no existe vuelve a «todos»', () => {
+    const d = normalizeDraft({ ...newDraft('2026-11-03', 'BRASA'), subcategory: 'Brasa enorme' }, catalog, noDays)
+    expect(d.subcategory).toBeNull()
+    expect(d.category).toBe('BRASA')
+  })
+
+  it('en el paso 1 un borrador válido no cambia', () => {
+    const stored = newDraft('2026-11-03', 'BRASA')
+    expect(normalizeDraft(stored, catalog, noDays)).toBe(stored)
   })
 })

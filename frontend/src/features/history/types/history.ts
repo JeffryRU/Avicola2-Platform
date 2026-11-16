@@ -8,7 +8,7 @@ export const NO_CHANGES_LABEL = 'No hay cambios en este período.'
 export const AFTER_CUTOFF_LABEL = 'Después del corte'
 export const PERIOD_LABEL = 'Período'
 export const SELLER_LABEL = 'Vendedor'
-export const ALL_SELLERS_LABEL = 'Todos los vendedores'
+export { ALL_SELLERS_LABEL } from '@/shared/types/labels'
 
 export const CHANGE_ACTION_LABEL: Record<ChangeAction, string> = {
   created: 'Registró',

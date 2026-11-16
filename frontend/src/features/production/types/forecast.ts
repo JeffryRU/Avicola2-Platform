@@ -37,3 +37,10 @@ export const DEVIATION_LABEL = 'Desviación'
 export const NO_HISTORY_TITLE = 'Todavía no se puede pronosticar'
 export const noHistoryBody = (minDays: number) =>
   `Hacen falta al menos ${minDays} días con producción registrada. Regístrala cada día en Producción o carga la historia.`
+
+/** Nombre legible del modelo de llegada en uso (lo elige solo el backend). */
+export function modelLabel(method: string): string {
+  if (method === 'hybrid_weight') return 'Suavizado + árboles con el peso de la parvada'
+  const halfLife = /^ewma_(\d+(?:\.\d+)?)$/.exec(method)?.[1]
+  return halfLife ? `Suavizado exponencial, vida media ${halfLife} días` : method
+}

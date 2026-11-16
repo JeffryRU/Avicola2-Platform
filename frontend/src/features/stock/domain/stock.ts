@@ -1,6 +1,8 @@
 import { z } from 'zod'
-import { addDays, type IsoDate } from '@/shared/domain/dates'
-import { productSchema, type Product } from '@/features/catalog/domain/schemas'
+import { addDays, type IsoDate, isRecentDay } from '@/shared/domain/dates'
+import { parseUnits, round2, toggleIn } from '@/shared/domain/format'
+import { DEFAULT_LOT_DAYS } from '@/features/stock/domain/defaults'
+import { type Product, productSchema, productType } from '@/shared/domain/products'
 
 /** Contratos del stock de despacho, validados al recibirlos. */
 export const stockLineSchema = z.object({
@@ -39,35 +41,25 @@ export interface StockEntry {
   lot_date: IsoDate
 }
 
-/** Días hacia atrás que se pueden registrar o corregir (igual que el backend). */
+/** Días hacia atrás que se pueden registrar o corregir (STOCK_BACK_DAYS del backend). */
 export const STOCK_BACK_DAYS = 7
-const MAX_UNITS = 1_000_000
 
-/** ¿Se puede registrar o corregir ese día? Hoy y los 7 anteriores; nunca un día futuro. */
-export const isEditableDay = (day: IsoDate, ref: IsoDate) => day <= ref && day >= addDays(ref, -STOCK_BACK_DAYS)
-
-/** Días que se pueden registrar, del más reciente al más antiguo. */
-export const editableDays = (ref: IsoDate): IsoDate[] =>
-  Array.from({ length: STOCK_BACK_DAYS + 1 }, (_, i) => addDays(ref, -i))
-
-/** Unidades: solo dígitos. Vacío = sin dato. */
-export function parseUnits(raw: string): number | null {
-  const digits = raw.replace(/\D/g, '').slice(0, 7)
-  if (digits === '') return null
-  return Math.min(Number(digits), MAX_UNITS)
-}
+/** ¿Se puede registrar o corregir el stock de ese día? Hoy y los 7 anteriores; nunca un día futuro. */
+export const isEditableDay = (day: IsoDate, ref: IsoDate) => isRecentDay(day, ref, STOCK_BACK_DAYS)
 
 // --- Cómo se mira el stock (se recuerda en el equipo) -------------------------------------
 
 export const ALL = 'ALL'
 export const UNITS = ['units', 'kg', 'both'] as const
 export const QUALITIES = [ALL, 'A', 'B'] as const
-/** Lotes que se pueden mostrar: del día del stock hasta 8 días atrás (el pollo dura unos 8 días). */
-export const LOT_OFFSETS = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const
+/** Antigüedad máxima de un lote que se puede mostrar: el pollo dura unos 8 días. */
+export const MAX_LOT_AGE = 8
+/** Lotes que se pueden mostrar: del día del stock hasta MAX_LOT_AGE días atrás. */
+export const LOT_OFFSETS = Array.from({ length: MAX_LOT_AGE + 1 }, (_, i) => i)
 
 export const stockViewSchema = z.object({
   /** Lotes elegidos, como días hacia atrás desde el día del stock (así sirven para cualquier día). */
-  lots: z.array(z.number().int().min(0).max(8)).min(1),
+  lots: z.array(z.number().int().min(0).max(MAX_LOT_AGE)).min(1),
   location: z.string(),
   type: z.string(),
   quality: z.enum(QUALITIES),
@@ -75,35 +67,23 @@ export const stockViewSchema = z.object({
 })
 export type StockView = z.infer<typeof stockViewSchema>
 
-export const defaultView = (lotDays = 3): StockView => ({
-  lots: Array.from({ length: Math.min(lotDays, 8) + 1 }, (_, i) => i),
+/** Vista de partida: todos los lotes que descuenta la saca (`lotDays`), todas las ubicaciones y tipos. */
+export const defaultView = (lotDays = DEFAULT_LOT_DAYS): StockView => ({
+  lots: Array.from({ length: Math.min(lotDays, MAX_LOT_AGE) + 1 }, (_, i) => i),
   location: ALL,
   type: ALL,
   quality: ALL,
   unit: 'units',
 })
 
-const VIEW_KEY = 'stock.view'
-export function storedView(storage: Pick<Storage, 'getItem'> | undefined, lotDays?: number): StockView {
-  try {
-    const parsed = stockViewSchema.safeParse(JSON.parse(storage?.getItem(VIEW_KEY) ?? 'null'))
-    if (parsed.success) return parsed.data
-  } catch {
-    // Lo guardado no sirve: se vuelve a la vista de partida.
-  }
-  return defaultView(lotDays)
-}
-export const storeView = (storage: Pick<Storage, 'setItem'> | undefined, view: StockView) =>
-  storage?.setItem(VIEW_KEY, JSON.stringify(view))
-
 /** Marca o desmarca un lote; nunca deja la lista vacía. */
 export function toggleLot(lots: number[], offset: number): number[] {
-  const next = lots.includes(offset) ? lots.filter((o) => o !== offset) : [...lots, offset]
+  const next = toggleIn(lots, offset)
   return next.length ? next.sort((a, b) => a - b) : lots
 }
 
-/** Tipo de un artículo: su tamaño (Brasa chica…) o, si no tiene, su categoría. */
-export const typeOf = (p: Product) => p.subcategory ?? p.category
+/** Tipo de un artículo (ver productType). */
+export const typeOf = productType
 
 export const typesOf = (items: Product[]) => [...new Set(items.map(typeOf))]
 
@@ -150,7 +130,6 @@ export function draftOf(lines: StockLine[]): StockDraft {
 export const unitsAt = (draft: StockDraft, productId: string, lot: IsoDate) =>
   parseUnits(draft[cellKey(productId, lot)] ?? '') ?? 0
 
-const round2 = (n: number) => Math.round(n * 100) / 100
 export const kgOf = (p: Product, units: number) => round2(units * p.kg_per_unit)
 
 export interface StockTotals {

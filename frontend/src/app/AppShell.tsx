@@ -22,14 +22,17 @@ import { NavLink, Outlet, useLocation } from 'react-router'
 import { InstallBanner } from '@/app/install'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
 import { initials } from '@/shared/domain/format'
-import { can, hasTeamView, roleLabel } from '@/features/auth/domain/session'
-import { useLogout } from '@/features/auth/ui/hooks'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { VersionChip } from '@/features/versions/ui/versions'
-import { useUnreadCount } from '@/features/notifications/ui/hooks'
-import { useUnlocks } from '@/features/editing/ui/hooks'
+import { can, hasTeamView, roleLabel } from '@/shared/domain/session'
+import { useLogout, useRequiredSession } from '@/features/auth'
+import { VersionChip } from '@/features/versions'
+import { useUnreadCount } from '@/features/notifications'
+import { useUnlocks, MY_REQUESTS_NAV, MY_REQUESTS_TITLE, UNLOCKS_TITLE } from '@/features/editing'
 import { Logo } from '@/shared/ui/components/brand'
 import { cn } from '@/shared/ui/lib/utils'
+import { LOGOUT_LABEL } from '@/shared/types/labels'
+import { STOCK_TITLE } from '@/features/stock'
+import { FORECAST_NAV_LABEL, PRODUCTION_TITLE } from '@/features/production'
+import { SACA_TITLE } from '@/features/saca'
 
 const itemCls = (active: boolean) =>
   cn(
@@ -67,7 +70,7 @@ function Sidebar() {
   const { seller } = session
   const { pathname } = useLocation()
   const unread = useUnreadCount()
-  const inDash = pathname.startsWith('/dashboards')
+  const inDash = pathname.startsWith(paths.dashboards)
   const [expanded, setExpanded] = useState(true)
   // El supervisor no registra proyecciones: administra usuarios y ve los dashboards del equipo.
   const supervisor = hasTeamView(session)
@@ -104,7 +107,7 @@ function Sidebar() {
       <SideItem to={paths.profile} icon={<Settings />} label="Configuración" />
       <button type="button" className={itemCls(false)} onClick={() => logout.mutate()}>
         <LogOut />
-        <span>Cerrar sesión</span>
+        <span>{LOGOUT_LABEL}</span>
       </button>
     </div>
   )
@@ -117,9 +120,13 @@ function Sidebar() {
           <Logo />
         </div>
         <nav className="grid gap-0.5" aria-label="Principal">
-          <SideItem to={paths.home} end icon={<PackageCheck />} label="Stock de despacho" />
-          {can(session, 'view_production') && <SideItem to={paths.production} icon={<Factory />} label="Producción" />}
-          {can(session, 'view_production') && <SideItem to={paths.forecast} icon={<TrendingUp />} label="Pronóstico" />}
+          <SideItem to={paths.home} end icon={<PackageCheck />} label={STOCK_TITLE} />
+          {can(session, 'view_production') && (
+            <SideItem to={paths.production} icon={<Factory />} label={PRODUCTION_TITLE} />
+          )}
+          {can(session, 'view_production') && (
+            <SideItem to={paths.forecast} icon={<TrendingUp />} label={FORECAST_NAV_LABEL} />
+          )}
           {bell}
         </nav>
         {footer}
@@ -169,7 +176,7 @@ function Sidebar() {
               <SideItem
                 to={paths.unlocks}
                 icon={<LockOpen />}
-                label="Habilitaciones"
+                label={UNLOCKS_TITLE}
                 extra={
                   pending > 0 && (
                     <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-warn px-1.5 text-[11px] font-extrabold text-white not-italic">
@@ -183,13 +190,17 @@ function Sidebar() {
         ) : (
           <>
             <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
-            <SideItem to={paths.requests} icon={<LockOpen />} label="Solicitudes de apertura" />
+            <SideItem to={paths.requests} icon={<LockOpen />} label={MY_REQUESTS_TITLE} />
           </>
         )}
-        {can(session, 'view_saca') && <SideItem to={paths.saca} icon={<Bird />} label="Cálculo de saca" />}
-        {can(session, 'view_production') && <SideItem to={paths.production} icon={<Factory />} label="Producción" />}
-        {can(session, 'view_production') && <SideItem to={paths.forecast} icon={<TrendingUp />} label="Pronóstico" />}
-        {can(session, 'view_stock') && <SideItem to={paths.stock} icon={<PackageCheck />} label="Stock de despacho" />}
+        {can(session, 'view_saca') && <SideItem to={paths.saca} icon={<Bird />} label={SACA_TITLE} />}
+        {can(session, 'view_production') && (
+          <SideItem to={paths.production} icon={<Factory />} label={PRODUCTION_TITLE} />
+        )}
+        {can(session, 'view_production') && (
+          <SideItem to={paths.forecast} icon={<TrendingUp />} label={FORECAST_NAV_LABEL} />
+        )}
+        {can(session, 'view_stock') && <SideItem to={paths.stock} icon={<PackageCheck />} label={STOCK_TITLE} />}
         <SideItem to={paths.history} icon={<History />} label="Historial" />
         <SideItem to={paths.products} icon={<Box />} label="Productos" />
         {bell}
@@ -203,7 +214,7 @@ const BOTTOM = [
   { to: paths.home, icon: Home, label: 'Inicio', end: true },
   { to: paths.register, icon: Plus, label: 'Registrar' },
   { to: paths.mine, icon: ClipboardList, label: 'Proyecciones' },
-  { to: paths.requests, icon: LockOpen, label: 'Solicitudes' },
+  { to: paths.requests, icon: LockOpen, label: MY_REQUESTS_NAV },
   { to: paths.profile, icon: User, label: 'Perfil' },
 ]
 const BOTTOM_SUPERVISOR = [
@@ -216,8 +227,8 @@ const BOTTOM_SUPERVISOR = [
 
 const BOTTOM_DISPATCH = [
   { to: paths.home, icon: PackageCheck, label: 'Stock', end: true },
-  { to: paths.production, icon: Factory, label: 'Producción', end: false },
-  { to: paths.forecast, icon: TrendingUp, label: 'Pronóstico', end: false },
+  { to: paths.production, icon: Factory, label: PRODUCTION_TITLE, end: false },
+  { to: paths.forecast, icon: TrendingUp, label: FORECAST_NAV_LABEL, end: false },
   { to: paths.notifications, icon: Bell, label: 'Avisos', end: false },
   { to: paths.profile, icon: User, label: 'Perfil', end: false },
 ]

@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { nf1 } from '@/shared/domain/format'
 import { parseCell } from '@/shared/domain/format'
 import { Segmented } from '@/shared/ui/components/segmented'
 import { useCatalog } from '@/features/catalog/ui/hooks'
-import { PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
+import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
+import { tableCls } from '@/shared/ui/lib/table-styles'
 import { Input } from '@/shared/ui/components/shadcn/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
+import { kgAmount } from '@/shared/types/labels'
 
 export function ProductsPage() {
   const { catalog } = useCatalog()
@@ -71,7 +72,7 @@ export function ProductsPage() {
                 <div>
                   <small className="font-semibold text-muted-foreground">Equivale a</small>
                   <div className="text-[26px] font-extrabold" data-testid="calc-result">
-                    {nf1((units ?? 0) * selected.kg_per_unit)} kg
+                    {kgAmount((units ?? 0) * selected.kg_per_unit)}
                   </div>
                 </div>
               </div>
@@ -103,7 +104,7 @@ export function ProductsPage() {
                         )}
                       </td>
                       <td className={tableCls.td}>{p.kg_per_unit.toFixed(2)}</td>
-                      <td className={tableCls.td}>{nf1(p.kg_per_unit * 10)} kg</td>
+                      <td className={tableCls.td}>{kgAmount(p.kg_per_unit * 10)}</td>
                     </tr>
                   ))}
                 </tbody>

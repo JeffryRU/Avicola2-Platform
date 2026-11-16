@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import type { Product } from '@/features/catalog/domain/schemas'
+import type { Product } from '@/shared/domain/products'
 import {
   ALL,
   byLocation,
   defaultView,
   draftOf,
   draftTotals,
-  editableDays,
   isEditableDay,
   linesAt,
   locationsOf,
-  parseUnits,
   shownLots,
   stockDaySchema,
-  storeView,
-  storedView,
   toEntries,
   toggleLot,
   visibleGroups,
 } from '@/features/stock/domain/stock'
+import { parseUnits } from '@/shared/domain/format'
+import { BrowserStore } from '@/shared/infrastructure/browser-store'
+import { DEFAULT_LOT_DAYS } from '@/features/stock/domain/defaults'
+import { readStockView, STOCK_VIEW_KEY } from '@/features/stock/ui/hooks'
 
 const item = (id: string, name: string, kg: number, subcategory: string | null, quality = 'A', category = 'BRASA') =>
   ({ id, category, name, kg_per_unit: kg, sort_order: 1, subcategory, quality }) satisfies Product
@@ -48,7 +48,6 @@ describe('stock de despacho', () => {
     expect(isEditableDay('2026-11-03', '2026-11-10')).toBe(true)
     expect(isEditableDay('2026-11-02', '2026-11-10')).toBe(false)
     expect(isEditableDay('2026-11-11', '2026-11-10')).toBe(false)
-    expect(editableDays('2026-11-10')).toHaveLength(8)
     expect(parseUnits('1 2a3')).toBe(123)
     expect(parseUnits('')).toBeNull()
   })
@@ -101,17 +100,27 @@ describe('stock de despacho', () => {
   })
 
   it('recuerda cómo se mira el stock y vuelve a la vista de partida si lo guardado no sirve', () => {
+    // useStockView lee la vista con el puerto KeyValueStore: lo guardado o, si no sirve, la de partida.
     const data = new Map<string, string>()
-    const storage = {
-      getItem: (k: string) => data.get(k) ?? null,
-      setItem: (k: string, v: string) => void data.set(k, v),
-    }
-    expect(storedView(storage, 3)).toEqual(defaultView(3))
+    const store = new BrowserStore(
+      () =>
+        ({
+          getItem: (k: string) => data.get(k) ?? null,
+          setItem: (k: string, v: string) => void data.set(k, v),
+        }) as unknown as Storage,
+    )
+    const read = (lotDays = DEFAULT_LOT_DAYS) => readStockView(store, lotDays)
+    expect(STOCK_VIEW_KEY).toBe('stock.view') // la misma clave de antes: no se pierde lo guardado
+    expect(read(3)).toEqual(defaultView(3))
     expect(defaultView(3).lots).toEqual([0, 1, 2, 3])
+    expect(defaultView().lots).toEqual([0, 1, 2, 3]) // DEFAULT_LOT_DAYS
+    expect(defaultView(20).lots).toHaveLength(9) // como mucho 8 días atrás
     const mine = { ...defaultView(3), lots: [1, 4], location: 'Piura', unit: 'both' as const, quality: 'B' as const }
-    storeView(storage, mine)
-    expect(storedView(storage)).toEqual(mine)
+    store.set(STOCK_VIEW_KEY, mine)
+    expect(read()).toEqual(mine)
     data.set('stock.view', '{"lots":[]}')
-    expect(storedView(storage, 2).lots).toEqual([0, 1, 2])
+    expect(read(2).lots).toEqual([0, 1, 2])
+    data.set('stock.view', 'no es json')
+    expect(read(2).lots).toEqual([0, 1, 2])
   })
 })

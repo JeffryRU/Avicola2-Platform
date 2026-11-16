@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { unitsSchema } from '@/features/catalog/domain/schemas'
+import { unitsSchema } from '@/shared/domain/products'
 import { isoDateSchema } from '@/shared/domain/schemas'
 
 /** Contratos de la API de proyecciones y ventas, validados al recibirlos. */
@@ -46,5 +46,3 @@ export const submissionSchema = z.object({
   error: z.string().nullable().optional(),
 })
 export type Submission = z.infer<typeof submissionSchema>
-
-export const CONFIRMED = 'confirmed'

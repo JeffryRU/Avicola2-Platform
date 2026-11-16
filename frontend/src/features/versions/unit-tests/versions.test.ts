@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import catalogText from '../../../../public/versions.json?raw'
+import catalogText from '@/../public/versions.json?raw'
 import {
   changeLabel,
   liveNumber,

@@ -12,20 +12,22 @@ import {
   weekStart,
   type IsoDate,
 } from '@/shared/domain/dates'
-import { closesLabel } from '@/features/editing/types/editing'
-import { useEditingWindow } from '@/features/editing/ui/hooks'
-import { sumUnits } from '@/features/catalog/domain/catalog'
-import { roleLabel } from '@/features/auth/domain/session'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { useCatalog } from '@/features/catalog/ui/hooks'
-import { useMyDays } from '@/features/projections/ui/hooks'
-import { useUnreadCount } from '@/features/notifications/ui/hooks'
-import { BRANDS, BrandMark, useBrand } from '@/shared/ui/components/brand'
+import { closesLabel, useEditingWindow } from '@/features/editing'
+import { sumUnits } from '@/shared/domain/products'
+import { roleLabel } from '@/shared/domain/session'
+import { useRequiredSession } from '@/features/auth'
+import { useCatalog } from '@/features/catalog'
+import { useMyDays } from '@/features/projections'
+import { useUnreadCount } from '@/features/notifications'
+import { BrandMark } from '@/shared/ui/components/brand'
+import { BRANDS } from '@/shared/types/brands'
+import { useBrand } from '@/shared/ui/hooks/use-brand'
 import { CountUp } from '@/shared/ui/components/charts'
 import { Note } from '@/shared/ui/components/feedback'
 import { Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
+import { UNITS_SHORT } from '@/shared/types/labels'
 
 /** Hora límite para confirmar la proyección del día (mensaje informativo del mockup). */
 
@@ -183,7 +185,7 @@ export function HomePage() {
                 <Package className="size-5" />
                 <span className="text-ink-2">Total proyectado</span>
                 <b>
-                  <CountUp value={weekUnits} /> unid.
+                  <CountUp value={weekUnits} /> {UNITS_SHORT}
                 </b>
               </div>
               <div className="grid grid-cols-[24px_1fr_auto] items-center gap-3 py-[13px]">

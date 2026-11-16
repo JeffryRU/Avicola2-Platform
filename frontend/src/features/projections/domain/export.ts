@@ -1,7 +1,9 @@
 import { dDow } from '@/shared/domain/dates'
 import type { MyDay } from '@/features/projections/domain/aggregation'
-import type { Catalog } from '@/features/catalog/domain/catalog'
+import type { Catalog } from '@/features/catalog'
 import type { ExportColumn, ExportTable } from '@/shared/domain/export'
+import { round2 } from '@/shared/domain/format'
+import { STATUS_LABEL } from '@/shared/types/labels'
 
 const COLUMNS: ExportColumn[] = [
   { label: 'Fecha', width: 11 },
@@ -16,9 +18,8 @@ const COLUMNS: ExportColumn[] = [
   { label: 'Enviado', width: 17 },
 ]
 
-const SYNC_LABEL: Record<MyDay['sync'], string> = { ok: 'Sincronizada', pending: 'Por sincronizar' }
-
-const round2 = (n: number) => Math.round(n * 100) / 100
+/** Estado de sincronización de un día, con los mismos textos que la pantalla. */
+const SYNC_LABEL: Record<MyDay['sync'], string> = { ok: STATUS_LABEL.synced, pending: STATUS_LABEL.queued }
 
 /** Proyecciones propias: una fila por día y producto, ordenadas por fecha. */
 export function projectionsTable(days: MyDay[], catalog: Catalog, seller: string, generatedAt: Date): ExportTable {

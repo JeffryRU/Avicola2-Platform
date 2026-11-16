@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { dShort } from '@/shared/domain/dates'
-import { nf0 } from '@/shared/domain/format'
+import { nf0, keepDigits, RECORD_MAX_DIGITS } from '@/shared/domain/format'
 import { paths } from '@/app/routes'
-import { useCatalog } from '@/features/catalog/ui/hooks'
+import { useCatalog } from '@/features/catalog'
 import {
   emptyForecast,
   project,
@@ -27,7 +27,9 @@ import {
   MODEL_NOTE,
   MODEL_TITLE,
   MODEL_WEIGHT_NOTE,
+  modelLabel,
   NO_HISTORY_TITLE,
+  noHistoryBody,
   QUALITY_A_LABEL,
   QUALITY_B_LABEL,
   REQUEST_HINT,
@@ -38,7 +40,6 @@ import {
   WEIGHTS_HINT,
   WEIGHTS_TITLE,
   WEIGHTS_UNUSED,
-  noHistoryBody,
 } from '@/features/production/types/forecast'
 import {
   cleanKg,
@@ -48,7 +49,6 @@ import {
   type WeightDraft,
 } from '@/features/production/domain/production'
 import { SyncStatus } from '@/shared/ui/components/sync-status'
-import { modelLabel } from '@/features/saca/types/saca'
 import { useArrivalForecast } from '@/features/production/ui/hooks'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
@@ -153,7 +153,7 @@ function Projector({
                   inputMode="numeric"
                   placeholder="0"
                   value={draft[g.name] ?? ''}
-                  onChange={(e) => setDraft((d) => ({ ...d, [g.name]: e.target.value.replace(/\D/g, '').slice(0, 7) }))}
+                  onChange={(e) => setDraft((d) => ({ ...d, [g.name]: keepDigits(e.target.value, RECORD_MAX_DIGITS) }))}
                   className={inputCls}
                 />
               </label>

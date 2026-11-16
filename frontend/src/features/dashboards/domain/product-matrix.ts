@@ -1,8 +1,8 @@
 import type { IsoDate } from '@/shared/domain/dates'
-import type { Seller } from '@/features/auth/domain/session'
-import { bySubcategory } from '@/features/catalog/domain/catalog'
-import type { Product } from '@/features/catalog/domain/schemas'
-import { CONFIRMED, type Projection } from '@/features/projections/domain/schemas'
+import type { Seller } from '@/shared/domain/session'
+import { bySubcategory, type Product } from '@/shared/domain/products'
+import { CONFIRMED } from '@/shared/types/labels'
+import type { Projection } from '@/features/projections'
 
 /** Una columna de la tabla: qué proyecciones suma y bajo qué encabezado agrupado va. */
 export interface MatrixColumn {

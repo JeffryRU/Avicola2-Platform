@@ -2,50 +2,7 @@ import { ArrowDown, ArrowUp } from 'lucide-react'
 import { NavLink, useSearchParams } from 'react-router'
 import { pct1 } from '@/shared/domain/format'
 import { DASHBOARDS } from '@/app/routes'
-import { weekOptions } from '@/features/dashboards/domain/weeks'
-import { checkPeriod, customPeriod, weekPeriod } from '@/features/dashboards/domain/period'
-import { isoDateSchema } from '@/shared/domain/schemas'
 import { cn } from '@/shared/ui/lib/utils'
-
-/**
- * Filtros de los dashboards guardados en la URL para poder compartirla:
- * ?semana= o ?desde=&hasta= (rango personalizado), &vendedor=a,b (vacío = todos)&dia=&zona=&tamano=.
- */
-export function useDashboardFilters() {
-  const [params, setParams] = useSearchParams()
-  const weeks = weekOptions()
-  const asked = params.get('semana') ?? ''
-  const week = weeks.includes(asked) ? asked : weeks[0]
-  const sellers = (params.get('vendedor') ?? '').split(',').filter((v) => v && v !== 'all')
-  const from = params.get('desde') ?? ''
-  const to = params.get('hasta') ?? ''
-  const valid = isoDateSchema.safeParse(from).success && isoDateSchema.safeParse(to).success
-  const period = valid && !checkPeriod(from, to) ? customPeriod(from, to) : weekPeriod(week)
-  /** Cambia varios filtros a la vez (null o '' los quita). Se puede llamar varias veces seguidas. */
-  const update = (patch: Record<string, string | null>) => {
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        for (const [key, value] of Object.entries(patch)) {
-          if (value) next.set(key, value)
-          else next.delete(key)
-        }
-        return next
-      },
-      { replace: true },
-    )
-  }
-  return {
-    week,
-    period,
-    sellers,
-    param: (key: string) => params.get(key),
-    update,
-    setWeek: (w: string) => update({ semana: w, desde: null, hasta: null }),
-    setCustom: (a: string, b: string) => update({ desde: a, hasta: b }),
-    setSellers: (list: string[]) => update({ vendedor: list.join(',') || null }),
-  }
-}
 
 /** Pestañas entre dashboards (solo celular; en escritorio están en el menú). */
 export function DashboardTabs() {

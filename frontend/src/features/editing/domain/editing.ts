@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { collapseSpaces } from '@/shared/domain/format'
 import type { IsoDate } from '@/shared/domain/dates'
 import { isoDateSchema } from '@/shared/domain/schemas'
 
@@ -46,7 +47,7 @@ export const unlockRequestSchema = z.object({
   date: isoDateSchema,
   reason: z
     .string()
-    .transform((v) => v.split(/\s+/).filter(Boolean).join(' '))
+    .transform(collapseSpaces)
     .pipe(z.string().min(1, 'Indica el motivo.').max(300, 'Como máximo 300 caracteres.')),
 })
 
@@ -56,10 +57,6 @@ export const cutoffFormSchema = z.object({
   days_before: z.number().int().min(0).max(7),
   enabled: z.boolean(),
 })
-
-/** "2026-11-05T07:00:00-05:00" → "07:00" (sin pasar por la zona del navegador). */
-export const timeOf = (iso: string) => iso.slice(11, 16)
-export const dateOf = (iso: string): IsoDate => iso.slice(0, 10)
 
 /** Días elegidos que están cerrados y sin habilitación. */
 export function closedDays(window: EditingWindow | undefined, dates: IsoDate[]): IsoDate[] {

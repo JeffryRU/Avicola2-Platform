@@ -22,7 +22,7 @@ export const EMPTY_DETAIL_LABEL = 'No hay vendedores para este filtro.'
 
 /** Barra de filtros de los dashboards. */
 export const CLEAR_FILTERS_LABEL = 'Limpiar'
-export const ALL_SELLERS_LABEL = 'Todos los vendedores'
+export { ALL_SELLERS_LABEL } from '@/shared/types/labels'
 export const WEEK_FILTER_LABEL = 'Semana'
 export const SELLERS_FILTER_LABEL = 'Vendedores'
 export const DAY_FILTER_LABEL = 'Día'
@@ -39,7 +39,7 @@ export const CUSTOM_PERIOD_TITLE = 'Rango personalizado'
 export const FROM_LABEL = 'Desde'
 export const TO_LABEL = 'Hasta'
 export const APPLY_LABEL = 'Aplicar'
-export const CANCEL_LABEL = 'Cancelar'
+export { CANCEL_LABEL } from '@/shared/types/labels'
 export const MISSING_DATES_LABEL = 'Elige las dos fechas.'
 export const PERIOD_ERROR: Record<PeriodError, string> = {
   order: 'La fecha «Hasta» debe ser igual o posterior a «Desde».',

@@ -1,6 +1,5 @@
 import { toast } from 'sonner'
-import { dShort, formatTime, hhmm } from '@/shared/domain/dates'
-import { dateOf } from '@/features/editing/domain/editing'
+import { dateOf, dShort, clockTime } from '@/shared/domain/dates'
 import { paths } from '@/app/routes'
 import { policyKey, sortUnlocks, type Unlock, type UnlockAction } from '@/features/editing/domain/editing'
 import {
@@ -15,7 +14,7 @@ import {
 } from '@/features/editing/types/editing'
 import { useDecideUnlock, useEditingWindow, useUnlocks } from '@/features/editing/ui/hooks'
 import { CutoffForm } from '@/features/editing/ui/components/cutoff-form'
-import { useSellers } from '@/features/dashboards/ui/hooks'
+import { useSellers } from '@/features/sellers'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
@@ -85,7 +84,7 @@ function UnlockRow({ unlock, name }: { unlock: Unlock; name: string }) {
         </div>
         <p className="mt-1 text-[14px]">{unlock.reason}</p>
         <small className="text-muted-foreground">
-          Pedida el {dShort(dateOf(unlock.requested_at))} a las {formatTime(hhmm(unlock.requested_at))}
+          Pedida el {dShort(dateOf(unlock.requested_at))} a las {clockTime(unlock.requested_at)}
         </small>
       </div>
       {actions.length > 0 && (

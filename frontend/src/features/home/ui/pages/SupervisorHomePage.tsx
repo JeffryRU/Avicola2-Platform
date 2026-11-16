@@ -1,6 +1,6 @@
 import { dDowLong, dFull, greeting, today } from '@/shared/domain/dates'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { TeamDayView } from '@/features/dashboards/ui/pages/TeamDayPage'
+import { useRequiredSession } from '@/features/auth'
+import { TeamDayView } from '@/features/dashboards'
 
 /** Inicio del supervisor: cómo va hoy el equipo (quién confirmó, cuánto y qué falta). */
 export function SupervisorHomePage() {

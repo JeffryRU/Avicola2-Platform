@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { Catalog } from '@/features/catalog/domain/catalog'
+import { Catalog } from '@/features/catalog'
 import { MISSING_LABEL, teamProjectionsTable } from '@/features/dashboards/domain/export'
-import type { Projection } from '@/features/projections/domain/schemas'
+import type { Projection } from '@/features/projections'
 
 const catalog = new Catalog([
   { id: 'P1', name: 'Brasa 1', category: 'BRASA', subcategory: null, kg_per_unit: 1.5 },

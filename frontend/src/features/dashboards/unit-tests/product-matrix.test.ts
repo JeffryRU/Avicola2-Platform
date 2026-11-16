@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { Seller } from '@/features/auth/domain/session'
-import { Catalog } from '@/features/catalog/domain/catalog'
+import type { Seller } from '@/shared/domain/session'
+import { Catalog } from '@/features/catalog'
 import { dayColumns, productMatrix, sellerColumns, zonesOf } from '@/features/dashboards/domain/product-matrix'
-import type { Projection } from '@/features/projections/domain/schemas'
+import type { Projection } from '@/features/projections'
 
 const catalog = new Catalog([
   { id: 'P1', category: 'BRASA', name: 'Brasa 1', kg_per_unit: 1, sort_order: 0, subcategory: 'Brasa chica' },

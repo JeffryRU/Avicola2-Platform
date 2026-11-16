@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { addDays, dShort, formatTime, hhmm, today } from '@/shared/domain/dates'
-import { isSupervisor } from '@/features/auth/domain/session'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { useCatalog } from '@/features/catalog/ui/hooks'
-import { useSellers } from '@/features/dashboards/ui/hooks'
-import { dateOf } from '@/features/editing/domain/editing'
+import { addDays, dateOf, dShort, today, clockTime } from '@/shared/domain/dates'
+import { isSupervisor } from '@/shared/domain/session'
+import { useRequiredSession } from '@/features/auth'
+import { useCatalog } from '@/features/catalog'
+import { useSellers } from '@/features/sellers'
 import { useHistory } from '@/features/history/ui/hooks'
 import { bySupervisor, changedLines, type ProjectionChange } from '@/features/history/domain/history'
 import {
@@ -22,7 +21,8 @@ import {
   unitsChange,
 } from '@/features/history/types/history'
 import { EmptyState } from '@/shared/ui/components/feedback'
-import { PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
+import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
+import { tableCls } from '@/shared/ui/lib/table-styles'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { cn } from '@/shared/ui/lib/utils'
 
@@ -143,7 +143,7 @@ function ChangeRow({
     <tr className={tableCls.row}>
       <td className={tableCls.td}>
         <b className="block">{dShort(dateOf(c.changed_at))}</b>
-        <small className="text-muted-foreground">{formatTime(hhmm(c.changed_at))}</small>
+        <small className="text-muted-foreground">{clockTime(c.changed_at)}</small>
       </td>
       {team && <td className={tableCls.td}>{nameOf(c.seller)}</td>}
       <td className={tableCls.td}>{dShort(c.date)}</td>

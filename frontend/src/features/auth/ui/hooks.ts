@@ -1,7 +1,21 @@
+import { useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
 import { queryKeys } from '@/shared/application/query-keys'
-import type { Credentials, Session } from '@/features/auth/domain/session'
+import type { Session } from '@/shared/domain/session'
+import type { Credentials } from '@/features/auth/domain/credentials'
+
+export function useSession(): Session | null {
+  const { auth } = useContainer()
+  return useSyncExternalStore(auth.subscribe, auth.current)
+}
+
+/** Sesión obligatoria (las pantallas internas solo se montan con sesión). */
+export function useRequiredSession(): Session {
+  const session = useSession()
+  if (!session) throw new Error('Sin sesión.')
+  return session
+}
 
 /**
  * Al abrir la app, confirma la cookie con el servidor (GET /auth/me) una sola vez por usuario.

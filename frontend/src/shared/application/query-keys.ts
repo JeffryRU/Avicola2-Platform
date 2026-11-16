@@ -17,7 +17,11 @@
  * - production.range      → GET /production; production.forecast → GET /production/forecast
  * - editing.window        → GET /editing; editing.unlocks → GET /editing/unlocks
  * - notifications.all     → GET /notifications
+ * - versions.catalog       → public/versions.json; versions.changes → historial de GitHub
  */
+/** Datos de referencia que cambian poco (catálogo, vendedores, opciones del stock): 10 minutos frescos. */
+export const REFERENCE_DATA_STALE_MS = 10 * 60_000
+
 export const queryKeys = {
   auth: {
     all: ['auth'] as const,
@@ -85,5 +89,12 @@ export const queryKeys = {
 
   notifications: {
     all: ['notifications'] as const,
+  },
+
+  versions: {
+    all: ['versions'] as const,
+    catalog: ['versions', 'catalog'] as const,
+    /** Cambios entre dos puntos del historial (rama, tag o commit). */
+    changes: (repo: string, from: string | null, to: string | null) => ['versions', 'changes', repo, from, to] as const,
   },
 } as const

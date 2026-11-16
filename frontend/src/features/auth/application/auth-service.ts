@@ -1,6 +1,7 @@
 import { ApiError } from '@/shared/application/ports'
 import type { AuthGateway, LogoutCleanup, SessionRepository } from '@/features/auth/application/ports'
-import { credentialsSchema, type Credentials, type Session } from '@/features/auth/domain/session'
+import { type Credentials, credentialsSchema } from '@/features/auth/domain/credentials'
+import type { Session } from '@/shared/domain/session'
 
 type Listener = (session: Session | null) => void
 

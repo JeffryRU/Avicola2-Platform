@@ -4,7 +4,9 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
 import type { InstallState } from '@/shared/application/ports'
-import { BRANDS, BrandMark, useBrand } from '@/shared/ui/components/brand'
+import { BrandMark } from '@/shared/ui/components/brand'
+import { BRANDS } from '@/shared/types/brands'
+import { useBrand } from '@/shared/ui/hooks/use-brand'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import {
   Dialog,
@@ -14,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/components/shadcn/dialog'
+import { DAY_MS } from '@/shared/domain/dates'
 
 const SNOOZE_KEY = 'nv_install_snooze_until'
 const SNOOZE_DAYS = 14
@@ -174,7 +177,7 @@ export function InstallBanner() {
 
   if (state === 'installed' || !offerable || snoozed) return dialog
   const later = () => {
-    preferences.set(SNOOZE_KEY, Date.now() + SNOOZE_DAYS * 86_400_000)
+    preferences.set(SNOOZE_KEY, Date.now() + SNOOZE_DAYS * DAY_MS)
     setSnoozed(true)
   }
 

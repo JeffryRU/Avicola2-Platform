@@ -6,7 +6,7 @@ import {
   otherRoles,
   type AdminAccount,
 } from '@/features/accounts/domain/accounts'
-import { roleName } from '@/features/auth/types/roles'
+import { roleName } from '@/shared/types/roles'
 import { ACCOUNT_STATE_LABEL } from '@/features/accounts/types/accounts'
 
 const account = (over: Partial<AdminAccount> = {}): AdminAccount => ({

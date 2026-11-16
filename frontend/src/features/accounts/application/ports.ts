@@ -1,5 +1,5 @@
 import type { AdminAccount, NewAccount, NewCredentials } from '@/features/accounts/domain/accounts'
-import type { Role } from '@/features/auth/domain/session'
+import type { Role } from '@/shared/domain/session'
 
 /**
  * Administración de cuentas (solo supervisor). Hoy contra la API propia; cuando la app sea un

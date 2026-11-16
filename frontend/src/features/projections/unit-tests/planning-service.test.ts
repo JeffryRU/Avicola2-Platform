@@ -3,7 +3,7 @@ import { ApiError } from '@/shared/application/ports'
 import { addDays, today } from '@/shared/domain/dates'
 import type { ProjectionsGateway, SubmissionQueue } from '@/features/projections/application/ports'
 import { PlanningService } from '@/features/projections/application/planning-service'
-import { Catalog } from '@/features/catalog/domain/catalog'
+import { Catalog } from '@/features/catalog'
 import { newDraft } from '@/features/projections/domain/draft'
 import type { Submission } from '@/features/projections/domain/schemas'
 

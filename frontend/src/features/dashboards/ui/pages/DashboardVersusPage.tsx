@@ -2,16 +2,17 @@ import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { BarChart3, ShoppingCart, Target, TrendingDown } from 'lucide-react'
 import { dDM, dDow, dShort } from '@/shared/domain/dates'
 import { nf0, nf1, pct1 } from '@/shared/domain/format'
-import { periodAgg, versusReal } from '@/features/projections/domain/aggregation'
-import { DashboardTabs, useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
+import { periodAgg, versusReal } from '@/features/projections'
+import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
+import { tableCls } from '@/shared/ui/lib/table-styles'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
-import { useCatalog } from '@/features/catalog/ui/hooks'
-import { usePeriodData } from '@/features/dashboards/ui/hooks'
+import { kgPerUnitLabel, useCatalog } from '@/features/catalog'
+import { usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
 import { CountUp, LineChart } from '@/shared/ui/components/charts'
 import { EmptyState } from '@/shared/ui/components/feedback'
-import { Kpi, PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
+import { Kpi, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
-import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
+import { kgAmount } from '@/shared/types/labels'
 
 const tone = (v: number) => (v < 0 ? 'text-destructive' : 'text-ok')
 
@@ -119,13 +120,13 @@ export function DashboardVersusPage() {
                       <>
                         <b>{dShort(p.date)}</b>
                         <br />
-                        Proyección: {nf1(p.pk)} kg
+                        Proyección: {kgAmount(p.pk)}
                         <br />
                         {p.rk == null ? (
                           'Venta real: sin datos aún'
                         ) : (
                           <>
-                            Venta real: {nf1(p.rk)} kg
+                            Venta real: {kgAmount(p.rk)}
                             <br />
                             Diferencia: {pct1(((p.rk - p.pk) / p.pk) * 100)}
                           </>

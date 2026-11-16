@@ -3,12 +3,12 @@ import { Link } from 'react-router'
 import { InstallOption } from '@/app/install'
 import { paths } from '@/app/routes'
 import { initials } from '@/shared/domain/format'
-import { can, hasTeamView, roleLabel } from '@/features/auth/domain/session'
-import { useLogout } from '@/features/auth/ui/hooks'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { can, hasTeamView, roleLabel } from '@/shared/domain/session'
+import { useLogout, useRequiredSession } from '@/features/auth'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
-import { VersionChip } from '@/features/versions/ui/versions'
+import { VersionChip } from '@/features/versions'
+import { LOGOUT_LABEL } from '@/shared/types/labels'
 
 const optCls =
   'flex w-full flex-wrap items-center gap-3.5 border-b border-muted px-5 py-4 text-left last:border-0 dsk:flex-nowrap'
@@ -109,7 +109,7 @@ export function ProfilePage() {
               <LogOut />
             </span>
             <span className="min-w-0 flex-1">
-              <b className="block">Cerrar sesión</b>
+              <b className="block">{LOGOUT_LABEL}</b>
               <small className="text-muted-foreground">Volver a la pantalla de inicio de sesión</small>
             </span>
             <ChevronRight className="size-[18px]" />

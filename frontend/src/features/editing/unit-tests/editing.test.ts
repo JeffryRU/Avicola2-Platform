@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   activeUnlocks,
-  defaultGrantDays,
   closedDays,
   cutoffFormSchema,
+  defaultGrantDays,
+  type EditingWindow,
   pastCutoff,
   sortUnlocks,
-  timeOf,
-  unlockRequestSchema,
-  type EditingWindow,
   type Unlock,
+  unlockRequestSchema,
 } from '@/features/editing/domain/editing'
+import { timeOf } from '@/shared/domain/dates'
 import { closesLabel, cutoffRule } from '@/features/editing/types/editing'
 
 const day = (date: string, open: boolean) => ({ date, closes_at: `${date}T07:00:00-05:00`, open, unlock: null })

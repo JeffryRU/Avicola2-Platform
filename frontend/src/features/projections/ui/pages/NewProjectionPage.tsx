@@ -5,55 +5,35 @@ import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { addDays, dFull, dShort, daysText, today, type IsoDate } from '@/shared/domain/dates'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { isSupervisor } from '@/features/auth/domain/session'
-import { useSellers } from '@/features/dashboards/ui/hooks'
-import type { MyDay } from '@/features/projections/domain/aggregation'
-import type { Catalog } from '@/features/catalog/domain/catalog'
+import { useRequiredSession } from '@/features/auth'
+import { isSupervisor } from '@/shared/domain/session'
+import { useTeamSellers } from '@/features/sellers'
+import { capitalize, categoryName, kgPerUnitLabel, shortSizeLabel, useCatalog } from '@/features/catalog'
 import {
   copyPreviousSheets,
   draftDates,
   emptyDays,
+  normalizeDraft,
   newDraft,
-  openNewSheets,
   previousSheets,
   submittableDraft,
+  withNewSheets,
   type Draft,
 } from '@/features/projections/domain/draft'
 import { isoDateSchema } from '@/shared/domain/schemas'
 import { DaysSlider } from '@/features/projections/ui/components/days-slider'
 import { ProjectionMatrix } from '@/features/projections/ui/components/projection-matrix'
 import { ReviewDialog } from '@/features/projections/ui/components/review-dialog'
-import { useCatalog } from '@/features/catalog/ui/hooks'
 import { useMyDays, useSubmitProjection, useSuggestion } from '@/features/projections/ui/hooks'
 import { LoadingOverlay, Note } from '@/shared/ui/components/feedback'
-import { FooterActions, PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
+import { FooterActions, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
+import { tableCls } from '@/shared/ui/lib/table-styles'
 import { Button } from '@/shared/ui/components/shadcn/button'
-import { capitalize, categoryName, shortSizeLabel } from '@/features/catalog/types/catalog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
-import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
-import { daysCount } from '@/shared/types/labels'
-import { closedDays, openDates, windowDates } from '@/features/editing/domain/editing'
-import { closedDaysNote } from '@/features/editing/types/editing'
-import { EditingDays } from '@/features/editing/ui/components/editing-days'
-import { useEditingWindow } from '@/features/editing/ui/hooks'
-
-/** Abre la hoja nueva de cada día (INS-06): en blanco, sin precargar lo ya registrado. */
-function withNewSheets(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): Draft {
-  const visible = new Set(catalog.selected(draft).map((p) => p.id))
-  return openNewSheets(draft, previousSheets(draft, days), visible)
-}
-
-function normalize(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): Draft {
-  let d = draft
-  if (!catalog.categories.includes(d.category)) {
-    d = { ...d, category: days.get(d.start)?.category ?? catalog.categories[0], subcategory: null, units: {} }
-  }
-  if (d.subcategory && !catalog.subcategories(d.category).includes(d.subcategory)) d = { ...d, subcategory: null }
-  return d.step === 1 ? withNewSheets(d, catalog, days) : d
-}
+import { daysCount, CANCEL_LABEL } from '@/shared/types/labels'
+import { closedDays, closedDaysNote, EditingDays, openDates, useEditingWindow, windowDates } from '@/features/editing'
 
 export function NewProjectionPage() {
   const { drafts } = useContainer()
@@ -62,7 +42,7 @@ export function NewProjectionPage() {
   const [params] = useSearchParams()
   // El supervisor registra o edita por un vendedor (?vendedor= desde el detalle del día).
   const supervisor = isSupervisor(seller)
-  const team = (useSellers().data ?? []).filter((s) => !isSupervisor(s))
+  const team = useTeamSellers()
   const [target, setTarget] = useState(() => params.get('vendedor') ?? '')
   const owner = supervisor ? target : seller.username
   const ownerName = team.find((s) => s.username === owner)?.name ?? owner
@@ -86,7 +66,7 @@ export function NewProjectionPage() {
 
   // Borrador efectivo: categoría válida y días ya confirmados precargados (derivado, sin efectos).
   const draft = useMemo(() => {
-    let d = catalog ? normalize(stored, catalog, days) : stored
+    let d = catalog ? normalizeDraft(stored, catalog, days) : stored
     if (allowed?.length) {
       // Se empieza en el primer día abierto: hoy (y quizá mañana) ya cerró por la hora de corte,
       // y un borrador guardado puede ser de otro día.
@@ -288,7 +268,7 @@ export function NewProjectionPage() {
               className="h-10 flex-none font-bold text-ink-2"
               onClick={() => navigate(paths.home)}
             >
-              Cancelar
+              {CANCEL_LABEL}
             </Button>
             <Button
               className="h-[54px] flex-1 rounded-[14px] text-[16.5px] font-bold dsk:min-w-[220px] dsk:flex-none"

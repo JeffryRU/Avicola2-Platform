@@ -1,7 +1,10 @@
+import { DAY_AFTER_TOMORROW_LABEL, TODAY_LABEL, TOMORROW_LABEL, YESTERDAY_LABEL } from '@/shared/types/labels'
+
 /** Fechas como texto ISO (AAAA-MM-DD) en hora local: sin desfases de zona horaria. */
 export type IsoDate = string
 
-const DAY_MS = 86_400_000
+/** Un día en milisegundos. */
+export const DAY_MS = 86_400_000
 export const DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 export const DOW_LONG = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
@@ -48,8 +51,6 @@ export function weekStart(s: IsoDate): IsoDate {
 export const weekDates = (ws: IsoDate): IsoDate[] => [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(ws, i))
 export const rangeDates = (start: IsoDate, days: number): IsoDate[] =>
   Array.from({ length: days }, (_, i) => addDays(start, i))
-/** Índice lunes=0 … domingo=6. */
-export const weekdayIndex = (s: IsoDate) => (fromIso(s).getDay() + 6) % 7
 
 export const dDow = (s: IsoDate) => DOW[fromIso(s).getDay()]
 export const dDowLong = (s: IsoDate) => DOW_LONG[fromIso(s).getDay()]
@@ -58,6 +59,8 @@ export function dDM(s: IsoDate) {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`
 }
 export const dShort = (s: IsoDate) => `${dDow(s)} ${dDM(s)}`
+/** "Lunes 03/11" (título de un día). */
+export const dDowLongDM = (s: IsoDate) => `${dDowLong(s)} ${dDM(s)}`
 export function dFull(s: IsoDate) {
   const d = fromIso(s)
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`
@@ -82,7 +85,13 @@ export const weekLabel = (ws: IsoDate, long = false): string => rangeLabel(ws, a
 
 export function relativeDay(s: IsoDate, ref: IsoDate = today()): string | null {
   const n = diffDays(s, ref)
-  return ({ 0: 'Hoy', 1: 'Mañana', 2: 'Pasado mañana', [-1]: 'Ayer' } as Record<number, string>)[n] ?? null
+  const names: Record<number, string> = {
+    0: TODAY_LABEL,
+    1: TOMORROW_LABEL,
+    2: DAY_AFTER_TOMORROW_LABEL,
+    [-1]: YESTERDAY_LABEL,
+  }
+  return names[n] ?? null
 }
 
 /** "Hoy, mañana y pasado mañana." o "Del Lun 03/11 al Vie 07/11." */
@@ -109,5 +118,30 @@ export function greeting(hour = new Date().getHours()): string {
 /** Hora local "HH:MM" de un instante ISO. */
 export const hhmm = (iso: string) => {
   const d = new Date(iso)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** "08:05 a. m." de un instante ISO (hora local). */
+export const clockTime = (iso: string) => formatTime(hhmm(iso))
+
+/** Fecha de un instante con su zona ("2026-11-05T07:00:00-05:00" → "2026-11-05"), sin pasar por la del navegador. */
+export const dateOf = (iso: string): IsoDate => iso.slice(0, 10)
+/** Hora de un instante con su zona ("2026-11-05T07:00:00-05:00" → "07:00"), sin pasar por la del navegador. */
+export const timeOf = (iso: string) => iso.slice(11, 16)
+
+/**
+ * Registro de algo que ya pasó (stock, producción): hoy o hasta `backDays` días atrás, nunca un
+ * día futuro. Es la misma regla que `check_recent_day` del backend (planning/domain/dates.py).
+ */
+export const isRecentDay = (day: IsoDate, ref: IsoDate, backDays: number) =>
+  day <= ref && day >= addDays(ref, -backDays)
+
+/** Días que se pueden registrar, del más reciente (`ref`) al más antiguo. */
+export const recentDays = (ref: IsoDate, backDays: number): IsoDate[] =>
+  Array.from({ length: backDays + 1 }, (_, i) => addDays(ref, -i))
+
+/** Tira de días para elegir: los recientes y, si se abrió uno más antiguo desde la lista, ese al final. */
+export function recentDayStrip(day: IsoDate, ref: IsoDate, backDays: number): IsoDate[] {
+  const days = recentDays(ref, backDays)
+  return days.includes(day) ? days : [...days, day]
 }

@@ -23,6 +23,8 @@ describe('claves de consulta', () => {
     expect(startsWith(queryKeys.saca.plan('2026-11-13'), queryKeys.saca.all)).toBe(true)
     expect(startsWith(queryKeys.stock.options, queryKeys.stock.all)).toBe(true)
     expect(startsWith(queryKeys.production.forecast([2.4, 2.6]), queryKeys.production.all)).toBe(true)
+    expect(startsWith(queryKeys.versions.catalog, queryKeys.versions.all)).toBe(true)
+    expect(startsWith(queryKeys.versions.changes('org/repo', 'v1', null), queryKeys.versions.all)).toBe(true)
     expect(startsWith(queryKeys.editing.unlocks, queryKeys.editing.all)).toBe(true)
   })
 

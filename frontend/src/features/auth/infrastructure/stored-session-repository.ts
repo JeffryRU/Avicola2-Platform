@@ -1,6 +1,6 @@
 import type { KeyValueStore } from '@/shared/application/ports'
 import type { SessionRepository } from '@/features/auth/application/ports'
-import { sessionSchema, type Session } from '@/features/auth/domain/session'
+import { type Session, sessionSchema } from '@/shared/domain/session'
 
 const KEY = 'nv_session'
 

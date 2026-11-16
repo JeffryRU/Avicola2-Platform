@@ -1,4 +1,4 @@
-import type { Session } from '@/features/auth/domain/session'
+import type { Session } from '@/shared/domain/session'
 
 /** API de sesión. La cookie HttpOnly la pone y la quita el servidor. */
 export interface AuthGateway {

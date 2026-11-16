@@ -3,7 +3,8 @@ import { type z } from 'zod'
 import { ApiError, type KeyValueStore } from '@/shared/application/ports'
 import { AuthService } from '@/features/auth/application/auth-service'
 import type { AuthGateway } from '@/features/auth/application/ports'
-import { newPasswordSchema, profileSchema, type Session } from '@/features/auth/domain/session'
+import { newPasswordSchema } from '@/features/auth/domain/credentials'
+import type { Session } from '@/shared/domain/session'
 import { StoredSessionRepository } from '@/features/auth/infrastructure/stored-session-repository'
 
 const SESSION: Session = {
@@ -124,10 +125,5 @@ describe('perfil', () => {
     // Al reabrir la app, el perfil guardado ya trae el nombre nuevo.
     const reopened = new AuthService(gateway, new StoredSessionRepository(local, tab))
     expect(reopened.current()?.seller.name).toBe('Roberto Navarro Ruiz')
-  })
-
-  it('normaliza los espacios del nombre y exige uno', () => {
-    expect(profileSchema.parse({ name: '  Ana   Torres ' }).name).toBe('Ana Torres')
-    expect(profileSchema.safeParse({ name: '   ' }).success).toBe(false)
   })
 })

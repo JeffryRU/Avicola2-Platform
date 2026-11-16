@@ -1,36 +1,17 @@
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import { nf0, nf1 } from '@/shared/domain/format'
 import { useCountUp } from '@/shared/ui/hooks/use-count-up'
+import { useTooltip } from '@/shared/ui/hooks/use-tooltip'
 import { useElementWidth } from '@/shared/ui/hooks/use-element-width'
 
 /** Por debajo de este ancho (px) el gráfico usa su versión compacta. */
 const COMPACT = 560
-
-/** Tooltip que sigue al mouse (gráficos y tarjetas del mockup). */
-export function useTooltip() {
-  const [tip, setTip] = useState<{ x: number; y: number; content: ReactNode } | null>(null)
-  const bind = (content: ReactNode) => ({
-    onMouseMove: (e: React.MouseEvent) => setTip({ x: e.clientX, y: e.clientY, content }),
-    onMouseLeave: () => setTip(null),
-  })
-  const node = tip && (
-    <div
-      role="tooltip"
-      className="pointer-events-none fixed z-[80] -translate-x-1/2 -translate-y-[calc(100%+12px)] rounded-[10px] bg-head px-[11px] py-2 text-[13px] leading-snug whitespace-nowrap text-white shadow-lg [&_b]:font-extrabold"
-      style={{ left: tip.x, top: tip.y }}
-    >
-      {tip.content}
-    </div>
-  )
-  return { bind, node }
-}
 
 function niceMax(m: number) {
   if (m <= 0) return 10
   const p = Math.pow(10, Math.floor(Math.log10(m)))
   return ([1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((s) => m / p <= s) ?? 10) * p
 }
-
-const fmt0 = (n: number) => Math.round(n).toLocaleString('es-PE')
 
 export interface Bar {
   key: string
@@ -80,7 +61,7 @@ export function BarChart({
           <g key={i}>
             <line className="gl" x1={L} x2={W - R} y1={y((max * i) / 4)} y2={y((max * i) / 4)} />
             <text className="ax" x={L - 8} y={y((max * i) / 4) + 4} textAnchor="end">
-              {fmt0((max * i) / 4)}
+              {nf0((max * i) / 4)}
             </text>
           </g>
         ))}
@@ -105,7 +86,7 @@ export function BarChart({
               <path className={b.value ? 'bar' : 'bar zero'} style={delay} d={d} />
               {showValues && (
                 <text className="val" style={delay} x={cx} y={top - 8} textAnchor="middle">
-                  {fmt0(b.value)}
+                  {nf0(b.value)}
                 </text>
               )}
               {i % every === 0 && (
@@ -165,7 +146,7 @@ export function LineChart({ points, label }: { points: LinePoint[]; label: strin
           <g key={i}>
             <line className="gl" x1={L} x2={W - R} y1={y((max * i) / 5)} y2={y((max * i) / 5)} />
             <text className="ax" x={L - 8} y={y((max * i) / 5) + 4} textAnchor="end">
-              {fmt0((max * i) / 5)}
+              {nf0((max * i) / 5)}
             </text>
           </g>
         ))}
@@ -238,9 +219,7 @@ export function Donut({ pct }: { pct: number }) {
 /** Número que cuenta hacia arriba al aparecer. */
 export function CountUp({ value, decimals = 0, suffix = '' }: { value: number; decimals?: number; suffix?: string }) {
   const v = useCountUp(value)
-  const text = decimals
-    ? (Math.round(v * 10) / 10).toLocaleString('es-PE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-    : fmt0(v)
+  const text = decimals ? nf1(v) : nf0(v)
   return (
     <span>
       {text}

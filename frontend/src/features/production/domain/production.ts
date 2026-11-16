@@ -1,6 +1,7 @@
 import { z } from 'zod'
-import type { Product } from '@/features/catalog/domain/schemas'
-import { parseUnits } from '@/features/stock/domain/stock'
+import { type IsoDate, isRecentDay } from '@/shared/domain/dates'
+import { parseUnits } from '@/shared/domain/format'
+import type { Product } from '@/shared/domain/products'
 
 /** Producción diaria: lo pedido a granja y lo que llegó, por producto. */
 export const productionLineSchema = z.object({
@@ -24,6 +25,12 @@ export const productionDaySchema = z.object({
   recorded_at: z.string(),
 })
 export type ProductionDay = z.infer<typeof productionDaySchema>
+
+/** Días hacia atrás que se pueden registrar o corregir (PRODUCTION_BACK_DAYS del backend). */
+export const PRODUCTION_BACK_DAYS = 7
+
+/** ¿Se puede registrar o corregir la producción de ese día? Hoy y los 7 anteriores; nunca un día futuro. */
+export const isEditableDay = (day: IsoDate, ref: IsoDate) => isRecentDay(day, ref, PRODUCTION_BACK_DAYS)
 
 export interface ProductionEntry {
   product_id: string

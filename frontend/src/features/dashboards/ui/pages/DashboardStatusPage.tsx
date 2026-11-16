@@ -3,17 +3,18 @@ import { Check, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { dDM, dDow, dFull, dShort, rangeLabel } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
-import { periodAgg } from '@/features/projections/domain/aggregation'
-import { DashboardTabs, useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
+import { periodAgg } from '@/features/projections'
+import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
+import { useTooltip } from '@/shared/ui/hooks/use-tooltip'
+import { tableCls } from '@/shared/ui/lib/table-styles'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
-import { useCatalog } from '@/features/catalog/ui/hooks'
-import { BarChart, useTooltip } from '@/shared/ui/components/charts'
+import { useCatalog } from '@/features/catalog'
+import { BarChart } from '@/shared/ui/components/charts'
 import { StatusBadge } from '@/shared/ui/components/feedback'
-import { PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
+import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
-import { STATUS_LABEL } from '@/shared/types/labels'
-import { kgAmount, unitsCount } from '@/shared/types/labels'
-import { useDayPath, usePeriodData } from '@/features/dashboards/ui/hooks'
+import { kgAmount, STATUS_LABEL, unitsCount } from '@/shared/types/labels'
+import { useDayPath, usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
 
 export function DashboardStatusPage() {
   const { period, sellers } = useDashboardFilters()
@@ -35,13 +36,13 @@ export function DashboardStatusPage() {
         <span className="grid size-6 place-items-center rounded-full bg-ok text-white">
           <Check className="size-3.5" strokeWidth={3} />
         </span>
-        Confirmada
+        {STATUS_LABEL.confirmed}
       </span>
       <span className="flex items-center gap-2">
         <span className="grid size-6 place-items-center rounded-full bg-pend text-white">
           <Clock className="size-3.5" strokeWidth={2.5} />
         </span>
-        Pendiente
+        {STATUS_LABEL.pending}
       </span>
     </div>
   )
@@ -111,7 +112,7 @@ export function DashboardStatusPage() {
                     <>
                       <b>{dShort(d.date)}</b>
                       <br />
-                      {nf0(d.u)} unidades, {nf1(d.kg)} kg
+                      {nf0(d.u)} unidades, {kgAmount(d.kg)}
                     </>
                   ),
                 }))}

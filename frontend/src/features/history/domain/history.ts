@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { isoDateSchema } from '@/shared/domain/schemas'
-import type { Catalog } from '@/features/catalog/domain/catalog'
+import type { Catalog } from '@/features/catalog'
 
 export const CHANGE_ACTIONS = ['created', 'updated'] as const
 export type ChangeAction = (typeof CHANGE_ACTIONS)[number]

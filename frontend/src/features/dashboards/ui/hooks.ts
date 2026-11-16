@@ -1,20 +1,55 @@
-import { useQuery } from '@tanstack/react-query'
-import { useContainer } from '@/app/di'
-import { queryKeys } from '@/shared/application/query-keys'
 import { paths } from '@/app/routes'
 import { addDays, dShort, type IsoDate } from '@/shared/domain/dates'
-import type { Period } from '@/features/dashboards/domain/period'
-import { dataWindow, useRangeData } from '@/features/projections/ui/hooks'
-import { isSupervisor } from '@/features/auth/domain/session'
-import type { Catalog } from '@/features/catalog/domain/catalog'
+import { useSearchParams } from 'react-router'
+import { checkPeriod, customPeriod, weekPeriod, type Period } from '@/features/dashboards/domain/period'
+import { weekOptions } from '@/features/dashboards/domain/weeks'
+import { isoDateSchema } from '@/shared/domain/schemas'
+import { dataWindow, useRangeData } from '@/features/projections'
+import { isSupervisor } from '@/shared/domain/session'
+import type { Catalog } from '@/features/catalog'
 import { zonesOf } from '@/features/dashboards/domain/product-matrix'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
+import { useRequiredSession } from '@/features/auth'
+import { useTeamSellers } from '@/features/sellers'
 import { ALL, NO_ZONE_LABEL, type FilterChip } from '@/features/dashboards/types/product-detail'
 
-export function useSellers() {
-  const { sellers } = useContainer()
-  return useQuery({ queryKey: queryKeys.sellers.all, queryFn: () => sellers.sellers(), staleTime: 10 * 60_000 })
+/**
+ * Filtros de los dashboards guardados en la URL para poder compartirla:
+ * ?semana= o ?desde=&hasta= (rango personalizado), &vendedor=a,b (vacío = todos)&dia=&zona=&tamano=.
+ */
+export function useDashboardFilters() {
+  const [params, setParams] = useSearchParams()
+  const weeks = weekOptions()
+  const asked = params.get('semana') ?? ''
+  const week = weeks.includes(asked) ? asked : weeks[0]
+  const sellers = (params.get('vendedor') ?? '').split(',').filter((v) => v && v !== 'all')
+  const from = params.get('desde') ?? ''
+  const to = params.get('hasta') ?? ''
+  const valid = isoDateSchema.safeParse(from).success && isoDateSchema.safeParse(to).success
+  const period = valid && !checkPeriod(from, to) ? customPeriod(from, to) : weekPeriod(week)
+  /** Cambia varios filtros a la vez (null o '' los quita). Se puede llamar varias veces seguidas. */
+  const update = (patch: Record<string, string | null>) => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        for (const [key, value] of Object.entries(patch)) {
+          if (value) next.set(key, value)
+          else next.delete(key)
+        }
+        return next
+      },
+      { replace: true },
+    )
+  }
+  return {
+    week,
+    period,
+    sellers,
+    param: (key: string) => params.get(key),
+    update,
+    setWeek: (w: string) => update({ semana: w, desde: null, hasta: null }),
+    setCustom: (a: string, b: string) => update({ desde: a, hasta: b }),
+    setSellers: (list: string[]) => update({ vendedor: list.join(',') || null }),
+  }
 }
 
 /** A dónde lleva tocar un día: el vendedor ve su proyección; el supervisor, la de todo el equipo. */
@@ -41,14 +76,10 @@ export function useDetailFilters() {
 /** Clave de una opción de «Tamaño»: "BRASA|" (todas) o "BRASA|Brasa chica". */
 export const choiceKey = (category: string, subcategory: string | null) => `${category}|${subcategory ?? ''}`
 
-/** Marca o desmarca un valor de una lista. */
-export const toggleIn = (list: string[], value: string) =>
-  list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
-
 /** Filtros de la tabla ya validados contra la semana, el catálogo y las zonas, con sus etiquetas. */
 export function useDetailSelection(dates: IsoDate[], catalog: Catalog | null | undefined) {
   const f = useDetailFilters()
-  const team = (useSellers().data ?? []).filter((s) => !isSupervisor(s))
+  const team = useTeamSellers()
   const weekDays = dates
   const allZones = zonesOf(team, NO_ZONE_LABEL)
   // En el orden de la semana / alfabético, sin valores que ya no existen.

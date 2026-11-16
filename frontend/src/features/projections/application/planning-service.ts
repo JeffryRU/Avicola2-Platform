@@ -2,7 +2,7 @@ import { ApiError } from '@/shared/application/ports'
 import { today } from '@/shared/domain/dates'
 import type { ProjectionsGateway, SubmissionQueue } from '@/features/projections/application/ports'
 import { draftDates, submittableDraft, type Draft } from '@/features/projections/domain/draft'
-import type { Catalog } from '@/features/catalog/domain/catalog'
+import type { Catalog } from '@/features/catalog'
 import type { Submission, SubmissionResult } from '@/features/projections/domain/schemas'
 
 export type SubmitOutcome =

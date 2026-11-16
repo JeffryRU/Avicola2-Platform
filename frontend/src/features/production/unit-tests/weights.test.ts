@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cleanKg, invalidWeights, parseKg, toWeights, weightDraftOf } from '@/features/production/domain/production'
-import { modelLabel } from '@/features/saca/types/saca'
+import { modelLabel } from '@/features/production/types/forecast'
 
 describe('peso promedio de la parvada', () => {
   it('parte de lo anotado y deja en blanco lo que falta', () => {

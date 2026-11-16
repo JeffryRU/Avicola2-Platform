@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { Product } from '@/features/catalog/domain/schemas'
+import type { Product } from '@/shared/domain/products'
 import {
   deviation,
   draftOf,
   invalidQuality,
+  isEditableDay,
+  PRODUCTION_BACK_DAYS,
   productionDaySchema,
   toEntries,
   totals,
@@ -54,5 +56,15 @@ describe('producción diaria', () => {
       P0003: { ordered: '4050', produced: '1174', quality_b: '' },
       P0004: { ordered: '', produced: '', quality_b: '' },
     })
+  })
+})
+
+describe('días que se pueden corregir', () => {
+  it('hoy y los 7 anteriores (PRODUCTION_BACK_DAYS del backend), nunca un día futuro', () => {
+    expect(PRODUCTION_BACK_DAYS).toBe(7)
+    expect(isEditableDay('2026-11-10', '2026-11-10')).toBe(true)
+    expect(isEditableDay('2026-11-03', '2026-11-10')).toBe(true)
+    expect(isEditableDay('2026-11-02', '2026-11-10')).toBe(false)
+    expect(isEditableDay('2026-11-11', '2026-11-10')).toBe(false)
   })
 })

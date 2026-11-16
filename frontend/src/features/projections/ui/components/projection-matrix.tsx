@@ -1,12 +1,11 @@
 import { Fragment } from 'react'
 import { dShort, relativeDay, type IsoDate } from '@/shared/domain/dates'
-import { nf0, nf1 } from '@/shared/domain/format'
-import { bySubcategory } from '@/features/catalog/domain/catalog'
+import { nf0, nf1, parseCell } from '@/shared/domain/format'
+import { bySubcategory, type Product } from '@/shared/domain/products'
 import type { Draft } from '@/features/projections/domain/draft'
-import { parseCell } from '@/shared/domain/format'
-import type { Product } from '@/features/catalog/domain/schemas'
 import { cn } from '@/shared/ui/lib/utils'
-import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
+import { kgPerUnitLabel } from '@/features/catalog'
+import { kgAmount } from '@/shared/types/labels'
 
 interface Props {
   draft: Draft
@@ -70,7 +69,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
         />
         {mobile && (
           <small className="mt-0.5 block text-[10px] whitespace-nowrap text-muted-foreground">
-            {v ? `${nf1(v * p.kg_per_unit)} kg` : ' '}
+            {v ? kgAmount(v * p.kg_per_unit) : ' '}
           </small>
         )}
       </>
@@ -131,7 +130,9 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
                       <td className="min-w-[60px] border-b border-muted pr-3 text-center">
                         <b className="text-sm font-extrabold">{nf0(productUnits(p))}</b>
                         <small className="block text-[10.5px] font-semibold text-ink-2">
-                          {nf1(productUnits(p) && dates.reduce((s, d) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0))} kg
+                          {kgAmount(
+                            productUnits(p) && dates.reduce((s, d) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0),
+                          )}
                         </small>
                       </td>
                     </tr>
@@ -143,14 +144,14 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
                 {dates.map((d) => (
                   <td key={d}>
                     <b className="text-sm">{nf0(dayUnits(d))}</b>
-                    <small className="block text-[10.5px] font-semibold text-ink-2">{nf1(dayKg(d))} kg</small>
+                    <small className="block text-[10.5px] font-semibold text-ink-2">{kgAmount(dayKg(d))}</small>
                   </td>
                 ))}
                 <td className="pr-3">
                   <b className="text-sm" data-testid="grand-units">
                     {nf0(totalUnits)}
                   </b>
-                  <small className="block text-[10.5px] font-semibold text-ink-2">{nf1(totalKg)} kg</small>
+                  <small className="block text-[10.5px] font-semibold text-ink-2">{kgAmount(totalKg)}</small>
                 </td>
               </tr>
             </tbody>

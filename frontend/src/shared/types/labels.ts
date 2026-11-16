@@ -11,7 +11,24 @@ export const STATUS_LABEL = {
 } as const
 export type StatusKind = keyof typeof STATUS_LABEL
 
+/** Estado de una proyección confirmada, tal como lo envía la API. */
+export const CONFIRMED = 'confirmed' satisfies StatusKind
+
 export const NOT_REGISTERED = 'Sin registrar'
+
+/** Acciones comunes. */
+export const CANCEL_LABEL = 'Cancelar'
+export const SAVE_LABEL = 'Guardar'
+export const RETRY_LABEL = 'Reintentar'
+export const LOGOUT_LABEL = 'Cerrar sesión'
+/** Filtro de vendedores sin elegir ninguno. */
+export const ALL_SELLERS_LABEL = 'Todos los vendedores'
+
+/** Días relativos a hoy. */
+export const TODAY_LABEL = 'Hoy'
+export const TOMORROW_LABEL = 'Mañana'
+export const DAY_AFTER_TOMORROW_LABEL = 'Pasado mañana'
+export const YESTERDAY_LABEL = 'Ayer'
 /** Abreviatura de unidades, para ir después de un número ("12 unid."). */
 export const UNITS_SHORT = 'unid.'
 

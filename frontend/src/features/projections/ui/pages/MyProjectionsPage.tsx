@@ -8,30 +8,29 @@ import {
   addDays,
   dDM,
   dDow,
-  formatTime,
-  hhmm,
   today,
   weekDates,
   weekLabel,
   weekStart,
   type IsoDate,
+  clockTime,
 } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { useRequiredSession } from '@/features/auth'
 import { versusReal, weekAgg, type MyDay } from '@/features/projections/domain/aggregation'
-import { sumUnits, type Catalog } from '@/features/catalog/domain/catalog'
+import { sumUnits } from '@/shared/domain/products'
+import { type Catalog, useCatalog } from '@/features/catalog'
 import { projectionsTable } from '@/features/projections/domain/export'
 import { type ExportFormat } from '@/shared/domain/export'
 import { Segmented } from '@/shared/ui/components/segmented'
 import { ExportMenu } from '@/shared/ui/components/export-menu'
-import { useCatalog } from '@/features/catalog/ui/hooks'
 import { useFlushQueue, useMyDays, useQueue, useWindowData } from '@/features/projections/ui/hooks'
 import { StatusBadge } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
-import { NOT_REGISTERED } from '@/shared/types/labels'
+import { NOT_REGISTERED, RETRY_LABEL, kgAmount } from '@/shared/types/labels'
 
 function ProjectionCard({
   date,
@@ -69,7 +68,7 @@ function ProjectionCard({
           </span>
           <span>
             <Scale className="size-4" />
-            <b>{nf1(kg)} kg</b> (aprox.)
+            <b>{kgAmount(kg)}</b> (aprox.)
           </span>
         </div>
       </span>
@@ -78,7 +77,7 @@ function ProjectionCard({
         {day && <StatusBadge kind={day.sync === 'ok' ? 'synced' : 'queued'} />}
         <small className="flex items-center gap-1.5 text-muted-foreground">
           <Clock className="size-[15px]" />
-          {day ? formatTime(hhmm(day.submittedAt)) : date >= now ? 'Por enviar' : 'Sin envío'}
+          {day ? clockTime(day.submittedAt) : date >= now ? 'Por enviar' : 'Sin envío'}
         </small>
       </span>
       <ChevronRight className="col-start-3 row-span-2 row-start-1 size-[18px] dsk:col-start-auto dsk:row-span-1 dsk:row-start-auto" />
@@ -145,7 +144,7 @@ export function MyProjectionsPage() {
               dispositivo
             </b>
             <button type="button" className="font-bold hover:underline" onClick={retry}>
-              Reintentar
+              {RETRY_LABEL}
             </button>
           </div>
         )}
@@ -192,7 +191,7 @@ export function MyProjectionsPage() {
                     <small className="text-muted-foreground">unidades</small>
                   </span>
                   <span className="hidden text-right dsk:block">
-                    <b className="block">{nf1(agg.reduce((s, d) => s + d.kg, 0))} kg</b>
+                    <b className="block">{kgAmount(agg.reduce((s, d) => s + d.kg, 0))}</b>
                     <small className="text-muted-foreground">proyectado</small>
                   </span>
                   <span className="text-right">

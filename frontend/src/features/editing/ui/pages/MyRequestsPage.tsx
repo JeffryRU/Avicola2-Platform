@@ -1,6 +1,6 @@
-import { dShort, formatTime, hhmm } from '@/shared/domain/dates'
+import { dateOf, dShort, clockTime } from '@/shared/domain/dates'
 import { paths } from '@/app/routes'
-import { dateOf, sortUnlocks, type Unlock } from '@/features/editing/domain/editing'
+import { sortUnlocks, type Unlock } from '@/features/editing/domain/editing'
 import {
   MY_REQUESTS_EMPTY,
   MY_REQUESTS_HINT,
@@ -53,7 +53,7 @@ export function MyRequestsPage() {
                     </div>
                     <p className="mt-1 text-[14px] break-words text-ink-2">{u.reason}</p>
                     <small className="mt-1 block text-[12.5px] text-muted-foreground">
-                      Pedida el {dShort(dateOf(u.requested_at))}, {formatTime(hhmm(u.requested_at))}
+                      Pedida el {dShort(dateOf(u.requested_at))}, {clockTime(u.requested_at)}
                       {u.decided_by && u.decided_at && ` · ${decidedByLabel(u.status, u.decided_by)}`}
                     </small>
                   </li>

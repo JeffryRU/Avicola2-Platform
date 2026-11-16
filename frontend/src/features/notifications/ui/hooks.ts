@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
 import { queryKeys } from '@/shared/application/query-keys'
-import { useSession } from '@/features/auth/ui/use-session'
+import { useSession } from '@/features/auth'
 import type { NotificationPage } from '@/features/notifications/domain/notifications'
 
 const EMPTY: NotificationPage = { items: [], unread: 0 }

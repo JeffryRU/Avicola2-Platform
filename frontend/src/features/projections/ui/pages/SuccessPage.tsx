@@ -3,21 +3,20 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { paths } from '@/app/routes'
 import { dFull, dShort } from '@/shared/domain/dates'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { useRequiredSession } from '@/features/auth'
 import type { SubmitOutcome } from '@/features/projections/application/planning-service'
-import { sumUnits } from '@/features/catalog/domain/catalog'
+import { sumUnits, type Units } from '@/shared/domain/products'
 import type { Draft } from '@/features/projections/domain/draft'
-import type { Units } from '@/features/catalog/domain/schemas'
-import { useCatalog } from '@/features/catalog/ui/hooks'
+import { useCatalog } from '@/features/catalog'
 import { useFlushQueue, useQueue } from '@/features/projections/ui/hooks'
-import { SummaryRow } from '@/features/projections/ui/components/review-dialog'
+import { SummaryRow } from '@/shared/ui/components/summary-row'
 import { CountUp } from '@/shared/ui/components/charts'
 import { Confetti, Note } from '@/shared/ui/components/feedback'
-import { PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
+import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
+import { tableCls } from '@/shared/ui/lib/table-styles'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
-import { daysCount } from '@/shared/types/labels'
-import { kgAmount, unitsCount } from '@/shared/types/labels'
+import { daysCount, kgAmount, unitsCount, RETRY_LABEL } from '@/shared/types/labels'
 
 export function SuccessPage() {
   const state = useLocation().state as { outcome: SubmitOutcome; draft: Draft } | null
@@ -84,7 +83,7 @@ export function SuccessPage() {
                 {outcome.error}
               </div>
               <Button className="h-10 font-bold" onClick={retry}>
-                Reintentar
+                {RETRY_LABEL}
               </Button>
             </Note>
           )}

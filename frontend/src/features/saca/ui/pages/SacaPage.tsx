@@ -3,27 +3,30 @@ import { Check, Minus, Pencil, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { addDays, dDowLong, dShort, today, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
-import { can } from '@/features/auth/domain/session'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { bySubcategory } from '@/features/catalog/domain/catalog'
-import type { Product } from '@/features/catalog/domain/schemas'
-import { useCatalog } from '@/features/catalog/ui/hooks'
+import { can } from '@/shared/domain/session'
+import { useRequiredSession } from '@/features/auth'
+import { bySubcategory, type Product } from '@/shared/domain/products'
+import { useCatalog } from '@/features/catalog'
 import { useSacaPlan, useSetSacaPlus } from '@/features/saca/ui/hooks'
 import { emptySaca, missingSellers, parsePlus, sacaDays, type Saca, type SacaLine } from '@/features/saca/domain/saca'
 import {
   ARRIVAL_HINT,
+  arrivalNote,
   BIRDS_LABEL,
   BY_PRODUCT_TITLE,
   CANCEL,
   COLUMNS,
+  coverageText,
   DAY_LABEL,
   EDIT_PLUS_LABEL,
   FARM_COLUMNS,
   FARM_ORDER_HINT,
   FORMULA,
+  groupStockBNote,
   HERO_LABEL,
   KG_LABEL,
   LIVE_LABEL,
+  missingNote,
   NEED_LABEL,
   NO_ARRIVAL,
   NO_ORDERS,
@@ -32,32 +35,29 @@ import {
   NOTHING_BODY,
   NOTHING_TITLE,
   ORDERS_OK,
+  ordersOf,
   PLUS_INVALID,
   PLUS_SAVED,
+  projectionOf,
   SACA_SUBTITLE,
   SACA_TITLE,
   SAVE_PLUS,
   SOURCE,
   SOURCES_TITLE,
-  TODAY_LABEL,
-  TOMORROW_LABEL,
-  arrivalNote,
-  coverageText,
-  groupStockBNote,
-  missingNote,
-  modelLabel,
-  ordersOf,
-  projectionOf,
   stockAt,
   stockBNote,
   stockOldNote,
+  TODAY_LABEL,
+  TOMORROW_LABEL,
   WAITING_SOURCES,
 } from '@/features/saca/types/saca'
+import { modelLabel } from '@/features/production'
 import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { DayStrip } from '@/shared/ui/components/day-strip'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
+import { kgAmount, unitsCount } from '@/shared/types/labels'
 
 /** Supervisor: cuánto pedir a granja para un día, por producto, y con qué datos se calculó. */
 export function SacaPage() {
@@ -355,7 +355,7 @@ function Sources({ plan }: { plan: Saca }) {
         <SourceRow
           tone={plan.stock_date ? 'ok' : 'warn'}
           label={SOURCE.stock}
-          value={plan.stock_date ? `${nf0(plan.stock)} unid.` : undefined}
+          value={plan.stock_date ? unitsCount(plan.stock) : undefined}
         >
           <small className={small}>{plan.stock_date ? `Registro del ${dayText(plan.stock_date)}.` : NO_STOCK}</small>
           {plan.stock_b > 0 && <small className={small}>{stockBNote(plan.stock_b)}</small>}
@@ -366,7 +366,7 @@ function Sources({ plan }: { plan: Saca }) {
         <SourceRow
           tone={plan.orders_available ? 'ok' : 'off'}
           label={`${SOURCE.orders} (${dayText(plan.orders_date)})`}
-          value={plan.orders_available ? `${nf0(plan.ordered)} unid.` : undefined}
+          value={plan.orders_available ? unitsCount(plan.ordered) : undefined}
         >
           <small className={small}>{plan.orders_available ? ORDERS_OK : NO_ORDERS}</small>
         </SourceRow>
@@ -476,7 +476,7 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
                     ) : (
                       l.request > 0 && (
                         <small className="mt-0.5 block text-[12px] text-muted-foreground tabular-nums sm:hidden">
-                          {nf1(l.request_kg)} kg
+                          {kgAmount(l.request_kg)}
                         </small>
                       )
                     )}

@@ -1,7 +1,8 @@
 import { weekDates, type IsoDate } from '@/shared/domain/dates'
-import { addUnits, sumUnits, type Catalog } from '@/features/catalog/domain/catalog'
-import { CONFIRMED, type DailyUnits, type Projection, type Submission } from '@/features/projections/domain/schemas'
-import { type Units } from '@/features/catalog/domain/schemas'
+import { addUnits, sumUnits, type Units } from '@/shared/domain/products'
+import type { Catalog } from '@/features/catalog'
+import { CONFIRMED } from '@/shared/types/labels'
+import type { DailyUnits, Projection, Submission } from '@/features/projections/domain/schemas'
 
 export type SyncState = 'ok' | 'pending'
 
