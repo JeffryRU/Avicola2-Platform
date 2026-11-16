@@ -120,7 +120,7 @@ wheels = [
 ]
 
 [[package]]
-name = "avicola2-backend"
+name = "aviplanner-backend"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

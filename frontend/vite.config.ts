@@ -34,8 +34,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['mascot.png', 'favicon.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Noraves · Planificación de Demanda',
-        short_name: 'Noraves',
+        name: 'AviPlanner · Planificación de Demanda',
+        short_name: 'AviPlanner',
         description: 'Proyección diaria de demanda por producto para vendedores.',
         lang: 'es',
         start_url: '/',

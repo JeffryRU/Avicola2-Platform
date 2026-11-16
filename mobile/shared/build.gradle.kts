@@ -13,10 +13,10 @@ plugins {
 val generateAppConfig by tasks.registering {
     val out = layout.buildDirectory.dir("generated/appconfig")
     val values = mapOf(
-        "API_URL" to providers.gradleProperty("avicola.apiUrl"),
-        "API_URL_DEV" to providers.gradleProperty("avicola.apiUrlDev"),
-        "GITHUB_REPO" to providers.gradleProperty("avicola.githubRepo"),
-        "VERSION_NAME" to providers.gradleProperty("avicola.versionName"),
+        "API_URL" to providers.gradleProperty("aviplanner.apiUrl"),
+        "API_URL_DEV" to providers.gradleProperty("aviplanner.apiUrlDev"),
+        "GITHUB_REPO" to providers.gradleProperty("aviplanner.githubRepo"),
+        "VERSION_NAME" to providers.gradleProperty("aviplanner.versionName"),
     )
     inputs.properties(values.mapValues { it.value.get() })
     outputs.dir(out)

@@ -6,6 +6,8 @@
 # Perfil localdb: Postgres local en lugar de Supabase (sin internet / tests).
 #   docker compose --profile localdb up -d
 
+# Nombre del proyecto de Compose: se mantiene `avicola2` tras el cambio a AviPlanner porque
+# prefija los volúmenes (cambiarlo deja los datos en volúmenes huérfanos). ADR 0015.
 name: avicola2
 
 x-logging: &logging

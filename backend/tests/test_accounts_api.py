@@ -223,6 +223,26 @@ def test_tokens_from_another_secret_or_without_version_are_rejected():
     assert tokens.decode("no-es-un-jwt") is None
 
 
+def test_tokens_keep_working_after_the_rename_but_other_audiences_are_rejected():
+    import jwt
+
+    secret = "a" * 40
+    tokens = JwtTokenService(secret, 1)
+    claims = {"sub": "rnavarro", "ver": 1, "exp": 4102444800}
+    for audience, accepted in [
+        ("aviplanner-planning", True),
+        ("avicola2-planning", True),  # sesiones abiertas antes del cambio de nombre (ADR 0015)
+        ("otra-app", False),
+        (["otra-app"], False),
+    ]:
+        token = jwt.encode({**claims, "aud": audience}, secret, algorithm="HS256")
+        assert (tokens.decode(token) is not None) is accepted, audience
+    assert tokens.decode(jwt.encode(claims, secret, algorithm="HS256")) is None  # sin `aud`
+    assert jwt.decode(
+        tokens.issue("rnavarro", 1), secret, algorithms=["HS256"], audience="aviplanner-planning"
+    )
+
+
 # --- CSRF y cabeceras ----------------------------------------------------------------
 
 

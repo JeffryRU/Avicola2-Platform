@@ -119,7 +119,7 @@ def build_template(catalog: Catalog, rows: int = DEFAULT_ROWS) -> Workbook:
 
 def _write_help(ws: Worksheet, catalog: Catalog) -> None:
     lines = [
-        ("Plantilla de carga — Avícola 2", True),
+        ("Plantilla de carga — AviPlanner", True),
         ("", False),
         ("Completa la hoja «datos», una fila por cliente, producto y fecha.", False),
         ("No cambies los nombres ni el orden de las columnas.", False),

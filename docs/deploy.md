@@ -145,9 +145,9 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
 
 ## Respaldos y restauración
 
-- **Base (Supabase):** `db-backup` deja un `avicola2-AAAAMMDD-HHMM.dump` por día en el volumen `backups` y borra los de más de `BACKUP_KEEP_DAYS` días. Para restaurar (con un cliente de PostgreSQL 17):
+- **Base (Supabase):** `db-backup` deja un `aviplanner-AAAAMMDD-HHMM.dump` (los anteriores al cambio de nombre se llaman `avicola2-…`) por día en el volumen `backups` y borra los de más de `BACKUP_KEEP_DAYS` días. Para restaurar (con un cliente de PostgreSQL 17):
   ```bash
-  pg_restore --no-owner --clean --if-exists -d "postgresql://...:5432/postgres?sslmode=require" avicola2-20261103-0300.dump
+  pg_restore --no-owner --clean --if-exists -d "postgresql://...:5432/postgres?sslmode=require" aviplanner-20261103-0300.dump
   ```
 - **Lakehouse:** el volumen `lakehouse`. Se puede rehacer desde los archivos de bronze y la ingesta, pero conviene respaldarlo con los demás.
 - **Fuera del servidor:** un respaldo que solo vive en el mismo disco no protege si el servidor se pierde. Copia los volúmenes `backups` y `lakehouse` a S3 o GCS con el respaldo de volúmenes del panel o con `rclone`.

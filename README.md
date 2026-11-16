@@ -1,6 +1,6 @@
-# Avícola 2 — Plataforma de planificación de saca
+# AviPlanner — Plataforma de planificación de saca
 
-Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la demanda de pollo y planificar la saca sobre una sola fuente de verdad. Proyecto de taller (UPAO, Ingeniería de Sistemas).
+**AviPlanner** es la plataforma para centralizar los datos de las áreas de Avícola 2 (el cliente), predecir la demanda de pollo y planificar la saca sobre una sola fuente de verdad. Proyecto de taller (UPAO, Ingeniería de Sistemas).
 
 - Arquitectura: [`docs/architecture.md`](docs/architecture.md)
 - Supuestos por validar: [`docs/assumptions.md`](docs/assumptions.md)

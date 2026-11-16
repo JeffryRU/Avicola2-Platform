@@ -11,8 +11,8 @@ android {
         applicationId = "pe.avicola2.app"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionName = providers.gradleProperty("avicola.versionName").get()
-        versionCode = providers.gradleProperty("avicola.versionCode").get().toInt()
+        versionName = providers.gradleProperty("aviplanner.versionName").get()
+        versionCode = providers.gradleProperty("aviplanner.versionCode").get().toInt()
     }
 
     // Firma de las versiones publicadas. En el CI llega por variables de entorno (Secrets de

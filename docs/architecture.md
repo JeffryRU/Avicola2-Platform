@@ -1,4 +1,4 @@
-# Arquitectura — Avícola 2: plataforma de planificación de saca
+# Arquitectura — AviPlanner: plataforma de planificación de saca (cliente: Avícola 2)
 
 Especificación técnica de referencia. Las reglas de trabajo para agentes están en [`CLAUDE.md`](../CLAUDE.md), los supuestos pendientes en [`assumptions.md`](assumptions.md) y las decisiones en [`adr/`](adr/).
 

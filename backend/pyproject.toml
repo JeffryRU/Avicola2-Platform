@@ -1,7 +1,7 @@
 [project]
-name = "avicola2-backend"
+name = "aviplanner-backend"
 version = "0.1.0"
-description = "Backend de la plataforma de planificación de saca de Avícola 2"
+description = "Backend de AviPlanner, la plataforma de planificación de saca (cliente: Avícola 2)"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.0",

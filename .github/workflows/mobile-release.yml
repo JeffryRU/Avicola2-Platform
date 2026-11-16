@@ -71,8 +71,8 @@ jobs:
         run: |
           # versionCode crece con cada ejecución: Android solo actualiza a un código mayor.
           ./gradlew :androidApp:assembleRelease --console=plain \
-            -Pavicola.versionName=${{ needs.version.outputs.name }} \
-            -Pavicola.versionCode=$((100 + GITHUB_RUN_NUMBER))
+            -Paviplanner.versionName=${{ needs.version.outputs.name }} \
+            -Paviplanner.versionCode=$((100 + GITHUB_RUN_NUMBER))
           cp androidApp/build/outputs/apk/release/androidApp-release.apk "$RUNNER_TEMP/noraves.apk"
           "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$RUNNER_TEMP/noraves.apk" | head -n 3
       - uses: actions/upload-artifact@v7
@@ -95,7 +95,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Versión
         run: |
-          sed -i '' "s/^avicola.versionName=.*/avicola.versionName=${{ needs.version.outputs.name }}/" gradle.properties
+          sed -i '' "s/^aviplanner.versionName=.*/aviplanner.versionName=${{ needs.version.outputs.name }}/" gradle.properties
           sed -i '' "s/MARKETING_VERSION: .*/MARKETING_VERSION: \"${{ needs.version.outputs.name }}\"/" iosApp/project.yml
       - name: Compilar .ipa sin firmar
         working-directory: mobile/iosApp
@@ -106,7 +106,7 @@ jobs:
             -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -n 40
           mkdir -p Payload
-          cp -R build/Build/Products/Release-iphoneos/Noraves.app Payload/
+          cp -R build/Build/Products/Release-iphoneos/AviPlanner.app Payload/
           zip -qry "$RUNNER_TEMP/noraves-ios-sin-firmar.ipa" Payload
       - uses: actions/upload-artifact@v7
         with:
@@ -124,7 +124,7 @@ jobs:
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.version.outputs.tag }}
-          name: Noraves ${{ needs.version.outputs.name }}
+          name: AviPlanner ${{ needs.version.outputs.name }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           make_latest: true

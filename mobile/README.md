@@ -58,7 +58,7 @@ cd mobile
 cd iosApp && xcodegen && open iosApp.xcodeproj   # (Mac) abrir en Xcode
 ```
 
-**Servidor:** por defecto, producción (`avicola.apiUrl` en `gradle.properties`). En el login, "Servidor" permite cambiar a Pruebas o escribir otra URL. En el emulador de Android, la PC es `http://10.0.2.2:8000/api`.
+**Servidor:** por defecto, producción (`aviplanner.apiUrl` en `gradle.properties`). En el login, "Servidor" permite cambiar a Pruebas o escribir otra URL. En el emulador de Android, la PC es `http://10.0.2.2:8000/api`.
 
 ### Probar contra el backend local
 

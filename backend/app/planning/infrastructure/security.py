@@ -36,7 +36,10 @@ class JwtTokenService:
     """JWT firmado (HS256). Viaja en una cookie HttpOnly: el JavaScript de la página no lo lee."""
 
     ALGORITHM = "HS256"
-    AUDIENCE = "avicola2-planning"
+    AUDIENCE = "aviplanner-planning"
+    # Audiencia anterior al cambio de nombre (ADR 0015): se sigue aceptando para no cerrar las
+    # sesiones abiertas. Se puede quitar cuando pasen `AUTH_TOKEN_TTL_HOURS` desde el despliegue.
+    ACCEPTED_AUDIENCES = (AUDIENCE, "avicola2-planning")
 
     def __init__(self, secret: str, ttl_hours: int) -> None:
         self.secret, self.ttl = secret, timedelta(hours=ttl_hours)
@@ -58,7 +61,7 @@ class JwtTokenService:
                 token,
                 self.secret,
                 algorithms=[self.ALGORITHM],
-                audience=self.AUDIENCE,
+                audience=list(self.ACCEPTED_AUDIENCES),
                 options={"require": ["sub", "ver", "exp"]},
             )
         except jwt.PyJWTError:

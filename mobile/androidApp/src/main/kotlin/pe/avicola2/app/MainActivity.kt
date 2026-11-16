@@ -9,7 +9,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        val container = (application as AvicolaApp).container
+        val container = (application as AviPlannerApp).container
         setContent { App(container) }
     }
 }

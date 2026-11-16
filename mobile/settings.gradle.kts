@@ -1,4 +1,4 @@
-rootProject.name = "avicola2-mobile"
+rootProject.name = "aviplanner-mobile"
 
 pluginManagement {
     repositories {

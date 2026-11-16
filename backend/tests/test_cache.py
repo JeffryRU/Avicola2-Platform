@@ -130,7 +130,7 @@ def server():
     return fakeredis.FakeServer()
 
 
-def _redis(server, namespace="avicola2:test:", ttl=60):
+def _redis(server, namespace="aviplanner:test:", ttl=60):
     return RedisCache(fakeredis.FakeRedis(server=server), ttl, namespace)
 
 
@@ -141,7 +141,7 @@ def test_redis_round_trips_dataclasses_as_json(server) -> None:
     assert cache.get_or_load("products:stock", load, PRODUCTS_CODEC) == items
     assert cache.get_or_load("products:stock", load, PRODUCTS_CODEC) == items
     assert len(calls) == 1
-    raw = fakeredis.FakeRedis(server=server).get("avicola2:test:products:stock")
+    raw = fakeredis.FakeRedis(server=server).get("aviplanner:test:products:stock")
     assert b"P0001" in raw and b"\x80" not in raw  # JSON, no pickle
 
 
@@ -163,7 +163,7 @@ def test_redis_invalidation_is_shared_between_processes(server) -> None:
 
 
 def test_redis_namespaces_do_not_mix(server) -> None:
-    dev, prod = _redis(server, "avicola2:staging:"), _redis(server, "avicola2:production:")
+    dev, prod = _redis(server, "aviplanner:staging:"), _redis(server, "aviplanner:production:")
     dev.get_or_load("k", lambda: "dev")
     assert prod.get_or_load("k", lambda: "prod") == "prod"
     prod.invalidate()

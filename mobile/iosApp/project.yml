@@ -13,7 +13,7 @@ targets:
       - iosApp
     settings:
       base:
-        PRODUCT_NAME: Noraves
+        PRODUCT_NAME: AviPlanner
         PRODUCT_BUNDLE_IDENTIFIER: pe.avicola2.app
         INFOPLIST_FILE: iosApp/Info.plist
         MARKETING_VERSION: "0.1.0"

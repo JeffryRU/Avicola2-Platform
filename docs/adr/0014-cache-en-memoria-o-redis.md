@@ -17,7 +17,7 @@ Parte de esas consultas se repiten en casi cada petición y cambian poco: la con
 3. **Invalidación al escribir.** Toda escritura que pasa por los repositorios con caché borra su parte. La CLI la limpia al terminar: con Redis la API lo ve al instante; en memoria, al vencer el TTL (`CACHE_TTL_SECONDS`, 60 s).
 4. **No se cachea la cuenta de la sesión.** Desactivar una cuenta o cerrar sus sesiones debe valer al instante.
 5. **Redis nunca es requisito para responder.** Si no contesta (timeouts de 0.5 s), se lee de la base y se registra un aviso como mucho una vez por minuto.
-6. **JSON, no pickle.** Cada valor declara cómo serializarse (`Codec`), así un Redis comprometido no puede ejecutar código en la API. Las claves llevan el prefijo `avicola2:<APP_ENV>:`, así develop y producción pueden compartir un Redis.
+6. **JSON, no pickle.** Cada valor declara cómo serializarse (`Codec`), así un Redis comprometido no puede ejecutar código en la API. Las claves llevan el prefijo `aviplanner:<APP_ENV>:` (antes `avicola2:`, ver ADR 0015), así develop y producción pueden compartir un Redis.
 
 ## Consecuencias
 

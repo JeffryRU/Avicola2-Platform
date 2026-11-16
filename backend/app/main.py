@@ -39,7 +39,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
 
 
-app = FastAPI(title="Avícola 2 — Planificación de saca", version="0.1.0", lifespan=lifespan, **docs)
+app = FastAPI(
+    title="AviPlanner — Planificación de saca", version="0.1.0", lifespan=lifespan, **docs
+)
 register_error_handlers(app)
 install_security(app, https=settings.cookie_secure, trusted_origins=settings.trusted_origin_list)
 install_request_logging(app)

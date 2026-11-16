@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # tiempo; con redis, al instante.
     cache_ttl_seconds: float = Field(60, ge=0)
     redis_url: str | None = None
-    # Prefijo de las claves en Redis; vacío = "avicola2:<APP_ENV>:" (develop y producción
+    # Prefijo de las claves en Redis; vacío = "aviplanner:<APP_ENV>:" (develop y producción
     # pueden compartir un Redis sin pisarse).
     cache_namespace: str = ""
     # Esquema físico; vacío = el de config/tables.yaml (`app`). En Azure SQL p. ej. `dbo`.
@@ -138,7 +138,7 @@ class Settings(BaseSettings):
             "backend": self.cache_backend,
             "ttl_seconds": self.cache_ttl_seconds,
             "redis_url": self.redis_url,
-            "namespace": self.cache_namespace or f"avicola2:{self.app_env}:",
+            "namespace": self.cache_namespace or f"aviplanner:{self.app_env}:",
         }
 
     @property
