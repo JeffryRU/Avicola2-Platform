@@ -54,6 +54,23 @@ export function sheetRounds(
   return { rounds, kg }
 }
 
+/** Solo los productos elegidos (vacía = todos): para ver un producto o un grupo en el gráfico. */
+export function onlyProducts<T extends { units: Units }>(rows: T[], ids: readonly string[]): T[] {
+  if (!ids.length) return rows
+  const keep = new Set(ids)
+  return rows.map((r) => ({ ...r, units: Object.fromEntries(Object.entries(r.units).filter(([id]) => keep.has(id))) }))
+}
+
+/** Igual, para el historial (sus unidades van en `after`). */
+export function onlyProductsChanged(changes: ProjectionChange[], ids: readonly string[]): ProjectionChange[] {
+  if (!ids.length) return changes
+  const keep = new Set(ids)
+  return changes.map((c) => ({
+    ...c,
+    after: Object.fromEntries(Object.entries(c.after).filter(([id]) => keep.has(id))),
+  }))
+}
+
 const sorted = (u: Units) =>
   Object.entries(u)
     .filter(([, n]) => n)

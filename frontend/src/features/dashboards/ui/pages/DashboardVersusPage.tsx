@@ -10,7 +10,14 @@ import { usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hoo
 import { CountUp, LineChart } from '@/shared/ui/components/charts'
 import { EARLIER_DASH } from '@/shared/ui/lib/chart-dash'
 import { useHistory } from '@/features/history'
-import { sheetRounds } from '@/features/dashboards/domain/sheets'
+import { onlyProducts, onlyProductsChanged, sheetRounds } from '@/features/dashboards/domain/sheets'
+import { FilterMenu } from '@/features/dashboards/ui/components/filter-bar'
+import { CheckItem } from '@/features/dashboards/ui/components/product-detail'
+import { DropdownMenuLabel, DropdownMenuSeparator } from '@/shared/ui/components/shadcn/dropdown-menu'
+import { bySubcategory } from '@/shared/domain/products'
+import { toggleIn } from '@/shared/domain/format'
+import { Package } from 'lucide-react'
+import { useState } from 'react'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
@@ -53,16 +60,35 @@ export function DashboardVersusPage() {
   const source = data.data ?? { projections: [], sales: [] }
 
   const days = periodAgg(period.dates, sellers, source.projections, source.sales, catalog)
+  // Productos del gráfico (vacía = el total de todos). Solo cambia la evolución semanal.
+  const [picked, setPicked] = useState<string[]>([])
+  const chartProducts = catalog.forProjection().products
+  const pickedNames = chartProducts.filter((p) => picked.includes(p.id)).map((p) => p.name)
+  const chartDays = picked.length
+    ? periodAgg(
+        period.dates,
+        sellers,
+        onlyProducts(source.projections, picked),
+        onlyProducts(source.sales, picked),
+        catalog,
+      )
+    : days
   // Hojas de cada día (un vendedor puede volver a registrar 2 o 3 veces): una línea por ronda.
   const history = useHistory(period.from, period.to)
-  const sheets = sheetRounds(period.dates, sellers, source.projections, history.data ?? [], catalog)
+  const sheets = sheetRounds(
+    period.dates,
+    sellers,
+    onlyProducts(source.projections, picked),
+    onlyProductsChanged(history.data ?? [], picked),
+    catalog,
+  )
   const rounds = sheets.rounds
   const earlierRounds = Array.from({ length: rounds - 1 }, (_, i) => i + 1)
   const vs = versusReal(days, catalog)
   const withReal = days.filter((d) => d.real)
   // Sin ventas del ERP no hay desviación ni exactitud que mostrar (0 % sería engañoso).
   const noReal = vs.daysWithReal === 0
-  const points = days
+  const points = chartDays
     .filter((d) => d.confirmed)
     .map((d) => {
       const rk = d.real ? catalog.kg(d.real) : null
@@ -122,7 +148,44 @@ export function DashboardVersusPage() {
           />
         </KpiStrip>
         <div className="grid grid-cols-1 gap-4 @7xl/main:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-          <Section title="Evolución semanal (kg)">
+          <Section
+            title="Evolución semanal (kg)"
+            aside={
+              <FilterMenu
+                icon={<Package />}
+                title="Productos del gráfico"
+                label={
+                  !picked.length
+                    ? 'Total de productos'
+                    : picked.length > 2
+                      ? `${String(picked.length)} productos`
+                      : pickedNames.join(', ')
+                }
+                active={picked.length > 0}
+              >
+                <CheckItem checked={!picked.length} onToggle={() => setPicked([])}>
+                  Total de productos
+                </CheckItem>
+                {bySubcategory(chartProducts).map((g) => (
+                  <div key={g.name ?? ''}>
+                    <DropdownMenuSeparator />
+                    {g.name && (
+                      <DropdownMenuLabel className="text-xs text-muted-foreground">{g.name}</DropdownMenuLabel>
+                    )}
+                    {g.products.map((p) => (
+                      <CheckItem
+                        key={p.id}
+                        checked={picked.includes(p.id)}
+                        onToggle={() => setPicked(toggleIn(picked, p.id))}
+                      >
+                        {p.name}
+                      </CheckItem>
+                    ))}
+                  </div>
+                ))}
+              </FilterMenu>
+            }
+          >
             <div className="px-4 pt-3 pb-4 dsk:px-5">
               <div className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-ink-2">
                 {earlierRounds.map((r) => (
