@@ -1,5 +1,7 @@
 import { useState, type SyntheticEvent } from 'react'
-import { Pencil } from 'lucide-react'
+import { Link } from 'react-router'
+import { ArrowRight, Pencil } from 'lucide-react'
+import { paths } from '@/app/routes'
 import { toast } from 'sonner'
 import { addDays, dDowLong, dShort, today, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
@@ -21,6 +23,9 @@ import {
   EDIT_PLUS_LABEL,
   FARM_COLUMNS,
   FARM_ORDER_HINT,
+  FIX_ARRIVAL,
+  FIX_PROJECTIONS,
+  FIX_STOCK,
   FORMULA,
   groupStockBNote,
   HERO_LABEL,
@@ -229,7 +234,7 @@ function FarmOrder({ plan }: { plan: Saca }) {
                 <small className="block text-2xs text-muted-foreground">{groupStockBNote(g.stock_b)}</small>
               )}
             </span>
-            <span className="num text-right">{g.ordered ? `−${nf0(g.ordered)}` : 0}</span>
+            <span className={cn('num text-right', !g.ordered && 'text-faint')}>{g.ordered ? `−${nf0(g.ordered)}` : 0}</span>
             <span className="num text-right">+{nf0(g.projected)}</span>
             {plusCell(g.name, g.plus)}
             <b className="num text-right text-lg font-semibold hc:font-extrabold">{nf0(g.farm_order)}</b>
@@ -270,7 +275,7 @@ function FarmOrder({ plan }: { plan: Saca }) {
   )
 }
 
-const farmCols = 'grid items-baseline gap-x-2 grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,5.5rem))_minmax(0,6.5rem)]'
+const farmCols = 'grid items-baseline gap-x-2 grid-cols-[minmax(7rem,1fr)_repeat(4,minmax(0,4.5rem))_minmax(0,5rem)]'
 
 type Tone = 'ok' | 'warn' | 'off'
 const toneDot: Record<Tone, 'ok' | 'warn' | 'draft'> = { ok: 'ok', warn: 'warn', off: 'draft' }
@@ -302,6 +307,17 @@ function SourceRow({
   )
 }
 
+function FixLink({ to, children }: { to: string; children: string }) {
+  return (
+    <Link
+      to={to}
+      className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-ring hc:text-foreground hc:underline"
+    >
+      {children} <ArrowRight className="size-3.5" aria-hidden />
+    </Link>
+  )
+}
+
 /** Qué entró al cálculo y qué falta: reemplaza a una pila de avisos. */
 function Sources({ plan }: { plan: Saca }) {
   const missing = missingSellers(plan)
@@ -329,6 +345,7 @@ function Sources({ plan }: { plan: Saca }) {
             />
           </div>
           {missing > 0 && <small className={small}>{missingNote(missing)}</small>}
+          {missing > 0 && <FixLink to={paths.teamDay(plan.projection_date)}>{FIX_PROJECTIONS}</FixLink>}
         </SourceRow>
         <SourceRow
           tone={plan.stock_date ? 'ok' : 'warn'}
@@ -336,6 +353,7 @@ function Sources({ plan }: { plan: Saca }) {
           value={plan.stock_date ? unitsCount(plan.stock) : undefined}
         >
           <small className={small}>{plan.stock_date ? `Registro del ${dayText(plan.stock_date)}.` : NO_STOCK}</small>
+          {!plan.stock_date && <FixLink to={paths.stock}>{FIX_STOCK}</FixLink>}
           {plan.stock_b > 0 && <small className={small}>{stockBNote(plan.stock_b)}</small>}
           {plan.stock_old > 0 && (
             <small className={small}>{stockOldNote(plan.stock_old, plan.stock_lot_days ?? 3)}</small>
@@ -354,6 +372,7 @@ function Sources({ plan }: { plan: Saca }) {
               ? arrivalNote(plan.forecast.days, dShort(plan.forecast.date_from), dShort(plan.forecast.date_to))
               : NO_ARRIVAL}
           </small>
+          {!plan.forecast && <FixLink to={paths.production}>{FIX_ARRIVAL}</FixLink>}
           {plan.forecast && <small className={small}>Modelo en uso: {modelLabel(plan.forecast.method)}.</small>}
         </SourceRow>
       </ul>
@@ -442,9 +461,9 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
                       {nf0(l.stock)} stock − {nf0(l.ordered)} ped. + {nf0(l.projected)} proy.
                     </small>
                   </span>
-                  <span className={numCls}>{nf0(l.stock)}</span>
-                  <span className={numCls}>{l.ordered ? `−${nf0(l.ordered)}` : '0'}</span>
-                  <span className={numCls}>{l.projected ? `+${nf0(l.projected)}` : '0'}</span>
+                  <span className={cn(numCls, !l.stock && 'text-faint')}>{nf0(l.stock)}</span>
+                  <span className={cn(numCls, !l.ordered && 'text-faint')}>{l.ordered ? `−${nf0(l.ordered)}` : '0'}</span>
+                  <span className={cn(numCls, !l.projected && 'text-faint')}>{l.projected ? `+${nf0(l.projected)}` : '0'}</span>
                   <span className="text-right">
                     <b
                       className={cn(

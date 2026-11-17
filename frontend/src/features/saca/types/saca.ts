@@ -21,16 +21,16 @@ export const projectionOf = (d: string) => `Proyección del ${d}`
 export const FARM_COLUMNS = {
   type: 'Tipo',
   stock: 'Stock',
-  ordered: '− Pedidos (mañana)',
-  projected: '+ Proyección (pasado mañana)',
+  ordered: '− Pedidos',
+  projected: '+ Proyec.',
   plus: '+ Plus',
-  order: '= Pedir a granja',
+  order: '= Pedir',
 } as const
 export const EDIT_PLUS_LABEL = 'Cambiar el plus de cada tipo'
 export const PLUS_SAVED = 'Plus guardado.'
 export const PLUS_INVALID = 'Escribe un número entero entre 0 y 100 000 en cada tipo (por ejemplo 4000).'
 export { CANCEL_LABEL as CANCEL, SAVE_LABEL as SAVE_PLUS } from '@/shared/types/labels'
-export const NEED_LABEL = 'aves según los productos'
+export const NEED_LABEL = 'aves sin contar el plus'
 export const groupStockBNote = (n: number) => `incl. ${n.toLocaleString('es-PE')} en B`
 
 /** Panel "Con qué datos se calculó". */
@@ -75,3 +75,8 @@ export const missingNote = (n: number) =>
   n === 1
     ? 'Falta 1 vendedor: la proyección puede quedar corta.'
     : `Faltan ${String(n)}: la proyección puede quedar corta.`
+
+/** Enlaces para completar lo que falta. */
+export const FIX_PROJECTIONS = 'Ver quién falta'
+export const FIX_STOCK = 'Registrar stock'
+export const FIX_ARRIVAL = 'Ir a Producción'
