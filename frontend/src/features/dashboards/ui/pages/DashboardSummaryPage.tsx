@@ -12,6 +12,11 @@ import { STATUS_LABEL, kgAmount, UNITS_SHORT } from '@/shared/types/labels'
 import { useDayPath, useDetailSelection, usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
 import { DetailFilterMenus, ProductDetail } from '@/features/dashboards/ui/components/product-detail'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
+import { onlyProducts } from '@/features/dashboards/domain/sheets'
+import { NO_ZONE_LABEL } from '@/features/dashboards/types/product-detail'
+
+/** Vendedor que no existe: para que un filtro sin coincidencias no muestre a todos. */
+const NO_SELLER = '·'
 
 export function DashboardSummaryPage() {
   const { period, sellers } = useDashboardFilters()
@@ -23,9 +28,21 @@ export function DashboardSummaryPage() {
   const subtitle = period.custom ? 'Resumen del período' : 'Resumen semanal'
   const source = data.data ?? { projections: [], sales: [] }
 
-  const { projections, sales } = source
-  const days = periodAgg(period.dates, sellers, projections, sales, catalog)
-  const prev = periodAgg(previousDates(period), sellers, projections, sales, catalog)
+  // Los filtros de la barra (vendedor, zona, tamaño y días) cambian también los totales y el
+  // gráfico, no solo la tabla de detalle.
+  const byZone = detail.zones.length
+    ? detail.team.filter((s) => detail.zones.includes(s.zone ?? NO_ZONE_LABEL)).map((s) => s.username)
+    : null
+  const picked = byZone ? (sellers.length ? sellers.filter((s) => byZone.includes(s)) : byZone) : sellers
+  // Una zona sin vendedores no debe caer en «todos» (lista vacía = todos en periodAgg).
+  const scope = byZone && !picked.length ? [NO_SELLER] : picked
+  const ids = detail.selectedSizes.length ? detail.products.map((p) => p.id) : []
+  const projections = onlyProducts(source.projections, ids)
+  const sales = onlyProducts(source.sales, ids)
+  const allDays = periodAgg(period.dates, scope, projections, sales, catalog)
+  const days = detail.days.length ? allDays.filter((d) => detail.days.includes(d.date)) : allDays
+  const prevAll = periodAgg(previousDates(period), scope, projections, sales, catalog)
+  const prev = detail.days.length ? prevAll.filter((_, i) => detail.days.includes(allDays[i].date)) : prevAll
   // Variación contra los mismos días confirmados del período anterior.
   const same = prev.filter((_, i) => days[i].confirmed)
   const units = days.reduce((s, d) => s + d.u, 0)

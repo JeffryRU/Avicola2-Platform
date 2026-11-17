@@ -78,6 +78,7 @@ class PlanningUseCases:
     list_projections: uc.ListProjections
     submit_projection: uc.SubmitProjection
     get_sales: uc.GetSales
+    model_projections: uc.ModelProjections
     export_projections: ex.ExportProjections
     list_changes: uc.ListChanges
     suggest_projection: uc.SuggestProjection
@@ -116,8 +117,9 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     notifications = SqlNotificationRepository(session)
     notifier = nt.Notifier(notifications, event_bus, clock)
     arrival_model = AdaptiveArrivalModel()
+    order_history = SqlOrderHistory(session)
     forecaster = OrderHistoryForecaster(
-        SqlOrderHistory(session),
+        order_history,
         products,
         WeekdayAverageForecaster(projections, settings.planning_suggestion_weeks),
     )
@@ -171,6 +173,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             history=history,
         ),
         get_sales=uc.GetSales(sales),
+        model_projections=uc.ModelProjections(sellers, order_history, products),
         export_projections=ex.ExportProjections(products, projections, sales, sellers, clock),
         list_changes=uc.ListChanges(history),
         suggest_projection=uc.SuggestProjection(products, forecaster, settings.planning_max_days),

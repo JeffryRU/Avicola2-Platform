@@ -32,6 +32,16 @@ export function useRangeData(from: string, to: string) {
   })
 }
 
+/** Lo que el modelo habría sugerido cada día del rango (para comparar en los dashboards). */
+export function useModelProjections(from: string, to: string) {
+  const { projections: gateway } = useContainer()
+  return useQuery({
+    queryKey: queryKeys.projections.model(from, to),
+    queryFn: () => gateway.modelProjections({ from, to }),
+    staleTime: 10 * 60_000,
+  })
+}
+
 export function useQueue() {
   const { queue } = useContainer()
   return useSyncExternalStore(

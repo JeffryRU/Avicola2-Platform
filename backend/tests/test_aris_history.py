@@ -191,3 +191,38 @@ def test_store_orders_report_feeds_the_orders_of_that_day(tmp_path: Path) -> Non
     with SessionLocal() as session:
         units = LoadedOrders(session, SqlProductRepository(session)).units(TODAY)
     assert units == {"P0007": 10, "P0001": 20}
+
+
+def test_model_projection_uses_only_earlier_history(client) -> None:
+    # El modelo mira los últimos 4 días iguales de la semana: 3 semanas más de pedidos.
+    with SessionLocal() as session:
+        for weeks, units in ((1, 20), (2, 30), (3, 40)):
+            day = PAST - timedelta(weeks=weeks)
+            session.execute(
+                insert(dispatch_orders).values(
+                    order_number=weeks + 10,
+                    customer="Cliente",
+                    material_code="M1",
+                    material="POLLO ENTERO BRASA (1.60-1.69)",
+                    ordered_kg=0.0,
+                    dispatched_kg=0.0,
+                    ordered_units=units,
+                    dispatched_units=units,
+                    zone="TRUJILLO",
+                    registered_on=day,
+                    delivery_date=day,
+                    seller="Rnavarro",
+                )
+            )
+        session.commit()
+    _login(client)
+    week_later = str(PAST + timedelta(days=7))
+    params = {"date_from": week_later, "date_to": week_later}
+    [model] = client.get("/api/model-projections", params=params).json()
+    # Mediana de 30, 20, 30 y 40.
+    assert model["seller"] == "rnavarro" and model["units"] == {"P0006": 30}
+    # El mismo día de la historia no se predice con su propio dato.
+    same = {"date_from": str(PAST), "date_to": str(PAST)}
+    assert client.get("/api/model-projections", params=same).json() == []
+    too_long = {"date_from": str(PAST), "date_to": str(PAST + timedelta(days=120))}
+    assert client.get("/api/model-projections", params=too_long).status_code == 422

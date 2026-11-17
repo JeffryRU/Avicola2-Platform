@@ -1,7 +1,7 @@
 import { addDays, diffDays, rangeDates, today, weekStart, type IsoDate } from '@/shared/domain/dates'
 
 /** Largo máximo de un rango personalizado (días). */
-export const PERIOD_MAX_DAYS = 31
+export const PERIOD_MAX_DAYS = 92
 /** Hasta cuántos días atrás se puede consultar un rango personalizado. */
 export const PERIOD_HISTORY_DAYS = 365
 

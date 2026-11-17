@@ -77,6 +77,22 @@ export function sellerColumns(
     }))
 }
 
+/** Una columna por zona (Trujillo, Chimbote…): suma a sus vendedores. `zones` vacía = todas. */
+export function zoneColumns(
+  sellers: Seller[],
+  dates: IsoDate[],
+  noZone: string,
+  zones: readonly string[] = [],
+): MatrixColumn[] {
+  const days = new Set(dates)
+  return zonesOf(sellers, noZone)
+    .filter((z) => zones.length === 0 || zones.includes(z))
+    .map((zone) => {
+      const members = new Set(sellers.filter((s) => (s.zone ?? noZone) === zone).map((s) => s.username))
+      return { key: zone, label: zone, group: null, match: (p) => members.has(p.seller) && days.has(p.date) }
+    })
+}
+
 /** Una columna por día, para un vendedor o para todos (`seller` = null). */
 export function dayColumns(dates: IsoDate[], seller: string | null, label: (d: IsoDate) => string): MatrixColumn[] {
   return dates.map((d) => ({

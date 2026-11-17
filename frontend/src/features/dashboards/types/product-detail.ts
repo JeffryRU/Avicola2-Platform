@@ -2,10 +2,11 @@
 import { dFull, type IsoDate } from '@/shared/domain/dates'
 import { PERIOD_MAX_DAYS, type PeriodError } from '@/features/dashboards/domain/period'
 
-export type DetailView = 'seller' | 'day'
+export type DetailView = 'seller' | 'zone' | 'day'
 
 export const DETAIL_VIEW_LABEL: Record<DetailView, string> = {
   seller: 'Por vendedor',
+  zone: 'Por zona',
   day: 'Por día',
 }
 

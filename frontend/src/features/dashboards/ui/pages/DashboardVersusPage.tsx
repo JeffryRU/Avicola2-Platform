@@ -1,7 +1,7 @@
 import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { dDM, dDow, dShort } from '@/shared/domain/dates'
 import { nf0, nf1, pct1 } from '@/shared/domain/format'
-import { periodAgg, versusReal } from '@/features/projections'
+import { periodAgg, useModelProjections, versusReal } from '@/features/projections'
 import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
 import { tableCls } from '@/shared/ui/lib/table-styles'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
@@ -30,9 +30,15 @@ const tone = (v: number) => (v < 0 ? 'text-bad' : 'text-ok')
  * Muestra de una serie: línea continua (proyección vigente), discontinua (venta real) o, para
  * una ronda anterior (`round` 1, 2…), el trazo tenue de esa ronda. No depende solo del color.
  */
-function SeriesKey({ dashed, round }: { dashed?: boolean; round?: number }) {
+function SeriesKey({ dashed, round, model }: { dashed?: boolean; round?: number; model?: boolean }) {
   const prev = round !== undefined
-  const color = prev ? PREV_COLOR[(round - 1) % PREV_COLOR.length] : dashed ? 'var(--chart-2)' : 'var(--chart-1)'
+  const color = model
+    ? 'var(--chart-model)'
+    : prev
+      ? PREV_COLOR[(round - 1) % PREV_COLOR.length]
+      : dashed
+        ? 'var(--chart-2)'
+        : 'var(--chart-1)'
   return (
     <svg aria-hidden width="28" height="12" viewBox="0 0 28 12" className="inline-block flex-none">
       <line
@@ -43,10 +49,14 @@ function SeriesKey({ dashed, round }: { dashed?: boolean; round?: number }) {
         strokeWidth={2.5}
         strokeLinecap="round"
         stroke={color}
-        strokeDasharray={prev ? EARLIER_DASH[(round - 1) % EARLIER_DASH.length] : dashed ? '5 3' : undefined}
+        strokeDasharray={
+          model ? '10 4' : prev ? EARLIER_DASH[(round - 1) % EARLIER_DASH.length] : dashed ? '5 3' : undefined
+        }
       />
       {/* El mismo marcador del gráfico: círculo (proyección; hueco si es anterior) o cuadrado (venta). */}
-      {dashed ? (
+      {model ? (
+        <path d="M14 1.5 L18.5 6 L14 10.5 L9.5 6 Z" fill={color} stroke="var(--surface)" strokeWidth="1.25" />
+      ) : dashed ? (
         <rect x="10.5" y="2.5" width="7" height="7" fill={color} stroke="var(--surface)" strokeWidth="1.5" />
       ) : (
         <circle
@@ -106,10 +116,20 @@ export function DashboardVersusPage() {
   // De qué está hecha cada día la proyección vigente: franjas por tamaño (o por producto).
   const parts = projectionParts(period.dates, sellers, source.projections, chartProducts, picked)
   // Todos los días del período (el gráfico ocupa la semana entera); sin dato, la línea se corta.
+  // Lo que el modelo habría sugerido cada día (mediana de los pedidos de ARIS de las 4 semanas
+  // anteriores), con los mismos filtros de vendedor y productos.
+  const model = useModelProjections(period.from, period.to)
+  const modelKg = new Map<string, number>()
+  for (const row of onlyProducts(model.data ?? [], picked)) {
+    if (sellers.length && !sellers.includes(row.seller)) continue
+    modelKg.set(row.date, (modelKg.get(row.date) ?? 0) + catalog.kg(row.units))
+  }
+  const hasModel = modelKg.size > 0
   const allPoints = chartDays.map((d) => {
     const rk = d.real ? catalog.kg(d.real) : null
     const earlier = rounds > 1 ? sheets.kg[d.date].slice(0, -1) : []
-    return { date: d.date, confirmed: d.confirmed, pk: d.kg, rk, earlier, parts: parts.kg[d.date] }
+    const mk = modelKg.get(d.date) ?? null
+    return { date: d.date, confirmed: d.confirmed, pk: d.kg, rk, mk, earlier, parts: parts.kg[d.date] }
   })
   // La tabla, solo con los días que tienen proyección.
   const points = allPoints.filter((p) => p.confirmed)
@@ -120,7 +140,7 @@ export function DashboardVersusPage() {
       <DashboardFilterBar />
       <DashboardTabs />
       <PageBody>
-        <SyncStatus queries={[data, history]} />
+        <SyncStatus queries={[data, history, model]} />
         <KpiStrip className="mb-4">
           <Kpi
             label="Proyección"
@@ -218,6 +238,12 @@ export function DashboardVersusPage() {
                   <SeriesKey />
                   {roundLabel(rounds, rounds)}
                 </span>
+                {hasModel && (
+                  <span className="flex items-center gap-1.5">
+                    <SeriesKey model />
+                    Modelo (sugerencia)
+                  </span>
+                )}
                 <span className="flex items-center gap-1.5">
                   <SeriesKey dashed />
                   Venta real (ERP)
@@ -261,6 +287,7 @@ export function DashboardVersusPage() {
                     sublabel: dDM(p.date),
                     a: p.confirmed ? p.pk : null,
                     b: p.rk,
+                    c: p.mk,
                     earlier: p.confirmed ? p.earlier : undefined,
                     parts: p.confirmed && parts.names.length > 1 ? p.parts : undefined,
                     tip: (
@@ -285,6 +312,12 @@ export function DashboardVersusPage() {
                               </span>
                             </span>
                           ))}
+                        {p.mk != null && (
+                          <>
+                            <br />
+                            Modelo: {kgAmount(p.mk)}
+                          </>
+                        )}
                         <br />
                         {p.rk == null ? (
                           'Venta real: sin datos aún'
@@ -350,6 +383,21 @@ export function DashboardVersusPage() {
                           </td>
                         ))}
                       </tr>
+                      {hasModel && (
+                        <tr>
+                          <td className={tableCls.td}>
+                            <span className="flex items-center gap-2">
+                              <SeriesKey model />
+                              Modelo (kg)
+                            </span>
+                          </td>
+                          {points.map((p) => (
+                            <td key={p.date} className={cn(tableCls.td, 'num', p.mk == null && 'text-faint')}>
+                              {p.mk == null ? '—' : nf0(p.mk)}
+                            </td>
+                          ))}
+                        </tr>
+                      )}
                       <tr>
                         <td className={tableCls.td}>
                           <span className="flex items-center gap-2">

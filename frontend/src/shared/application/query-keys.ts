@@ -49,6 +49,8 @@ export const queryKeys = {
     /** Proyecciones y ventas de todos los rangos (dashboards, inicio, mis proyecciones). */
     all: ['projections'] as const,
     range: (from: string, to: string) => ['projections', from, to] as const,
+    /** Lo que el modelo habría sugerido (GET /model-projections). */
+    model: (from: string, to: string) => ['projections', 'model', from, to] as const,
   },
 
   suggestions: {

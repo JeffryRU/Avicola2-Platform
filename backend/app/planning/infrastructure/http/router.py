@@ -377,6 +377,19 @@ def sales(
     return [s.DailyUnitsOut(**asdict(d)) for d in found]
 
 
+@router.get("/model-projections")
+def model_projections(
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    date_from: DateFrom,
+    date_to: DateTo,
+    seller: SellerFilter = None,
+) -> list[s.DailyUnitsOut]:
+    """Lo que el modelo habría sugerido cada día (con la historia anterior), por vendedor."""
+    found = use_cases.model_projections(viewer, date_from, date_to, seller)
+    return [s.DailyUnitsOut(**asdict(d)) for d in found]
+
+
 @router.get("/suggestions")
 def suggestions(
     use_cases: UseCases,

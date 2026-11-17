@@ -109,6 +109,8 @@ export interface LinePoint {
   /** Serie A (proyección vigente); null = el día no tiene dato (la línea se corta). */
   a: number | null
   b: number | null
+  /** Serie C (lo que habría sugerido el modelo); null = sin dato ese día. */
+  c?: number | null
   /** Rondas anteriores de la serie A (hojas 1, 2… antes de la vigente), en orden. */
   earlier?: (number | null)[]
   /** Partes de A apiladas bajo la línea (p. ej. kg por tamaño de brasa), de abajo hacia arriba. */
@@ -133,7 +135,7 @@ export function LineChart({ points, label, empty }: { points: LinePoint[]; label
   const R = 14
   const T = 16
   const B = 44
-  const values = points.flatMap((p) => [p.a ?? 0, p.b ?? 0, ...(p.earlier ?? []).map((v) => v ?? 0)])
+  const values = points.flatMap((p) => [p.a ?? 0, p.b ?? 0, p.c ?? 0, ...(p.earlier ?? []).map((v) => v ?? 0)])
   const max = niceMax(Math.max(...values, 1) * 1.05, 5)
   const iw = W - L - R
   const ih = H - T - B
@@ -157,6 +159,7 @@ export function LineChart({ points, label, empty }: { points: LinePoint[]; label
   const a = points.map((p) => p.a)
   const aRuns = runs(a)
   const b = runs(points.map((p) => p.b))
+  const c = runs(points.map((p) => p.c ?? null))
   const rounds = Math.max(0, ...points.map((p) => p.earlier?.length ?? 0))
   const earlier = Array.from({ length: rounds }, (_, r) =>
     runs(points.map((p) => (p.a == null ? null : (p.earlier?.[r] ?? p.a)))),
@@ -175,7 +178,7 @@ export function LineChart({ points, label, empty }: { points: LinePoint[]; label
         ]
       : [],
   )
-  const hasData = points.some((p) => p.a != null || p.b != null)
+  const hasData = points.some((p) => p.a != null || p.b != null || p.c != null)
   return (
     <div ref={ref} className="chart absolute inset-0">
       <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={label} className="block">
@@ -204,7 +207,7 @@ export function LineChart({ points, label, empty }: { points: LinePoint[]; label
               />
             ))}
         {points.map((p, i) => (
-          <g key={p.key} className="col" {...(p.a != null || p.b != null ? bind(p.tip) : {})}>
+          <g key={p.key} className="col" {...(p.a != null || p.b != null || p.c != null ? bind(p.tip) : {})}>
             <rect fill="transparent" x={x(i) - step / 2} y={T} width={step} height={ih} />
             <line className="guide" x1={x(i)} x2={x(i)} y1={T} y2={T + ih} />
             <text className="ax2" x={x(i)} y={H - B + 20} textAnchor="middle">
@@ -242,11 +245,21 @@ export function LineChart({ points, label, empty }: { points: LinePoint[]; label
         {aRuns.map((run, j) => (
           <path key={`a${j}`} className="ln s1" d={path(run)} />
         ))}
+        {c.map((run, j) => (
+          <path key={`c${j}`} className="ln s3" d={path(run)} />
+        ))}
         {b.map((run, j) => (
           <path key={`b${j}`} className="ln s2" d={path(run)} />
         ))}
         {aRuns.flat().map((p, i) => (
           <circle key={`ap${i}`} className="pt s1" cx={p[0]} cy={p[1]} r={4} />
+        ))}
+        {c.flat().map((p, i) => (
+          <path
+            key={`cp${i}`}
+            className="pt s3"
+            d={`M${p[0]} ${p[1] - 5} L${p[0] + 5} ${p[1]} L${p[0]} ${p[1] + 5} L${p[0] - 5} ${p[1]} Z`}
+          />
         ))}
         {b.flat().map((p, i) => (
           <rect key={`bp${i}`} className="pt s2" x={p[0] - 3.5} y={p[1] - 3.5} width={7} height={7} />
