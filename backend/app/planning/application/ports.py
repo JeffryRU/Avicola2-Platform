@@ -61,6 +61,15 @@ class SellerRepository(Protocol):
         ...
 
 
+class DemandModelStore(Protocol):
+    """La última corrida del modelo de demanda: métricas y predicciones fuera de muestra."""
+
+    def latest(self) -> dict | None: ...
+    def predictions(
+        self, model: str, date_from: date, date_to: date, seller: str | None
+    ) -> list[DailyUnits]: ...
+
+
 class ProjectionHistory(Protocol):
     """Proyecciones históricas de fuera de la app (p. ej. lo pedido en ARIS), solo lectura."""
 

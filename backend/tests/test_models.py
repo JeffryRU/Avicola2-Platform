@@ -29,6 +29,8 @@ def test_expected_tables() -> None:
         "np_production",
         "np_production_weights",
         "np_saca_snapshots",
+        "np_model_runs",
+        "np_model_predictions",
         "np_dispatch_orders",
         "np_store_sales",
     }

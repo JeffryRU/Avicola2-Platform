@@ -390,6 +390,13 @@ def model_projections(
     return [s.DailyUnitsOut(**asdict(d)) for d in found]
 
 
+@router.get("/model/summary")
+def model_summary(use_cases: UseCases, viewer: CurrentSeller) -> dict[str, Any] | None:
+    """Última corrida del modelo de demanda: división temporal, error de cada modelo por nivel,
+    qué modelo se usa en cada lugar y lo predicho frente a lo real por día (ADR 0020)."""
+    return use_cases.model_summary(viewer)
+
+
 @router.get("/suggestions")
 def suggestions(
     use_cases: UseCases,
@@ -400,7 +407,7 @@ def suggestions(
     on_behalf: SellerFilter = None,
 ) -> s.SuggestionOut:
     result = use_cases.suggest_projection(seller, category, start, days, on_behalf)
-    method = use_cases.suggest_projection.forecaster.name
+    method = use_cases.suggest_projection.method
     return s.SuggestionOut(method=method, days=[s.DailyUnitsOut(**asdict(d)) for d in result])
 
 

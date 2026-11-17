@@ -14,6 +14,7 @@ from app.planning.application.ports import (
     ChangeLog,
     Clock,
     DemandForecaster,
+    DemandModelStore,
     OrderHistory,
     ProductRepository,
     ProjectionHistory,
@@ -26,7 +27,7 @@ from app.planning.domain.dates import check_range
 from app.planning.domain.history import CREATED, UPDATED, ProjectionChange
 from app.planning.domain.models import SELLER, DailyUnits, Product, Projection, Seller
 from app.planning.domain.orders import ORDER_CATEGORY, daily_units, weekday_median
-from app.planning.domain.permissions import Permission
+from app.planning.domain.permissions import Permission, require
 from app.shared.domain.errors import DomainError, ForbiddenError
 
 logger = logging.getLogger(__name__)
@@ -231,8 +232,22 @@ class GetSales:
 
 
 class SuggestProjection:
-    def __init__(self, products: ProductRepository, forecaster: DemandForecaster, max_days: int):
+    """Sugerencia de la proyección: la del modelo entrenado (combinación robusta, ADR 0020) si ya
+    pronosticó esos días; si no, la del pronosticador (mediana de 4 semanas o promedio propio)."""
+
+    STORED_METHOD = "modelo_combinacion_robusta"
+
+    def __init__(
+        self,
+        products: ProductRepository,
+        forecaster: DemandForecaster,
+        max_days: int,
+        store: DemandModelStore | None = None,
+    ):
         self.products, self.forecaster, self.max_days = products, forecaster, max_days
+        self.store = store
+        # Con qué se armó la última sugerencia (la API lo informa).
+        self.method = forecaster.name
 
     def __call__(
         self, seller: Seller, category: str, start: date, days: int, on_behalf: str | None = None
@@ -243,7 +258,17 @@ class SuggestProjection:
             raise DomainError(f"Debe pedir entre 1 y {self.max_days} días.")
         Catalog(self.products.list_active()).of(category)  # valida la categoría
         dates = [start + timedelta(days=i) for i in range(days)]
-        return self.forecaster.suggest(username, category, dates)
+        if self.store and category == ORDER_CATEGORY:
+            stored = {
+                d.date: d
+                for d in self.store.predictions(STORED_MODEL, dates[0], dates[-1], username)
+            }
+            if stored and all(d in stored for d in dates):
+                self.method = self.STORED_METHOD
+                return [DailyUnits(username, d, stored[d].units) for d in dates]
+        result = self.forecaster.suggest(username, category, dates)
+        self.method = self.forecaster.name
+        return result
 
 
 # Hasta cuántos días se le pide al modelo de una vez (un año, como los dashboards).
@@ -256,9 +281,14 @@ class ModelProjections:
     comparar, en los dashboards, el modelo con lo que proyectó el vendedor y lo que se vendió."""
 
     def __init__(
-        self, sellers: SellerRepository, orders: OrderHistory, products: ProductRepository
+        self,
+        sellers: SellerRepository,
+        orders: OrderHistory,
+        products: ProductRepository,
+        store: DemandModelStore | None = None,
     ):
         self.sellers, self.orders, self.products = sellers, orders, products
+        self.store = store
 
     def __call__(
         self, viewer: Seller, date_from: date, date_to: date, seller: str | None
@@ -268,6 +298,18 @@ class ModelProjections:
             raise DomainError(f"Pide hasta {MODEL_MAX_DAYS} días del modelo.")
         who = visible_seller(viewer, seller)
         team = [who] if who else [s.username for s in self.sellers.list_active() if s.is_seller]
+        # Los días que evaluó el modelo entrenado (ADR 0020) traen su predicción guardada (la
+        # combinación robusta); el resto, la mediana de 4 semanas.
+        stored = (
+            [
+                d
+                for d in self.store.predictions(STORED_MODEL, date_from, date_to, who)
+                if d.seller in team
+            ]
+            if self.store
+            else []
+        )
+        covered = {d.date for d in stored}
         products = [p for p in self.products.list_active() if p.category == ORDER_CATEGORY]
         days = [date_from + timedelta(days=i) for i in range((date_to - date_from).days + 1)]
         out = []
@@ -276,10 +318,27 @@ class ModelProjections:
             if not history:
                 continue
             for day in days:
+                if day in covered:
+                    continue
                 units = weekday_median(history, day)
                 if units:
                     out.append(DailyUnits(name, day, units))
-        return out
+        return stored + out
+
+
+# La predicción guardada que se muestra como «Modelo» en los dashboards y la sugerencia.
+STORED_MODEL = "robusta"
+
+
+class GetModelSummary:
+    """Métricas de la última corrida del modelo de demanda (pantalla «Modelo»)."""
+
+    def __init__(self, store: DemandModelStore):
+        self.store = store
+
+    def __call__(self, viewer: Seller) -> dict | None:
+        require(viewer.role, Permission.VIEW_TEAM)
+        return self.store.latest()
 
 
 class ListChanges:

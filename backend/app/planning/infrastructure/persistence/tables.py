@@ -136,6 +136,27 @@ saca_snapshots = Table(
     Column("payload", Text, nullable=False),
 )
 
+# Modelo de demanda (ADR 0020): la última corrida (métricas en JSON) y sus predicciones por
+# modelo, vendedor y día (unidades por producto en JSON).
+model_runs = Table(
+    TABLES["model_runs"],
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("trained_at", DateTime(timezone=True), nullable=False),
+    Column("summary", Text, nullable=False),
+)
+
+model_predictions = Table(
+    TABLES["model_predictions"],
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("model", String(20), nullable=False),
+    Column("seller", String(50), nullable=False),
+    Column("date", Date, nullable=False),
+    Column("units", Text, nullable=False),
+    Index(f"ix_{TABLES['model_predictions']}_model_date", "model", "date"),
+)
+
 edit_unlocks = Table(
     TABLES["edit_unlocks"],
     metadata,
