@@ -9,23 +9,32 @@ export const NOT_REGISTERED_BODY = 'Aún no se registró el stock de este día.'
 
 export const LOCATION_LABEL = 'Ubicación'
 export const ALL_LOCATIONS = 'Todas las ubicaciones'
-export const TYPE_LABEL = 'Tipo'
-export const ALL_TYPES = 'Todos los tipos'
+export const TYPE_LABEL = 'Tipo de producto'
+export const ALL_TYPES = 'Todos (brasa, pollo de mercado, descartes)'
 export const QUALITY_LABEL = 'Calidad'
-export const QUALITY_OPTION = { ALL: 'A y B juntas', A: 'Solo calidad A', B: 'Solo calidad B' } as const
-export const UNIT_LABEL = 'Mostrar en'
+export const QUALITY_OPTION = { ALL: 'Todas', A: 'Solo calidad A', B: 'Solo calidad B', D: 'Solo descartes' } as const
+export const UNIT_LABEL = 'Ver cantidades en'
 export const UNIT_OPTION = { units: 'Unidades', kg: 'Kg', both: 'Unidades y kg' } as const
-export const LOTS_LABEL = 'Lotes (fecha de beneficio)'
-export const LOTS_HINT = 'Elige los lotes que quieres ver como columnas. Se recuerda en este equipo.'
+export const LOTS_LABEL = 'Lotes: fecha de beneficio (una columna por fecha)'
+export const LOTS_HINT =
+  'Un lote es la fecha en que se benefició el pollo. Marca las fechas que quieres ver como columnas; se recuerda en este equipo.'
 export const LOT_TODAY = 'del día'
 export const lotAgeLabel = (age: number) =>
   age === 0 ? LOT_TODAY : age === 1 ? 'hace 1 día' : `hace ${String(age)} días`
 export const lotCountsNote = (days: number) =>
   `Para la saca cuentan los lotes de hasta ${String(days)} días; lo más antiguo se troza y no se descuenta.`
 export const OLD_LOT = 'no descuenta'
-export const PICK_LOCATION = 'Estás viendo todas las ubicaciones juntas. Elige una ubicación para registrar o corregir.'
+export const PICK_LOCATION = 'Elige una ubicación (primer filtro) para registrar o corregir el stock.'
 export const UNITS_ONLY_HINT = 'Se escriben unidades; los kg se calculan con el peso promedio de cada artículo.'
 export const QUALITY_B_TAG = 'Calidad B'
+export const DISCARD_TAG = 'Descarte · no entra a la saca'
+export const REGISTER_STEPS_TITLE = 'Cómo registrar el stock'
+export const REGISTER_STEPS = [
+  'Elige el día arriba y la ubicación donde está el pollo.',
+  'Cada fila es un producto y cada columna un lote (su fecha de beneficio).',
+  'Escribe las unidades que quedaron; los kg se calculan solos.',
+  'Toca «Guardar stock». Puedes volver a corregirlo hasta 7 días después.',
+] as const
 export const BY_LOCATION_TITLE = 'Por ubicación'
 
 export const COLUMNS = {

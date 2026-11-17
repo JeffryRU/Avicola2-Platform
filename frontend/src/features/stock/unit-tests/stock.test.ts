@@ -124,3 +124,13 @@ describe('stock de despacho', () => {
     expect(read(2).lots).toEqual([0, 1, 2])
   })
 })
+
+describe('descartes', () => {
+  it('suman unidades y kg pero no cuentan como calidad A ni B', () => {
+    const items = [
+      { id: 'P0201', category: 'Descarte', name: 'Descarte brasa', kg_per_unit: 1.5, sort_order: 0, quality: 'D' },
+    ]
+    const t = draftTotals(items, { 'P0201|2026-11-17': '10' })
+    expect(t).toEqual({ units: 10, kg: 15, unitsA: 0, unitsB: 0 })
+  })
+})

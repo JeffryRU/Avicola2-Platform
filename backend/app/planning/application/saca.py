@@ -18,7 +18,7 @@ from app.planning.application.ports import (
     StockRepository,
 )
 from app.planning.domain.catalog import Catalog
-from app.planning.domain.models import CONFIRMED, Seller
+from app.planning.domain.models import CONFIRMED, QUALITY_B, Seller
 from app.planning.domain.permissions import Permission, require
 from app.planning.domain.production import LOOKBACK, estimate_from
 from app.planning.domain.saca import (
@@ -124,7 +124,7 @@ class CalculateSaca:
         fresh = latest.units_by_product(self.stock_lot_days) if latest else {}
         quality_b: Counter[str] = Counter()
         for item in self.products.list_stock_items():
-            if not item.is_projectable and fresh.get(item.id):
+            if item.quality == QUALITY_B and fresh.get(item.id):
                 quality_b[product_group(item)] += fresh[item.id]
         plan = build_plan(
             day,

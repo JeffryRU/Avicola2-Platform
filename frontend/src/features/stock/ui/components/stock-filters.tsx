@@ -36,18 +36,21 @@ export function Filters({
   options,
   locations,
   day,
+  allowAll,
 }: {
   view: StockView
   setView: (patch: Partial<StockView>) => void
   options: StockOptions
   locations: string[]
   day: IsoDate
+  /** Quien registra debe elegir una ubicación concreta; solo la consulta junta todas. */
+  allowAll: boolean
 }) {
   return (
     <Section className="mb-4">
       <div className="grid grid-cols-1 gap-3 px-4 pt-4 sm:grid-cols-2 dsk:px-5 @4xl/main:grid-cols-4">
         <Pick label={LOCATION_LABEL} value={view.location} onChange={(location) => setView({ location })}>
-          <option value={ALL}>{ALL_LOCATIONS}</option>
+          {allowAll && <option value={ALL}>{ALL_LOCATIONS}</option>}
           {locations.map((l) => (
             <option key={l} value={l}>
               {l}
