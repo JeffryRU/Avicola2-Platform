@@ -14,6 +14,7 @@ from app.planning.application.ports import (
     ChangeLog,
     Clock,
     DemandForecaster,
+    OrderHistory,
     ProductRepository,
     ProjectionHistory,
     ProjectionRepository,
@@ -24,6 +25,7 @@ from app.planning.domain.catalog import Catalog
 from app.planning.domain.dates import check_range
 from app.planning.domain.history import CREATED, UPDATED, ProjectionChange
 from app.planning.domain.models import SELLER, DailyUnits, Product, Projection, Seller
+from app.planning.domain.orders import ORDER_CATEGORY, daily_units, weekday_median
 from app.planning.domain.permissions import Permission
 from app.shared.domain.errors import DomainError, ForbiddenError
 
@@ -242,6 +244,42 @@ class SuggestProjection:
         Catalog(self.products.list_active()).of(category)  # valida la categoría
         dates = [start + timedelta(days=i) for i in range(days)]
         return self.forecaster.suggest(username, category, dates)
+
+
+# Hasta cuántos días se le pide al modelo de una vez (un trimestre, como los dashboards).
+MODEL_MAX_DAYS = 92
+
+
+class ModelProjections:
+    """Lo que el modelo (ADR 0012: mediana de los pedidos de los últimos 4 días iguales de la
+    semana) habría sugerido cada día, con solo la historia anterior a ese día. Sirve para
+    comparar, en los dashboards, el modelo con lo que proyectó el vendedor y lo que se vendió."""
+
+    def __init__(
+        self, sellers: SellerRepository, orders: OrderHistory, products: ProductRepository
+    ):
+        self.sellers, self.orders, self.products = sellers, orders, products
+
+    def __call__(
+        self, viewer: Seller, date_from: date, date_to: date, seller: str | None
+    ) -> list[DailyUnits]:
+        check_range(date_from, date_to)
+        if (date_to - date_from).days >= MODEL_MAX_DAYS:
+            raise DomainError(f"Pide hasta {MODEL_MAX_DAYS} días del modelo.")
+        who = visible_seller(viewer, seller)
+        team = [who] if who else [s.username for s in self.sellers.list_active() if s.is_seller]
+        products = [p for p in self.products.list_active() if p.category == ORDER_CATEGORY]
+        days = [date_from + timedelta(days=i) for i in range((date_to - date_from).days + 1)]
+        out = []
+        for name in team:
+            history = daily_units(self.orders.lines(name, date_to + timedelta(days=1)), products)
+            if not history:
+                continue
+            for day in days:
+                units = weekday_median(history, day)
+                if units:
+                    out.append(DailyUnits(name, day, units))
+        return out
 
 
 class ListChanges:

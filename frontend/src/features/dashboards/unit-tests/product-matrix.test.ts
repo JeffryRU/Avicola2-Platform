@@ -92,3 +92,21 @@ describe('detalle por producto', () => {
     expect(zonesOf([...SELLERS, seller('x', 'X', null)], 'Sin zona')).toEqual(['Piura', 'Sin zona', 'Trujillo'])
   })
 })
+
+describe('columnas por zona', () => {
+  it('suma a los vendedores de cada zona', async () => {
+    const { zoneColumns, productMatrix } = await import('@/features/dashboards/domain/product-matrix')
+    const team = [
+      { username: 'a', name: 'A', zone: 'TRUJILLO', role: 'seller' },
+      { username: 'b', name: 'B', zone: 'TRUJILLO', role: 'seller' },
+      { username: 'c', name: 'C', zone: 'PIURA', role: 'seller' },
+    ] as Parameters<typeof zoneColumns>[0]
+    const p = (seller: string, units: number) =>
+      ({ id: seller, seller, date: '2026-11-16', status: 'confirmed', units: { P1: units } }) as never
+    const cols = zoneColumns(team, ['2026-11-16'], 'Sin zona')
+    expect(cols.map((c) => c.label)).toEqual(['PIURA', 'TRUJILLO'])
+    const products = [{ id: 'P1', category: 'BRASA', name: 'Brasa 1', kg_per_unit: 1, sort_order: 0 }]
+    const m = productMatrix(cols, products, [p('a', 2), p('b', 3), p('c', 4)])
+    expect(m.cells).toEqual([4, 5])
+  })
+})

@@ -5,7 +5,7 @@ import { nf0, nf1, toggleIn } from '@/shared/domain/format'
 import { isSupervisor } from '@/shared/domain/session'
 import { useRequiredSession } from '@/features/auth'
 import type { Catalog } from '@/features/catalog'
-import { dayColumns, productMatrix, sellerColumns } from '@/features/dashboards/domain/product-matrix'
+import { dayColumns, productMatrix, sellerColumns, zoneColumns } from '@/features/dashboards/domain/product-matrix'
 import { FilterMenu } from '@/features/dashboards/ui/components/filter-bar'
 import { choiceKey, useDetailSelection } from '@/features/dashboards/ui/hooks'
 import type { Projection } from '@/features/projections'
@@ -67,10 +67,12 @@ export function ProductDetail({
 
   const columns = bySeller
     ? sellerColumns(shown, dates, NO_ZONE_LABEL)
-    : dayColumns(dates, null, dShort).map((c) => ({
-        ...c,
-        match: (p: Projection) => c.match(p) && shown.some((s) => s.username === p.seller),
-      }))
+    : supervisor && view === 'zone'
+      ? zoneColumns(shown, dates, NO_ZONE_LABEL)
+      : dayColumns(dates, null, dShort).map((c) => ({
+          ...c,
+          match: (p: Projection) => c.match(p) && shown.some((s) => s.username === p.seller),
+        }))
   const m = productMatrix(columns, f.products, projections)
   const title = f.days.length
     ? `Detalle por producto · ${f.days.length > 2 ? daysCount(f.days.length) : f.days.map(dShort).join(', ')}`
@@ -82,7 +84,7 @@ export function ProductDetail({
       onChange={setView}
       full
       className="w-full dsk:inline-flex dsk:w-auto [&>button]:whitespace-nowrap"
-      options={(['seller', 'day'] as const).map((v) => ({ value: v, label: DETAIL_VIEW_LABEL[v] }))}
+      options={(['seller', 'zone', 'day'] as const).map((v) => ({ value: v, label: DETAIL_VIEW_LABEL[v] }))}
     />
   )
 
@@ -275,7 +277,15 @@ export function DetailFilterMenus({ dates, custom, catalog }: { dates: IsoDate[]
 }
 
 /** Opción marcable de un menú que queda abierto para elegir varias. */
-export function CheckItem({ checked, onToggle, children }: { checked: boolean; onToggle: () => void; children: ReactNode }) {
+export function CheckItem({
+  checked,
+  onToggle,
+  children,
+}: {
+  checked: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
   return (
     <DropdownMenuCheckboxItem
       checked={checked}

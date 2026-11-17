@@ -21,6 +21,8 @@ export class HttpProjectionsGateway implements ProjectionsGateway {
 
   projections = (r: DateRange) => this.http.get(endpoints.projections.list, z.array(projectionSchema), rangeQuery(r))
   sales = (r: DateRange) => this.http.get(endpoints.sales.list, z.array(dailyUnitsSchema), rangeQuery(r))
+  modelProjections = (r: DateRange) =>
+    this.http.get(endpoints.model.list, z.array(dailyUnitsSchema), rangeQuery(r))
   suggestions = (category: string, start: IsoDate, days: number, seller?: string) =>
     this.http.get(endpoints.suggestions.get, suggestionSchema, { category, start, days, on_behalf: seller })
 

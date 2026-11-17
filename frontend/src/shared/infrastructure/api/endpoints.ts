@@ -59,6 +59,11 @@ export const endpoints = {
     list: '/sales',
   },
 
+  model: {
+    /** GET ?date_from&date_to&seller → lo que el modelo habría sugerido cada día, por vendedor. */
+    list: '/model-projections',
+  },
+
   suggestions: {
     /** GET ?category&start&days&on_behalf → proyección sugerida con el historial. */
     get: '/suggestions',

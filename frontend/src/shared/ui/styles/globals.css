@@ -83,6 +83,8 @@
   /* Gráficos */
   --chart-1: var(--primary);
   --chart-2: #b0640f;
+  /* Lo que habría sugerido el modelo (línea de raya larga con rombos). */
+  --chart-model: #15803d;
   /* Partes del gráfico (tamaños de brasa) y rondas anteriores de la proyección (grises). */
   --chart-part-1: #0f9488;
   --chart-part-2: #7c3aed;
@@ -190,6 +192,8 @@
   --draft: #9ba3ae;
 
   --chart-2: #e9a35c;
+  /* Lo que habría sugerido el modelo (línea de raya larga con rombos). */
+  --chart-model: #4ade80;
   /* Partes del gráfico (tamaños de brasa) y rondas anteriores de la proyección (grises). */
   --chart-part-1: #2dd4bf;
   --chart-part-2: #a78bfa;
@@ -331,6 +335,8 @@
   --draft: #111418;
 
   --chart-2: #8a4a00;
+  /* Lo que habría sugerido el modelo (línea de raya larga con rombos). */
+  --chart-model: #166534;
   /* Partes del gráfico (tamaños de brasa) y rondas anteriores de la proyección (grises). */
   --chart-part-1: #0f766e;
   --chart-part-2: #6d28d9;
@@ -414,6 +420,8 @@
   --draft: #ffffff;
 
   --chart-2: #ffc46b;
+  /* Lo que habría sugerido el modelo (línea de raya larga con rombos). */
+  --chart-model: #86efac;
   /* Partes del gráfico (tamaños de brasa) y rondas anteriores de la proyección (grises). */
   --chart-part-1: #5eead4;
   --chart-part-2: #c4b5fd;
@@ -871,6 +879,13 @@
   .chart .ln.s2 {
     stroke: var(--chart-2);
     stroke-dasharray: 5 4;
+  }
+  .chart .ln.s3 {
+    stroke: var(--chart-model);
+    stroke-dasharray: 10 4;
+  }
+  .chart .pt.s3 {
+    fill: var(--chart-model);
   }
   /* Rondas anteriores de la proyección (hojas 1, 2…): en grises (la vigente es la única azul),
      cada una con su trazo; el color va en línea (--chart-prev-N). */
