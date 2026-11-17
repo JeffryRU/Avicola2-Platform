@@ -57,6 +57,7 @@ export function AppearanceProvider({
     const root = document.documentElement
     root.dataset.theme = resolved.theme
     root.dataset.contrast = resolved.contrast
+    root.dataset.accent = resolved.accent
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColor(resolved, brand))
   }, [resolved, brand])
 

@@ -1,8 +1,11 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
+  ACCENT_IDS,
+  ACCENT_KEY,
   CONTRAST_KEY,
   CONTRAST_PREFERENCES,
+  DEFAULT_APPEARANCE,
   THEME_KEY,
   THEME_PREFERENCES,
   contrastFromSwitch,
@@ -21,20 +24,22 @@ const system = (prefersDark: boolean, prefersMoreContrast: boolean): SystemAppea
 
 describe('resolveAppearance', () => {
   it('sin elección, sigue al sistema (tema y contraste)', () => {
-    const pref: AppearancePreference = { theme: 'system', contrast: 'system' }
-    expect(resolveAppearance(pref, system(false, false))).toEqual({ theme: 'light', contrast: 'normal' })
-    expect(resolveAppearance(pref, system(true, false))).toEqual({ theme: 'dark', contrast: 'normal' })
-    expect(resolveAppearance(pref, system(false, true))).toEqual({ theme: 'light', contrast: 'high' })
+    const pref: AppearancePreference = { theme: 'system', contrast: 'system', accent: 'brand' }
+    expect(resolveAppearance(pref, system(false, false))).toMatchObject({ theme: 'light', contrast: 'normal' })
+    expect(resolveAppearance(pref, system(true, false))).toMatchObject({ theme: 'dark', contrast: 'normal' })
+    expect(resolveAppearance(pref, system(false, true))).toMatchObject({ theme: 'light', contrast: 'high' })
   })
 
   it('la elección del usuario manda sobre el sistema', () => {
-    expect(resolveAppearance({ theme: 'light', contrast: 'normal' }, system(true, true))).toEqual({
+    expect(resolveAppearance({ theme: 'light', contrast: 'normal', accent: 'green' }, system(true, true))).toEqual({
       theme: 'light',
       contrast: 'normal',
+      accent: 'green',
     })
-    expect(resolveAppearance({ theme: 'dark', contrast: 'high' }, system(false, false))).toEqual({
+    expect(resolveAppearance({ theme: 'dark', contrast: 'high', accent: 'brand' }, system(false, false))).toEqual({
       theme: 'dark',
       contrast: 'high',
+      accent: 'brand',
     })
   })
 
@@ -46,7 +51,7 @@ describe('resolveAppearance', () => {
         fc.boolean(),
         fc.boolean(),
         (theme, contrast, dark, more) => {
-          const r = resolveAppearance({ theme, contrast }, system(dark, more))
+          const r = resolveAppearance({ theme, contrast, accent: 'brand' }, system(dark, more))
           // Oráculo escrito desde la regla: «sistema» copia la media query; si no, la elección.
           expect(r.theme).toBe(theme === 'system' ? (dark ? 'dark' : 'light') : theme)
           expect(r.contrast).toBe(contrast === 'system' ? (more ? 'high' : 'normal') : contrast)
@@ -71,7 +76,7 @@ describe('contrastFromSwitch', () => {
     fc.assert(
       fc.property(fc.boolean(), fc.boolean(), fc.boolean(), (on, dark, more) => {
         const sys = system(dark, more)
-        const r = resolveAppearance({ theme: 'system', contrast: contrastFromSwitch(on, sys) }, sys)
+        const r = resolveAppearance({ theme: 'system', contrast: contrastFromSwitch(on, sys), accent: 'brand' }, sys)
         expect(r.contrast).toBe(on ? 'high' : 'normal')
       }),
     )
@@ -102,14 +107,14 @@ function runBoot(storage: Record<string, string | null>, media: { dark: boolean;
 describe('public/appearance-boot.js (antes del primer pintado)', () => {
   const stored = fc.oneof(
     fc.constant(null),
-    fc.constantFrom('light', 'dark', 'system', 'normal', 'high', 'noraves', 'rocio').map((v) => JSON.stringify(v)),
+    fc.constantFrom('light', 'dark', 'system', 'normal', 'high', 'noraves', 'rocio', 'brand', 'green', 'teal').map((v) => JSON.stringify(v)),
     fc.string(), // dato corrupto: no debe romper nada
   )
 
   it('aplica lo mismo que resolveAppearance y themeColor (propiedad)', () => {
     fc.assert(
-      fc.property(stored, stored, stored, fc.boolean(), fc.boolean(), (t, c, b, dark, more) => {
-        const { attrs, color } = runBoot({ [THEME_KEY]: t, [CONTRAST_KEY]: c, nv_brand: b }, { dark, more })
+      fc.property(stored, stored, stored, stored, fc.boolean(), fc.boolean(), (t, c, b, a, dark, more) => {
+        const { attrs, color } = runBoot({ [THEME_KEY]: t, [CONTRAST_KEY]: c, nv_brand: b, [ACCENT_KEY]: a }, { dark, more })
         const parse = (raw: string | null) => {
           try {
             return raw === null ? null : (JSON.parse(raw) as unknown)
@@ -122,12 +127,18 @@ describe('public/appearance-boot.js (antes del primer pintado)', () => {
           return ok.includes(v as T) ? (v as T) : fallback
         }
         const pref: AppearancePreference = {
-          theme: pick(t, THEME_PREFERENCES, 'system'),
+          theme: pick(t, THEME_PREFERENCES, DEFAULT_APPEARANCE.theme),
           contrast: pick(c, CONTRAST_PREFERENCES, 'system'),
+          accent: pick(a, ACCENT_IDS, DEFAULT_APPEARANCE.accent),
         }
         const brand = pick(b, ['noraves', 'rocio'] as const, 'noraves')
         const expected = resolveAppearance(pref, system(dark, more))
-        expect(attrs).toEqual({ 'data-theme': expected.theme, 'data-contrast': expected.contrast, 'data-brand': brand })
+        expect(attrs).toMatchObject({
+          'data-theme': expected.theme,
+          'data-contrast': expected.contrast,
+          'data-brand': brand,
+          'data-accent': expected.accent,
+        })
         expect(color).toBe(themeColor(expected, brand))
       }),
     )
@@ -135,7 +146,12 @@ describe('public/appearance-boot.js (antes del primer pintado)', () => {
 
   it('sin almacenamiento ni matchMedia, queda en claro y contraste normal', () => {
     const { attrs } = runBoot({}, 'throws')
-    expect(attrs).toEqual({ 'data-theme': 'light', 'data-contrast': 'normal', 'data-brand': 'noraves' })
+    expect(attrs).toMatchObject({
+      'data-theme': 'light',
+      'data-contrast': 'normal',
+      'data-brand': 'noraves',
+      'data-accent': 'brand',
+    })
   })
 
   it('el sistema con más contraste activa el alto contraste por defecto', () => {

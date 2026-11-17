@@ -18,6 +18,7 @@
  *   data-theme     light | dark      (lo resuelve shared/domain/appearance.ts antes del primer pintado)
  *   data-contrast  normal | high     (alto contraste = dirección B)
  *   data-brand     noraves | rocio   (la marca solo cambia el acento)
+ *   data-accent    brand | green | violet | orange | teal   (color principal elegido por el usuario)
  * Los bloques van de menos a más específicos: cada uno pisa solo lo que cambia.
  */
 
@@ -195,6 +196,82 @@
   --head: #1f1d1b;
 }
 
+/* ===== Color principal elegido (data-accent; «brand» = el de la marca, sin cambios) =====
+ * Contraste normal aquí; la versión de alto contraste va tras los bloques B. Texto blanco sobre el
+ * primario claro y texto oscuro sobre el primario oscuro pasan 4,5:1. */
+[data-theme='light'][data-accent='green']:not([data-contrast='high']) {
+  --primary: #15803d;
+  --primary-hover: #116932;
+  --primary-foreground: #ffffff;
+  --selected: #e7f4ec;
+  --selected-foreground: #0f4d27;
+  --ring: #15803d;
+  --head: #0f3d24;
+}
+[data-theme='light'][data-accent='violet']:not([data-contrast='high']) {
+  --primary: #6d28d9;
+  --primary-hover: #5b21b6;
+  --primary-foreground: #ffffff;
+  --selected: #f0eafc;
+  --selected-foreground: #3f1a8a;
+  --ring: #6d28d9;
+  --head: #2e1065;
+}
+[data-theme='light'][data-accent='orange']:not([data-contrast='high']) {
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-foreground: #ffffff;
+  --selected: #fdeee6;
+  --selected-foreground: #7c2d12;
+  --ring: #c2410c;
+  --head: #431407;
+}
+[data-theme='light'][data-accent='teal']:not([data-contrast='high']) {
+  --primary: #0f766e;
+  --primary-hover: #115e59;
+  --primary-foreground: #ffffff;
+  --selected: #e3f4f2;
+  --selected-foreground: #134e4a;
+  --ring: #0f766e;
+  --head: #0b3b38;
+}
+[data-theme='dark'][data-accent='green']:not([data-contrast='high']) {
+  --primary: #5fd08a;
+  --primary-hover: #86dda6;
+  --primary-foreground: #06210f;
+  --selected: #16301f;
+  --selected-foreground: #c8f2d6;
+  --ring: #5fd08a;
+  --head: #0f3d24;
+}
+[data-theme='dark'][data-accent='violet']:not([data-contrast='high']) {
+  --primary: #b69cff;
+  --primary-hover: #cdbcff;
+  --primary-foreground: #1b0b40;
+  --selected: #2a2145;
+  --selected-foreground: #e2d8ff;
+  --ring: #b69cff;
+  --head: #2e1065;
+}
+[data-theme='dark'][data-accent='orange']:not([data-contrast='high']) {
+  --primary: #ff9a5c;
+  --primary-hover: #ffb689;
+  --primary-foreground: #2b0f02;
+  --selected: #3a2316;
+  --selected-foreground: #ffd8bf;
+  --ring: #ff9a5c;
+  --head: #431407;
+}
+[data-theme='dark'][data-accent='teal']:not([data-contrast='high']) {
+  --primary: #4fd1c5;
+  --primary-hover: #7fded5;
+  --primary-foreground: #04201d;
+  --selected: #133230;
+  --selected-foreground: #c3f1ec;
+  --ring: #4fd1c5;
+  --head: #0b3b38;
+}
+
 /* ===== B · alto contraste (claro) ===== */
 [data-contrast='high'] {
   --background: #ffffff;
@@ -322,6 +399,57 @@
   --primary-hover: #ffc2bd;
   --primary-foreground: #000000;
   --head: #1f1d1b;
+}
+
+/* Color principal elegido también en alto contraste: más oscuro en claro y más claro en oscuro
+ * (≥ 7:1 sobre el fondo). Lo pendiente y la selección siguen en amarillo, como en la dirección B. */
+[data-contrast='high'][data-theme='light'][data-accent='green'] {
+  --primary: #0f5f2e;
+  --primary-hover: #0f3d24;
+  --primary-foreground: #ffffff;
+  --head: #0f3d24;
+}
+[data-contrast='high'][data-theme='light'][data-accent='violet'] {
+  --primary: #5b21b6;
+  --primary-hover: #2e1065;
+  --primary-foreground: #ffffff;
+  --head: #2e1065;
+}
+[data-contrast='high'][data-theme='light'][data-accent='orange'] {
+  --primary: #9a3412;
+  --primary-hover: #431407;
+  --primary-foreground: #ffffff;
+  --head: #431407;
+}
+[data-contrast='high'][data-theme='light'][data-accent='teal'] {
+  --primary: #115e59;
+  --primary-hover: #0b3b38;
+  --primary-foreground: #ffffff;
+  --head: #0b3b38;
+}
+[data-contrast='high'][data-theme='dark'][data-accent='green'] {
+  --primary: #8ee6ae;
+  --primary-hover: #b8f0cb;
+  --primary-foreground: #000000;
+  --head: #0f3d24;
+}
+[data-contrast='high'][data-theme='dark'][data-accent='violet'] {
+  --primary: #cdbcff;
+  --primary-hover: #e2d8ff;
+  --primary-foreground: #000000;
+  --head: #2e1065;
+}
+[data-contrast='high'][data-theme='dark'][data-accent='orange'] {
+  --primary: #ffb689;
+  --primary-hover: #ffd2b5;
+  --primary-foreground: #000000;
+  --head: #431407;
+}
+[data-contrast='high'][data-theme='dark'][data-accent='teal'] {
+  --primary: #8ae8df;
+  --primary-hover: #b6f1eb;
+  --primary-foreground: #000000;
+  --head: #0b3b38;
 }
 
 @theme inline {
@@ -701,4 +829,67 @@
     opacity: 0.5;
     animation: none !important;
   }
+}
+
+/* ===== Accesibilidad (botón de accesibilidad; shared/domain/accessibility.ts) ===== */
+/* Tamaño de texto: escala el rem, así crece todo en proporción (letra, controles y espacios). */
+html[data-text-size='large'] {
+  font-size: 112.5%;
+}
+html[data-text-size='xlarge'] {
+  font-size: 125%;
+}
+/* Reducir animaciones: lo mismo que pide prefers-reduced-motion, a elección del usuario. */
+[data-motion='reduce'] *,
+[data-motion='reduce'] *::before,
+[data-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+/* Subrayar enlaces: no depender solo del color para reconocerlos. */
+[data-links='underline'] a {
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+/* Espaciado de texto (WCAG 1.4.12): más aire entre letras, palabras y líneas. */
+[data-spacing='wide'] body,
+[data-spacing='wide'] body * {
+  letter-spacing: 0.04em !important;
+  word-spacing: 0.14em !important;
+}
+[data-spacing='wide'] body p,
+[data-spacing='wide'] body li,
+[data-spacing='wide'] body small,
+[data-spacing='wide'] body label {
+  line-height: 1.75 !important;
+}
+/* Letra más legible: fuentes de sistema abiertas y de trazo uniforme. */
+[data-font='readable'] body,
+[data-font='readable'] body * {
+  font-family: Verdana, 'Segoe UI', Tahoma, system-ui, sans-serif !important;
+}
+/* Foco resaltado: contorno grueso con halo, visible sobre cualquier fondo. */
+[data-focus='strong'] :focus-visible {
+  outline: 3px solid var(--ring) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--ring) 30%, transparent) !important;
+}
+/* Ocultar imágenes: fotos, ilustraciones y adornos marcados con data-decor (los iconos quedan). */
+[data-images='hidden'] img,
+[data-images='hidden'] picture,
+[data-images='hidden'] video,
+[data-images='hidden'] [data-decor] {
+  display: none !important;
+}
+/* Lector: el cursor indica que tocar algo lo lee en voz alta. */
+[data-reader='on'] body {
+  cursor: help;
+}
+[data-reader='on'] .reading {
+  outline: 3px dashed var(--ring) !important;
+  outline-offset: 2px;
 }
