@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { RotateCcw } from 'lucide-react'
+import { Link } from 'react-router'
 import { dShort } from '@/shared/domain/dates'
 import { nf0, keepDigits, RECORD_MAX_DIGITS } from '@/shared/domain/format'
 import { paths } from '@/app/routes'
@@ -19,6 +20,7 @@ import {
   ACCURACY_TITLE,
   accuracyVerdict,
   BAR_LEGEND_A,
+  GO_PRODUCTION_LABEL,
   BAR_LEGEND_B,
   BARS_NOTE,
   REQUEST_UNIT,
@@ -99,9 +101,21 @@ export function ForecastPage() {
       <PageBody>
         <SyncStatus queries={[query]} />
         {!forecast.available ? (
-          <Section>
-            <EmptyState title={NO_HISTORY_TITLE}>{noHistoryBody(forecast.min_days)}</EmptyState>
-          </Section>
+          <div className="grid max-w-3xl gap-4">
+            <Section title={WHAT_TITLE}>
+              <p className="px-4 py-3 text-sm text-ink-2 dsk:px-5">{WHAT_BODY}</p>
+            </Section>
+            <Section>
+              <EmptyState title={NO_HISTORY_TITLE}>
+                {noHistoryBody(forecast.min_days)}
+                <span className="mt-4 block">
+                  <Button asChild variant="outline">
+                    <Link to={paths.production}>{GO_PRODUCTION_LABEL}</Link>
+                  </Button>
+                </span>
+              </EmptyState>
+            </Section>
+          </div>
         ) : (
           <Projector
             // Al llegar los datos, el formulario parte de lo último que se pidió.

@@ -2,6 +2,7 @@
 export const FORECAST_TITLE = 'Pronóstico de llegada'
 export const FORECAST_NAV_LABEL = 'Pronóstico'
 export const FORECAST_SUBTITLE = 'Escribe lo que se pedirá a granja y mira en qué rango llegará.'
+export const GO_PRODUCTION_LABEL = 'Ir a registrar producción'
 export const WHAT_TITLE = 'Qué predice'
 export const WHAT_BODY =
   'Para cada tipo de ave, cuántas llegarán en cada rango (y cuántas serán de calidad B) según el pedido que escribas. Se calcula con la producción registrada en días anteriores.'
