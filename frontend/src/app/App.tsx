@@ -34,12 +34,11 @@ const loadAuthenticatedApp = () => import('@/app/AuthenticatedApp')
 const AuthenticatedApp = lazy(() => loadAuthenticatedApp().then((m) => ({ default: m.AuthenticatedApp })))
 
 /**
- * Pantalla de bienvenida: al abrir la app y tras iniciar sesión. Es breve a propósito: tapa la
- * descarga de la app con sesión, pero no hace esperar de más.
+ * Pantalla de bienvenida: al abrir la app y tras iniciar sesión. Dura lo justo para que se vea la
+ * entrada de la mascota y el nombre; tapa la descarga de la app con sesión.
  */
-const SPLASH_MS = 700
-const LOGIN_SPLASH_MS = 500
-const SPLASH_ANIMATION_S = 0.65
+const SPLASH_MS = 1300
+const LOGIN_SPLASH_MS = 1000
 
 /** Confirma la cookie al abrir la app y, al cerrar sesión, olvida los datos del usuario anterior. */
 function useSessionLifecycle() {
@@ -92,7 +91,7 @@ function Routed() {
   }
   return (
     <VersionProvider>
-      <Splash visible={splash} durationS={SPLASH_ANIMATION_S} />
+      <Splash visible={splash} />
       {!session ? (
         <LoginPage onLoggedIn={showSplash} corner={<TopControls />} />
       ) : (
