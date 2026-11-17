@@ -60,6 +60,14 @@ class SellerRepository(Protocol):
         ...
 
 
+class ProjectionHistory(Protocol):
+    """Proyecciones históricas de fuera de la app (p. ej. lo pedido en ARIS), solo lectura."""
+
+    def projections(
+        self, date_from: date, date_to: date, seller: str | None
+    ) -> list[Projection]: ...
+
+
 class ProjectionRepository(Protocol):
     def find(
         self, date_from: date, date_to: date, seller: str | None = None

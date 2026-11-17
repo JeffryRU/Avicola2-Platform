@@ -19,6 +19,7 @@ from app.planning.application import saca as sc
 from app.planning.application import stock as st
 from app.planning.application import use_cases as uc
 from app.planning.domain.accounts import LockoutPolicy
+from app.planning.infrastructure.aris_history import ArisHistory, ArisOrSimulatedSales
 from app.planning.infrastructure.arrival_model import AdaptiveArrivalModel
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.events import event_bus
@@ -125,7 +126,9 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     history = SqlChangeLog(session)
     stock = SqlStockRepository(session)
     production = SqlProductionRepository(session)
-    sales = SimulatedSalesSource(projections, clock)
+    # Venta real e historia de proyecciones desde ARIS (cli historia); sin ARIS, la simulada.
+    aris = ArisHistory(session, products)
+    sales = ArisOrSimulatedSales(aris, SimulatedSalesSource(projections, clock))
     stored_settings = CachedSettingsRepository(SqlSettingsRepository(session), planning_cache)
     saca_plus = sc.SacaPlus(stored_settings, settings.saca_group_plus)
     editing = ed.EditingSettings(
@@ -156,7 +159,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         change_role=acc.ChangeRole(sellers, event_bus, notifications),
         get_catalog=uc.GetCatalog(products),
         list_sellers=uc.ListSellers(sellers),
-        list_projections=uc.ListProjections(projections),
+        list_projections=uc.ListProjections(projections, aris),
         submit_projection=uc.SubmitProjection(
             products,
             projections,

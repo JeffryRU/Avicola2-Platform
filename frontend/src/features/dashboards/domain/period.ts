@@ -3,7 +3,7 @@ import { addDays, diffDays, rangeDates, today, weekStart, type IsoDate } from '@
 /** Largo máximo de un rango personalizado (días). */
 export const PERIOD_MAX_DAYS = 31
 /** Hasta cuántos días atrás se puede consultar un rango personalizado. */
-export const PERIOD_HISTORY_DAYS = 120
+export const PERIOD_HISTORY_DAYS = 365
 
 /** Período que muestran los dashboards: una semana (lunes a domingo) o un rango personalizado. */
 export interface Period {
@@ -27,7 +27,7 @@ export const customPeriod = (from: IsoDate, to: IsoDate): Period => ({
   dates: rangeDates(from, diffDays(to, from) + 1),
 })
 
-/** Fechas permitidas para un rango personalizado: 120 días atrás hasta el fin de la semana próxima. */
+/** Fechas permitidas para un rango personalizado: un año atrás (la historia de ARIS) hasta el fin de la semana próxima. */
 export function periodLimits(ref: IsoDate = today()) {
   return { min: addDays(ref, -PERIOD_HISTORY_DAYS), max: addDays(weekStart(ref), 13) }
 }

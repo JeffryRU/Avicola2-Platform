@@ -15,6 +15,7 @@ from app.planning.application.ports import (
     Clock,
     DemandForecaster,
     ProductRepository,
+    ProjectionHistory,
     ProjectionRepository,
     SalesSource,
     SellerRepository,
@@ -53,14 +54,26 @@ class ListSellers:
 
 
 class ListProjections:
-    def __init__(self, projections: ProjectionRepository):
-        self.projections = projections
+    """Las proyecciones de la app y, en los días que no tienen, la historia (lo pedido en ARIS)."""
+
+    def __init__(self, projections: ProjectionRepository, history: ProjectionHistory | None = None):
+        self.projections, self.history = projections, history
 
     def __call__(
         self, viewer: Seller, date_from: date, date_to: date, seller: str | None
     ) -> list[Projection]:
         check_range(date_from, date_to)
-        return self.projections.find(date_from, date_to, visible_seller(viewer, seller))
+        who = visible_seller(viewer, seller)
+        found = self.projections.find(date_from, date_to, who)
+        if self.history is None:
+            return found
+        taken = {(p.seller, p.date) for p in found}
+        past = [
+            p
+            for p in self.history.projections(date_from, date_to, who)
+            if (p.seller, p.date) not in taken
+        ]
+        return found + past
 
 
 @dataclass(frozen=True)

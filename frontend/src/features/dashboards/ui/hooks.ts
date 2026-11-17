@@ -123,6 +123,10 @@ export function useDetailSelection(dates: IsoDate[], catalog: Catalog | null | u
 export function usePeriodData(period: Period) {
   const w = dataWindow()
   const prevFrom = addDays(period.from, -period.dates.length)
-  // Sin salir de la ventana habitual comparte su caché; un rango más antiguo pide lo que falta.
-  return useRangeData(prevFrom < w.from ? prevFrom : w.from, period.to > w.to ? period.to : w.to)
+  // Un período antiguo (p. ej. la historia de ARIS) pide solo sus días, no hasta hoy. Si no,
+  // sin salir de la ventana habitual comparte su caché y un rango más antiguo pide lo que falta.
+  const old = period.to < w.from
+  const from = old || prevFrom < w.from ? prevFrom : w.from
+  const to = old ? period.to : period.to > w.to ? period.to : w.to
+  return useRangeData(from, to)
 }
