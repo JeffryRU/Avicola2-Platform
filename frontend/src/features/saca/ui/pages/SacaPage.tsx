@@ -234,7 +234,7 @@ function FarmOrder({ plan }: { plan: Saca }) {
                 <small className="block text-2xs text-muted-foreground">{groupStockBNote(g.stock_b)}</small>
               )}
             </span>
-            <span className="num text-right">{g.ordered ? `−${nf0(g.ordered)}` : 0}</span>
+            <span className={cn('num text-right', !g.ordered && 'text-faint')}>{g.ordered ? `−${nf0(g.ordered)}` : 0}</span>
             <span className="num text-right">+{nf0(g.projected)}</span>
             {plusCell(g.name, g.plus)}
             <b className="num text-right text-lg font-semibold hc:font-extrabold">{nf0(g.farm_order)}</b>
@@ -275,7 +275,7 @@ function FarmOrder({ plan }: { plan: Saca }) {
   )
 }
 
-const farmCols = 'grid items-baseline gap-x-2 grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,5.5rem))_minmax(0,6.5rem)]'
+const farmCols = 'grid items-baseline gap-x-2 grid-cols-[minmax(7rem,1fr)_repeat(4,minmax(0,4.5rem))_minmax(0,5rem)]'
 
 type Tone = 'ok' | 'warn' | 'off'
 const toneDot: Record<Tone, 'ok' | 'warn' | 'draft'> = { ok: 'ok', warn: 'warn', off: 'draft' }
@@ -461,9 +461,9 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
                       {nf0(l.stock)} stock − {nf0(l.ordered)} ped. + {nf0(l.projected)} proy.
                     </small>
                   </span>
-                  <span className={numCls}>{nf0(l.stock)}</span>
-                  <span className={numCls}>{l.ordered ? `−${nf0(l.ordered)}` : '0'}</span>
-                  <span className={numCls}>{l.projected ? `+${nf0(l.projected)}` : '0'}</span>
+                  <span className={cn(numCls, !l.stock && 'text-faint')}>{nf0(l.stock)}</span>
+                  <span className={cn(numCls, !l.ordered && 'text-faint')}>{l.ordered ? `−${nf0(l.ordered)}` : '0'}</span>
+                  <span className={cn(numCls, !l.projected && 'text-faint')}>{l.projected ? `+${nf0(l.projected)}` : '0'}</span>
                   <span className="text-right">
                     <b
                       className={cn(
