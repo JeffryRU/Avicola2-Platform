@@ -24,6 +24,8 @@ from app.shared.infrastructure.database.session import SessionLocal
 logger = logging.getLogger(__name__)
 # Quien figura como autor de la saca guardada al cierre.
 SYSTEM_USER = "sistema"
+# Ventana del reentrenamiento diario del modelo de demanda (horas desde MODEL_TRAIN_HOUR).
+TRAIN_WINDOW_HOURS = 3
 
 
 def check_missed_projections(settings: Settings) -> int:
@@ -64,7 +66,9 @@ def train_demand_model(settings: Settings) -> int:
         return 0
     clock = ZoneClock(settings.tz)
     now = clock.now()
-    if now.hour < settings.model_train_hour:
+    # Solo de madrugada (3 horas desde MODEL_TRAIN_HOUR): nunca en horario de uso, aunque se
+    # despliegue de día y no haya corrida de hoy.
+    if not settings.model_train_hour <= now.hour < settings.model_train_hour + TRAIN_WINDOW_HOURS:
         return 0
     with SessionLocal() as session:
         last = training.latest(session)
