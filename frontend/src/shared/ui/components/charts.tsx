@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { EARLIER_DASH, PART_OPACITY } from '@/shared/ui/lib/chart-dash'
+import { EARLIER_DASH, PART_COLOR, PREV_COLOR } from '@/shared/ui/lib/chart-dash'
 import { nf0, nf1 } from '@/shared/domain/format'
 import { niceMax } from '@/shared/domain/chart-scale'
 import { useTooltip } from '@/shared/ui/hooks/use-tooltip'
@@ -190,12 +190,7 @@ export function LineChart({ points, label, empty }: { points: LinePoint[]; label
         {nParts
           ? bands.map((ds, k) =>
               ds.map((d, j) => (
-                <path
-                  key={`${k}-${j}`}
-                  className="band"
-                  d={d}
-                  style={{ fillOpacity: PART_OPACITY[k % PART_OPACITY.length] }}
-                />
+                <path key={`${k}-${j}`} className="band" d={d} style={{ fill: PART_COLOR[k % PART_COLOR.length] }} />
               )),
             )
           : aRuns.map((run, j) => (
@@ -226,10 +221,20 @@ export function LineChart({ points, label, empty }: { points: LinePoint[]; label
               <path
                 className="ln prev"
                 d={path(pts)}
-                style={{ strokeDasharray: EARLIER_DASH[r % EARLIER_DASH.length] }}
+                style={{
+                  strokeDasharray: EARLIER_DASH[r % EARLIER_DASH.length],
+                  stroke: PREV_COLOR[r % PREV_COLOR.length],
+                }}
               />
               {pts.map((p, i) => (
-                <circle key={i} className="pt prev" cx={p[0]} cy={p[1]} r={3} />
+                <circle
+                  key={i}
+                  className="pt prev"
+                  cx={p[0]}
+                  cy={p[1]}
+                  r={3}
+                  style={{ stroke: PREV_COLOR[r % PREV_COLOR.length] }}
+                />
               ))}
             </g>
           )),

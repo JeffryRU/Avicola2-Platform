@@ -83,6 +83,14 @@
   /* Gráficos */
   --chart-1: var(--primary);
   --chart-2: #b0640f;
+  /* Partes del gráfico (tamaños de brasa) y rondas anteriores de la proyección (grises). */
+  --chart-part-1: #0f9488;
+  --chart-part-2: #7c3aed;
+  --chart-part-3: #db2777;
+  --chart-part-4: #ca8a04;
+  --chart-prev-1: #a3adbb;
+  --chart-prev-2: #6b7686;
+  --chart-prev-3: #3f4a5a;
   --chart-grid: #e3e2dc;
   --chart-zero: #d6d5ce;
 
@@ -182,6 +190,14 @@
   --draft: #9ba3ae;
 
   --chart-2: #e9a35c;
+  /* Partes del gráfico (tamaños de brasa) y rondas anteriores de la proyección (grises). */
+  --chart-part-1: #2dd4bf;
+  --chart-part-2: #a78bfa;
+  --chart-part-3: #f472b6;
+  --chart-part-4: #facc15;
+  --chart-prev-1: #5d6878;
+  --chart-prev-2: #8a95a5;
+  --chart-prev-3: #c1c9d4;
   --chart-grid: #2b3038;
   --chart-zero: #3a404a;
   --shadow-pop: 0 6px 16px rgb(0 0 0 / 0.45);
@@ -315,6 +331,14 @@
   --draft: #111418;
 
   --chart-2: #8a4a00;
+  /* Partes del gráfico (tamaños de brasa) y rondas anteriores de la proyección (grises). */
+  --chart-part-1: #0f766e;
+  --chart-part-2: #6d28d9;
+  --chart-part-3: #be185d;
+  --chart-part-4: #a16207;
+  --chart-prev-1: #7c8695;
+  --chart-prev-2: #4b5563;
+  --chart-prev-3: #1f2937;
   --chart-grid: #d5d8dd;
   --chart-zero: #9aa0a8;
 
@@ -390,6 +414,14 @@
   --draft: #ffffff;
 
   --chart-2: #ffc46b;
+  /* Partes del gráfico (tamaños de brasa) y rondas anteriores de la proyección (grises). */
+  --chart-part-1: #5eead4;
+  --chart-part-2: #c4b5fd;
+  --chart-part-3: #f9a8d4;
+  --chart-part-4: #fde047;
+  --chart-prev-1: #9aa3b0;
+  --chart-prev-2: #cbd5e1;
+  --chart-prev-3: #f1f5f9;
   --chart-grid: #4a515c;
   --chart-zero: #6b727d;
   --shadow-pop: 0 0 0 2px #ffffff;
@@ -840,30 +872,27 @@
     stroke: var(--chart-2);
     stroke-dasharray: 5 4;
   }
-  /* Rondas anteriores de la proyección (hojas 1, 2…): el mismo color, más tenue y con su trazo. */
+  /* Rondas anteriores de la proyección (hojas 1, 2…): en grises (la vigente es la única azul),
+     cada una con su trazo; el color va en línea (--chart-prev-N). */
   .chart .ln.prev {
-    stroke: var(--chart-1);
-    stroke-width: 1.75;
-    opacity: 0.55;
+    stroke-width: 2;
   }
   .chart .pt.prev {
     fill: var(--surface);
-    stroke: var(--chart-1);
-    stroke-width: 1.5;
-    opacity: 0.75;
-  }
-  [data-contrast='high'] .chart .ln.prev {
-    opacity: 0.8;
+    stroke-width: 1.75;
   }
   .chart .area {
     fill: var(--chart-1);
     opacity: 0.06;
   }
-  /* Partes apiladas bajo la proyección (tamaños de brasa): el mismo color, cada una más tenue. */
+  /* Partes apiladas bajo la proyección (tamaños de brasa): un color cada una (--chart-part-N). */
   .chart .band {
-    fill: var(--chart-1);
+    fill-opacity: 0.3;
     stroke: var(--surface);
     stroke-width: 1;
+  }
+  [data-contrast='high'] .chart .band {
+    fill-opacity: 0.45;
   }
   .chart .pt {
     stroke: var(--surface);

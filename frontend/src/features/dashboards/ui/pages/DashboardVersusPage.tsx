@@ -11,7 +11,7 @@ import { CountUp, LineChart } from '@/shared/ui/components/charts'
 import { EARLIER_DASH } from '@/shared/ui/lib/chart-dash'
 import { useHistory } from '@/features/history'
 import { onlyProducts, onlyProductsChanged, projectionParts, sheetRounds } from '@/features/dashboards/domain/sheets'
-import { PART_OPACITY } from '@/shared/ui/lib/chart-dash'
+import { PART_COLOR, PREV_COLOR } from '@/shared/ui/lib/chart-dash'
 import { FilterMenu } from '@/features/dashboards/ui/components/filter-bar'
 import { CheckItem } from '@/features/dashboards/ui/components/product-detail'
 import { DropdownMenuLabel, DropdownMenuSeparator } from '@/shared/ui/components/shadcn/dropdown-menu'
@@ -32,18 +32,32 @@ const tone = (v: number) => (v < 0 ? 'text-bad' : 'text-ok')
  */
 function SeriesKey({ dashed, round }: { dashed?: boolean; round?: number }) {
   const prev = round !== undefined
+  const color = prev ? PREV_COLOR[(round - 1) % PREV_COLOR.length] : dashed ? 'var(--chart-2)' : 'var(--chart-1)'
   return (
-    <svg aria-hidden width="20" height="8" viewBox="0 0 20 8" className="inline-block flex-none">
+    <svg aria-hidden width="28" height="12" viewBox="0 0 28 12" className="inline-block flex-none">
       <line
-        x1="0"
-        x2="20"
-        y1="4"
-        y2="4"
-        strokeWidth={prev ? 2 : 2.5}
-        strokeOpacity={prev ? 0.6 : 1}
-        stroke={dashed ? 'var(--chart-2)' : 'var(--chart-1)'}
+        x1="1"
+        x2="27"
+        y1="6"
+        y2="6"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        stroke={color}
         strokeDasharray={prev ? EARLIER_DASH[(round - 1) % EARLIER_DASH.length] : dashed ? '5 3' : undefined}
       />
+      {/* El mismo marcador del gráfico: círculo (proyección; hueco si es anterior) o cuadrado (venta). */}
+      {dashed ? (
+        <rect x="10.5" y="2.5" width="7" height="7" fill={color} stroke="var(--surface)" strokeWidth="1.5" />
+      ) : (
+        <circle
+          cx="14"
+          cy="6"
+          r="3.5"
+          fill={prev ? 'var(--surface)' : color}
+          stroke={prev ? color : 'var(--surface)'}
+          strokeWidth="1.75"
+        />
+      )}
     </svg>
   )
 }
@@ -154,7 +168,7 @@ export function DashboardVersusPage() {
         </KpiStrip>
         <div className="grid grid-cols-1 gap-4 @7xl/main:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
           <Section
-            className="flex flex-col"
+            className="flex flex-col overflow-hidden"
             title="Evolución semanal (kg)"
             aside={
               <FilterMenu
@@ -219,10 +233,9 @@ export function DashboardVersusPage() {
                           width="12"
                           height="12"
                           rx="2"
-                          fill="var(--chart-1)"
-                          fillOpacity={PART_OPACITY[k % PART_OPACITY.length]}
-                          stroke="var(--chart-1)"
-                          strokeOpacity={0.4}
+                          fill={PART_COLOR[k % PART_COLOR.length]}
+                          fillOpacity={0.45}
+                          stroke={PART_COLOR[k % PART_COLOR.length]}
                         />
                       </svg>
                       {name}
@@ -292,7 +305,7 @@ export function DashboardVersusPage() {
                 />
               </div>
               {points.length > 0 && (
-                <div className="relative -mx-4 mt-3 overflow-x-auto dsk:-mx-5">
+                <div className="relative -mx-4 mt-3 -mb-4 overflow-x-auto dsk:-mx-5">
                   <table className={cn(tableCls.table, 'text-sm')}>
                     <thead>
                       <tr>
