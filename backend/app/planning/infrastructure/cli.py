@@ -19,6 +19,9 @@
                         data/inbox, que no se versiona): DESPACHO*.csv (pedidos de ARIS),
                         VENTAS*.csv (ventas en tienda) y el Excel con la hoja DB_CALIDA_B
                         (producción). Antes ejecuta `init`. Reemplaza lo ya cargado
+    uv run python -m app.planning.infrastructure.cli tiendas <archivo.xlsx>
+                        pedidos de brasa de las tiendas («Proyección tiendas»: zona, fecha,
+                        CANTIDAD 2 y RANGO) para la saca de esos días; reemplaza los anteriores
     uv run python -m app.planning.infrastructure.cli seed         3 semanas de ejemplo
     uv run python -m app.planning.infrastructure.cli show [n]     resumen y últimas n
     uv run python -m app.planning.infrastructure.cli clear --yes  borra las proyecciones
@@ -72,6 +75,7 @@ from app.planning.infrastructure.persistence.tables import (
 )
 from app.planning.infrastructure.production_import import SHEET, read_production
 from app.planning.infrastructure.security import RandomTemporaryPasswords, ScryptPasswordHasher
+from app.planning.infrastructure.store_orders_import import load_store_orders
 from app.shared.infrastructure.database.session import SessionLocal
 from app.shared.infrastructure.logging.setup import configure_from_settings
 
@@ -306,6 +310,17 @@ class _DayClock:
         return datetime.combine(self.day, time(8, 30), tzinfo=UTC)
 
 
+def import_store_orders(session: Session, path: Path) -> int:
+    """Pedidos de tiendas (Proyección tiendas.xlsx) para el cálculo de saca de esos días."""
+    if not path.is_file():
+        print(f"No existe el archivo {path}.")
+        return 1
+    loaded, skipped = load_store_orders(session, path, SqlProductRepository(session).list_active())
+    session.commit()
+    print(f"OK: {loaded} pedidos de brasa de tiendas ({path.name}); {skipped} filas descartadas.")
+    return 0
+
+
 def import_production(session: Session, settings: Settings, path: Path) -> int:
     if not path.is_file():
         print(f"No existe el archivo {path}.")
@@ -436,7 +451,7 @@ def main(argv: list[str]) -> int:
         planning_cache.invalidate()
 
 
-def _run(argv: list[str], settings: Settings) -> int:
+def _run(argv: list[str], settings: Settings) -> int:  # noqa: PLR0911 (un caso por comando)
     cmd = argv[0] if argv else ""
     with SessionLocal() as session:
         if cmd == "init":
@@ -451,6 +466,8 @@ def _run(argv: list[str], settings: Settings) -> int:
             )
         elif cmd == "rol" and len(argv) == 3:
             return set_role(session, argv[1].strip().lower(), argv[2].strip())
+        elif cmd == "tiendas" and len(argv) == 2:
+            return import_store_orders(session, Path(argv[1]))
         elif cmd == "produccion" and len(argv) == 2:
             return import_production(session, settings, Path(argv[1]))
         elif cmd == "historia" and len(argv) <= 2:
