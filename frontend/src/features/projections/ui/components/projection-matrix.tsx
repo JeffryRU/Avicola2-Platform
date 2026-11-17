@@ -6,7 +6,7 @@ import { bySubcategory, type Product, type Units } from '@/shared/domain/product
 import type { Draft } from '@/features/projections/domain/draft'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgPerUnitLabel } from '@/features/catalog'
-import { kgAmount } from '@/shared/types/labels'
+import { kgAmount, UNITS_SHORT } from '@/shared/types/labels'
 
 interface Props {
   draft: Draft
@@ -52,11 +52,11 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
         aria-label={`Usar la sugerencia: ${nf0(s)} de ${p.name}, ${dShort(d)}`}
         onClick={() => onChange(d, p.id, s)}
         className={cn(
-          'num rounded px-1 text-xs font-medium text-primary/80 transition-colors hover:bg-primary/10 hover:text-primary hc:text-primary hc:underline',
+          'num rounded px-1 text-xs font-medium whitespace-nowrap text-primary/80 transition-colors hover:bg-primary/10 hover:text-primary hc:text-primary hc:underline',
           value(d, p) === s && 'text-faint',
         )}
       >
-        {nf0(s)}
+        {nf0(s)} {UNITS_SHORT}
       </button>
     )
   }
@@ -106,7 +106,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
   const deskCell = (d: IsoDate, p: Product) => (
     <div className="flex items-center justify-center gap-1">
       {cell(d, p)}
-      {suggested && <span className="inline-flex w-8 justify-start">{hint(d, p)}</span>}
+      {suggested && <span className="inline-flex w-16 justify-start">{hint(d, p)}</span>}
     </div>
   )
 
@@ -281,7 +281,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
                             title="Kg según la sugerencia del modelo"
                             className="mt-0.5 text-[0.6875rem] text-primary/80 hc:text-primary"
                           >
-                            <span className="sr-only">Sugerencia: </span>≈ {nf1(hintOf(d, p) * p.kg_per_unit)}
+                            <span className="sr-only">Sugerencia: </span>≈ {kgAmount(hintOf(d, p) * p.kg_per_unit)}
                           </span>
                         )}
                       </span>
