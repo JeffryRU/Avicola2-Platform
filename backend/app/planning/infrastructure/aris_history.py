@@ -16,15 +16,20 @@ from uuid import NAMESPACE_URL, uuid5
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
-from app.planning.application.ports import ProductRepository
+from app.planning.application.ports import ProductRepository, SellerRepository
 from app.planning.domain.models import CONFIRMED, DailyUnits, Projection, ProjectionLine
 from app.planning.domain.orders import ORDER_CATEGORY, ORDER_MATERIAL_PREFIX, OrderLine, product_for
 from app.planning.infrastructure.persistence.tables import dispatch_orders
 
 
 class ArisHistory:
-    def __init__(self, session: Session, products: ProductRepository) -> None:
-        self.session, self.products = session, products
+    """Solo cuenta a los vendedores con cuenta en la app (el equipo de los dashboards): los
+    demás de ARIS no tienen proyección, modelo ni filtros con los que compararlos."""
+
+    def __init__(
+        self, session: Session, products: ProductRepository, sellers: SellerRepository
+    ) -> None:
+        self.session, self.products, self.sellers = session, products, sellers
 
     def available(self) -> bool:
         """¿Hay historia de ARIS cargada? (con vendedor: los pedidos de tiendas no cuentan)."""
@@ -48,8 +53,12 @@ class ArisHistory:
             t.seller.is_not(None),
             func.upper(t.material).startswith(ORDER_MATERIAL_PREFIX, autoescape=True),
         )
+        team = [s.username.lower() for s in self.sellers.list_active() if s.is_seller]
         if seller:
-            query = query.where(func.lower(t.seller) == seller.lower())
+            team = [seller.lower()] if seller.lower() in team else []
+        if not team:
+            return {}
+        query = query.where(func.lower(t.seller).in_(team))
         products = [p for p in self.products.list_active() if p.category == ORDER_CATEGORY]
         out: dict[tuple[str, date], dict[str, float]] = defaultdict(dict)
         for who, day, *rest in self.session.execute(query):

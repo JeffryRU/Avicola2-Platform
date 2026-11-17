@@ -129,7 +129,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     stock = SqlStockRepository(session)
     production = SqlProductionRepository(session)
     # Venta real e historia de proyecciones desde ARIS (cli historia); sin ARIS, la simulada.
-    aris = ArisHistory(session, products)
+    aris = ArisHistory(session, products, sellers)
     sales = ArisOrSimulatedSales(aris, SimulatedSalesSource(projections, clock))
     stored_settings = CachedSettingsRepository(SqlSettingsRepository(session), planning_cache)
     saca_plus = sc.SacaPlus(stored_settings, settings.saca_group_plus)
