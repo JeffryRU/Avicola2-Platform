@@ -38,7 +38,8 @@ import { closedDays, closedDaysNote, EditingDays, openDates, useEditingWindow, w
 export function NewProjectionPage() {
   const { drafts } = useContainer()
   const { seller } = useRequiredSession()
-  const { catalog } = useCatalog()
+  // Solo lo que se proyecta (la brasa): el pollo de mercado queda para el stock y la saca.
+  const { projection: catalog } = useCatalog()
   const [params] = useSearchParams()
   // El supervisor registra o edita por un vendedor (?vendedor= desde el detalle del día).
   const supervisor = isSupervisor(seller)

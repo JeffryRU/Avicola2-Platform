@@ -112,6 +112,9 @@ class ProductOut(BaseModel):
     sort_order: int
     subcategory: str | None = None
     quality: str = Field(default=QUALITY_A, description="A, o B (calidad B: solo en el stock).")
+    projected: bool = Field(
+        default=True, description="Lo registran los vendedores en sus proyecciones."
+    )
 
 
 class ProjectionOut(BaseModel):

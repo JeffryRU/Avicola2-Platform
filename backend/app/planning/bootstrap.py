@@ -164,6 +164,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             settings.planning_max_days,
             on_submitted=nt.NotifyProjectionSubmitted(sellers, notifier, event_bus),
             rules=ed.EditingRules(editing, unlocks),
+            projected=frozenset(settings.planning_projected_categories),
             sellers=sellers,
             history=history,
         ),

@@ -115,7 +115,10 @@ export function withNewSheets(draft: Draft, catalog: Catalog, days: Map<IsoDate,
 export function normalizeDraft(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): Draft {
   let d = draft
   if (!catalog.categories.includes(d.category)) {
-    d = { ...d, category: days.get(d.start)?.category ?? catalog.categories[0], subcategory: null, units: {} }
+    // La del día ya registrado, si aún se proyecta (un día viejo puede ser de otra categoría).
+    const registered = days.get(d.start)?.category
+    const category = registered && catalog.categories.includes(registered) ? registered : catalog.categories[0]
+    d = { ...d, category, subcategory: null, units: {} }
   }
   if (d.subcategory && !catalog.subcategories(d.category).includes(d.subcategory)) d = { ...d, subcategory: null }
   return d.step === 1 ? withNewSheets(d, catalog, days) : d

@@ -17,6 +17,11 @@ export class Catalog {
     this.byId = new Map(this.products.map((p) => [p.id, p]))
   }
 
+  /** Lo que registran los vendedores en sus proyecciones (el resto queda para el stock y la saca). */
+  forProjection(): Catalog {
+    return new Catalog(this.products.filter((p) => p.projected !== false))
+  }
+
   get categories(): string[] {
     return [...new Set(this.products.map((p) => p.category))]
   }
