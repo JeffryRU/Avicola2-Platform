@@ -128,7 +128,7 @@ export function TeamDayView({
               </Note>
             )}
 
-            <div className="grid grid-cols-1 gap-4 @7xl/main:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 items-start gap-4 @7xl/main:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
               <Section title="Por vendedor" aside={`${day.confirmed} de ${day.rows.length} confirmaron`}>
                 {/* Celular: una fila por vendedor con lo esencial (la tabla no entra en 390 px). */}
                 <ul className="dsk:hidden">

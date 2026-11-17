@@ -166,7 +166,7 @@ export function DashboardVersusPage() {
             foot="según días con venta"
           />
         </KpiStrip>
-        <div className="grid grid-cols-1 gap-4 @7xl/main:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 items-start gap-4 @7xl/main:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
           <Section
             className="flex flex-col overflow-hidden"
             title="Evolución semanal (kg)"
