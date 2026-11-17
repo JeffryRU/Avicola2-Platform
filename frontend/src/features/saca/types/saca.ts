@@ -75,3 +75,8 @@ export const missingNote = (n: number) =>
   n === 1
     ? 'Falta 1 vendedor: la proyección puede quedar corta.'
     : `Faltan ${String(n)}: la proyección puede quedar corta.`
+
+/** Enlaces para completar lo que falta. */
+export const FIX_PROJECTIONS = 'Ver quién falta'
+export const FIX_STOCK = 'Registrar stock'
+export const FIX_ARRIVAL = 'Ir a Producción'
