@@ -6,7 +6,7 @@ import { bySubcategory, type Product, type Units } from '@/shared/domain/product
 import type { Draft } from '@/features/projections/domain/draft'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgPerUnitLabel } from '@/features/catalog'
-import { kgAmount, UNITS_SHORT } from '@/shared/types/labels'
+import { kgAmount } from '@/shared/types/labels'
 
 interface Props {
   draft: Draft
@@ -56,7 +56,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
           value(d, p) === s && 'text-faint',
         )}
       >
-        {nf0(s)} {UNITS_SHORT}
+        {nf0(s)}
       </button>
     )
   }
@@ -106,7 +106,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
   const deskCell = (d: IsoDate, p: Product) => (
     <div className="flex items-center justify-center gap-1">
       {cell(d, p)}
-      {suggested && <span className="inline-flex w-16 justify-start">{hint(d, p)}</span>}
+      {suggested && <span className="inline-flex w-8 justify-start">{hint(d, p)}</span>}
     </div>
   )
 
@@ -274,7 +274,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
                       {/* Los kg de lo escrito y, debajo, los de la sugerencia (solo se muestran). */}
                       <span className="flex flex-col items-center leading-tight">
                         <span className={cn(!value(d, p) && 'text-faint')}>
-                          {value(d, p) ? nf1((value(d, p) ?? 0) * p.kg_per_unit) : '—'}
+                          {value(d, p) ? kgAmount((value(d, p) ?? 0) * p.kg_per_unit) : '—'}
                         </span>
                         {hintOf(d, p) > 0 && value(d, p) !== hintOf(d, p) && (
                           <span
