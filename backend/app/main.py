@@ -60,8 +60,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
 
 
+# Sin redirección automática de la barra final: «/mcp/» o «/api/x/» responden 4xx igual con o sin
+# la PWA montada (en producción la PWA ya ocupa esas rutas; sin ella, Starlette redirigía con 307).
 app = FastAPI(
-    title="AviPlanner — Planificación de saca", version="0.1.0", lifespan=lifespan, **docs
+    title="AviPlanner — Planificación de saca",
+    version="0.1.0",
+    lifespan=lifespan,
+    redirect_slashes=False,
+    **docs,
 )
 register_error_handlers(app)
 install_security(app, https=settings.cookie_secure, trusted_origins=settings.trusted_origin_list)
