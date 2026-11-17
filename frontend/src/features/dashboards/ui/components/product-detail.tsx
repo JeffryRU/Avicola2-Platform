@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react'
+import { bucketsOf, granularityOf } from '@/features/dashboards/domain/buckets'
+import { bucketLabels } from '@/features/dashboards/types/buckets'
 import { CalendarDays, Layers, MapPin } from 'lucide-react'
 import { dShort, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1, toggleIn } from '@/shared/domain/format'
@@ -69,10 +71,18 @@ export function ProductDetail({
     ? sellerColumns(shown, dates, NO_ZONE_LABEL)
     : supervisor && view === 'zone'
       ? zoneColumns(shown, dates, NO_ZONE_LABEL)
-      : dayColumns(dates, null, dShort).map((c) => ({
-          ...c,
-          match: (p: Projection) => c.match(p) && shown.some((s) => s.username === p.seller),
-        }))
+      : granularityOf(dates.length) === 'day'
+        ? dayColumns(dates, null, dShort).map((c) => ({
+            ...c,
+            match: (p: Projection) => c.match(p) && shown.some((s) => s.username === p.seller),
+          }))
+        : // Período largo: una columna por semana o por mes.
+          bucketsOf(dates).map((b) => ({
+            key: b.key,
+            label: bucketLabels(b, granularityOf(dates.length)).title,
+            group: null,
+            match: (p: Projection) => b.dates.includes(p.date) && shown.some((s) => s.username === p.seller),
+          }))
   const m = productMatrix(columns, f.products, projections)
   const title = f.days.length
     ? `Detalle por producto · ${f.days.length > 2 ? daysCount(f.days.length) : f.days.map(dShort).join(', ')}`

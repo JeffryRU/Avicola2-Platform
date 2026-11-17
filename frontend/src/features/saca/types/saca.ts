@@ -1,6 +1,20 @@
 /** Textos del cálculo de saca (única fuente). */
 export const SACA_TITLE = 'Cálculo de saca'
 export const SACA_SUBTITLE = 'Cuánto pedir a granja cada día, por producto.'
+export const HISTORY_TITLE = 'Historial de sacas'
+export const HISTORY_SUBTITLE = 'La saca de cada día tal como quedó: lo que se pidió a granja, por tipo.'
+export const HISTORY_LINK = 'Historial'
+export const HISTORY_RANGES = [
+  { days: 30, label: '30 días' },
+  { days: 90, label: '90 días' },
+  { days: 365, label: '1 año' },
+] as const
+export const HISTORY_EMPTY_TITLE = 'Todavía no hay sacas guardadas'
+export const HISTORY_EMPTY_BODY =
+  'La saca de cada día se guarda al verla y al cierre de la jornada. Desde hoy se irán sumando aquí.'
+export const HISTORY_COLUMNS = { date: 'Día', total: 'Total aves', saved: 'Guardada' } as const
+export const savedNote = (time: string, by: string) =>
+  `Saca guardada a las ${time}${by === 'sistema' ? ' (cierre del día)' : ` por ${by}`}.`
 export const DAY_LABEL = 'Día del cálculo'
 export { TODAY_LABEL, TOMORROW_LABEL } from '@/shared/types/labels'
 export const HERO_LABEL = 'Pedido final a granja'

@@ -67,6 +67,7 @@ export const queryKeys = {
   saca: {
     all: ['saca'] as const,
     plan: (day: string) => ['saca', day] as const,
+    history: (from: string, to: string) => ['saca', 'history', from, to] as const,
   },
 
   stock: {

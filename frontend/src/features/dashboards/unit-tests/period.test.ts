@@ -29,11 +29,11 @@ describe('período de los dashboards', () => {
     const { min, max } = periodLimits(TODAY)
     expect(max).toBe('2026-11-15') // fin de la semana próxima
     expect(checkPeriod('2026-11-03', '2026-11-01', TODAY)).toBe('order')
-    expect(checkPeriod('2026-07-01', '2026-11-04', TODAY)).toBe('too_long')
+    expect(checkPeriod('2025-09-01', '2026-11-04', TODAY)).toBe('too_long')
     expect(checkPeriod(min, min, TODAY)).toBeNull()
     expect(checkPeriod('2026-11-10', '2026-11-16', TODAY)).toBe('out_of_range')
-    // 92 días que terminan en el último día permitido.
-    const last = customPeriod('2026-08-16', '2026-11-15')
+    // 366 días que terminan en el último día permitido.
+    const last = customPeriod('2025-11-15', '2026-11-15')
     expect(last.dates).toHaveLength(PERIOD_MAX_DAYS)
     expect(checkPeriod(last.from, last.to, TODAY)).toBeNull()
   })

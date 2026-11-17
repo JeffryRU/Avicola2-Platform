@@ -22,6 +22,26 @@ El ADR 0012 eligió la mediana del mismo día de la semana (4 semanas) midiendo 
 
 Una primera corrida mostró un combinado con 17 % en equipo×día: era una **fuga de datos** (el boosting quedaba entrenado con días del período de prueba). Se corrigió: el modelo se reentrena cada 28 días y nunca con días posteriores al que predice.
 
+### Modelos preentrenados (sin entrenar, con nuestra historia como contexto)
+
+`scripts/compare_foundation_models.py`, en el mismo backtest:
+
+| Modelo | Vendedor×producto×día | Vendedor×día | Equipo×día | Sesgo |
+|---|---|---|---|---|
+| Chronos-Bolt small, por detalle | 62,3 % | 45,7 % | 31,8 % | −20,2 % |
+| Chronos-Bolt small, total del vendedor × mezcla | 65,5 % | 41,0 % | 24,0 % | −2,7 % |
+| Chronos-Bolt base, total del vendedor × mezcla | 63,5 % | 38,8 % | 23,0 % | −4,2 % |
+
+Ninguno supera a la mediana: con 8 meses de historia diaria, un modelo genérico no tiene de dónde aprender más.
+
+### Otros niveles
+
+| Modelo | Equipo×semana | Tamaño×día (chica/mediana/grande, lo de la saca) |
+|---|---|---|
+| Mediana mismo día, 4 sem. (actual) | 15,3 % | 29,9 % |
+| Por cliente (4 sem.) | 13,6 % | 29,9 % |
+| Combinado: por cliente + suavizado | 14,3 % | 28,4 % |
+
 ## Hallazgos
 
 - **Ningún modelo es «mucho mejor» con estos datos.** Las diferencias son de 1 a 2 puntos. El error del equipo por día ronda el 22 % y el de cada vendedor el 35 %.
@@ -32,8 +52,10 @@ Una primera corrida mostró un combinado con 17 % en equipo×día: era una **fug
 
 Se mantiene la mediana del mismo día de la semana (ADR 0012): es igual de buena que las alternativas, se explica sola y no se entrena. Para mejorar de verdad hacen falta **datos nuevos**, no otro algoritmo:
 
-- **Historia más larga:** al menos un año, para la estacionalidad anual y los feriados con historia propia.
+- **Historia más larga:** no existe (antes todo era a mano), así que se acumula desde ahora en la app.
 - **Pedidos adelantados de los clientes:** por ejemplo, el reporte de pedidos de tiendas («Proyección tiendas») ya trae los pedidos de mañana y pasado.
 - **Demanda censurada:** los días en que faltó pollo, para no aprender ventas recortadas.
 
-El script queda para repetir la comparación cuando lleguen esos datos.
+- **Las proyecciones de los vendedores guardadas en la app** (antes no se registraban): en unas semanas se podrá medir su error y combinarlas con el modelo, lo que suele mejorar a ambos.
+
+Los scripts quedan para repetir la comparación cuando haya más datos.

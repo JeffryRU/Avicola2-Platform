@@ -309,3 +309,59 @@ def test_discards_are_registered_in_stock_but_never_enter_the_farm_order(client)
     assert "P0201" not in {line["product_id"] for line in plan["lines"]}
     assert "Descarte" not in {g["name"] for g in plan["groups"]}
     assert plan["stock_b"] == 0 and plan["farm_order"] == 60
+
+
+# --- Sacas guardadas -------------------------------------------------------------------
+
+
+def test_todays_saca_is_saved_and_listed_in_the_history(client) -> None:
+    _login(client, "supervisor")
+    _set_plus(client, NO_PLUS)
+    plan = _saca(client)
+    assert plan["saved_at"] and plan["saved_by"] == "supervisor"
+    r = client.get("/api/saca/history", params={"date_from": str(TODAY), "date_to": str(TODAY)})
+    [saved] = r.json()
+    assert saved["date"] == str(TODAY) and saved["farm_order"] == plan["farm_order"]
+    assert {g["name"] for g in saved["groups"]} == set(NO_PLUS)
+    # El vendedor no ve la saca ni su historial.
+    _login(client, "rnavarro")
+    assert (
+        client.get(
+            "/api/saca/history", params={"date_from": str(TODAY), "date_to": str(TODAY)}
+        ).status_code
+        == 403
+    )
+
+
+def test_a_past_saca_is_shown_as_it_was_saved(client) -> None:
+    from app.planning.domain.saca import SacaSnapshot
+    from app.planning.infrastructure.persistence.saca_snapshots import SqlSacaSnapshotRepository
+
+    _login(client, "supervisor")
+    _set_plus(client, NO_PLUS)
+    payload = _saca(client)
+    yesterday = TODAY - timedelta(days=1)
+    payload.update(date=str(yesterday), farm_order=1234)
+    import json
+    from datetime import UTC, datetime
+
+    with SessionLocal() as session:
+        SqlSacaSnapshotRepository(session).save(
+            SacaSnapshot(yesterday, datetime.now(UTC), "supervisor", 1234, json.dumps(payload))
+        )
+    # Aunque cambien los datos, ayer se ve tal como quedó guardada.
+    past = _saca(client, yesterday)
+    assert past["farm_order"] == 1234 and past["saved_by"] == "supervisor"
+
+
+def test_the_scheduler_saves_the_closing_saca(client) -> None:
+    from app.planning.infrastructure.scheduler import SYSTEM_USER, snapshot_saca
+
+    settings = get_settings().model_copy(update={"saca_snapshot_hour": 0})
+    assert snapshot_saca(settings) == 1
+    assert snapshot_saca(settings) == 0  # ya está la del cierre
+    _login(client, "supervisor")
+    [saved] = client.get(
+        "/api/saca/history", params={"date_from": str(TODAY), "date_to": str(TODAY)}
+    ).json()
+    assert saved["saved_by"] == SYSTEM_USER
