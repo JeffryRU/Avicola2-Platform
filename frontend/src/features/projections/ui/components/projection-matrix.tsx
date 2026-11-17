@@ -271,21 +271,17 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
                   {dates.map((d) => [
                     <td key={`${d}u`}>{deskCell(d, p)}</td>,
                     <td key={`${d}k`} className="num min-w-14 text-sm text-muted-foreground">
-                      {/* Los kg de lo escrito y, al lado, los de la sugerencia (solo se muestran). */}
-                      <span className="inline-flex items-center justify-center gap-1.5">
-                        <span className={cn('min-w-9 text-right', !value(d, p) && 'text-faint')}>
+                      {/* Los kg de lo escrito y, debajo, los de la sugerencia (solo se muestran). */}
+                      <span className="flex flex-col items-center leading-tight">
+                        <span className={cn(!value(d, p) && 'text-faint')}>
                           {value(d, p) ? nf1((value(d, p) ?? 0) * p.kg_per_unit) : '—'}
                         </span>
-                        {hintOf(d, p) > 0 && (
+                        {hintOf(d, p) > 0 && value(d, p) !== hintOf(d, p) && (
                           <span
                             title="Kg según la sugerencia del modelo"
-                            className={cn(
-                              'min-w-9 text-left text-xs text-primary/80 hc:text-primary',
-                              value(d, p) === hintOf(d, p) && 'text-faint',
-                            )}
+                            className="mt-0.5 text-[0.6875rem] text-primary/80 hc:text-primary"
                           >
-                            <span className="sr-only">Sugerencia: </span>
-                            {nf1(hintOf(d, p) * p.kg_per_unit)}
+                            <span className="sr-only">Sugerencia: </span>≈ {nf1(hintOf(d, p) * p.kg_per_unit)}
                           </span>
                         )}
                       </span>
