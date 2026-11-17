@@ -134,17 +134,29 @@ export function HomePage() {
                   const state = ok ? 'confirmado' : due ? 'pendiente' : 'sin registrar'
                   return (
                     <li key={d}>
+                      {/* Sin recuadros: el número va en un círculo. Hoy, relleno del color
+                          principal; el día que falta, borde de aviso; al pasar el mouse, tenue. */}
                       <Link
                         to={paths.day(d)}
-                        aria-label={`${dShort(d)}: ${state}`}
+                        aria-label={`${dShort(d)}: ${state}${d === now ? ' (hoy)' : ''}`}
                         className={cn(
-                          'flex min-h-touch flex-col items-center gap-1 rounded-md py-2 text-sm transition-colors hover:bg-muted',
-                          due && 'font-semibold text-warn hc:bg-warn-soft hc:text-foreground',
-                          d === now && 'ring-1 ring-border-strong ring-inset',
+                          'group flex min-h-touch flex-col items-center gap-1 rounded-md py-2 text-sm outline-none',
+                          due && 'font-semibold text-warn hc:text-foreground',
                         )}
                       >
                         <span className={cn('text-xs', !due && 'text-muted-foreground')}>{dDow(d)}</span>
-                        <span className="num">{dDM(d).slice(0, 2)}</span>
+                        <span
+                          className={cn(
+                            'num grid size-8 place-items-center rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-ring',
+                            d === now
+                              ? 'bg-primary font-semibold text-primary-foreground'
+                              : due
+                                ? 'border-[1.5px] border-dashed border-warn group-hover:bg-warn-soft hc:border-solid hc:border-foreground'
+                                : 'group-hover:bg-muted',
+                          )}
+                        >
+                          {dDM(d).slice(0, 2)}
+                        </span>
                         {/* Punto en A; en alto contraste, texto (el estado no depende del color). */}
                         <span className="hc:hidden">
                           {ok ? (
