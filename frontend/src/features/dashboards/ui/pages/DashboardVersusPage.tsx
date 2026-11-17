@@ -8,6 +8,9 @@ import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-b
 import { kgPerUnitLabel, useCatalog } from '@/features/catalog'
 import { usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
 import { CountUp, LineChart } from '@/shared/ui/components/charts'
+import { EARLIER_DASH } from '@/shared/ui/lib/chart-dash'
+import { useHistory } from '@/features/history'
+import { sheetRounds } from '@/features/dashboards/domain/sheets'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
@@ -15,8 +18,12 @@ import { kgAmount } from '@/shared/types/labels'
 
 const tone = (v: number) => (v < 0 ? 'text-bad' : 'text-ok')
 
-/** Muestra de una serie: línea continua (proyección) o discontinua (venta real), no solo color. */
-function SeriesKey({ dashed }: { dashed?: boolean }) {
+/**
+ * Muestra de una serie: línea continua (proyección vigente), discontinua (venta real) o, para
+ * una ronda anterior (`round` 1, 2…), el trazo tenue de esa ronda. No depende solo del color.
+ */
+function SeriesKey({ dashed, round }: { dashed?: boolean; round?: number }) {
+  const prev = round !== undefined
   return (
     <svg aria-hidden width="20" height="8" viewBox="0 0 20 8" className="inline-block flex-none">
       <line
@@ -24,13 +31,18 @@ function SeriesKey({ dashed }: { dashed?: boolean }) {
         x2="20"
         y1="4"
         y2="4"
-        strokeWidth="2.5"
+        strokeWidth={prev ? 2 : 2.5}
+        strokeOpacity={prev ? 0.6 : 1}
         stroke={dashed ? 'var(--chart-2)' : 'var(--chart-1)'}
-        strokeDasharray={dashed ? '5 3' : undefined}
+        strokeDasharray={prev ? EARLIER_DASH[(round - 1) % EARLIER_DASH.length] : dashed ? '5 3' : undefined}
       />
     </svg>
   )
 }
+
+/** Nombre de cada ronda: «Proyección 1», «Proyección 2»…; la última es la vigente. */
+const roundLabel = (r: number, rounds: number) =>
+  rounds === 1 ? 'Proyección' : r === rounds ? `Proyección ${String(r)} (vigente)` : `Proyección ${String(r)}`
 
 export function DashboardVersusPage() {
   const { period, sellers } = useDashboardFilters()
@@ -41,6 +53,11 @@ export function DashboardVersusPage() {
   const source = data.data ?? { projections: [], sales: [] }
 
   const days = periodAgg(period.dates, sellers, source.projections, source.sales, catalog)
+  // Hojas de cada día (un vendedor puede volver a registrar 2 o 3 veces): una línea por ronda.
+  const history = useHistory(period.from, period.to)
+  const sheets = sheetRounds(period.dates, sellers, source.projections, history.data ?? [], catalog)
+  const rounds = sheets.rounds
+  const earlierRounds = Array.from({ length: rounds - 1 }, (_, i) => i + 1)
   const vs = versusReal(days, catalog)
   const withReal = days.filter((d) => d.real)
   // Sin ventas del ERP no hay desviación ni exactitud que mostrar (0 % sería engañoso).
@@ -49,7 +66,7 @@ export function DashboardVersusPage() {
     .filter((d) => d.confirmed)
     .map((d) => {
       const rk = d.real ? catalog.kg(d.real) : null
-      return { date: d.date, pk: d.kg, rk }
+      return { date: d.date, pk: d.kg, rk, earlier: rounds > 1 ? sheets.kg[d.date].slice(0, -1) : [] }
     })
 
   return (
@@ -58,7 +75,7 @@ export function DashboardVersusPage() {
       <DashboardFilterBar />
       <DashboardTabs />
       <PageBody>
-        <SyncStatus queries={[data]} />
+        <SyncStatus queries={[data, history]} />
         <KpiStrip className="mb-4">
           <Kpi
             label="Proyección"
@@ -108,9 +125,15 @@ export function DashboardVersusPage() {
           <Section title="Evolución semanal (kg)">
             <div className="px-4 pt-3 pb-4 dsk:px-5">
               <div className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-ink-2">
+                {earlierRounds.map((r) => (
+                  <span key={r} className="flex items-center gap-1.5">
+                    <SeriesKey round={r} />
+                    {roundLabel(r, rounds)}
+                  </span>
+                ))}
                 <span className="flex items-center gap-1.5">
                   <SeriesKey />
-                  Proyección
+                  {roundLabel(rounds, rounds)}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <SeriesKey dashed />
@@ -126,11 +149,18 @@ export function DashboardVersusPage() {
                     sublabel: dDM(p.date),
                     a: p.pk,
                     b: p.rk,
+                    earlier: p.earlier,
                     tip: (
                       <>
                         <b>{dShort(p.date)}</b>
+                        {p.earlier.map((kg, i) => (
+                          <span key={i}>
+                            <br />
+                            {roundLabel(i + 1, rounds)}: {kgAmount(kg)}
+                          </span>
+                        ))}
                         <br />
-                        Proyección: {kgAmount(p.pk)}
+                        {roundLabel(rounds, rounds)}: {kgAmount(p.pk)}
                         <br />
                         {p.rk == null ? (
                           'Venta real: sin datos aún'
@@ -168,11 +198,26 @@ export function DashboardVersusPage() {
                       </tr>
                     </thead>
                     <tbody>
+                      {earlierRounds.map((r) => (
+                        <tr key={r} className="text-muted-foreground">
+                          <td className={tableCls.td}>
+                            <span className="flex items-center gap-2">
+                              <SeriesKey round={r} />
+                              {roundLabel(r, rounds)} (kg)
+                            </span>
+                          </td>
+                          {points.map((p) => (
+                            <td key={p.date} className={cn(tableCls.td, 'num')}>
+                              {nf0(p.earlier[r - 1])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
                       <tr>
                         <td className={tableCls.td}>
                           <span className="flex items-center gap-2">
                             <SeriesKey />
-                            Proyección (kg)
+                            {roundLabel(rounds, rounds)} (kg)
                           </span>
                         </td>
                         {points.map((p) => (

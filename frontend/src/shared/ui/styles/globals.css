@@ -840,6 +840,21 @@
     stroke: var(--chart-2);
     stroke-dasharray: 5 4;
   }
+  /* Rondas anteriores de la proyección (hojas 1, 2…): el mismo color, más tenue y con su trazo. */
+  .chart .ln.prev {
+    stroke: var(--chart-1);
+    stroke-width: 1.75;
+    opacity: 0.55;
+  }
+  .chart .pt.prev {
+    fill: var(--surface);
+    stroke: var(--chart-1);
+    stroke-width: 1.5;
+    opacity: 0.75;
+  }
+  [data-contrast='high'] .chart .ln.prev {
+    opacity: 0.8;
+  }
   .chart .area {
     fill: var(--chart-1);
     opacity: 0.06;

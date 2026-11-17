@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { EARLIER_DASH } from '@/shared/ui/lib/chart-dash'
 import { nf0, nf1 } from '@/shared/domain/format'
 import { niceMax } from '@/shared/domain/chart-scale'
 import { useTooltip } from '@/shared/ui/hooks/use-tooltip'
@@ -106,6 +107,8 @@ export interface LinePoint {
   sublabel: string
   a: number
   b: number | null
+  /** Rondas anteriores de la serie A (hojas 1, 2… antes de la vigente), en orden. */
+  earlier?: number[]
   tip: ReactNode
 }
 
@@ -120,7 +123,7 @@ export function LineChart({ points, label }: { points: LinePoint[]; label: strin
   const R = 14
   const T = 16
   const B = 44
-  const max = niceMax(Math.max(...points.flatMap((p) => [p.a, p.b ?? 0]), 1) * 1.05, 5)
+  const max = niceMax(Math.max(...points.flatMap((p) => [p.a, p.b ?? 0, ...(p.earlier ?? [])]), 1) * 1.05, 5)
   const iw = W - L - R
   const ih = H - T - B
   const step = iw / Math.max(points.length - 1, 1)
@@ -131,6 +134,10 @@ export function LineChart({ points, label }: { points: LinePoint[]; label: strin
   const path = (pts: readonly (readonly [number, number])[]) =>
     pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
   const area = `${path(p1)} L${p1[p1.length - 1][0]} ${T + ih} L${p1[0][0]} ${T + ih} Z`
+  const rounds = Math.max(0, ...points.map((p) => p.earlier?.length ?? 0))
+  const earlier = Array.from({ length: rounds }, (_, r) =>
+    points.map((p, i) => [x(i), y(p.earlier?.[r] ?? p.a)] as const),
+  )
   return (
     <div ref={ref} className="chart relative">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
@@ -153,6 +160,18 @@ export function LineChart({ points, label }: { points: LinePoint[]; label: strin
             <text className="ax" x={x(i)} y={H - B + 35} textAnchor="middle">
               {p.sublabel}
             </text>
+          </g>
+        ))}
+        {earlier.map((pts, r) => (
+          <g key={`r${r}`}>
+            <path
+              className="ln prev"
+              d={path(pts)}
+              style={{ strokeDasharray: EARLIER_DASH[r % EARLIER_DASH.length] }}
+            />
+            {pts.map((p, i) => (
+              <circle key={i} className="pt prev" cx={p[0]} cy={p[1]} r={3} />
+            ))}
           </g>
         ))}
         <path className="ln s1" d={path(p1)} />
