@@ -1,9 +1,10 @@
-import { useState, type SyntheticEvent } from 'react'
+import { useState, type ReactNode, type SyntheticEvent } from 'react'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { credentialsSchema } from '@/features/auth/domain/credentials'
 import { useLogin } from '@/features/auth/ui/hooks'
+import { LoginBackdrop } from '@/features/auth/ui/components/login-backdrop'
 import { LoginShowcase } from '@/features/auth/ui/components/login-showcase'
 import { BrandMark } from '@/shared/ui/components/brand'
 import { BRANDS } from '@/shared/types/brands'
@@ -15,10 +16,11 @@ import { cn } from '@/shared/ui/lib/utils'
 
 type FieldErrors = Partial<Record<'username' | 'password' | 'form', string>>
 
-/** Usuarios de prueba solo en desarrollo (o si el build lo pide): nunca en producción. */
+/** Usuario de prueba precargado solo en desarrollo (o si el build lo pide): nunca en producción. */
 const DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_USERS === 'true'
 
-export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
+/** `corner`: controles arriba a la derecha (versiones, sol/luna); los pone app/. */
+export function LoginPage({ onLoggedIn, corner }: { onLoggedIn: () => void; corner?: ReactNode }) {
   const login = useLogin()
   const { brand } = useBrand()
   const [showPassword, setShowPassword] = useState(false)
@@ -55,13 +57,15 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   return (
     <div className="grid min-h-dvh bg-background dsk:grid-cols-[1fr_1fr]">
       <LoginShowcase />
-      <div className="flex items-start justify-center px-5 pt-14 pb-8 dsk:items-center dsk:pt-8">
+      <div className="relative flex items-start justify-center px-5 pt-14 pb-8 dsk:items-center dsk:pt-8">
+        <LoginBackdrop />
+        {corner && <div className="absolute top-3 right-3 z-10">{corner}</div>}
         <form
           key={shakeKey}
           onSubmit={submit}
           noValidate
           aria-label="Inicio de sesión"
-          className={cn('w-full max-w-sm', shakeKey > 0 && 'animate-shake')}
+          className={cn('relative w-full max-w-sm', shakeKey > 0 && 'animate-shake')}
         >
           <div className="mb-8 flex items-center gap-3 dsk:mb-10">
             <BrandMark size={48} />
@@ -143,11 +147,6 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               ¿Olvidaste tu contraseña?
             </button>
           </div>
-          {DEMO && (
-            <p className="mt-6 border-t border-rule pt-4 text-xs text-muted-foreground">
-              Usuarios de prueba: rnavarro, hdias, mcordova, supervisor y general (contraseña demo1234).
-            </p>
-          )}
         </form>
       </div>
     </div>
