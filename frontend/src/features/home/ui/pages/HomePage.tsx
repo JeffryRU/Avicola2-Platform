@@ -26,6 +26,7 @@ import { Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
 import { UNITS_SHORT } from '@/shared/types/labels'
+import { SyncStatus } from '@/shared/ui/components/sync-status'
 
 /** "de mañana", "de pasado mañana" o "del Jue 05/11". */
 function dayPhrase(date: IsoDate, ref: IsoDate): string {
@@ -46,7 +47,11 @@ export function HomePage() {
   const next = editingWindow.data?.days.find((d) => d.open)
   // El aviso y la semana dependen de las dos consultas: hasta tenerlas no se dibujan, para no
   // anunciar por un instante "falta" lo que ya está confirmado ni mover la página al llegar.
-  const ready = !daysLoading && !editingWindow.isPending
+  // Pero no se espera para siempre: sin red (consulta en pausa) o con el servidor fallando
+  // (ya hubo un intento fallido), se dibuja con lo que hay y SyncStatus avisa.
+  const windowSettled =
+    !editingWindow.isPending || editingWindow.fetchStatus === 'paused' || editingWindow.failureCount > 0
+  const ready = !daysLoading && windowSettled
   const week = weekDates(weekStart(now))
   const confirmed = week.filter((d) => days.has(d)).length
   const weekUnits = week.reduce((s, d) => s + sumUnits(days.get(d)?.units), 0)
@@ -71,6 +76,7 @@ export function HomePage() {
         </h1>
       </header>
 
+      <SyncStatus queries={[editingWindow]} />
       {!ready ? (
         <p role="status" className="sr-only">
           Cargando tu semana…
