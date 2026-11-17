@@ -2,7 +2,7 @@ import { dDM, dDow, diffDays, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1, keepDigits, RECORD_MAX_DIGITS } from '@/shared/domain/format'
 import type { Product } from '@/shared/domain/products'
 import { cellKey, kgOf, type StockDraft, type StockView, unitsAt } from '@/features/stock/domain/stock'
-import { COLUMNS, lotAgeLabel, OLD_LOT, QUALITY_B_TAG } from '@/features/stock/types/stock'
+import { COLUMNS, DISCARD_TAG, lotAgeLabel, OLD_LOT, QUALITY_B_TAG } from '@/features/stock/types/stock'
 import { kgAmount } from '@/shared/types/labels'
 import { cn } from '@/shared/ui/lib/utils'
 
@@ -90,6 +90,11 @@ export function Grid({
                   className="sticky left-0 z-[1] max-w-44 min-w-30 border-b border-rule bg-surface px-3 py-2 text-left font-medium"
                 >
                   <span className="block truncate">{p.name}</span>
+                  {p.quality === 'D' && (
+                    <span className="mt-0.5 block text-2xs font-medium text-muted-foreground hc:font-bold">
+                      {DISCARD_TAG}
+                    </span>
+                  )}
                   {p.quality === 'B' && (
                     <span className="mt-0.5 block text-2xs font-medium text-warn hc:font-bold">{QUALITY_B_TAG}</span>
                   )}

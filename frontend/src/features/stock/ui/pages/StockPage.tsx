@@ -1,4 +1,5 @@
 import { useState, type SyntheticEvent } from 'react'
+import { EditToggle } from '@/shared/ui/components/edit-toggle'
 import { Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { addDays, dDowLongDM, type IsoDate, recentDayStrip, relativeDay, today } from '@/shared/domain/dates'
@@ -30,6 +31,8 @@ import {
   NOT_REGISTERED_BODY,
   NOT_REGISTERED_TITLE,
   PICK_LOCATION,
+  REGISTER_STEPS,
+  REGISTER_STEPS_TITLE,
   REGISTERED_LABEL,
   SAVE_LABEL,
   SAVED_MESSAGE,
@@ -62,7 +65,12 @@ const asideCls = 'grid gap-4 @4xl/main:sticky @4xl/main:top-6'
 /** Stock de despacho: el jefe de despacho lo registra por artículo y lote; el supervisor lo consulta. */
 export function StockPage() {
   const session = useRequiredSession()
-  const canManage = can(session, 'manage_stock')
+  // La supervisión solo ve: registra o corrige tras tocar «Editar». El jefe de despacho, siempre.
+  const [editing, setEditing] = useState(false)
+  const supervision = hasTeamView(session)
+  const canManage = can(session, 'manage_stock') && (!supervision || editing)
+  const toggle =
+    supervision && can(session, 'manage_stock') ? <EditToggle editing={editing} onChange={setEditing} /> : undefined
   const optionsQuery = useStockOptions()
   const options = optionsQuery.options
   const ref = today()
@@ -81,6 +89,8 @@ export function StockPage() {
         title={STOCK_TITLE}
         subtitle={canManage ? STOCK_SUBTITLE_MANAGE : STOCK_SUBTITLE_VIEW}
         back={hasTeamView(session) ? paths.home : null}
+        actions={toggle}
+        mobileActions={toggle}
       />
       <PageBody>
         <DayStrip
@@ -96,7 +106,7 @@ export function StockPage() {
         {
           <Board
             // Al cambiar de día, de ubicación o al guardar, el borrador parte de lo registrado.
-            key={`${day}:${current.location}:${record?.recorded_at ?? ''}`}
+            key={`${day}:${current.location}:${String(canManage)}:${record?.recorded_at ?? ''}`}
             day={day}
             options={options}
             locations={locationsOf(options.locations, days)}
@@ -136,7 +146,9 @@ function Board({
 }) {
   const register = useRegisterStock()
   // Una ubicación guardada que ya no existe se trata como «todas».
-  const location = view.location === ALL || locations.includes(view.location) ? view.location : ALL
+  // Quien registra parte de la primera ubicación: sin ubicación concreta no hay formulario.
+  const saved = view.location === ALL || locations.includes(view.location) ? view.location : ALL
+  const location = saved === ALL && editable ? (locations[0] ?? ALL) : saved
   const lines = linesAt(record, location)
   const [initial] = useState<StockDraft>(() => draftOf(lines))
   const [draft, setDraft] = useState<StockDraft>(initial)
@@ -161,7 +173,23 @@ function Board({
 
   return (
     <>
-      <Filters view={{ ...view, location }} setView={setView} options={options} locations={locations} day={day} />
+      {writing && (
+        <Section title={REGISTER_STEPS_TITLE} className="mb-4">
+          <ol className="grid list-decimal gap-1 px-4 py-3 pl-9 text-sm text-ink-2 dsk:px-5 dsk:pl-10">
+            {REGISTER_STEPS.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </Section>
+      )}
+      <Filters
+        view={{ ...view, location }}
+        setView={setView}
+        options={options}
+        locations={locations}
+        day={day}
+        allowAll={!editable}
+      />
       <div className={splitCls}>
         <Section title={dDowLongDM(day)} aside={<Scope location={location} />}>
           {!writing && lines.length === 0 ? (

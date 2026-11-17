@@ -24,7 +24,7 @@ from app.planning.domain.dates import check_range
 from app.planning.domain.history import CREATED, UPDATED, ProjectionChange
 from app.planning.domain.models import SELLER, DailyUnits, Product, Projection, Seller
 from app.planning.domain.permissions import Permission
-from app.shared.domain.errors import DomainError, ForbiddenError, NotFoundError
+from app.shared.domain.errors import DomainError, ForbiddenError
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,9 @@ class DayUnits:
     units: dict[str, int]
 
 
+REVIEW_ONLY = "La supervisión revisa las proyecciones; cada vendedor registra las suyas."
+
+
 class SubmitProjection:
     """Guarda la proyección de cada día enviado. Si el día ya tenía una, el registro nuevo es
     otra hoja que la reemplaza (INS-06): vale la última y el historial conserva las anteriores."""
@@ -79,15 +82,17 @@ class SubmitProjection:
         projections: ProjectionRepository,
         clock: Clock,
         max_days: int,
-        on_submitted: Callable[[Seller, list[Projection], Seller], None] | None = None,
+        on_submitted: Callable[[Seller, list[Projection]], None] | None = None,
         rules: EditingRules | None = None,
-        sellers: SellerRepository | None = None,
         history: ChangeLog | None = None,
+        projected: frozenset[str] | None = None,
     ):
         self.products, self.projections, self.clock = products, projections, clock
         self.max_days = max_days
-        # Para que el supervisor registre por un vendedor; y el historial de cambios.
-        self.sellers, self.history = sellers, history
+        # Categorías que se proyectan; None = todas (la carga de ejemplos no la usa).
+        self.projected = projected
+        # Historial de cambios; la carga de ejemplos (cli seed) no lo usa.
+        self.history = history
         # Ventana de registro y hora de corte; la carga de ejemplos (cli seed) no la usa.
         self.rules = rules
         # Se llama tras guardar (avisos al supervisor); la carga de ejemplos no lo usa.
@@ -101,9 +106,10 @@ class SubmitProjection:
         submission_id: UUID | None,
         on_behalf: str | None = None,
     ) -> list[Projection]:
-        """`seller` es quien envía (sale de la sesión); `on_behalf`, el vendedor de la proyección
-        cuando la registra el supervisor."""
+        """`seller` es quien envía (sale de la sesión); `on_behalf`, solo si es él mismo."""
         author, seller = seller, self._target(seller, on_behalf)
+        if self.projected is not None and category not in self.projected:
+            raise DomainError(f"La categoría {category} no se proyecta.")
         if not 1 <= len(days) <= self.max_days:
             raise DomainError(f"Debe enviar entre 1 y {self.max_days} días.")
         if len({d.date for d in days}) != len(days):
@@ -146,24 +152,20 @@ class SubmitProjection:
             sum(p.total_units for p in result),
         )
         if self.on_submitted:
-            self.on_submitted(seller, result, author)
+            self.on_submitted(seller, result)
         return result
 
     def _target(self, author: Seller, on_behalf: str | None) -> Seller:
-        """El supervisor elige el vendedor; un vendedor solo registra lo suyo."""
-        if not author.can(Permission.VIEW_TEAM):
-            if not author.is_seller:
-                # P. ej., el jefe de despacho: tiene cuenta, pero no proyecta.
-                raise ForbiddenError("Tu rol no registra proyecciones.")
-            if on_behalf and on_behalf != author.username:
-                raise ForbiddenError("Solo puedes registrar tus propias proyecciones.")
-            return author
-        if not on_behalf:
-            raise DomainError("Elige el vendedor de la proyección.")
-        account = self.sellers.get_account(on_behalf) if self.sellers else None
-        if account is None or not account.seller.is_seller:
-            raise NotFoundError("No existe ese vendedor.")
-        return account.seller
+        """Solo el vendedor registra, y solo lo suyo. Registrar es la tarea del rol vendedor, no un
+        permiso: la supervisión revisa (ve al equipo, habilita la edición), pero no registra."""
+        if not author.is_seller:
+            if author.can(Permission.VIEW_TEAM):
+                raise ForbiddenError(REVIEW_ONLY)
+            # P. ej., el jefe de despacho: tiene cuenta, pero no proyecta.
+            raise ForbiddenError("Tu rol no registra proyecciones.")
+        if on_behalf and on_behalf != author.username:
+            raise ForbiddenError("Solo puedes registrar tus propias proyecciones.")
+        return author
 
     def _current(self, seller: Seller, category: str, dates: list[date]) -> dict[date, Projection]:
         """La proyección vigente de cada día enviado (la hoja anterior, si existe)."""

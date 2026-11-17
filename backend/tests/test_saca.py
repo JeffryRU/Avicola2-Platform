@@ -259,9 +259,9 @@ def test_supervisors_change_the_plus_of_each_type(client) -> None:
 
 def test_saca_counts_only_recent_lots_and_quality_b_by_type(client) -> None:
     _login(client, "rnavarro")
-    for category, picked in (("BRASA", {"P0001": 300}), ("Pollo de mercado", {"P0011": 50})):
-        body = {"category": category, "days": [{"date": str(AFTER_TOMORROW), "units": picked}]}
-        assert client.post("/api/projections", json=body).status_code == 201, category
+    # Solo la brasa se proyecta; el pollo de mercado entra a la saca solo por su stock.
+    body = {"category": "BRASA", "days": [{"date": str(AFTER_TOMORROW), "units": {"P0001": 300}}]}
+    assert client.post("/api/projections", json=body).status_code == 201
     _login(client, "despacho")
     lots = {
         "lines": [
@@ -285,6 +285,27 @@ def test_saca_counts_only_recent_lots_and_quality_b_by_type(client) -> None:
     # La calidad B se suma al stock del tipo: 80 + 40 − 0 + 300 = 420.
     chica = groups["Brasa chica"]
     assert (chica["stock"], chica["stock_b"], chica["farm_order"]) == (120, 40, 420)
-    # El pollo de mercado es un tipo más: 10 − 0 + 50.
-    assert groups["Pollo de mercado"]["farm_order"] == 60
-    assert plan["farm_order"] == 480
+    # El pollo de mercado es un tipo más, sin proyección: 10 − 0 + 0.
+    assert groups["Pollo de mercado"]["farm_order"] == 10
+    assert plan["farm_order"] == 430
+
+
+def test_discards_are_registered_in_stock_but_never_enter_the_farm_order(client) -> None:
+    _login(client, "despacho")
+    options = client.get("/api/stock/options").json()["items"]
+    by_id = {p["id"]: p for p in options}
+    assert by_id["P0201"]["category"] == "Descarte" and by_id["P0201"]["quality"] == "D"
+    lots = {
+        "lines": [
+            {"product_id": "P0001", "units": 60, "lot_date": str(TODAY)},
+            {"product_id": "P0201", "units": 90, "lot_date": str(TODAY)},
+        ]
+    }
+    assert client.put(f"/api/stock/{TODAY}", json=lots).status_code == 200
+
+    _login(client, "supervisor")
+    _set_plus(client, NO_PLUS)
+    plan = _saca(client)
+    assert "P0201" not in {line["product_id"] for line in plan["lines"]}
+    assert "Descarte" not in {g["name"] for g in plan["groups"]}
+    assert plan["stock_b"] == 0 and plan["farm_order"] == 60

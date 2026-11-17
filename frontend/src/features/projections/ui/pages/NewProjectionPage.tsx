@@ -6,8 +6,6 @@ import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { addDays, dFull, dShort, daysText, today, type IsoDate } from '@/shared/domain/dates'
 import { useRequiredSession } from '@/features/auth'
-import { isSupervisor } from '@/shared/domain/session'
-import { useTeamSellers } from '@/features/sellers'
 import { capitalize, categoryName, kgPerUnitLabel, shortSizeLabel, useCatalog } from '@/features/catalog'
 import {
   copyPreviousSheets,
@@ -29,7 +27,6 @@ import { LoadingOverlay, Note } from '@/shared/ui/components/feedback'
 import { FooterActions, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { tableCls } from '@/shared/ui/lib/table-styles'
 import { Button } from '@/shared/ui/components/shadcn/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
 import { daysCount, CANCEL_LABEL } from '@/shared/types/labels'
@@ -38,15 +35,12 @@ import { closedDays, closedDaysNote, EditingDays, openDates, useEditingWindow, w
 export function NewProjectionPage() {
   const { drafts } = useContainer()
   const { seller } = useRequiredSession()
-  const { catalog } = useCatalog()
+  // Solo lo que se proyecta (la brasa): el pollo de mercado queda para el stock y la saca.
+  const { projection: catalog } = useCatalog()
   const [params] = useSearchParams()
-  // El supervisor registra o edita por un vendedor (?vendedor= desde el detalle del día).
-  const supervisor = isSupervisor(seller)
-  const team = useTeamSellers()
-  const [target, setTarget] = useState(() => params.get('vendedor') ?? '')
-  const owner = supervisor ? target : seller.username
-  const ownerName = team.find((s) => s.username === owner)?.name ?? owner
-  const { days } = useMyDays(owner || undefined)
+  // Solo el vendedor registra, y solo lo suyo (la supervisión revisa: no tiene esta pantalla).
+  const owner = seller.username
+  const { days } = useMyDays()
   const editing = useEditingWindow().data
   // Días que se pueden registrar (desde mañana); sin datos aún, sin tope.
   const allowed = editing ? windowDates(editing) : null
@@ -54,7 +48,6 @@ export function NewProjectionPage() {
   const mobile = useIsMobile()
   const navigate = useNavigate()
   const submit = useSubmitProjection()
-  const suggestion = useSuggestion()
   // ?dia=AAAA-MM-DD abre la edición de un solo día (desde Inicio o el detalle).
   const [stored, setStored] = useState<Draft>(() => {
     const day = params.get('dia')
@@ -83,6 +76,14 @@ export function NewProjectionPage() {
   }
 
   const dates = useMemo(() => draftDates(draft), [draft])
+  // Sugerencia del modelo: se pide sola en la tabla (paso 2) y va junto a cada casilla.
+  const suggestion = useSuggestion(
+    draft.category,
+    draft.start,
+    draft.days,
+    undefined,
+    draft.step === 1 && !!owner,
+  )
   if (!catalog) return <PageHeader title="Nueva proyección" />
   const loaded = catalog
 
@@ -98,40 +99,14 @@ export function NewProjectionPage() {
   const lastAllowed = allowed?.at(-1)
   const room = allowed ? allowed.length - Math.max(0, allowed.indexOf(draft.start)) : undefined
 
-  if (draft.step === 0 || (supervisor && !owner)) {
+  if (draft.step === 0) {
     return (
       <div>
         <PageHeader title="Nueva proyección" mobileActions={<StepPill n={1} />} actions={<StepPill n={1} />} />
         <PageBody>
-          <div className="grid grid-cols-1 gap-4 @3xl/main:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-4 @3xl/main:grid-cols-2">
             <Section>
               <div className="grid gap-6 px-4 pt-5 pb-4 dsk:px-5 dsk:pb-5">
-                {supervisor && (
-                  <div>
-                    <label id="np-seller-label" className="mb-2 block text-base font-semibold">
-                      Vendedor
-                    </label>
-                    <Select
-                      value={target}
-                      onValueChange={(v) => {
-                        setTarget(v)
-                        setDraft({ ...draft, units: {} })
-                      }}
-                    >
-                      <SelectTrigger aria-labelledby="np-seller-label" className="w-full text-md">
-                        <SelectValue placeholder="Elige el vendedor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {team.map((s) => (
-                          <SelectItem key={s.username} value={s.username}>
-                            {s.name}
-                            {s.zone ? ` · ${s.zone}` : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
                 <div>
                   <span id="np-cat-label" className="mb-2 block text-base font-semibold">
                     Categoría
@@ -258,7 +233,7 @@ export function NewProjectionPage() {
             </Button>
             <Button
               className="h-12 flex-1 text-md dsk:h-control dsk:min-w-56 dsk:flex-none dsk:text-base"
-              disabled={closed.length > 0 || !owner}
+              disabled={closed.length > 0}
               onClick={() => setDraft(withNewSheets({ ...draft, step: 1, tried: false }, loaded, days))}
             >
               Continuar <ArrowRight />
@@ -277,28 +252,29 @@ export function NewProjectionPage() {
     setDraft({ ...draft, units: { ...draft.units, [date]: day } })
   }
 
-  async function suggest() {
-    try {
-      const s = await suggestion.mutateAsync({
-        category: draft.category,
-        start: draft.start,
-        days: draft.days,
-        seller: supervisor ? owner : undefined,
-      })
-      const filled = s.days.filter((d) => Object.keys(d.units).length)
-      if (!filled.length) return void toast('Aún no hay historial suficiente para sugerir.')
-      const units = { ...draft.units }
-      // Con un tamaño elegido, solo se sugieren sus productos; el resto queda como estaba.
-      const visible = new Set(products.map((p) => p.id))
-      for (const d of filled) {
-        const picked = Object.entries(d.units).filter(([id]) => visible.has(id))
-        units[d.date] = { ...units[d.date], ...Object.fromEntries(picked) }
-      }
-      setDraft({ ...draft, units })
-      toast.success(`Sugerencia cargada (${filled.length} de ${draft.days} días). Revísala antes de enviar.`)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo obtener la sugerencia.')
+  const suggested = Object.fromEntries((suggestion.data?.days ?? []).map((d) => [d.date, d.units]))
+  /** Llena con la sugerencia del modelo todos los días, o solo `only`. Pisa solo lo sugerido. */
+  function fill(only?: IsoDate) {
+    if (suggestion.isError) {
+      void suggestion.refetch()
+      return void toast.error('No se pudo obtener la sugerencia. Se vuelve a intentar.')
     }
+    const filled = (suggestion.data?.days ?? []).filter(
+      (d) => (!only || d.date === only) && Object.entries(d.units).some(([id, u]) => u > 0 && visibleIds.has(id)),
+    )
+    if (!filled.length) return void toast('Aún no hay historial suficiente para sugerir.')
+    const units = { ...draft.units }
+    // Con un tamaño elegido, solo se sugieren sus productos; el resto queda como estaba.
+    for (const d of filled) {
+      const picked = Object.entries(d.units).filter(([id]) => visibleIds.has(id))
+      units[d.date] = { ...units[d.date], ...Object.fromEntries(picked) }
+    }
+    setDraft({ ...draft, units })
+    toast.success(
+      only
+        ? `Sugerencia cargada para ${dShort(only)}. Revísala antes de enviar.`
+        : `Sugerencia cargada (${String(filled.length)} de ${String(draft.days)} días). Revísala antes de enviar.`,
+    )
   }
 
   function review() {
@@ -318,13 +294,6 @@ export function NewProjectionPage() {
       const outcome = await submit.mutateAsync({ draft, catalog: loaded, owner, author: seller.username })
       await new Promise((r) => setTimeout(r, Math.max(0, 1200 - (Date.now() - started))))
       drafts.clear()
-      if (supervisor) {
-        // El supervisor vuelve al detalle del día del equipo, donde ve el cambio.
-        if (outcome.sync === 'ok') toast.success(`Proyección de ${ownerName} guardada.`)
-        else toast(`Sin conexión: la proyección de ${ownerName} se enviará al reconectar.`)
-        void navigate(paths.teamDay(draft.start))
-        return
-      }
       void navigate(paths.registered, { state: { outcome, draft } })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo enviar la proyección.')
@@ -334,8 +303,8 @@ export function NewProjectionPage() {
   }
 
   const suggestBtn = (
-    <Button variant="outline" disabled={suggestion.isPending} onClick={suggest}>
-      {suggestion.isPending ? <Loader2 className="animate-spin" /> : <Wand2 />} Sugerir con historial
+    <Button variant="outline" disabled={suggestion.isFetching} onClick={() => fill()}>
+      {suggestion.isFetching ? <Loader2 className="animate-spin" /> : <Wand2 />} Llenar todo con la sugerencia
     </Button>
   )
 
@@ -343,14 +312,12 @@ export function NewProjectionPage() {
     <div>
       <PageHeader
         title="Nueva proyección"
-        subtitle={supervisor ? `Para ${ownerName}, ${choiceLabel}` : `Proyección por producto, ${choiceLabel}`}
+        subtitle={`Proyección por producto, ${choiceLabel}`}
         mobileActions={<StepPill n={2} />}
-        actions={suggestBtn}
       />
       <PageBody>
         <Section className="mb-4">
           <div className="flex flex-wrap items-end gap-x-7 gap-y-3 px-4 py-3 dsk:px-5">
-            {supervisor && <Summary label="Vendedor" value={ownerName} />}
             <Summary label="Fecha de inicio" value={dFull(draft.start)} />
             <Summary label="Días de proyección" value={daysCount(draft.days)} />
             <Summary label="Categoría" value={choiceLabel} />
@@ -390,6 +357,15 @@ export function NewProjectionPage() {
             <ArrowRight className="size-4" aria-hidden /> Desliza la tabla para ver los {dates.length} días
           </p>
         )}
+        {/* Sugerencia del modelo: el número junto a cada casilla, «Llenar» por día y todo junto. */}
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <p className="mx-1 min-w-0 flex-1 basis-64 text-sm text-muted-foreground">
+            {suggestion.isError
+              ? 'No se pudo obtener la sugerencia del modelo; se reintenta al usarla.'
+              : 'Junto a cada casilla, en azul, va lo que sugiere el modelo. Tócalo para usarlo, o llena un día o todos.'}
+          </p>
+          {suggestBtn}
+        </div>
         <ProjectionMatrix
           draft={draft}
           dates={dates}
@@ -397,13 +373,14 @@ export function NewProjectionPage() {
           invalid={invalid}
           mobile={mobile}
           onChange={setCell}
+          suggested={suggested}
+          onFillDay={fill}
         />
         <div className="mx-1 mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <Info className="size-4 flex-none" aria-hidden />
           <span className="min-w-0 flex-1 basis-56">
             Ingresa solo las unidades. Los kilogramos se calculan automáticamente.
           </span>
-          <span className="dsk:hidden">{suggestBtn}</span>
         </div>
         <FooterActions>
           <Button variant="ghost" className="flex-none" onClick={back}>

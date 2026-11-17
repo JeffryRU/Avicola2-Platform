@@ -11,6 +11,10 @@ CONFIRMED = "confirmed"
 # Calidad de un producto (config/planning_seed.yaml). La A se proyecta y se pide a granja;
 # cualquier otra (la B) solo se cuenta en el stock, por tipo.
 QUALITY_A = "A"
+QUALITY_B = "B"
+# Descarte: producto que no se vende como pollo entero. Se registra en el stock de despacho,
+# pero no se proyecta ni entra al pedido a granja de la saca (ni como calidad B).
+QUALITY_DISCARD = "D"
 # Categoría de los pollos para brasa (clave de config/planning_seed.yaml): la de los pedidos
 # reales, la producción y los datos de ejemplo.
 BRASA_CATEGORY = "BRASA"

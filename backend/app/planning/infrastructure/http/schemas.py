@@ -112,6 +112,9 @@ class ProductOut(BaseModel):
     sort_order: int
     subcategory: str | None = None
     quality: str = Field(default=QUALITY_A, description="A, o B (calidad B: solo en el stock).")
+    projected: bool = Field(
+        default=True, description="Lo registran los vendedores en sus proyecciones."
+    )
 
 
 class ProjectionOut(BaseModel):
@@ -141,7 +144,7 @@ class SubmissionIn(BaseModel):
     submission_id: UUID | None = None
     category: str = Field(min_length=1, max_length=30)
     days: list[DayIn] = Field(min_length=1)
-    # Solo el supervisor: el vendedor de la proyección. Para un vendedor sale de la sesión.
+    # El vendedor sale de la sesión. Se acepta por compatibilidad: si no es él mismo, 403.
     seller: str | None = Field(default=None, max_length=50)
 
 

@@ -27,7 +27,8 @@ ROLE_LABELS = {
 
 
 class Permission(StrEnum):
-    # Ve los datos de todos los vendedores, registra por ellos y recibe los avisos del equipo.
+    # Ve los datos de todos los vendedores y recibe los avisos del equipo. Revisa: no registra
+    # proyecciones (eso es tarea del rol vendedor, ver Seller.is_seller).
     VIEW_TEAM = "view_team"
     # Hora de corte, habilitaciones y solicitudes de edición; edita sin pasar por el corte.
     MANAGE_EDITING = "manage_editing"
@@ -67,8 +68,10 @@ ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
             Permission.MANAGE_PRODUCTION,
         }
     ),
-    # El supervisor consulta el stock (lo necesita para la saca) pero no lo registra.
-    SUPERVISOR: _SUPERVISION | {Permission.VIEW_STOCK},
+    # El supervisor consulta el stock (lo necesita para la saca) y, si se lo piden, corrige el
+    # stock y la producción (en la app, solo tras tocar «Editar»: por defecto los ve).
+    SUPERVISOR: _SUPERVISION
+    | {Permission.VIEW_STOCK, Permission.MANAGE_STOCK, Permission.MANAGE_PRODUCTION},
     # El supervisor general crea jefes de despacho, así que tiene también sus permisos
     # (nadie gestiona un rol con más permisos que el suyo).
     GENERAL_SUPERVISOR: _SUPERVISION

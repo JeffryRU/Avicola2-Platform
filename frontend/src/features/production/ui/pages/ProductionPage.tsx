@@ -1,4 +1,5 @@
 import { useState, type SyntheticEvent } from 'react'
+import { EditToggle } from '@/shared/ui/components/edit-toggle'
 import { Loader2, Save, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -15,7 +16,7 @@ import {
 } from '@/shared/domain/dates'
 import { nf0, nf1, parseUnits, keepDigits, RECORD_MAX_DIGITS } from '@/shared/domain/format'
 import { paths } from '@/app/routes'
-import { can } from '@/shared/domain/session'
+import { can, hasTeamView } from '@/shared/domain/session'
 import { useRequiredSession } from '@/features/auth'
 import { bySubcategory, type Product } from '@/shared/domain/products'
 import { useCatalog } from '@/features/catalog'
@@ -58,6 +59,9 @@ import {
   SAVED_MESSAGE,
   STATUS_EDITING,
   STATUS_PENDING,
+  STEPS,
+  STEPS_END,
+  STEPS_TITLE,
   STATUS_SAVED,
   SUMMARY_TITLE,
   UPDATE_LABEL,
@@ -98,7 +102,12 @@ const totalsOf = (d: ProductionDay): Totals => ({
 /** Producción diaria: el jefe de despacho la registra; el supervisor la consulta. */
 export function ProductionPage() {
   const session = useRequiredSession()
-  const canManage = can(session, 'manage_production')
+  // La supervisión solo ve: registra o corrige tras tocar «Editar». El jefe de despacho, siempre.
+  const [editing, setEditing] = useState(false)
+  const supervision = hasTeamView(session)
+  const canManage = can(session, 'manage_production') && (!supervision || editing)
+  const toggle =
+    supervision && can(session, 'manage_production') ? <EditToggle editing={editing} onChange={setEditing} /> : null
   const { catalog } = useCatalog()
   const ref = today()
   const [day, setDay] = useState<IsoDate>(ref)
@@ -123,8 +132,13 @@ export function ProductionPage() {
         title={PRODUCTION_TITLE}
         subtitle={canManage ? PRODUCTION_SUBTITLE_MANAGE : PRODUCTION_SUBTITLE_VIEW}
         back={paths.home}
-        actions={forecastLink}
-        mobileActions={forecastLink}
+        actions={
+          <>
+            {toggle}
+            {forecastLink}
+          </>
+        }
+        mobileActions={toggle ?? forecastLink}
       />
       <PageBody>
         <DayStrip
@@ -419,6 +433,23 @@ function Editor({
   const [initialWeights] = useState<WeightDraft>(() => weightDraftOf(groups, record?.weights))
   const [weights, setWeights] = useState<WeightDraft>(initialWeights)
   const t = totals(products, draft)
+  const stepsList = (
+    <ol aria-label={STEPS_TITLE} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-3 dsk:px-5">
+      {STEPS.map((s, i) => (
+        <li key={s.title} className="flex min-w-0 gap-2">
+          <span
+            aria-hidden
+            className="num grid size-5 flex-none place-items-center rounded-full bg-primary text-2xs font-semibold text-primary-foreground"
+          >
+            {i + 1}
+          </span>
+          <span className="min-w-0 text-muted-foreground">
+            <b className="font-medium text-foreground">{s.title}.</b> {s.body}
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
   const dirty =
     JSON.stringify(draft) !== JSON.stringify(initial) || JSON.stringify(weights) !== JSON.stringify(initialWeights)
   const read = (id: string, field: Field) => parseUnits(draft[id]?.[field] ?? '') ?? 0
@@ -460,6 +491,16 @@ function Editor({
       <div className={splitCls}>
         <Section title={dDowLongDM(day)}>
           <form id={FORM_ID} onSubmit={submit} noValidate>
+            <details className="group border-b border-rule bg-muted/50 sm:hidden">
+              <summary className="flex min-h-touch cursor-pointer items-center justify-between px-4 text-sm font-medium">
+                {STEPS_TITLE}
+                <span aria-hidden className="text-muted-foreground transition-transform group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <div className="pb-3">{stepsList}</div>
+            </details>
+            <div className="hidden border-b border-rule bg-muted/50 sm:block">{stepsList}</div>
             <Rows
               products={products}
               read={read}
@@ -467,15 +508,22 @@ function Editor({
                 <input
                   inputMode="numeric"
                   aria-label={`${FIELD_LABEL[f]} de ${p.name}`}
+                  aria-invalid={
+                    f === 'quality_b' && read(p.id, 'quality_b') > read(p.id, 'produced') ? true : undefined
+                  }
                   placeholder="0"
                   value={draft[p.id]?.[f] ?? ''}
                   onChange={(e) => set(p.id, f, keepDigits(e.target.value, RECORD_MAX_DIGITS))}
-                  className={cn(cellCls, f === 'produced' && 'font-semibold')}
+                  className={cn(
+                    cellCls,
+                    f === 'produced' && 'font-semibold',
+                    f === 'quality_b' && read(p.id, 'quality_b') > read(p.id, 'produced') && 'border-bad text-bad',
+                  )}
                 />
               )}
             />
             <p className="px-4 py-3 text-sm text-muted-foreground dsk:px-5">
-              {HINT} {DEVIATION_HINT}
+              {HINT} {DEVIATION_HINT} {STEPS_END}
             </p>
             {groups.length > 0 && (
               <fieldset className="border-t border-rule px-4 pt-3 pb-4 dsk:px-5">

@@ -41,7 +41,7 @@ export function useQueue() {
 }
 
 /** Proyecciones propias por fecha (servidor + cola offline). */
-/** Días del vendedor con sesión, o de otro (el supervisor registrando por él). */
+/** Días del vendedor con sesión (o de otro, si se pide su nombre). */
 export function useMyDays(username?: string) {
   const session = useRequiredSession()
   const data = useWindowData()
@@ -87,25 +87,22 @@ export function useSubmitProjection() {
 }
 
 /** Sugerencia con el historial: se pide al tocar el botón y siempre fresca (GET /suggestions). */
-export function useSuggestion() {
+/**
+ * Sugerencia del modelo para la tabla de Nueva proyección: se pide sola al abrir el paso 2 y se
+ * muestra junto a cada casilla (y se usa con «Llenar»). `seller`: solo el supervisor.
+ */
+export function useSuggestion(
+  category: string,
+  start: string,
+  days: number,
+  seller: string | undefined,
+  enabled: boolean,
+) {
   const { projections } = useContainer()
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: ({
-      category,
-      start,
-      days,
-      seller,
-    }: {
-      category: string
-      start: string
-      days: number
-      seller?: string
-    }) =>
-      client.query({
-        queryKey: queryKeys.suggestions.get(category, start, days, seller),
-        queryFn: () => projections.suggestions(category, start, days, seller),
-        staleTime: 0,
-      }),
+  return useQuery({
+    queryKey: queryKeys.suggestions.get(category, start, days, seller),
+    queryFn: () => projections.suggestions(category, start, days, seller),
+    enabled,
+    staleTime: 5 * 60_000,
   })
 }

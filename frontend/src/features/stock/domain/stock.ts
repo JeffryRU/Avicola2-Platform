@@ -51,7 +51,7 @@ export const isEditableDay = (day: IsoDate, ref: IsoDate) => isRecentDay(day, re
 
 export const ALL = 'ALL'
 export const UNITS = ['units', 'kg', 'both'] as const
-export const QUALITIES = [ALL, 'A', 'B'] as const
+export const QUALITIES = [ALL, 'A', 'B', 'D'] as const
 /** Antigüedad máxima de un lote que se puede mostrar: el pollo dura unos 8 días. */
 export const MAX_LOT_AGE = 8
 /** Lotes que se pueden mostrar: del día del stock hasta MAX_LOT_AGE días atrás. */
@@ -150,7 +150,7 @@ export function draftTotals(items: Product[], draft: StockDraft): StockTotals {
     t.units += units
     t.kg += units * product.kg_per_unit
     if (product.quality === 'B') t.unitsB += units
-    else t.unitsA += units
+    else if (product.quality !== 'D') t.unitsA += units
   }
   return { ...t, kg: round2(t.kg) }
 }

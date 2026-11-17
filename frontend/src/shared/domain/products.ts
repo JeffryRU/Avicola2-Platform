@@ -17,6 +17,8 @@ export const productSchema = z.object({
   subcategory: z.string().nullish(),
   // «A» o «B». La calidad B solo aparece en el stock de despacho.
   quality: z.string().optional(),
+  // Lo registran los vendedores (solo la brasa). Sin el dato (catálogo viejo guardado), sí.
+  projected: z.boolean().optional(),
 })
 export type Product = z.infer<typeof productSchema>
 

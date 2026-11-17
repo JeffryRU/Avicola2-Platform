@@ -34,6 +34,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     sort_order: 10,
     subcategory: null,
     quality: 'A',
+    projected: false,
   },
   {
     id: 'P0012',
@@ -43,5 +44,6 @@ export const DEFAULT_PRODUCTS: Product[] = [
     sort_order: 11,
     subcategory: null,
     quality: 'A',
+    projected: false,
   },
 ]

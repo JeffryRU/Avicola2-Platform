@@ -99,7 +99,7 @@ export function DispatchHomePage() {
           />
         </KpiStrip>
 
-        <div className="grid gap-4 dsk:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+        <div className="grid items-start gap-4 dsk:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
           <Section title="Últimos días" aside={`${dShort(from)} – ${dShort(now)}`}>
             <table className="w-full text-sm">
               <thead>

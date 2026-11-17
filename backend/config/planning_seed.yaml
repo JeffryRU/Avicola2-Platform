@@ -26,6 +26,11 @@ products:
     - {id: P0011, name: Pollo entero con menudencia, kg_per_unit: 2.07}
     - {id: P0012, name: Pollo entero carne sin menudencia, kg_per_unit: 1.8}
     - {id: P0112, name: Pollo entero carne sin menudencia B, kg_per_unit: 1.8, quality: B}
+  # Descartes: se cuentan en el stock de despacho, pero no se proyectan ni entran al pedido a
+  # granja (calidad D). SUPUESTO: nombres y pesos promedio a confirmar con el negocio.
+  Descarte:
+    - {id: P0201, name: Descarte brasa, kg_per_unit: 1.5, quality: D}
+    - {id: P0202, name: Descarte pollo de mercado, kg_per_unit: 1.8, quality: D}
 
 # Vendedores (id_usuario U0001..U0007 de la tabla maestra). Solo se crean con APP_ENV=local, con la
 # contraseña de PLANNING_DEMO_PASSWORD (por defecto demo1234). En producción, el primer supervisor
