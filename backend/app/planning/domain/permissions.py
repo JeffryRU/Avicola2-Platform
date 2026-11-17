@@ -27,7 +27,8 @@ ROLE_LABELS = {
 
 
 class Permission(StrEnum):
-    # Ve los datos de todos los vendedores, registra por ellos y recibe los avisos del equipo.
+    # Ve los datos de todos los vendedores y recibe los avisos del equipo. Revisa: no registra
+    # proyecciones (eso es tarea del rol vendedor, ver Seller.is_seller).
     VIEW_TEAM = "view_team"
     # Hora de corte, habilitaciones y solicitudes de edición; edita sin pasar por el corte.
     MANAGE_EDITING = "manage_editing"

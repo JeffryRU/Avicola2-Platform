@@ -3,7 +3,7 @@ import { useContainer } from '@/app/di'
 import { queryKeys, REFERENCE_DATA_STALE_MS } from '@/shared/application/query-keys'
 import { sellersOnly, type Seller } from '@/shared/domain/session'
 
-/** Vendedores visibles para la sesión (filtros, Historial, Habilitaciones, registrar por otro). */
+/** Vendedores visibles para la sesión (filtros, Historial, Habilitaciones). */
 export function useSellers() {
   const { sellers } = useContainer()
   return useQuery({
@@ -13,7 +13,7 @@ export function useSellers() {
   })
 }
 
-/** Solo los vendedores (sin supervisión): filtros del equipo y registrar por otro. */
+/** Solo los vendedores (sin supervisión): filtros del equipo. */
 export function useTeamSellers(): Seller[] {
   return sellersOnly(useSellers().data ?? [])
 }

@@ -18,7 +18,6 @@ from app.planning.domain.models import SELLER, Projection, Seller, SellerAccount
 from app.planning.domain.notifications import (
     ANNOUNCEMENT,
     AUDIENCES,
-    HISTORY_LINK,
     NOTIFICATION_CREATED,
     PROJECTION_MISSED,
     PROJECTION_REMINDER,
@@ -124,31 +123,19 @@ class NotifyProjectionSubmitted:
     def __init__(self, sellers: SellerRepository, notifier: Notifier, events: EventPublisher):
         self.sellers, self.notifier, self.events = sellers, notifier, events
 
-    def __call__(
-        self, seller: Seller, saved: list[Projection], author: Seller | None = None
-    ) -> None:
+    def __call__(self, seller: Seller, saved: list[Projection]) -> None:
         dates = sorted(p.date for p in saved)
         units = sum(p.total_units for p in saved)
         days = f"{len(saved)} día" if len(saved) == 1 else f"{len(saved)} días"
         what = f"{days} de {saved[0].category} ({units} unid.) desde el {dates[0]:%d/%m}."
-        if author and author.username != seller.username:
-            # Lo registró el supervisor: el aviso es para el vendedor.
-            self.notifier.notify(
-                [seller],
-                PROJECTION_SUBMITTED,
-                f"{author.name} actualizó tu proyección",
-                what[0].upper() + what[1:],
-                link=HISTORY_LINK,
-            )
-        else:
-            supervisors = [s for s in self.sellers.list_active() if s.can(Permission.VIEW_TEAM)]
-            self.notifier.notify(
-                supervisors,
-                PROJECTION_SUBMITTED,
-                f"Proyección de {seller.name}",
-                f"Registró {what}",
-                link=TEAM_STATUS_LINK,
-            )
+        supervisors = [s for s in self.sellers.list_active() if s.can(Permission.VIEW_TEAM)]
+        self.notifier.notify(
+            supervisors,
+            PROJECTION_SUBMITTED,
+            f"Proyección de {seller.name}",
+            f"Registró {what}",
+            link=TEAM_STATUS_LINK,
+        )
         # El propio vendedor también: sus otros dispositivos actualizan su historial.
         audience = team_audience(self.sellers, Permission.VIEW_TEAM, seller.username)
         self.events.publish(

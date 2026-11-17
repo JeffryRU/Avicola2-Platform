@@ -117,7 +117,6 @@ function TeamRoutes({ session }: { session: Session }) {
       {can(session, 'view_saca') && <Route path={paths.saca} element={<SacaPage />} />}
       {can(session, 'view_production') && <Route path={paths.production} element={<ProductionPage />} />}
       {can(session, 'view_production') && <Route path={paths.forecast} element={<ForecastPage />} />}
-      <Route path={paths.register} element={<NewProjectionPage />} />
       <Route path={paths.history} element={<HistoryPage />} />
       <Route path={paths.dashSummary} element={<DashboardSummaryPage />} />
       <Route path={paths.dashVersus} element={<DashboardVersusPage />} />

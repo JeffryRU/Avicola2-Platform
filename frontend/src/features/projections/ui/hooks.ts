@@ -41,7 +41,7 @@ export function useQueue() {
 }
 
 /** Proyecciones propias por fecha (servidor + cola offline). */
-/** Días del vendedor con sesión, o de otro (el supervisor registrando por él). */
+/** Días del vendedor con sesión (o de otro, si se pide su nombre). */
 export function useMyDays(username?: string) {
   const session = useRequiredSession()
   const data = useWindowData()

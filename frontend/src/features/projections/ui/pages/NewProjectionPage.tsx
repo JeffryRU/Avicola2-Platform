@@ -6,8 +6,6 @@ import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { addDays, dFull, dShort, daysText, today, type IsoDate } from '@/shared/domain/dates'
 import { useRequiredSession } from '@/features/auth'
-import { isSupervisor } from '@/shared/domain/session'
-import { useTeamSellers } from '@/features/sellers'
 import { capitalize, categoryName, kgPerUnitLabel, shortSizeLabel, useCatalog } from '@/features/catalog'
 import {
   copyPreviousSheets,
@@ -29,7 +27,6 @@ import { LoadingOverlay, Note } from '@/shared/ui/components/feedback'
 import { FooterActions, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { tableCls } from '@/shared/ui/lib/table-styles'
 import { Button } from '@/shared/ui/components/shadcn/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
 import { daysCount, CANCEL_LABEL } from '@/shared/types/labels'
@@ -40,13 +37,9 @@ export function NewProjectionPage() {
   const { seller } = useRequiredSession()
   const { catalog } = useCatalog()
   const [params] = useSearchParams()
-  // El supervisor registra o edita por un vendedor (?vendedor= desde el detalle del día).
-  const supervisor = isSupervisor(seller)
-  const team = useTeamSellers()
-  const [target, setTarget] = useState(() => params.get('vendedor') ?? '')
-  const owner = supervisor ? target : seller.username
-  const ownerName = team.find((s) => s.username === owner)?.name ?? owner
-  const { days } = useMyDays(owner || undefined)
+  // Solo el vendedor registra, y solo lo suyo (la supervisión revisa: no tiene esta pantalla).
+  const owner = seller.username
+  const { days } = useMyDays()
   const editing = useEditingWindow().data
   // Días que se pueden registrar (desde mañana); sin datos aún, sin tope.
   const allowed = editing ? windowDates(editing) : null
@@ -98,7 +91,7 @@ export function NewProjectionPage() {
   const lastAllowed = allowed?.at(-1)
   const room = allowed ? allowed.length - Math.max(0, allowed.indexOf(draft.start)) : undefined
 
-  if (draft.step === 0 || (supervisor && !owner)) {
+  if (draft.step === 0) {
     return (
       <div>
         <PageHeader title="Nueva proyección" mobileActions={<StepPill n={1} />} actions={<StepPill n={1} />} />
@@ -106,32 +99,6 @@ export function NewProjectionPage() {
           <div className="grid grid-cols-1 gap-4 @3xl/main:grid-cols-2">
             <Section>
               <div className="grid gap-6 px-4 pt-5 pb-4 dsk:px-5 dsk:pb-5">
-                {supervisor && (
-                  <div>
-                    <label id="np-seller-label" className="mb-2 block text-base font-semibold">
-                      Vendedor
-                    </label>
-                    <Select
-                      value={target}
-                      onValueChange={(v) => {
-                        setTarget(v)
-                        setDraft({ ...draft, units: {} })
-                      }}
-                    >
-                      <SelectTrigger aria-labelledby="np-seller-label" className="w-full text-md">
-                        <SelectValue placeholder="Elige el vendedor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {team.map((s) => (
-                          <SelectItem key={s.username} value={s.username}>
-                            {s.name}
-                            {s.zone ? ` · ${s.zone}` : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
                 <div>
                   <span id="np-cat-label" className="mb-2 block text-base font-semibold">
                     Categoría
@@ -258,7 +225,7 @@ export function NewProjectionPage() {
             </Button>
             <Button
               className="h-12 flex-1 text-md dsk:h-control dsk:min-w-56 dsk:flex-none dsk:text-base"
-              disabled={closed.length > 0 || !owner}
+              disabled={closed.length > 0}
               onClick={() => setDraft(withNewSheets({ ...draft, step: 1, tried: false }, loaded, days))}
             >
               Continuar <ArrowRight />
@@ -283,7 +250,6 @@ export function NewProjectionPage() {
         category: draft.category,
         start: draft.start,
         days: draft.days,
-        seller: supervisor ? owner : undefined,
       })
       const filled = s.days.filter((d) => Object.keys(d.units).length)
       if (!filled.length) return void toast('Aún no hay historial suficiente para sugerir.')
@@ -318,13 +284,6 @@ export function NewProjectionPage() {
       const outcome = await submit.mutateAsync({ draft, catalog: loaded, owner, author: seller.username })
       await new Promise((r) => setTimeout(r, Math.max(0, 1200 - (Date.now() - started))))
       drafts.clear()
-      if (supervisor) {
-        // El supervisor vuelve al detalle del día del equipo, donde ve el cambio.
-        if (outcome.sync === 'ok') toast.success(`Proyección de ${ownerName} guardada.`)
-        else toast(`Sin conexión: la proyección de ${ownerName} se enviará al reconectar.`)
-        void navigate(paths.teamDay(draft.start))
-        return
-      }
       void navigate(paths.registered, { state: { outcome, draft } })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo enviar la proyección.')
@@ -343,14 +302,13 @@ export function NewProjectionPage() {
     <div>
       <PageHeader
         title="Nueva proyección"
-        subtitle={supervisor ? `Para ${ownerName}, ${choiceLabel}` : `Proyección por producto, ${choiceLabel}`}
+        subtitle={`Proyección por producto, ${choiceLabel}`}
         mobileActions={<StepPill n={2} />}
         actions={suggestBtn}
       />
       <PageBody>
         <Section className="mb-4">
           <div className="flex flex-wrap items-end gap-x-7 gap-y-3 px-4 py-3 dsk:px-5">
-            {supervisor && <Summary label="Vendedor" value={ownerName} />}
             <Summary label="Fecha de inicio" value={dFull(draft.start)} />
             <Summary label="Días de proyección" value={daysCount(draft.days)} />
             <Summary label="Categoría" value={choiceLabel} />

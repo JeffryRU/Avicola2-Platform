@@ -152,7 +152,7 @@ def test_seller_only_sees_own_data_everywhere(db):
 def test_supervisor_cannot_act_on_behalf_of_non_sellers(db):
     sup = login("supervisor")
     body = {"category": "BRASA", "days": [{"date": TODAY.isoformat(), "units": {"P0001": 5}}]}
-    assert sup.post("/api/projections", json=body | {"seller": "general"}).status_code == 404
+    assert sup.post("/api/projections", json=body | {"seller": "general"}).status_code == 403
     r = sup.post("/api/admin/editing/sellers/general/grant", json={"dates": [TODAY.isoformat()]})
     assert r.status_code == 404
     assert {x["username"] for x in sup.get("/api/sellers").json()}.isdisjoint(

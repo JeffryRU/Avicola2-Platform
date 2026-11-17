@@ -95,17 +95,18 @@ def test_submit_replaces_same_day_and_lists(client) -> None:
     assert rows[0]["total_units"] == 4 and rows[0]["units"]["P0002"] == 4
 
 
-def test_supervisor_submits_on_behalf_of_a_seller(client) -> None:
-    _login(client, "supervisor")
+@pytest.mark.parametrize("supervisor", ["supervisor", "general"])
+def test_supervision_reviews_but_never_registers(client, supervisor) -> None:
+    """Supervisor y supervisor general revisan: no registran, ni propias ni por un vendedor."""
+    _login(client, supervisor)
     body = {"category": "BRASA", "days": [{"date": _day(0), "units": {"P0001": 1}}]}
-    # Sin vendedor no se sabe de quién es; un supervisor no es un vendedor.
-    assert client.post("/api/projections", json=body).status_code == 422
-    assert client.post("/api/projections", json={**body, "seller": "supervisor"}).status_code == 404
-    assert client.post("/api/projections", json={**body, "seller": "rnavarro"}).status_code == 201
+    for extra in ({}, {"seller": supervisor}, {"seller": "rnavarro"}):
+        r = client.post("/api/projections", json={**body, **extra})
+        assert r.status_code == 403 and "revisa" in r.json()["detail"]
     stored = client.get(
         "/api/projections", params={"date_from": _day(0), "date_to": _day(0), "seller": "rnavarro"}
     ).json()
-    assert [p["units"]["P0001"] for p in stored] == [1]
+    assert stored == []
 
 
 def test_seller_cannot_submit_for_someone_else(client) -> None:
@@ -130,23 +131,19 @@ def test_history_records_who_changed_what(client) -> None:
         client.post("/api/projections", json={"category": "BRASA", "days": [day]}).status_code
         == 201
     )
-    _login(client, "supervisor")
-    edited = {
-        "category": "BRASA",
-        "days": [{"date": _day(1), "units": {"P0001": 9}}],
-        "seller": "rnavarro",
-    }
+    edited = {"category": "BRASA", "days": [{"date": _day(1), "units": {"P0001": 9}}]}
     assert client.post("/api/projections", json=edited).status_code == 201
 
-    _login(client)
     params = {"date_from": _day(0), "date_to": _day(0)}
     history = client.get("/api/projections/history", params=params).json()
     assert [(h["author"], h["action"], h["before_total"], h["after_total"]) for h in history] == [
-        ("supervisor", "updated", 4, 9),
+        ("rnavarro", "updated", 4, 9),
         ("rnavarro", "created", None, 4),
     ]
-    kinds = [n["title"] for n in client.get("/api/notifications").json()["items"]]
-    assert any("actualizó tu proyección" in t for t in kinds)
+    # El supervisor lo ve en su historial del equipo.
+    _login(client, "supervisor")
+    team = client.get("/api/projections/history", params={**params, "seller": "rnavarro"}).json()
+    assert len(team) == 2
     # Otro vendedor no ve el historial de Roberto.
     _login(client, "hdias")
     assert client.get("/api/projections/history", params=params).json() == []

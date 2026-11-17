@@ -105,13 +105,10 @@ function navGroups(session: Session, counts: { unread: number; unlocks: number }
       : []),
   ]
   if (hasTeamView(session)) {
-    // El supervisor no registra proyecciones propias: administra el equipo y ve sus dashboards.
+    // La supervisión revisa: no registra proyecciones (ni propias ni por un vendedor).
     return [
       {
-        items: [
-          { to: paths.home, label: 'Inicio', end: true },
-          { to: paths.register, label: 'Registrar' },
-        ],
+        items: [{ to: paths.home, label: 'Inicio', end: true }],
       },
       ...(operation.length ? [{ title: 'Operación', items: operation }] : []),
       dashboards,

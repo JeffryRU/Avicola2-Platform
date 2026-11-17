@@ -1,5 +1,5 @@
 import { SyncStatus } from '@/shared/ui/components/sync-status'
-import { ChevronLeft, ChevronRight, Pencil, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Users } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router'
 import { paths } from '@/app/routes'
 import { addDays, dDowLong, dFull, today, type IsoDate, clockTime } from '@/shared/domain/dates'
@@ -16,7 +16,6 @@ import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/compon
 import { tableCls } from '@/shared/ui/lib/table-styles'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
-import { useFirstEditableDay } from '@/features/editing'
 import { NOT_REGISTERED, UNITS_SHORT, kgAmount } from '@/shared/types/labels'
 
 /** Ruta /dashboards/dia/:date: detalle de un día para el supervisor. */
@@ -49,15 +48,12 @@ export function TeamDayView({
   const sellersQuery = useSellers()
   const sellers = sellersQuery.data ?? []
   const data = useWindowData()
-  const firstEditable = useFirstEditableDay()
   const source = data.data ?? { projections: [], sales: [] }
   // Sin datos todavía (cargando o sin red) no se dibujan ceros: parecerían «nadie confirmó».
   const ready = data.data !== undefined && sellersQuery.data !== undefined
 
   const day = teamDay(date, sellers, source.projections, source.sales, catalog)
   const pending = day.rows.filter((r) => !r.confirmed)
-  // El supervisor edita cualquier día de la ventana (aunque haya cerrado): desde mañana.
-  const editable = date >= firstEditable
   const { from, to } = dataWindow()
   const prev = addDays(date, -1)
   const next = addDays(date, 1)
@@ -153,16 +149,6 @@ export function TeamDayView({
                         </span>
                         {r.confirmed && <span className="num block text-sm text-muted-foreground">{nf1(r.kg)} kg</span>}
                       </div>
-                      {editable && (
-                        <Button asChild variant="outline" size="icon">
-                          <Link
-                            to={`${paths.register}?vendedor=${r.seller.username}&dia=${date}`}
-                            aria-label={`${r.confirmed ? 'Editar' : 'Registrar'} la proyección de ${r.seller.name}`}
-                          >
-                            <Pencil />
-                          </Link>
-                        </Button>
-                      )}
                     </li>
                   ))}
                   <li className="flex items-center justify-between gap-3 border-t border-rule-strong bg-muted px-4 py-3 font-semibold hc:border-t-heavy hc:border-foreground">
@@ -183,11 +169,6 @@ export function TeamDayView({
                         <th className={tableCls.th}>Kg aprox.</th>
                         <th className={tableCls.th}>Venta real (kg)</th>
                         <th className={tableCls.th}>Enviado</th>
-                        {editable && (
-                          <th className={tableCls.th}>
-                            <span className="sr-only">Acciones</span>
-                          </th>
-                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -217,18 +198,6 @@ export function TeamDayView({
                           <td className={cn(tableCls.td, 'num text-muted-foreground')}>
                             {r.submittedAt ? clockTime(r.submittedAt) : '—'}
                           </td>
-                          {editable && (
-                            <td className={cn(tableCls.td, 'py-1.5')}>
-                              <Button asChild variant="outline" size="sm">
-                                <Link
-                                  to={`${paths.register}?vendedor=${r.seller.username}&dia=${date}`}
-                                  aria-label={`${r.confirmed ? 'Editar' : 'Registrar'} la proyección de ${r.seller.name}`}
-                                >
-                                  <Pencil /> {r.confirmed ? 'Editar' : 'Registrar'}
-                                </Link>
-                              </Button>
-                            </td>
-                          )}
                         </tr>
                       ))}
                       <tr className={tableCls.total}>
@@ -241,7 +210,6 @@ export function TeamDayView({
                         <td className={cn(tableCls.td, 'num')}>{nf1(day.kg)}</td>
                         <td className={cn(tableCls.td, 'num')}>{day.realKg === null ? '—' : nf1(day.realKg)}</td>
                         <td className={tableCls.td} />
-                        {editable && <td className={tableCls.td} />}
                       </tr>
                     </tbody>
                   </table>

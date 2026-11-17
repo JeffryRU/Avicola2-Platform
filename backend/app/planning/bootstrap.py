@@ -164,7 +164,6 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             settings.planning_max_days,
             on_submitted=nt.NotifyProjectionSubmitted(sellers, notifier, event_bus),
             rules=ed.EditingRules(editing, unlocks),
-            sellers=sellers,
             history=history,
         ),
         get_sales=uc.GetSales(sales),
