@@ -19,6 +19,7 @@ from datetime import UTC, date, datetime, timedelta
 import numpy as np
 from sqlalchemy import delete, func, insert, select
 from sqlalchemy.orm import Session
+from threadpoolctl import threadpool_limits
 
 from app.planning.domain.models import Product
 from app.planning.domain.orders import ORDER_CATEGORY, ORDER_MATERIAL_PREFIX, OrderLine, product_for
@@ -31,6 +32,7 @@ from app.planning.infrastructure.persistence.tables import (
 
 logger = logging.getLogger(__name__)
 
+TRAIN_THREADS = 2  # núcleos para entrenar (la API sigue atendiendo con el resto)
 MIN_DAYS = (
     100  # días con pedidos para ser un vendedor «principal» (los demás solo enseñan al maestro)
 )
@@ -107,8 +109,16 @@ def _cubes(session: Session, products: list[Product]):
     return YA, idx, core_sellers, days, C, owner, brasa
 
 
-def train(session: Session, products: list[Product]) -> dict | None:
-    """Entrena, mide y guarda. Devuelve el resumen (None si no hay historia suficiente)."""
+def train(session: Session, products: list[Product], threads: int = TRAIN_THREADS) -> dict | None:
+    """Entrena, mide y guarda. Devuelve el resumen (None si no hay historia suficiente).
+
+    Usa a lo sumo `threads` núcleos: corre junto a la API y no debe dejarla sin CPU.
+    """
+    with threadpool_limits(limits=threads):
+        return _train(session, products)
+
+
+def _train(session: Session, products: list[Product]) -> dict | None:
     cubes = _cubes(session, products)
     if cubes is None:
         return None
