@@ -79,7 +79,11 @@ def test_training_measures_every_model_on_unseen_days(trained) -> None:
         assert set(m["metrics"]) == {
             "detalle", "vendedor_dia", "tamano_dia", "equipo_dia", "equipo_semana", "sesgo",
         }  # fmt: skip
-    assert trained["chosen"] == {"sugerencia": "robusta", "saca": "destilado", "semana": "apilado"}
+    # Cada uso toma el modelo de menor error en su nivel.
+    errors = {m["key"]: m["metrics"] for m in trained["models"]}
+    for use, level in training.USES.items():
+        best = min((k for k in errors if k != "actual"), key=lambda k: errors[k][level])
+        assert trained["chosen"][use] == best
     # La división es temporal: entrenamiento < validación < prueba.
     split = trained["split"]
     assert split["entrenamiento"][1] < split["validacion"][0] <= split["validacion"][1]
@@ -94,18 +98,18 @@ def test_summary_is_for_supervision_and_suggestion_uses_the_model(trained) -> No
     client = TestClient(app)
     _login(client, "supervisor")
     body = client.get("/api/model/summary").json()
-    assert body["chosen"]["sugerencia"] == "robusta" and body["series"]
+    assert body["chosen"]["sugerencia"] in {m["key"] for m in body["models"]} and body["series"]
     _login(client, "rnavarro")
     assert client.get("/api/model/summary").status_code == 403
     first = trained["forecast_dates"][0]
     r = client.get("/api/suggestions", params={"category": "BRASA", "start": first, "days": 2})
     assert r.status_code == 200, r.text
-    assert r.json()["method"] == "modelo_combinacion_robusta"
+    assert r.json()["method"] == "modelo_entrenado"
     assert any(day["units"] for day in r.json()["days"])
     # Fuera de los días pronosticados, la sugerencia de siempre.
     later = str(START + timedelta(days=DAYS + 30))
     r = client.get("/api/suggestions", params={"category": "BRASA", "start": later, "days": 1})
-    assert r.json()["method"] != "modelo_combinacion_robusta"
+    assert r.json()["method"] != "modelo_entrenado"
 
 
 def test_without_history_there_is_nothing_to_train() -> None:

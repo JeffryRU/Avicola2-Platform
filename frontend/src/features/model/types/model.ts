@@ -30,11 +30,7 @@ export const TABLE_NOTE = 'Medido en validación + prueba. En verde, el mejor de
 export const BIAS_LABEL = 'Sesgo'
 export const MODEL_COLUMN = 'Modelo'
 export const CHART_TITLE = 'Predicho frente a real (total del equipo por semana)'
-export const SERIES = {
-  real: 'Venta real',
-  robusta: 'Combinación robusta (en uso)',
-  actual: 'Mediana 4 semanas (anterior)',
-}
+export const SERIES = { real: 'Venta real', actual: 'Mediana 4 semanas (anterior)' }
 export const VS_BASELINE = (before: number) => `antes ${before.toFixed(1)} %`
 export const trainedNote = (when: string, from: string, to: string, sellers: number, teacher: number) =>
   `Entrenado el ${when} con la historia de ARIS del ${from} al ${to}: ${String(sellers)} vendedores principales (el maestro aprende de ${String(teacher)} series). Se reentrena solo cada noche.`

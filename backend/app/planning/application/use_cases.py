@@ -232,10 +232,10 @@ class GetSales:
 
 
 class SuggestProjection:
-    """Sugerencia de la proyección: la del modelo entrenado (combinación robusta, ADR 0020) si ya
+    """Sugerencia: la del modelo entrenado (el elegido para sugerir, ADR 0020) si ya
     pronosticó esos días; si no, la del pronosticador (mediana de 4 semanas o promedio propio)."""
 
-    STORED_METHOD = "modelo_combinacion_robusta"
+    STORED_METHOD = "modelo_entrenado"
 
     def __init__(
         self,
@@ -259,10 +259,12 @@ class SuggestProjection:
         Catalog(self.products.list_active()).of(category)  # valida la categoría
         dates = [start + timedelta(days=i) for i in range(days)]
         if self.store and category == ORDER_CATEGORY:
-            stored = {
-                d.date: d
-                for d in self.store.predictions(STORED_MODEL, dates[0], dates[-1], username)
-            }
+            model = suggestion_model(self.store)
+            stored = (
+                {d.date: d for d in self.store.predictions(model, dates[0], dates[-1], username)}
+                if model
+                else {}
+            )
             if stored and all(d in stored for d in dates):
                 self.method = self.STORED_METHOD
                 return [DailyUnits(username, d, stored[d].units) for d in dates]
@@ -298,15 +300,12 @@ class ModelProjections:
             raise DomainError(f"Pide hasta {MODEL_MAX_DAYS} días del modelo.")
         who = visible_seller(viewer, seller)
         team = [who] if who else [s.username for s in self.sellers.list_active() if s.is_seller]
-        # Los días que evaluó el modelo entrenado (ADR 0020) traen su predicción guardada (la
-        # combinación robusta); el resto, la mediana de 4 semanas.
+        # Los días que evaluó el modelo entrenado (ADR 0020) traen la predicción guardada del
+        # modelo elegido para la sugerencia; el resto, la mediana de 4 semanas.
+        model = suggestion_model(self.store) if self.store else None
         stored = (
-            [
-                d
-                for d in self.store.predictions(STORED_MODEL, date_from, date_to, who)
-                if d.seller in team
-            ]
-            if self.store
+            [d for d in self.store.predictions(model, date_from, date_to, who) if d.seller in team]
+            if self.store and model
             else []
         )
         covered = {d.date for d in stored}
@@ -326,8 +325,11 @@ class ModelProjections:
         return stored + out
 
 
-# La predicción guardada que se muestra como «Modelo» en los dashboards y la sugerencia.
-STORED_MODEL = "robusta"
+def suggestion_model(store: "DemandModelStore") -> str | None:
+    """El modelo que la última corrida eligió para la sugerencia (el de menor error por vendedor
+    y día); None si todavía no se entrenó."""
+    latest = store.latest()
+    return latest.get("chosen", {}).get("sugerencia") if latest else None
 
 
 class GetModelSummary:

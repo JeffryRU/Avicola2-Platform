@@ -34,9 +34,9 @@ export const modelSummarySchema = z.object({
       date: isoDateSchema,
       real: z.number(),
       actual: z.number(),
-      robusta: z.number(),
-      destilado: z.number(),
-      apilado: z.number(),
+      sugerencia: z.number(),
+      saca: z.number(),
+      semana: z.number(),
     }),
   ),
 })
