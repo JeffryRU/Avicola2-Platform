@@ -1,4 +1,5 @@
 import { ApiError } from '@/shared/application/ports'
+import { fromStored, toStored, type UiPreferences } from '@/shared/domain/preferences'
 import type { AuthGateway, LogoutCleanup, SessionRepository } from '@/features/auth/application/ports'
 import { type Credentials, credentialsSchema } from '@/features/auth/domain/credentials'
 import type { Session } from '@/shared/domain/session'
@@ -61,6 +62,16 @@ export class AuthService {
     const session = await this.gateway.updateProfile(name)
     this.store(session, this.remember)
     return session
+  }
+
+  /** Preferencias de la interfaz de la cuenta, saneadas (null si la cuenta aún no tiene). */
+  async getPreferences(): Promise<UiPreferences | null> {
+    const raw = await this.gateway.getPreferences()
+    return raw == null ? null : fromStored(raw)
+  }
+
+  savePreferences(preferences: UiPreferences): Promise<void> {
+    return this.gateway.savePreferences(toStored(preferences))
   }
 
   async changePassword(current: string, next: string): Promise<Session> {

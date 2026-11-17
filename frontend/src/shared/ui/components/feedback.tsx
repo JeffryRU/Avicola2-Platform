@@ -1,37 +1,75 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
+import { Backdrop } from '@/shared/ui/components/backdrop'
 import { BrandMark } from '@/shared/ui/components/brand'
 import { BRANDS } from '@/shared/types/brands'
 import { useBrand } from '@/shared/ui/hooks/use-brand'
 import { cn } from '@/shared/ui/lib/utils'
 import { RETRY_LABEL, STATUS_LABEL, type StatusKind } from '@/shared/types/labels'
 
-/** Pantalla de carga con la marca (al abrir la app y al iniciar sesión). */
-export function Splash({ visible, durationS = 2.2 }: { visible: boolean; durationS?: number }) {
+/**
+ * Pantalla de carga con la marca (al abrir la app y al iniciar sesión). Sigue el tema y el color
+ * principal: la mascota entra con un rebote, la rodea un arco que gira con ondas y aparecen el
+ * nombre y unos puntos de espera. Al irse, el contenido crece y se desvanece. Con «Reducir
+ * animaciones» queda quieta (las reglas globales cortan las animaciones).
+ */
+export function Splash({ visible }: { visible: boolean }) {
   const { brand } = useBrand()
+  // Cada vez que vuelve a mostrarse, la animación arranca de cero (nueva `key`).
+  const [run, setRun] = useState(0)
+  const [shown, setShown] = useState(visible)
+  if (visible !== shown) {
+    setShown(visible)
+    if (visible) setRun((r) => r + 1)
+  }
   return (
     <div
       aria-hidden={!visible}
       className={cn(
-        'fixed inset-0 z-[90] grid place-items-center bg-head text-head-foreground transition-[opacity,visibility] duration-300',
+        'fixed inset-0 z-[90] grid place-items-center overflow-hidden bg-background text-foreground transition-[opacity,visibility] duration-300',
         visible ? 'visible opacity-100' : 'invisible opacity-0',
       )}
     >
-      <div className="grid justify-items-center gap-1 text-center">
-        <BrandMark size={88} onDark />
-        <div className="mt-4 text-3xl font-semibold hc:font-extrabold">{BRANDS[brand].name}</div>
-        <div className="text-md text-head-muted">AviPlanner · Planificación de Demanda</div>
-        <div className="mt-6 h-0.5 w-40 overflow-hidden bg-head-muted/30">
-          {visible && (
-            <i
-              className="splash-bar block h-full w-full bg-brand-accent"
-              style={{ '--dur': `${durationS}s` } as CSSProperties}
+      <div aria-hidden data-decor className="splash-glow absolute inset-0 hc:hidden" />
+      <div className="splash-backdrop absolute inset-0">
+        <Backdrop animated />
+      </div>
+      <div key={run} className={cn('relative grid justify-items-center text-center', !visible && 'splash-leave')}>
+        <div className="relative grid size-32 place-items-center">
+          <span aria-hidden className="splash-ripple absolute inset-4 rounded-full border-2 border-primary" />
+          <span aria-hidden className="splash-ripple late absolute inset-4 rounded-full border-2 border-primary" />
+          <svg aria-hidden data-decor className="splash-orbit absolute inset-0 size-full text-primary" viewBox="0 0 100 100">
+            <circle
+              cx="50"
+              cy="50"
+              r="46"
+              pathLength={100}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
             />
-          )}
+          </svg>
+          <div className="splash-mark">
+            <BrandMark size={92} />
+          </div>
+        </div>
+        <div className="splash-rise mt-6 text-3xl font-semibold hc:font-extrabold" style={delay(0.25)}>
+          {BRANDS[brand].name}
+        </div>
+        <div className="splash-rise mt-1 text-md text-muted-foreground" style={delay(0.35)}>
+          AviPlanner · Planificación de Demanda
+        </div>
+        <div aria-hidden className="splash-rise mt-6 flex gap-2" style={delay(0.45)}>
+          {[0, 0.15, 0.3].map((d) => (
+            <i key={d} className="splash-dot block size-2 rounded-full bg-primary" style={delay(0.5 + d)} />
+          ))}
         </div>
       </div>
     </div>
   )
 }
+
+const delay = (s: number) => ({ '--delay': `${s}s` }) as CSSProperties
 
 /** Capa de espera con la mascota ("Enviando proyección"). */
 export function LoadingOverlay({ label }: { label: string | null }) {

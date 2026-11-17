@@ -31,6 +31,7 @@ from app.planning.domain.permissions import (
     can_manage,
     require,
 )
+from app.planning.domain.preferences import Preferences, check_preferences
 from app.shared.domain.errors import (
     AuthenticationError,
     ConflictError,
@@ -174,6 +175,28 @@ class UpdateProfile:
         self.sellers.save_profile(seller)
         logger.info("%s actualizó su perfil", seller.username)
         return replace(account, seller=seller)
+
+
+class GetPreferences:
+    """Preferencias de la interfaz de la propia cuenta (None si aún no guardó ninguna)."""
+
+    def __init__(self, sellers: SellerRepository):
+        self.sellers = sellers
+
+    def __call__(self, account: SellerAccount) -> Preferences | None:
+        return self.sellers.get_preferences(account.seller.username)
+
+
+class SavePreferences:
+    """Cada persona guarda sus preferencias de la interfaz; la siguen a cualquier dispositivo."""
+
+    def __init__(self, sellers: SellerRepository):
+        self.sellers = sellers
+
+    def __call__(self, account: SellerAccount, preferences: object) -> Preferences:
+        checked = check_preferences(preferences)
+        self.sellers.save_preferences(account.seller.username, checked)
+        return checked
 
 
 class ListAccounts:

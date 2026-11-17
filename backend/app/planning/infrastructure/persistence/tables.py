@@ -45,6 +45,8 @@ sellers = Table(
     Column("token_version", Integer, nullable=False, server_default="0"),
     Column("is_active", Boolean, nullable=False, default=True),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # Preferencias de la interfaz (domain/preferences.py), en JSON (texto: portable entre motores).
+    Column("preferences", Text),
 )
 
 products = Table(

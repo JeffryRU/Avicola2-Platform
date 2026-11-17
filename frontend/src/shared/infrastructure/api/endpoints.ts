@@ -20,6 +20,8 @@ export const endpoints = {
     me: '/auth/me',
     /** PATCH {name} → perfil actualizado. */
     profile: '/auth/profile',
+    /** GET → preferencias de la interfaz de la cuenta (o null) · PUT {…} → las guarda. */
+    preferences: '/auth/preferences',
     /** POST {current_password, new_password, remember} → perfil (cierra las otras sesiones). */
     password: '/auth/password',
   },

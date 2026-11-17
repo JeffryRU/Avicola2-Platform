@@ -44,6 +44,13 @@ class FakeGateway implements AuthGateway {
   async changePassword() {
     return SESSION
   }
+  stored: unknown = null
+  async getPreferences() {
+    return this.stored
+  }
+  async savePreferences(preferences: unknown) {
+    this.stored = preferences
+  }
   async updateProfile(name: string) {
     return { ...SESSION, seller: { ...SESSION.seller, name } }
   }

@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { credentialsSchema } from '@/features/auth/domain/credentials'
 import { useLogin } from '@/features/auth/ui/hooks'
-import { LoginBackdrop } from '@/features/auth/ui/components/login-backdrop'
+import { Backdrop } from '@/shared/ui/components/backdrop'
 import { LoginShowcase } from '@/features/auth/ui/components/login-showcase'
 import { BrandMark } from '@/shared/ui/components/brand'
 import { BRANDS } from '@/shared/types/brands'
@@ -58,7 +58,7 @@ export function LoginPage({ onLoggedIn, corner }: { onLoggedIn: () => void; corn
     <div className="grid min-h-dvh bg-background dsk:grid-cols-[1fr_1fr]">
       <LoginShowcase />
       <div className="relative flex items-start justify-center px-5 pt-14 pb-8 dsk:items-center dsk:pt-8">
-        <LoginBackdrop />
+        <Backdrop />
         {corner && <div className="absolute top-3 right-3 z-10">{corner}</div>}
         <form
           key={shakeKey}

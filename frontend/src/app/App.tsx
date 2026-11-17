@@ -7,7 +7,7 @@ import type { Container } from '@/app/container'
 import { ContainerContext, useContainer } from '@/app/di'
 import { createQueryClient } from '@/app/query-client'
 import { LoginPage } from '@/features/auth/ui/pages/LoginPage'
-import { useSession, useVerifySession } from '@/features/auth'
+import { usePreferencesSync, useSession, useVerifySession } from '@/features/auth'
 import { VersionProvider } from '@/features/versions'
 import { TopControls } from '@/app/top-controls'
 import { BrandProvider } from '@/shared/ui/components/brand'
@@ -34,12 +34,11 @@ const loadAuthenticatedApp = () => import('@/app/AuthenticatedApp')
 const AuthenticatedApp = lazy(() => loadAuthenticatedApp().then((m) => ({ default: m.AuthenticatedApp })))
 
 /**
- * Pantalla de bienvenida: al abrir la app y tras iniciar sesión. Es breve a propósito: tapa la
- * descarga de la app con sesión, pero no hace esperar de más.
+ * Pantalla de bienvenida: al abrir la app y tras iniciar sesión. Dura lo justo para que se vea la
+ * entrada de la mascota y el nombre; tapa la descarga de la app con sesión.
  */
-const SPLASH_MS = 700
-const LOGIN_SPLASH_MS = 500
-const SPLASH_ANIMATION_S = 0.65
+const SPLASH_MS = 1300
+const LOGIN_SPLASH_MS = 1000
 
 /** Confirma la cookie al abrir la app y, al cerrar sesión, olvida los datos del usuario anterior. */
 function useSessionLifecycle() {
@@ -48,6 +47,7 @@ function useSessionLifecycle() {
   const user = session?.seller.username
   const { auth } = useContainer()
   useVerifySession(user)
+  usePreferencesSync()
   useEffect(() => {
     // Al volver a la pestaña se confirma la sesión: en otra pestaña pudieron entrar con otra cuenta.
     const check = () => {
@@ -92,7 +92,7 @@ function Routed() {
   }
   return (
     <VersionProvider>
-      <Splash visible={splash} durationS={SPLASH_ANIMATION_S} />
+      <Splash visible={splash} />
       {!session ? (
         <LoginPage onLoggedIn={showSplash} corner={<TopControls />} />
       ) : (
