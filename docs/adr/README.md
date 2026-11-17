@@ -19,3 +19,4 @@ Cada decisión de arquitectura relevante o supuesto de proceso se registra aquí
 | [0016](0016-capas-con-import-linter-y-fuentes-unicas.md) | Capas verificadas con import-linter, `shared/` como módulo común y una sola fuente por regla | aceptado |
 | [0017](0017-agente-de-ia-con-mcp-y-n8n.md) | Agente de IA: servidor MCP de solo lectura en el backend y workflow de n8n con AI Agent | aceptado |
 | [0018](0018-sistema-visual-y-temas.md) | Sistema visual propio en tokens, modo oscuro y alto contraste | aceptado |
+| [0019](0019-modelo-de-demanda-contra-la-venta-real.md) | Modelo de demanda medido contra la venta real: ninguno es mucho mejor; hacen falta datos nuevos | aceptado |
