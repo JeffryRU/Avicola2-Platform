@@ -1,4 +1,5 @@
 import { useState, type SyntheticEvent } from 'react'
+import { EditToggle } from '@/shared/ui/components/edit-toggle'
 import { Loader2, Save, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -15,7 +16,7 @@ import {
 } from '@/shared/domain/dates'
 import { nf0, nf1, parseUnits, keepDigits, RECORD_MAX_DIGITS } from '@/shared/domain/format'
 import { paths } from '@/app/routes'
-import { can } from '@/shared/domain/session'
+import { can, hasTeamView } from '@/shared/domain/session'
 import { useRequiredSession } from '@/features/auth'
 import { bySubcategory, type Product } from '@/shared/domain/products'
 import { useCatalog } from '@/features/catalog'
@@ -98,7 +99,12 @@ const totalsOf = (d: ProductionDay): Totals => ({
 /** Producción diaria: el jefe de despacho la registra; el supervisor la consulta. */
 export function ProductionPage() {
   const session = useRequiredSession()
-  const canManage = can(session, 'manage_production')
+  // La supervisión solo ve: registra o corrige tras tocar «Editar». El jefe de despacho, siempre.
+  const [editing, setEditing] = useState(false)
+  const supervision = hasTeamView(session)
+  const canManage = can(session, 'manage_production') && (!supervision || editing)
+  const toggle =
+    supervision && can(session, 'manage_production') ? <EditToggle editing={editing} onChange={setEditing} /> : null
   const { catalog } = useCatalog()
   const ref = today()
   const [day, setDay] = useState<IsoDate>(ref)
@@ -123,8 +129,13 @@ export function ProductionPage() {
         title={PRODUCTION_TITLE}
         subtitle={canManage ? PRODUCTION_SUBTITLE_MANAGE : PRODUCTION_SUBTITLE_VIEW}
         back={paths.home}
-        actions={forecastLink}
-        mobileActions={forecastLink}
+        actions={
+          <>
+            {toggle}
+            {forecastLink}
+          </>
+        }
+        mobileActions={toggle ?? forecastLink}
       />
       <PageBody>
         <DayStrip

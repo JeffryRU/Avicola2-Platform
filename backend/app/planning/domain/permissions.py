@@ -67,8 +67,10 @@ ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
             Permission.MANAGE_PRODUCTION,
         }
     ),
-    # El supervisor consulta el stock (lo necesita para la saca) pero no lo registra.
-    SUPERVISOR: _SUPERVISION | {Permission.VIEW_STOCK},
+    # El supervisor consulta el stock (lo necesita para la saca) y, si se lo piden, corrige el
+    # stock y la producción (en la app, solo tras tocar «Editar»: por defecto los ve).
+    SUPERVISOR: _SUPERVISION
+    | {Permission.VIEW_STOCK, Permission.MANAGE_STOCK, Permission.MANAGE_PRODUCTION},
     # El supervisor general crea jefes de despacho, así que tiene también sus permisos
     # (nadie gestiona un rol con más permisos que el suyo).
     GENERAL_SUPERVISOR: _SUPERVISION

@@ -1,4 +1,5 @@
 import { useState, type SyntheticEvent } from 'react'
+import { EditToggle } from '@/shared/ui/components/edit-toggle'
 import { Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { addDays, dDowLongDM, type IsoDate, recentDayStrip, relativeDay, today } from '@/shared/domain/dates'
@@ -62,7 +63,12 @@ const asideCls = 'grid gap-4 @4xl/main:sticky @4xl/main:top-6'
 /** Stock de despacho: el jefe de despacho lo registra por artículo y lote; el supervisor lo consulta. */
 export function StockPage() {
   const session = useRequiredSession()
-  const canManage = can(session, 'manage_stock')
+  // La supervisión solo ve: registra o corrige tras tocar «Editar». El jefe de despacho, siempre.
+  const [editing, setEditing] = useState(false)
+  const supervision = hasTeamView(session)
+  const canManage = can(session, 'manage_stock') && (!supervision || editing)
+  const toggle =
+    supervision && can(session, 'manage_stock') ? <EditToggle editing={editing} onChange={setEditing} /> : undefined
   const optionsQuery = useStockOptions()
   const options = optionsQuery.options
   const ref = today()
@@ -81,6 +87,8 @@ export function StockPage() {
         title={STOCK_TITLE}
         subtitle={canManage ? STOCK_SUBTITLE_MANAGE : STOCK_SUBTITLE_VIEW}
         back={hasTeamView(session) ? paths.home : null}
+        actions={toggle}
+        mobileActions={toggle}
       />
       <PageBody>
         <DayStrip

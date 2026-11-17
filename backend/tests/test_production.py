@@ -193,7 +193,8 @@ def test_who_sees_and_who_registers_production(client) -> None:
     assert client.get("/api/production", params=params).status_code == 403
     _login(client, "supervisor")
     assert client.get("/api/production", params=params).status_code == 200
-    assert client.put(f"/api/production/{TODAY}", json={"lines": LINES}).status_code == 403
+    # El supervisor también la corrige si se lo piden (en la app, tras «Editar»).
+    assert client.put(f"/api/production/{TODAY}", json={"lines": LINES}).status_code == 200
     _login(client, "general")
     assert client.put(f"/api/production/{TODAY}", json={"lines": LINES}).status_code == 200
 
