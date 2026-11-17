@@ -52,7 +52,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
         aria-label={`Usar la sugerencia: ${nf0(s)} de ${p.name}, ${dShort(d)}`}
         onClick={() => onChange(d, p.id, s)}
         className={cn(
-          'num hover:bg-primary/10 rounded px-1 text-xs font-medium text-primary/80 transition-colors hover:text-primary hc:text-primary hc:underline',
+          'num rounded px-1 text-xs font-medium text-primary/80 transition-colors hover:bg-primary/10 hover:text-primary hc:text-primary hc:underline',
           value(d, p) === s && 'text-faint',
         )}
       >
@@ -121,7 +121,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
           disabled={!daySuggested(d)}
           title={daySuggested(d) ? 'Llenar este día con la sugerencia del modelo' : 'Sin sugerencia para este día'}
           aria-label={`Llenar ${dShort(d)} con la sugerencia`}
-          className="hover:bg-primary/10 mx-auto mb-1 flex min-h-7 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-primary transition-colors disabled:pointer-events-none disabled:opacity-40 hc:border-foreground"
+          className="mx-auto mb-1 flex min-h-7 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-40 hc:border-foreground"
         >
           <Wand2 aria-hidden className="size-3.5" /> Llenar
         </button>
@@ -272,9 +272,18 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
                     <td key={`${d}u`}>{deskCell(d, p)}</td>,
                     <td
                       key={`${d}k`}
-                      className={cn('num min-w-14 text-sm text-muted-foreground', !value(d, p) && 'text-faint')}
+                      className={cn(
+                        'num min-w-14 text-sm text-muted-foreground',
+                        !value(d, p) && (hintOf(d, p) ? 'text-primary/80 hc:text-primary' : 'text-faint'),
+                      )}
+                      // Sin unidades escritas, los kg de la sugerencia del modelo (en azul, como su número).
+                      title={!value(d, p) && hintOf(d, p) ? 'Kg según la sugerencia del modelo' : undefined}
                     >
-                      {value(d, p) ? nf1((value(d, p) ?? 0) * p.kg_per_unit) : '—'}
+                      {value(d, p)
+                        ? nf1((value(d, p) ?? 0) * p.kg_per_unit)
+                        : hintOf(d, p)
+                          ? nf1(hintOf(d, p) * p.kg_per_unit)
+                          : '—'}
                     </td>,
                   ])}
                   <td className="num font-semibold">{nf0(productUnits(p))}</td>
