@@ -38,3 +38,6 @@ export const daysCount = (n: number) => `${n} ${n === 1 ? 'día' : 'días'}`
 export const unitsCount = (n: number) => `${nf0(n)} ${UNITS_SHORT}`
 /** "12.5 kg" o "12.5 kg (aprox.)". */
 export const kgAmount = (kg: number, approx = false) => `${nf1(kg)} kg${approx ? ' (aprox.)' : ''}`
+
+/** Botón de engranaje del menú lateral (lleva a Perfil). */
+export const PROFILE_LABEL = 'Perfil, apariencia y accesibilidad'

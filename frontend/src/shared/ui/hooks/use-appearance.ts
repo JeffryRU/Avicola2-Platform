@@ -19,7 +19,7 @@ interface AppearanceState {
 /** Apariencia activa; la provee AppearanceProvider (shared/ui/components/appearance.tsx). */
 export const AppearanceContext = createContext<AppearanceState>({
   preference: DEFAULT_APPEARANCE,
-  resolved: { theme: 'light', contrast: 'normal' },
+  resolved: { theme: 'light', contrast: 'normal', accent: 'brand' },
   system: { prefersDark: false, prefersMoreContrast: false },
   setPreference: () => {},
 })

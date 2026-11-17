@@ -35,6 +35,11 @@ export function versionOfBranch(catalog: VersionCatalog, branch: string): AppVer
   return list.find((v) => v.branches.includes(branch)) ?? list.find((v) => v.moving) ?? list[list.length - 1]
 }
 
+/** La última versión del catálogo: la que no muestra franja ni aviso salvo que se pidan. */
+export function isLatest(catalog: VersionCatalog, version: AppVersion): boolean {
+  return catalog.versions[catalog.versions.length - 1]?.id === version.id
+}
+
 /** La versión anterior en el catálogo (para las novedades), o null si es la primera. */
 export function previousVersion(catalog: VersionCatalog, version: AppVersion): AppVersion | null {
   const i = catalog.versions.findIndex((v) => v.id === version.id)

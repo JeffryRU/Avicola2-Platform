@@ -25,7 +25,7 @@ export function BrandProvider({
 /** Mascota de Noraves en un círculo con borde fino dorado (y salto opcional). Identidad del cliente. */
 export function Mascot({ size, animated, shadow }: { size: number; animated?: boolean; shadow?: boolean }) {
   return (
-    <div className="flex flex-col items-center">
+    <div data-decor className="flex flex-col items-center">
       <div
         className={cn(
           'relative flex-none overflow-hidden rounded-full border-brand-accent bg-head-foreground',
@@ -115,20 +115,12 @@ export function BrandMark({
   )
 }
 
-/** Marca del producto: cuadro con la inicial, «AviPlanner» y la marca del cliente debajo. */
+/** Marca del producto: la mascota (o el isotipo de Rocío), «AviPlanner» y la marca del cliente debajo. */
 export function Logo({ onDark, compact }: { onDark?: boolean; compact?: boolean }) {
   const { brand } = useBrand()
   return (
     <div className="flex items-center gap-2.5">
-      <span
-        aria-hidden
-        className={cn(
-          'grid size-6.5 flex-none place-items-center rounded-md text-sm font-semibold hc:font-extrabold',
-          onDark ? 'bg-brand-accent text-head' : 'bg-head text-brand-accent',
-        )}
-      >
-        A
-      </span>
+      <BrandMark size={compact ? 30 : 34} onDark={onDark} />
       <span className="flex min-w-0 flex-col leading-tight">
         <span
           className={cn('text-md font-semibold hc:font-extrabold', onDark ? 'text-head-foreground' : 'text-foreground')}

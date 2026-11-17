@@ -41,7 +41,7 @@ export function ConnectionPage() {
   return (
     <div>
       <PageHeader title="Conexión" subtitle="Dónde se guardan las proyecciones." back={paths.profile} />
-      <PageBody className="grid gap-4 dsk:max-w-3xl">
+      <PageBody className="grid gap-4">
         {status.isLoading ? (
           <p role="status" className="text-muted-foreground">
             Comprobando conexión…

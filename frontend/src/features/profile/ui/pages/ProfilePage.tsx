@@ -4,14 +4,18 @@ import { Link } from 'react-router'
 import { InstallOption } from '@/app/install'
 import { paths } from '@/app/routes'
 import { contrastFromSwitch, type ThemePreference } from '@/shared/domain/appearance'
-import { initials } from '@/shared/domain/format'
-import { can, hasTeamView, roleLabel } from '@/shared/domain/session'
+import { can, hasTeamView } from '@/shared/domain/session'
 import { useLogout, useRequiredSession } from '@/features/auth'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Segmented } from '@/shared/ui/components/segmented'
 import { Switch } from '@/shared/ui/components/shadcn/switch'
+import { AccentSwatches } from '@/shared/ui/components/accent-picker'
+import { AccessibilityOptions } from '@/shared/ui/components/accessibility-options'
+import { A11Y_LABEL, ACCENT_LABEL, HIGH_CONTRAST_HINT, HIGH_CONTRAST_LABEL } from '@/shared/types/appearance'
 import { useAppearance } from '@/shared/ui/hooks/use-appearance'
+import { cn } from '@/shared/ui/lib/utils'
 import { VersionChip } from '@/features/versions'
+import { ProfileForm } from '@/features/profile/ui/pages/ProfileSettingsPage'
 import { LOGOUT_LABEL } from '@/shared/types/labels'
 
 const optCls =
@@ -42,95 +46,115 @@ function OptionText({ title, sub }: { title: ReactNode; sub: ReactNode }) {
   )
 }
 
-/** Tema (sistema, claro u oscuro) y alto contraste. Se guardan en este equipo. */
-function AppearanceSection() {
-  const { preference, resolved, system, setPreference } = useAppearance()
-  const contrastId = useId()
-  const high = resolved.contrast === 'high'
+/** Una fila de ajuste: título y ayuda arriba, el control debajo. */
+function Field({ title, hint, children }: { title: string; hint: ReactNode; children: ReactNode }) {
   return (
-    <Section title="Apariencia" className="mb-4">
-      <div className="grid gap-2 border-b border-rule px-4 py-3.5 dsk:px-5">
-        <span className="font-medium">Tema</span>
-        <Segmented
-          value={preference.theme}
-          options={THEME_OPTIONS}
-          onChange={(theme) => setPreference({ ...preference, theme })}
-          className="w-full dsk:w-96"
-          full
-        />
-        <small className="text-sm text-muted-foreground">
-          «Sistema» sigue el modo claro u oscuro de tu equipo
-          {preference.theme === 'system' ? ` (ahora: ${system.prefersDark ? 'oscuro' : 'claro'})` : ''}.
-        </small>
+    <div className="grid gap-2.5 border-b border-rule px-4 py-4 last:border-0 dsk:px-5">
+      <div>
+        <b className="block font-medium">{title}</b>
+        <small className="block text-sm text-muted-foreground">{hint}</small>
       </div>
-      <div className="flex items-start gap-4 px-4 py-3.5 dsk:px-5">
-        <label htmlFor={contrastId} className="min-w-0 flex-1 cursor-pointer">
-          <b className="block font-medium">Alto contraste</b>
-          <small className="block text-sm text-muted-foreground">
-            Letra más grande, más contraste y bordes marcados. Útil a pleno sol.
-            {system.prefersMoreContrast &&
-              ' Tu equipo pide más contraste, por eso viene activado; puedes apagarlo aquí.'}
-          </small>
-        </label>
-        <Switch
-          id={contrastId}
-          checked={high}
-          onCheckedChange={(on) => setPreference({ ...preference, contrast: contrastFromSwitch(on, system) })}
-          className="mt-1"
-        />
-      </div>
-    </Section>
+      {children}
+    </div>
   )
 }
 
+/** Mi cuenta: tus datos, tus herramientas (en celular, donde no hay menú lateral) y esta app. */
 export function ProfilePage() {
   const logout = useLogout()
   const session = useRequiredSession()
-  const { seller } = session
   // El jefe de despacho no proyecta: no tiene historial de proyecciones.
   const projects = hasTeamView(session) || !can(session, 'view_stock')
+  const tools: ReactNode[] = []
+  if (can(session, 'manage_editing'))
+    tools.push(
+      <Option key="u" to={paths.unlocks} title="Habilitaciones" sub="Horario de corte y solicitudes de edición" />,
+    )
+  if (can(session, 'view_saca'))
+    tools.push(<Option key="s" to={paths.saca} title="Cálculo de saca" sub="Cuánto pedir a granja cada día" />)
+  if (hasTeamView(session) && can(session, 'view_stock'))
+    tools.push(<Option key="t" to={paths.stock} title="Stock de despacho" sub="Lo que quedó en despacho cada día" />)
+  if (projects)
+    tools.push(
+      <Option key="h" to={paths.history} title="Historial de cambios" sub="Quién creó o modificó cada proyección" />,
+    )
   return (
     <div>
-      <PageHeader title="Perfil" />
-      <PageBody className="dsk:max-w-2xl">
-        <Section className="mb-4 flex items-center gap-4 p-4 dsk:p-5">
-          <div
-            aria-hidden
-            className="grid size-12 flex-none place-items-center rounded-full bg-selected text-md font-semibold text-selected-foreground"
-          >
-            {initials(seller.name)}
-          </div>
-          <div className="min-w-0">
-            <b className="block text-lg font-semibold hc:font-extrabold">{seller.name}</b>
-            <span className="text-muted-foreground">{roleLabel(seller)}</span>
-          </div>
-        </Section>
-        <AppearanceSection />
-        <Section title="Cuenta y herramientas" className="mb-4">
-          <Option to={paths.profileSettings} title="Configuración de perfil" sub="Tu nombre y los datos de tu cuenta" />
-          {can(session, 'manage_editing') && (
-            <Option to={paths.unlocks} title="Habilitaciones" sub="Horario de corte y solicitudes de edición" />
-          )}
-          {can(session, 'view_saca') && (
-            <Option to={paths.saca} title="Cálculo de saca" sub="Cuánto pedir a granja cada día" />
-          )}
-          {hasTeamView(session) && can(session, 'view_stock') && (
-            <Option to={paths.stock} title="Stock de despacho" sub="Lo que quedó en despacho cada día" />
-          )}
-          {projects && (
-            <Option to={paths.history} title="Historial de cambios" sub="Quién creó o modificó cada proyección" />
-          )}
-          <Option to={paths.connection} title="Conexión" sub="Dónde se guardan las proyecciones" />
+      <PageHeader title="Mi cuenta" back={null} />
+      <PageBody className="grid gap-4">
+        <ProfileForm />
+        {/* En escritorio estas pantallas ya están en el menú lateral. */}
+        {tools.length > 0 && (
+          <Section title="Herramientas" className="dsk:hidden">
+            {tools}
+          </Section>
+        )}
+        <Section title="Esta app">
           <InstallOption className={optCls} />
-          <Option to={paths.password} title="Cambiar contraseña" sub="Cierra tus sesiones en otros equipos" />
-          <button type="button" className={optCls} onClick={() => logout.mutate()}>
+          <VersionChip className="min-h-touch rounded-none border-b border-rule px-4 last:border-0 dsk:px-5" />
+          {/* En celular no hay menú lateral: aquí está la única salida. */}
+          <button type="button" className={cn(optCls, 'dsk:hidden')} onClick={() => logout.mutate()}>
             <OptionText
               title={<span className="text-bad">{LOGOUT_LABEL}</span>}
               sub="Volver a la pantalla de inicio de sesión"
             />
           </button>
         </Section>
-        <VersionChip className="min-h-touch border border-border bg-surface px-4 dsk:px-5" />
+      </PageBody>
+    </div>
+  )
+}
+
+/** Apariencia y accesibilidad: tema, color, alto contraste y las opciones de lectura. Se guardan en este equipo. */
+export function AppearancePage() {
+  const { preference, resolved, system, setPreference } = useAppearance()
+  const contrastId = useId()
+  const high = resolved.contrast === 'high'
+  return (
+    <div>
+      <PageHeader title="Apariencia y accesibilidad" back={paths.profile} />
+      <PageBody className="grid gap-4">
+        <Section title="Apariencia">
+          <Field
+            title="Tema"
+            hint={
+              <>
+                «Sistema» sigue el modo claro u oscuro de tu equipo
+                {preference.theme === 'system' ? ` (ahora: ${system.prefersDark ? 'oscuro' : 'claro'})` : ''}.
+              </>
+            }
+          >
+            <Segmented
+              value={preference.theme}
+              options={THEME_OPTIONS}
+              onChange={(theme) => setPreference({ ...preference, theme })}
+              className="w-full dsk:max-w-md"
+              full
+            />
+          </Field>
+          <Field title={ACCENT_LABEL} hint="Botones, enlaces y selección. También desde el botón de paleta del menú.">
+            <AccentSwatches />
+          </Field>
+          <div className="flex items-start gap-4 px-4 py-4 dsk:px-5">
+            <label htmlFor={contrastId} className="min-w-0 flex-1 cursor-pointer">
+              <b className="block font-medium">{HIGH_CONTRAST_LABEL}</b>
+              <small className="block text-sm text-muted-foreground">
+                {HIGH_CONTRAST_HINT}
+                {system.prefersMoreContrast &&
+                  ' Tu equipo pide más contraste, por eso viene activado; puedes apagarlo aquí.'}
+              </small>
+            </label>
+            <Switch
+              id={contrastId}
+              checked={high}
+              onCheckedChange={(on) => setPreference({ ...preference, contrast: contrastFromSwitch(on, system) })}
+              className="mt-1"
+            />
+          </div>
+        </Section>
+        <Section title={A11Y_LABEL}>
+          <AccessibilityOptions />
+        </Section>
       </PageBody>
     </div>
   )

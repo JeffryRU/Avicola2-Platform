@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import catalogText from '@/../public/versions.json?raw'
 import {
   changeLabel,
+  isLatest,
   liveNumber,
   notableChanges,
   previousVersion,
@@ -22,6 +23,11 @@ const pr = (n: number, title: string, date: string) =>
   commit(`Merge pull request #${String(n)} from JeffryRU/develop-6xp0z4\n\n${title}`, date, `pr${String(n)}`)
 
 describe('versiones', () => {
+  it('solo la última versión cuenta como la actual (sin franja ni aviso por su cuenta)', () => {
+    const [mvp1, mvp2, mvp3] = catalog.versions
+    expect([mvp1, mvp2, mvp3].map((v) => isLatest(catalog, v))).toEqual([false, false, true])
+  })
+
   it('el catálogo publicado es válido y va de la más antigua a la más nueva', () => {
     expect(catalog.versions.map((v) => v.id)).toEqual(['mvp1', 'mvp2', 'mvp3'])
     expect(catalog.versions.map((v) => v.version)).toEqual(['1.0.0', '2.0.0', '3.0.0'])

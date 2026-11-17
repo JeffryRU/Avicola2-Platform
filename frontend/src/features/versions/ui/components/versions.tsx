@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { History } from 'lucide-react'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
 import { PanelContext, useCurrentVersion, useOpenVersions } from '@/features/versions/ui/hooks'
@@ -8,16 +9,16 @@ import { cn } from '@/shared/ui/lib/utils'
 import { Highlights } from '@/features/versions/ui/components/version-panel'
 import { VersionPanel } from '@/features/versions/ui/components/version-panel'
 import { toneOf, longDate } from '@/features/versions/ui/components/version-style'
+import { isLatest } from '@/features/versions/domain/versions'
 
 /*
- * Selector de versiones (MVP 1, MVP 2…): una franja arriba dice qué versión se está viendo, al
- * abrir el enlace aparece un aviso grande y el panel permite cambiar de versión, ver sus
- * novedades y comparar dos. Cada versión se abre en su propio despliegue, con su backend.
+ * Selector de versiones (MVP 1, MVP 2…). En una versión anterior, una franja arriba dice qué
+ * versión se está viendo y el aviso grande sale una sola vez por versión. La última versión no
+ * muestra nada por su cuenta: el panel se abre con el botón de versiones (VersionsButton).
+ * Cada versión se abre en su propio despliegue, con su backend.
  */
 
 const SPLASH_KEY = 'nv_version_splash'
-/** El aviso grande vuelve a salir si pasaron unas horas desde la última vez (otra demo). */
-const SPLASH_EVERY_MS = 6 * 60 * 60_000
 const splashSchema = z.object({ id: z.string(), at: z.number() })
 
 /** Envuelve la app: franja de versión arriba, aviso grande al abrir y el panel. */
@@ -25,13 +26,12 @@ export function VersionProvider({ children }: { children: ReactNode }) {
   const { preferences } = useContainer()
   const [open, setOpen] = useState(false)
   const [dismissed, setDismissed] = useState<string | null>(null)
-  // Hora en que se abrió la app (no se recalcula en cada render).
-  const [openedAt] = useState(() => Date.now())
   const current = useCurrentVersion()
   const id = current.version?.id ?? null
+  const latest = !!current.catalog && !!current.version && isLatest(current.catalog, current.version)
   const seen = preferences.get(SPLASH_KEY, splashSchema)
-  const recently = !!seen && seen.id === id && openedAt - seen.at < SPLASH_EVERY_MS
-  const splash = !!id && dismissed !== id && !recently
+  // Una sola vez por versión, y nunca por su cuenta en la última.
+  const splash = !!id && !latest && dismissed !== id && seen?.id !== id
   const closeSplash = () => {
     if (!id) return
     setDismissed(id)
@@ -40,7 +40,7 @@ export function VersionProvider({ children }: { children: ReactNode }) {
   const openPanel = useMemo(() => () => setOpen(true), [])
   return (
     <PanelContext.Provider value={openPanel}>
-      <VersionRibbon onOpen={openPanel} />
+      {!latest && <VersionRibbon onOpen={openPanel} />}
       {children}
       {current.version && (
         <VersionSplash
@@ -57,7 +57,28 @@ export function VersionProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/** Franja de arriba: qué versión es esta. */
+/** Botón de versiones (arriba a la derecha): abre el panel para ver novedades o cambiar de versión. */
+export function VersionsButton({ className }: { className?: string }) {
+  const open = useOpenVersions()
+  const { version, number } = useCurrentVersion()
+  const label = version ? `Versiones (estás en ${version.name} · v${number})` : 'Versiones'
+  return (
+    <button
+      type="button"
+      onClick={open}
+      aria-label={label}
+      title={label}
+      className={cn(
+        'grid size-control flex-none place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground',
+        className,
+      )}
+    >
+      <History aria-hidden className="size-[1.15rem]" />
+    </button>
+  )
+}
+
+/** Franja de arriba (solo en versiones anteriores): qué versión es esta. */
 function VersionRibbon({ onOpen }: { onOpen: () => void }) {
   const { catalog, version, number } = useCurrentVersion()
   if (!version) return null

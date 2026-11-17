@@ -80,12 +80,12 @@ function VersionSelect({
   label: string
 }) {
   return (
-    <label className="grid gap-1.5">
+    <label className="grid min-w-0 gap-1.5">
       <span className="text-sm font-medium text-ink-2">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-touch rounded-md border-control border-input bg-surface px-3 text-base text-foreground focus-visible:border-ring dsk:h-control"
+        className="h-touch w-full min-w-0 rounded-md border-control border-input bg-surface px-3 text-base text-foreground focus-visible:border-ring dsk:h-control"
       >
         {catalog.versions.map((v) => (
           <option key={v.id} value={v.id}>
@@ -135,7 +135,7 @@ function VersionCard({
   current: AppVersion
 }) {
   return (
-    <div className="grid gap-3 rounded-md border border-border p-4 hc:border-x-0 hc:border-t-heavy hc:border-b-heavy">
+    <div className="grid min-w-0 gap-3 rounded-md border border-border p-4 hc:border-x-0 hc:border-t-heavy hc:border-b-heavy">
       <div className="flex items-start gap-3">
         <span aria-hidden className={cn('mt-2 size-2.5 flex-none rounded-full', toneOf(catalog, version))} />
         <div>
@@ -165,7 +165,7 @@ function VersionsTab({
   const [id, setId] = useState(current.id)
   const version = catalog.versions.find((v) => v.id === id) ?? current
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       <VersionSelect catalog={catalog} value={id} onChange={setId} label="Ver la app en" />
       <VersionCard
         catalog={catalog}
@@ -213,7 +213,7 @@ function NewsTab({ catalog, current }: { catalog: VersionCatalog; current: AppVe
   const version = catalog.versions.find((v) => v.id === id) ?? current
   const prev = previousVersion(catalog, version)
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       <VersionSelect catalog={catalog} value={id} onChange={setId} label="Novedades de" />
       {prev ? (
         <>
@@ -251,7 +251,7 @@ function CompareTab({
   // Las novedades siempre van de la más antigua a la más nueva.
   const [older, newer] = list.indexOf(va) <= list.indexOf(vb) ? [va, vb] : [vb, va]
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
         <VersionSelect catalog={catalog} value={a} onChange={setA} label="Versión A" />
         <ArrowRight className="mb-3 size-5 text-muted-foreground" />
