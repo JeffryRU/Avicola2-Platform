@@ -1,5 +1,6 @@
 """Repositorios SQL de la planificación: SQLAlchemy Core portable, sirve para cualquier motor."""
 
+import json
 from collections import defaultdict
 from datetime import UTC, date, datetime
 
@@ -15,6 +16,7 @@ from app.planning.domain.models import (
     SellerAccount,
     projectable,
 )
+from app.planning.domain.preferences import Preferences
 from app.planning.infrastructure.persistence.tables import (
     products,
     projection_lines,
@@ -199,6 +201,20 @@ class SqlSellerRepository:
             update(sellers)
             .where(sellers.c.username == seller.username)
             .values(name=seller.name, zone=seller.zone)
+        )
+        self.session.commit()
+
+    def get_preferences(self, username: str) -> Preferences | None:
+        raw = self.session.execute(
+            select(sellers.c.preferences).where(sellers.c.username == username)
+        ).scalar_one_or_none()
+        return None if raw is None else json.loads(raw)
+
+    def save_preferences(self, username: str, preferences: Preferences) -> None:
+        self.session.execute(
+            update(sellers)
+            .where(sellers.c.username == username)
+            .values(preferences=json.dumps(preferences, separators=(",", ":")))
         )
         self.session.commit()
 

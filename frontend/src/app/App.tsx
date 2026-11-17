@@ -7,7 +7,7 @@ import type { Container } from '@/app/container'
 import { ContainerContext, useContainer } from '@/app/di'
 import { createQueryClient } from '@/app/query-client'
 import { LoginPage } from '@/features/auth/ui/pages/LoginPage'
-import { useSession, useVerifySession } from '@/features/auth'
+import { usePreferencesSync, useSession, useVerifySession } from '@/features/auth'
 import { VersionProvider } from '@/features/versions'
 import { TopControls } from '@/app/top-controls'
 import { BrandProvider } from '@/shared/ui/components/brand'
@@ -47,6 +47,7 @@ function useSessionLifecycle() {
   const user = session?.seller.username
   const { auth } = useContainer()
   useVerifySession(user)
+  usePreferencesSync()
   useEffect(() => {
     // Al volver a la pestaña se confirma la sesión: en otra pestaña pudieron entrar con otra cuenta.
     const check = () => {

@@ -9,9 +9,9 @@ La app mÃ³vil no usa cookies: pide el token con `POST /api/auth/token` y lo envÃ
 
 from dataclasses import asdict
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Cookie, Depends, Header, Query, Response, status
+from fastapi import APIRouter, Body, Cookie, Depends, Header, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -228,6 +228,20 @@ def me(account: Account) -> s.AccountOut:
 def update_profile(use_cases: UseCases, account: Account, body: s.ProfileIn) -> s.AccountOut:
     """La persona edita su propio perfil (por ahora, el nombre visible)."""
     return _account_out(use_cases.update_profile(account, body.name))
+
+
+@public.get("/auth/preferences")
+def get_preferences(use_cases: UseCases, account: Account) -> dict[str, Any] | None:
+    """Preferencias de la interfaz de la cuenta (tema, color, accesibilidad); null si no hay."""
+    return use_cases.get_preferences(account)
+
+
+@public.put("/auth/preferences")
+def save_preferences(
+    use_cases: UseCases, account: Account, body: Annotated[dict[str, Any], Body()]
+) -> dict[str, Any]:
+    """Guarda las preferencias tal como las manda la app (solo se acota su forma)."""
+    return use_cases.save_preferences(account, body)
 
 
 @public.post("/auth/password")

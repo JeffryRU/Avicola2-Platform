@@ -330,6 +330,54 @@ def test_update_profile_requires_session(client):
     assert client.patch("/api/auth/profile", json={"name": "Alguien"}).status_code == 401
 
 
+# --- Preferencias de la interfaz por cuenta ----------------------------------------------
+
+PREFS = {
+    "theme": "dark",
+    "contrast": "system",
+    "accent": "green",
+    "a11y": {"textSize": "large", "readAloud": True, "hideImages": False},
+}
+
+
+def test_preferences_follow_the_account_not_the_device(client):
+    _login(client)
+    assert client.get("/api/auth/preferences").json() is None
+    r = client.put("/api/auth/preferences", json=PREFS)
+    assert r.status_code == 200, r.text
+    assert r.json() == PREFS
+    # Otro dispositivo (otro cliente, sin cookies compartidas) recibe lo mismo.
+    other = TestClient(app)
+    _login(other)
+    assert other.get("/api/auth/preferences").json() == PREFS
+    # Cada cuenta tiene las suyas.
+    _login(client, "hdias")
+    assert client.get("/api/auth/preferences").json() is None
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        ["dark"],
+        {"theme": "x" * 41},
+        {"a11y": {"nested": {"too": "deep"}}},
+        {"size": 3},
+        {f"k{i}": True for i in range(41)},
+        {"": True},
+    ],
+)
+def test_preferences_shape_is_bounded(client, bad):
+    _login(client)
+    assert client.put("/api/auth/preferences", json=bad).status_code == 422
+    assert client.get("/api/auth/preferences").json() is None
+
+
+def test_preferences_require_session(client):
+    client.cookies.clear()
+    assert client.get("/api/auth/preferences").status_code == 401
+    assert client.put("/api/auth/preferences", json=PREFS).status_code == 401
+
+
 def test_cli_creates_the_master_table_sellers_with_temporary_passwords(capsys):
     """`cli vendedores` (producción): 7 cuentas con contraseña inicial, sin cambio obligatorio."""
     metadata.drop_all(engine)

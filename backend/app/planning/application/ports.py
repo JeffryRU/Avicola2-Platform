@@ -13,6 +13,7 @@ from app.planning.domain.history import ProjectionChange
 from app.planning.domain.models import DailyUnits, Product, Projection, Seller, SellerAccount
 from app.planning.domain.notifications import Event, Notification
 from app.planning.domain.orders import OrderLine
+from app.planning.domain.preferences import Preferences
 from app.planning.domain.production import DailyProduction, FittedArrival
 from app.planning.domain.stock import DailyStock
 
@@ -46,6 +47,12 @@ class SellerRepository(Protocol):
     def save_profile(self, seller: Seller) -> None:
         """Guarda los datos visibles de la cuenta (nombre y zona)."""
         ...
+
+    def get_preferences(self, username: str) -> Preferences | None:
+        """Preferencias de la interfaz de la cuenta; None si aún no guardó ninguna."""
+        ...
+
+    def save_preferences(self, username: str, preferences: Preferences) -> None: ...
 
     def apply(self, change: AccountChange) -> ChangeOutcome:
         """Cambio administrativo atómico: vuelve a comprobar las condiciones de `change` con las
