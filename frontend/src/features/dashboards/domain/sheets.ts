@@ -1,5 +1,5 @@
 import type { IsoDate } from '@/shared/domain/dates'
-import type { Units } from '@/shared/domain/products'
+import { productType, type Product, type Units } from '@/shared/domain/products'
 import type { Catalog } from '@/features/catalog'
 import type { ProjectionChange } from '@/features/history'
 import type { Projection } from '@/features/projections'
@@ -52,6 +52,36 @@ export function sheetRounds(
     for (let r = 0; r < rounds; r++) kg[g.date][r] += catalog.kg(g.list[Math.min(r, g.list.length - 1)])
   }
   return { rounds, kg }
+}
+
+/**
+ * De qué está hecha la proyección vigente de cada día: kg por tamaño de brasa (chica, mediana,
+ * grande) o, si se eligieron de 1 a 4 productos, por producto. Partes de abajo hacia arriba.
+ */
+export function projectionParts(
+  dates: IsoDate[],
+  sellers: readonly string[], // vacía = todos
+  projections: Projection[],
+  products: Product[], // los que se proyectan, en orden
+  picked: readonly string[],
+): { names: string[]; kg: Record<IsoDate, number[]> } {
+  const byProduct = picked.length > 0 && picked.length <= 4
+  const shown = products.filter((p) => !picked.length || picked.includes(p.id))
+  const nameOf = (p: Product) => (byProduct ? p.name : productType(p))
+  const names = [...new Set(shown.map(nameOf))]
+  const part = new Map(shown.map((p) => [p.id, { k: names.indexOf(nameOf(p)), kg: p.kg_per_unit }]))
+  const inDates = new Set(dates)
+  const kg: Record<IsoDate, number[]> = {}
+  for (const d of dates) kg[d] = names.map(() => 0)
+  for (const p of projections) {
+    if (p.status !== 'confirmed' || !inDates.has(p.date)) continue
+    if (sellers.length && !sellers.includes(p.seller)) continue
+    for (const [id, units] of Object.entries(p.units)) {
+      const at = part.get(id)
+      if (at) kg[p.date][at.k] += units * at.kg
+    }
+  }
+  return { names, kg }
 }
 
 /** Solo los productos elegidos (vacía = todos): para ver un producto o un grupo en el gráfico. */
