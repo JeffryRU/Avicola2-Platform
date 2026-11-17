@@ -35,6 +35,8 @@ import { GithubVersionsGateway } from '@/features/versions/infrastructure/github
 import type { ProductionGateway } from '@/features/production'
 import { HttpProductionGateway } from '@/features/production/infrastructure/http-production-gateway'
 import type { SacaGateway } from '@/features/saca'
+import type { ModelGateway } from '@/features/model'
+import { HttpModelGateway } from '@/features/model/infrastructure/http-model-gateway'
 import { HttpSacaGateway } from '@/features/saca/infrastructure/http-saca-gateway'
 import { BrowserTableExporter } from '@/shared/infrastructure/table-exporter'
 import { StoredDraftRepository, StoredSubmissionQueue } from '@/features/projections/infrastructure/stored-repositories'
@@ -61,6 +63,7 @@ export interface Container {
   /** Versiones publicadas (MVP 1, MVP 2…) y sus novedades. */
   versions: VersionsGateway
   saca: SacaGateway
+  model: ModelGateway
   production: ProductionGateway
   installer: AppInstaller
 }
@@ -113,6 +116,7 @@ export function createContainer(): Container {
     stock: new HttpStockGateway(http),
     versions: new GithubVersionsGateway(),
     saca: new HttpSacaGateway(http),
+    model: new HttpModelGateway(http),
     production: new HttpProductionGateway(http),
     installer: new BrowserAppInstaller(window, import.meta.env.VITE_ANDROID_APK_URL),
   }
