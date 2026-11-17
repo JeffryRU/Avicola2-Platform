@@ -52,8 +52,16 @@ MODELS = {
 }
 ROBUST = ("actual", "suavizado", "tsb", "sba", "boosting", "cliente")
 # Qué modelo se usa en cada lugar de la app (elegidos con validación + prueba).
-CHOSEN = {"sugerencia": "robusta", "saca": "destilado", "semana": "apilado"}
-STORED = ("actual", "robusta", "destilado", "apilado")
+# Cada uso toma el modelo con menor error en su nivel (se recalcula en cada entrenamiento: con más
+# historia el mejor puede cambiar).
+USES = {"sugerencia": "vendedor_dia", "saca": "tamano_dia", "semana": "equipo_semana"}
+BASELINE = "actual"
+
+
+def choose(metrics: dict[str, dict[str, float]]) -> dict[str, str]:
+    """El modelo de menor error en el nivel de cada uso (sin contar la mediana anterior)."""
+    candidates = [k for k in metrics if k != BASELINE]
+    return {use: min(candidates, key=lambda k: metrics[k][level]) for use, level in USES.items()}
 
 
 def _cubes(session: Session, products: list[Product]):
@@ -196,6 +204,7 @@ def _train(session: Session, products: list[Product]) -> dict | None:
     evaluated = val_d + test_d
     A = Y[:, :, evaluated]
     metrics = {k: core.wape(np.stack([preds[k][d] for d in evaluated], axis=2), A) for k in MODELS}
+    chosen = choose(metrics)
     summary = {
         "trained_at": datetime.now(UTC).isoformat(),
         "data_from": days[0].isoformat(),
@@ -212,17 +221,20 @@ def _train(session: Session, products: list[Product]) -> dict | None:
         "sellers": sellers,
         "series_teacher": int(YA.shape[0]),
         "models": [{"key": k, "name": n, "metrics": metrics[k]} for k, n in MODELS.items()],
-        "chosen": CHOSEN,
+        "chosen": chosen,
+        # Total del equipo por día: lo real, la mediana anterior y el modelo de cada uso.
         "series": [
             {
                 "date": days[d].isoformat(),
                 "real": float(Y[:, :, d].sum()),
-                **{k: float(preds[k][d].sum()) for k in STORED},
+                "actual": float(preds[BASELINE][d].sum()),
+                **{use: float(preds[k][d].sum()) for use, k in chosen.items()},
             }
             for d in evaluated
         ],
     }
-    _save(session, summary, preds, evaluated + future, days, sellers, brasa)
+    stored = sorted({BASELINE, *chosen.values()})
+    _save(session, summary, preds, stored, evaluated + future, days, sellers, brasa)
     logger.info(
         "Modelo de demanda entrenado: %d vendedores, %s a %s",
         S, summary["data_from"], summary["data_to"],
@@ -230,7 +242,7 @@ def _train(session: Session, products: list[Product]) -> dict | None:
     return summary
 
 
-def _save(session, summary, preds, evaluated, days, sellers, brasa) -> None:
+def _save(session, summary, preds, stored, evaluated, days, sellers, brasa) -> None:
     # Solo se conserva la última corrida: las predicciones son de los días evaluados.
     session.execute(delete(model_predictions))
     session.execute(delete(model_runs))
@@ -238,7 +250,7 @@ def _save(session, summary, preds, evaluated, days, sellers, brasa) -> None:
         insert(model_runs).values(trained_at=datetime.now(UTC), summary=json.dumps(summary))
     )
     rows = []
-    for k in STORED:
+    for k in stored:
         for d in evaluated:
             for s, seller in enumerate(sellers):
                 units = {

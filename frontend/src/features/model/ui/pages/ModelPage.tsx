@@ -57,17 +57,19 @@ export function ModelPage() {
   const chosen = new Set(Object.values(s.chosen))
   const total = Object.values(s.split).reduce((a, p) => a + p[2], 0)
   // Por semana: 63 días no se leen día a día y la semana es el nivel de planificación.
-  const weeks: { start: string; days: number; real: number; robusta: number; actual: number }[] = []
+  const weeks: { start: string; days: number; real: number; model: number; actual: number }[] = []
   for (const p of s.series) {
     const start = weekStart(p.date)
     const last = weeks.at(-1)
     if (last?.start === start) {
       last.days += 1
       last.real += p.real
-      last.robusta += p.robusta
+      last.model += p.semana
       last.actual += p.actual
-    } else weeks.push({ start, days: 1, real: p.real, robusta: p.robusta, actual: p.actual })
+    } else weeks.push({ start, days: 1, real: p.real, model: p.semana, actual: p.actual })
   }
+  // El gráfico es semanal: muestra el modelo elegido para la semana.
+  const weekModel = `${byKey[s.chosen.semana]?.name ?? ''} (en uso)`
   // Solo semanas completas: una semana a medias parecería una caída de la demanda.
   const fullWeeks = weeks.filter((w) => w.days === 7)
   return (
@@ -173,7 +175,7 @@ export function ModelPage() {
         <Section title={CHART_TITLE} className="mb-4">
           <div className="px-4 pt-3 pb-4 dsk:px-5">
             <div className="mb-2 flex flex-wrap justify-end gap-x-4 gap-y-1 text-sm text-ink-2">
-              <span>— {SERIES.robusta}</span>
+              <span>— {weekModel}</span>
               <span className="text-[var(--chart-2)]">- - {SERIES.real}</span>
               <span className="text-[var(--chart-model)]">— — {SERIES.actual}</span>
             </div>
@@ -184,7 +186,7 @@ export function ModelPage() {
                   key: p.start,
                   label: 'Sem.',
                   sublabel: dDM(p.start),
-                  a: p.robusta,
+                  a: p.model,
                   b: p.real,
                   c: p.actual,
                   tip: (
@@ -193,7 +195,7 @@ export function ModelPage() {
                       <br />
                       {SERIES.real}: {nf0(p.real)}
                       <br />
-                      {SERIES.robusta}: {nf0(p.robusta)}
+                      {weekModel}: {nf0(p.model)}
                       <br />
                       {SERIES.actual}: {nf0(p.actual)}
                     </>
