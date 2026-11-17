@@ -109,10 +109,9 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
 1. **Comprobar:** `https://APP_DOMAIN/health` responde `{"status":"ok"}` (solo el proceso; es el que usa el healthcheck) y `https://APP_DOMAIN/health/ready` responde `{"status":"ok","database":"ok"}`.
 2. **Primer supervisor** (los usuarios de prueba no existen en producción):
    ```bash
-   docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli init
    docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli supervisor <usuario> "<Nombre Apellido>" --general
    ```
-   - `init` carga el catálogo de productos.
+   - El catálogo de productos no hace falta cargarlo: el backend corre `cli init` en cada arranque, después de las migraciones.
    - `supervisor` muestra una contraseña inicial (se puede cambiar desde el perfil, no es obligatorio). Con `--general` crea un supervisor general, el único que gestiona a otros supervisores y cambia roles ([ADR 0010](adr/0010-roles-y-permisos.md)).
    - Si ya había un supervisor de antes, se lo asciende con `cli rol <usuario> general_supervisor`.
    - Después, el supervisor crea a los vendedores desde la pantalla **Usuarios**, o se cargan de una vez los 7 de la tabla maestra (`config/planning_seed.yaml`):
