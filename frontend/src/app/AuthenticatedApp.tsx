@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, type ComponentType, type ReactNode } from 'r
 import { Navigate, Route, Routes } from 'react-router'
 import { toast } from 'sonner'
 import { AppShell } from '@/app/AppShell'
+import { ProfileLayout } from '@/app/ProfileLayout'
 import { paths, routePatterns } from '@/app/routes'
 import { can, hasTeamView, type Session } from '@/shared/domain/session'
 import { useRealtime } from '@/features/notifications'
@@ -22,7 +23,6 @@ const HistoryPage = page(() => import('@/features/history/ui/pages/HistoryPage')
 const UnlocksPage = page(() => import('@/features/editing/ui/pages/UnlocksPage'), 'UnlocksPage')
 const AccountsPage = page(() => import('@/features/accounts/ui/pages/AccountsPage'), 'AccountsPage')
 const ChangePasswordPage = page(() => import('@/features/auth/ui/pages/ChangePasswordPage'), 'ChangePasswordPage')
-const ConnectionPage = page(() => import('@/features/connection/ui/pages/ConnectionPage'), 'ConnectionPage')
 const DashboardStatusPage = page(
   () => import('@/features/dashboards/ui/pages/DashboardStatusPage'),
   'DashboardStatusPage',
@@ -36,15 +36,16 @@ const DashboardVersusPage = page(
   'DashboardVersusPage',
 )
 const SupervisorHomePage = page(() => import('@/features/home/ui/pages/SupervisorHomePage'), 'SupervisorHomePage')
-const ProfileSettingsPage = page(() => import('@/features/profile/ui/pages/ProfileSettingsPage'), 'ProfileSettingsPage')
 const TeamDayPage = page(() => import('@/features/dashboards/ui/pages/TeamDayPage'), 'TeamDayPage')
 const DayDetailPage = page(() => import('@/features/projections/ui/pages/DayDetailPage'), 'DayDetailPage')
 const HomePage = page(() => import('@/features/home/ui/pages/HomePage'), 'HomePage')
+const DispatchHomePage = page(() => import('@/features/home/ui/pages/DispatchHomePage'), 'DispatchHomePage')
 const MyProjectionsPage = page(() => import('@/features/projections/ui/pages/MyProjectionsPage'), 'MyProjectionsPage')
 const NewProjectionPage = page(() => import('@/features/projections/ui/pages/NewProjectionPage'), 'NewProjectionPage')
 const NotificationsPage = page(() => import('@/features/notifications/ui/pages/NotificationsPage'), 'NotificationsPage')
 const ProductsPage = page(() => import('@/features/catalog/ui/pages/ProductsPage'), 'ProductsPage')
 const ProfilePage = page(() => import('@/features/profile/ui/pages/ProfilePage'), 'ProfilePage')
+const AppearancePage = page(() => import('@/features/profile/ui/pages/ProfilePage'), 'AppearancePage')
 const ForecastPage = page(() => import('@/features/production/ui/pages/ForecastPage'), 'ForecastPage')
 const MyRequestsPage = page(() => import('@/features/editing/ui/pages/MyRequestsPage'), 'MyRequestsPage')
 const ProductionPage = page(() => import('@/features/production/ui/pages/ProductionPage'), 'ProductionPage')
@@ -81,10 +82,15 @@ function useOutboxSync() {
 const accountRoutes = (
   <>
     <Route path={paths.notifications} element={<NotificationsPage />} />
-    <Route path={paths.profile} element={<ProfilePage />} />
-    <Route path={paths.profileSettings} element={<ProfileSettingsPage />} />
-    <Route path={paths.password} element={<ChangePasswordPage />} />
-    <Route path={paths.connection} element={<ConnectionPage />} />
+    {/* Rutas viejas de la cuenta: datos va en «Mi cuenta», accesibilidad junto a apariencia. */}
+    <Route path={paths.profileSettings} element={<Navigate to={paths.profile} replace />} />
+    <Route path={paths.accessibility} element={<Navigate to={paths.appearance} replace />} />
+    <Route path={paths.connection} element={<Navigate to={paths.profile} replace />} />
+    <Route element={<ProfileLayout />}>
+      <Route path={paths.profile} element={<ProfilePage />} />
+      <Route path={paths.appearance} element={<AppearancePage />} />
+      <Route path={paths.password} element={<ChangePasswordPage />} />
+    </Route>
     <Route path="*" element={<Navigate to={paths.home} replace />} />
   </>
 )
@@ -123,11 +129,12 @@ function TeamRoutes({ session }: { session: Session }) {
   )
 }
 
-/** Jefe de despacho: su inicio es el stock; no proyecta ni ve dashboards. */
+/** Jefe de despacho: su inicio resume stock y producción; no proyecta ni ve dashboards. */
 function DispatchRoutes({ session }: { session: Session }) {
   return (
     <ShellRoutes>
-      <Route index element={<StockPage />} />
+      <Route index element={<DispatchHomePage />} />
+      <Route path={paths.stock} element={<StockPage />} />
       {can(session, 'view_production') && <Route path={paths.production} element={<ProductionPage />} />}
       {can(session, 'view_production') && <Route path={paths.forecast} element={<ForecastPage />} />}
       {accountRoutes}

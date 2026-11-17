@@ -19,6 +19,8 @@ export const paths = {
   notifications: '/notificaciones',
   profile: '/perfil',
   profileSettings: '/perfil/datos',
+  appearance: '/perfil/apariencia',
+  accessibility: '/perfil/accesibilidad',
   connection: '/perfil/conexion',
   password: '/perfil/contrasena',
   accounts: '/usuarios',

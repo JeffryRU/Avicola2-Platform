@@ -32,7 +32,7 @@ const FEATURE_DEPS = {
   stock: ['auth', 'catalog'],
   accounts: ['auth', 'editing'],
   profile: ['auth', 'versions'],
-  home: ['auth', 'catalog', 'dashboards', 'editing', 'notifications', 'projections'],
+  home: ['auth', 'catalog', 'dashboards', 'editing', 'notifications', 'production', 'projections', 'stock'],
 }
 
 // Toda carpeta de src/features debe estar declarada, y sin ciclos (solo hacia atrás en la lista).

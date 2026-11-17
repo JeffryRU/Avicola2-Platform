@@ -1,15 +1,37 @@
 import { useEffect } from 'react'
-import { Bell, LogOut } from 'lucide-react'
+import {
+  Bell,
+  CalendarDays,
+  Calculator,
+  ChartColumn,
+  ChartLine,
+  ClipboardPen,
+  Drumstick,
+  Factory,
+  History,
+  House,
+  Inbox,
+  ListChecks,
+  LockOpen,
+  LogOut,
+  Settings,
+  TrendingUp,
+  Users,
+  Warehouse,
+  type LucideIcon,
+} from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { InstallBanner } from '@/app/install'
+import { TopControls } from '@/app/top-controls'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
 import { can, hasTeamView, roleLabel, type Session } from '@/shared/domain/session'
+import { initials } from '@/shared/domain/format'
 import { useLogout, useRequiredSession } from '@/features/auth'
 import { useUnreadCount } from '@/features/notifications'
 import { useUnlocks, MY_REQUESTS_TITLE, UNLOCKS_TITLE } from '@/features/editing'
 import { Logo } from '@/shared/ui/components/brand'
 import { cn } from '@/shared/ui/lib/utils'
-import { LOGOUT_LABEL } from '@/shared/types/labels'
+import { LOGOUT_LABEL, PROFILE_LABEL } from '@/shared/types/labels'
 import { STOCK_TITLE } from '@/features/stock'
 import { FORECAST_NAV_LABEL, PRODUCTION_TITLE } from '@/features/production'
 import { SACA_TITLE } from '@/features/saca'
@@ -21,13 +43,35 @@ interface NavItem {
   end?: boolean
   /** Cifra a la derecha (pendientes, no leídas). */
   count?: number
+  /** Icono propio; si no, el de la ruta (NAV_ICONS). */
+  icon?: LucideIcon
 }
 interface NavGroup {
   title?: string
   items: NavItem[]
 }
 
-/** Menú lateral por rol: grupos con título, sin iconos (docs/diseno/sistema.md). */
+/** Icono de cada pantalla del menú lateral. */
+const NAV_ICONS: Record<string, LucideIcon> = {
+  [paths.home]: House,
+  [paths.register]: ClipboardPen,
+  [paths.mine]: ListChecks,
+  [paths.requests]: Inbox,
+  [paths.saca]: Calculator,
+  [paths.stock]: Warehouse,
+  [paths.production]: Factory,
+  [paths.forecast]: TrendingUp,
+  [paths.dashSummary]: ChartColumn,
+  [paths.dashVersus]: ChartLine,
+  [paths.dashStatus]: CalendarDays,
+  [paths.history]: History,
+  [paths.unlocks]: LockOpen,
+  [paths.accounts]: Users,
+  [paths.products]: Drumstick,
+  [paths.notifications]: Bell,
+}
+
+/** Menú lateral por rol: grupos con título, cada pantalla con su icono. */
 function navGroups(session: Session, counts: { unread: number; unlocks: number }): NavGroup[] {
   const production = can(session, 'view_production')
   const bell: NavItem = { to: paths.notifications, label: 'Notificaciones', count: counts.unread }
@@ -36,7 +80,8 @@ function navGroups(session: Session, counts: { unread: number; unlocks: number }
     return [
       {
         items: [
-          { to: paths.home, label: STOCK_TITLE, end: true },
+          { to: paths.home, label: 'Inicio', end: true },
+          { to: paths.stock, label: STOCK_TITLE },
           ...(production
             ? [
                 { to: paths.production, label: PRODUCTION_TITLE },
@@ -109,11 +154,13 @@ const sideItemCls = (active: boolean) =>
       'bg-nav-active font-semibold text-nav-active-foreground hover:bg-nav-active hover:text-nav-active-foreground hc:font-extrabold',
   )
 
-function SideItem({ to, label, end, count }: NavItem) {
+function SideItem({ to, label, end, count, icon }: NavItem) {
   const { pathname } = useLocation()
+  const Icon = icon ?? NAV_ICONS[to]
   // "Registrar" sigue activo en la pantalla de éxito y "Mis proyecciones" en el detalle.
   return (
     <NavLink to={to} end={end} className={({ isActive }) => sideItemCls(isActive || (!end && pathname.startsWith(to)))}>
+      {Icon && <Icon aria-hidden className="size-4 flex-none opacity-80" />}
       <span className="min-w-0 flex-1">{label}</span>
       {!!count && (
         <span
@@ -153,24 +200,45 @@ function Sidebar() {
             </div>
           ))}
         </nav>
-        {/* Pie compacto: la versión ya está en la franja de arriba y en Perfil. */}
-        <div className="mt-auto grid gap-px pt-5">
-          <div className="flex items-center gap-2 border-t border-border pt-2.5 pb-1 pl-2.5 hc:border-t-heavy hc:border-foreground">
+        {/* Pie: herramientas (versiones, color, accesibilidad, tema) y la cuenta con Perfil y salir. */}
+        <div className="mt-auto grid grid-cols-[minmax(0,1fr)] gap-px pt-5">
+          <TopControls side="top" className="mb-1 grid grid-cols-4 gap-0 [&>*]:w-full" />
+          <div className="flex items-center gap-1 border-t border-border pt-2.5 pb-1 pl-1 hc:border-t-heavy hc:border-foreground">
+            <span
+              aria-hidden
+              className="mr-0.5 grid size-7 flex-none place-items-center rounded-full bg-selected text-xs font-semibold text-selected-foreground hc:bg-brand-accent hc:text-foreground"
+            >
+              {initials(seller.name)}
+            </span>
             <div className="min-w-0 flex-1">
-              <b className="block truncate text-base font-medium">{seller.name}</b>
-              <small className="text-xs text-muted-foreground">{roleLabel(seller)}</small>
+              <b className="block truncate text-sm font-medium" title={seller.name}>
+                {seller.name}
+              </b>
+              <small className="block truncate text-xs text-muted-foreground">{roleLabel(seller)}</small>
             </div>
+            <NavLink
+              to={paths.profile}
+              aria-label={PROFILE_LABEL}
+              title={PROFILE_LABEL}
+              className={({ isActive }) =>
+                cn(
+                  'grid size-8 flex-none place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground',
+                  isActive && 'bg-nav-active text-nav-active-foreground hover:bg-nav-active',
+                )
+              }
+            >
+              <Settings className="size-4" />
+            </NavLink>
             <button
               type="button"
               aria-label={LOGOUT_LABEL}
               title={LOGOUT_LABEL}
               onClick={() => logout.mutate()}
-              className="grid size-control flex-none place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="grid size-8 flex-none place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <LogOut className="size-4" />
             </button>
           </div>
-          <SideItem to={paths.profile} label="Perfil y apariencia" />
         </div>
       </div>
     </aside>
@@ -195,6 +263,7 @@ function TopBar() {
         </span>
       </Link>
       <span className="hidden text-sm text-head-muted hc:dsk:inline">{seller.name}</span>
+      <TopControls className="dsk:hidden hc:text-head-foreground [&_button]:hc:text-head-foreground [&_button]:hc:hover:bg-transparent" />
       <Link
         to={paths.notifications}
         aria-label={unread > 0 ? `Notificaciones: ${unread} sin leer` : 'Notificaciones'}
@@ -228,9 +297,9 @@ const BOTTOM_SUPERVISOR: BottomItem[] = [
   { to: paths.profile, label: 'Perfil' },
 ]
 const BOTTOM_DISPATCH: BottomItem[] = [
-  { to: paths.home, label: 'Stock', end: true },
+  { to: paths.home, label: 'Inicio', end: true },
+  { to: paths.stock, label: 'Stock' },
   { to: paths.production, label: PRODUCTION_TITLE },
-  { to: paths.forecast, label: FORECAST_NAV_LABEL },
   { to: paths.notifications, label: 'Avisos' },
   { to: paths.profile, label: 'Perfil' },
 ]

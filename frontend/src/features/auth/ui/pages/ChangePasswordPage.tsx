@@ -92,7 +92,7 @@ export function ChangePasswordPage() {
   return (
     <div>
       <PageHeader title="Cambiar contraseña" back={paths.profile} />
-      <PageBody className="dsk:max-w-lg">
+      <PageBody>
         <Section>
           <PasswordForm onDone={() => navigate(paths.profile)} />
         </Section>
