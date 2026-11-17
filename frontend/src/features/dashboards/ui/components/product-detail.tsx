@@ -275,7 +275,7 @@ export function DetailFilterMenus({ dates, custom, catalog }: { dates: IsoDate[]
 }
 
 /** Opción marcable de un menú que queda abierto para elegir varias. */
-function CheckItem({ checked, onToggle, children }: { checked: boolean; onToggle: () => void; children: ReactNode }) {
+export function CheckItem({ checked, onToggle, children }: { checked: boolean; onToggle: () => void; children: ReactNode }) {
   return (
     <DropdownMenuCheckboxItem
       checked={checked}

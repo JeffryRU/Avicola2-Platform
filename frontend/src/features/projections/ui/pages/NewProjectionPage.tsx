@@ -35,7 +35,8 @@ import { closedDays, closedDaysNote, EditingDays, openDates, useEditingWindow, w
 export function NewProjectionPage() {
   const { drafts } = useContainer()
   const { seller } = useRequiredSession()
-  const { catalog } = useCatalog()
+  // Solo lo que se proyecta (la brasa): el pollo de mercado queda para el stock y la saca.
+  const { projection: catalog } = useCatalog()
   const [params] = useSearchParams()
   // Solo el vendedor registra, y solo lo suyo (la supervisión revisa: no tiene esta pantalla).
   const owner = seller.username
@@ -47,7 +48,6 @@ export function NewProjectionPage() {
   const mobile = useIsMobile()
   const navigate = useNavigate()
   const submit = useSubmitProjection()
-  const suggestion = useSuggestion()
   // ?dia=AAAA-MM-DD abre la edición de un solo día (desde Inicio o el detalle).
   const [stored, setStored] = useState<Draft>(() => {
     const day = params.get('dia')
@@ -76,6 +76,14 @@ export function NewProjectionPage() {
   }
 
   const dates = useMemo(() => draftDates(draft), [draft])
+  // Sugerencia del modelo: se pide sola en la tabla (paso 2) y va junto a cada casilla.
+  const suggestion = useSuggestion(
+    draft.category,
+    draft.start,
+    draft.days,
+    undefined,
+    draft.step === 1 && !!owner,
+  )
   if (!catalog) return <PageHeader title="Nueva proyección" />
   const loaded = catalog
 
@@ -96,7 +104,7 @@ export function NewProjectionPage() {
       <div>
         <PageHeader title="Nueva proyección" mobileActions={<StepPill n={1} />} actions={<StepPill n={1} />} />
         <PageBody>
-          <div className="grid grid-cols-1 gap-4 @3xl/main:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-4 @3xl/main:grid-cols-2">
             <Section>
               <div className="grid gap-6 px-4 pt-5 pb-4 dsk:px-5 dsk:pb-5">
                 <div>
@@ -244,27 +252,29 @@ export function NewProjectionPage() {
     setDraft({ ...draft, units: { ...draft.units, [date]: day } })
   }
 
-  async function suggest() {
-    try {
-      const s = await suggestion.mutateAsync({
-        category: draft.category,
-        start: draft.start,
-        days: draft.days,
-      })
-      const filled = s.days.filter((d) => Object.keys(d.units).length)
-      if (!filled.length) return void toast('Aún no hay historial suficiente para sugerir.')
-      const units = { ...draft.units }
-      // Con un tamaño elegido, solo se sugieren sus productos; el resto queda como estaba.
-      const visible = new Set(products.map((p) => p.id))
-      for (const d of filled) {
-        const picked = Object.entries(d.units).filter(([id]) => visible.has(id))
-        units[d.date] = { ...units[d.date], ...Object.fromEntries(picked) }
-      }
-      setDraft({ ...draft, units })
-      toast.success(`Sugerencia cargada (${filled.length} de ${draft.days} días). Revísala antes de enviar.`)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo obtener la sugerencia.')
+  const suggested = Object.fromEntries((suggestion.data?.days ?? []).map((d) => [d.date, d.units]))
+  /** Llena con la sugerencia del modelo todos los días, o solo `only`. Pisa solo lo sugerido. */
+  function fill(only?: IsoDate) {
+    if (suggestion.isError) {
+      void suggestion.refetch()
+      return void toast.error('No se pudo obtener la sugerencia. Se vuelve a intentar.')
     }
+    const filled = (suggestion.data?.days ?? []).filter(
+      (d) => (!only || d.date === only) && Object.entries(d.units).some(([id, u]) => u > 0 && visibleIds.has(id)),
+    )
+    if (!filled.length) return void toast('Aún no hay historial suficiente para sugerir.')
+    const units = { ...draft.units }
+    // Con un tamaño elegido, solo se sugieren sus productos; el resto queda como estaba.
+    for (const d of filled) {
+      const picked = Object.entries(d.units).filter(([id]) => visibleIds.has(id))
+      units[d.date] = { ...units[d.date], ...Object.fromEntries(picked) }
+    }
+    setDraft({ ...draft, units })
+    toast.success(
+      only
+        ? `Sugerencia cargada para ${dShort(only)}. Revísala antes de enviar.`
+        : `Sugerencia cargada (${String(filled.length)} de ${String(draft.days)} días). Revísala antes de enviar.`,
+    )
   }
 
   function review() {
@@ -293,8 +303,8 @@ export function NewProjectionPage() {
   }
 
   const suggestBtn = (
-    <Button variant="outline" disabled={suggestion.isPending} onClick={suggest}>
-      {suggestion.isPending ? <Loader2 className="animate-spin" /> : <Wand2 />} Sugerir con historial
+    <Button variant="outline" disabled={suggestion.isFetching} onClick={() => fill()}>
+      {suggestion.isFetching ? <Loader2 className="animate-spin" /> : <Wand2 />} Llenar todo con la sugerencia
     </Button>
   )
 
@@ -304,7 +314,6 @@ export function NewProjectionPage() {
         title="Nueva proyección"
         subtitle={`Proyección por producto, ${choiceLabel}`}
         mobileActions={<StepPill n={2} />}
-        actions={suggestBtn}
       />
       <PageBody>
         <Section className="mb-4">
@@ -348,6 +357,15 @@ export function NewProjectionPage() {
             <ArrowRight className="size-4" aria-hidden /> Desliza la tabla para ver los {dates.length} días
           </p>
         )}
+        {/* Sugerencia del modelo: el número junto a cada casilla, «Llenar» por día y todo junto. */}
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <p className="mx-1 min-w-0 flex-1 basis-64 text-sm text-muted-foreground">
+            {suggestion.isError
+              ? 'No se pudo obtener la sugerencia del modelo; se reintenta al usarla.'
+              : 'Junto a cada casilla, en azul, va lo que sugiere el modelo. Tócalo para usarlo, o llena un día o todos.'}
+          </p>
+          {suggestBtn}
+        </div>
         <ProjectionMatrix
           draft={draft}
           dates={dates}
@@ -355,13 +373,14 @@ export function NewProjectionPage() {
           invalid={invalid}
           mobile={mobile}
           onChange={setCell}
+          suggested={suggested}
+          onFillDay={fill}
         />
         <div className="mx-1 mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <Info className="size-4 flex-none" aria-hidden />
           <span className="min-w-0 flex-1 basis-56">
             Ingresa solo las unidades. Los kilogramos se calculan automáticamente.
           </span>
-          <span className="dsk:hidden">{suggestBtn}</span>
         </div>
         <FooterActions>
           <Button variant="ghost" className="flex-none" onClick={back}>

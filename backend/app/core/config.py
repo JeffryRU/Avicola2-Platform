@@ -68,6 +68,9 @@ class Settings(BaseSettings):
 
     # Proyecciones: días que se pueden registrar y semanas de historia para la sugerencia.
     planning_max_days: int = Field(7, ge=1)
+    # Categorías que los vendedores proyectan (PLANNING_PROJECTED_CATEGORIES, JSON). Las demás
+    # (p. ej. Pollo de mercado) siguen en el catálogo para el stock y la saca, pero no se registran.
+    planning_projected_categories: list[str] = Field(default_factory=lambda: ["BRASA"])
     # Primer día que se puede registrar: 1 = mañana (las proyecciones son de los días siguientes);
     # 0 = también hoy.
     planning_starts_in_days: int = Field(1, ge=0, le=1)

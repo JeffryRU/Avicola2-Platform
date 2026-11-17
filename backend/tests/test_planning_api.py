@@ -57,6 +57,8 @@ def test_seller_sees_only_himself(client) -> None:
     _login(client)
     catalog = client.get("/api/catalog").json()
     assert {p["category"] for p in catalog} == {"BRASA", "Pollo de mercado"}
+    # Solo la brasa se proyecta; el pollo de mercado queda para el stock y la saca.
+    assert {p["category"] for p in catalog if p["projected"]} == {"BRASA"}
     assert {p["quality"] for p in catalog} == {"A"}  # la calidad B solo existe en el stock
     assert [s["username"] for s in client.get("/api/sellers").json()] == ["rnavarro"]
 
@@ -147,6 +149,13 @@ def test_history_records_who_changed_what(client) -> None:
     # Otro vendedor no ve el historial de Roberto.
     _login(client, "hdias")
     assert client.get("/api/projections/history", params=params).json() == []
+
+
+def test_only_brasa_is_projected(client) -> None:
+    _login(client)
+    body = {"category": "Pollo de mercado", "days": [{"date": _day(1), "units": {"P0011": 4}}]}
+    r = client.post("/api/projections", json=body)
+    assert r.status_code == 422 and "no se proyecta" in r.json()["detail"]
 
 
 def test_submit_validation_errors_are_422(client) -> None:

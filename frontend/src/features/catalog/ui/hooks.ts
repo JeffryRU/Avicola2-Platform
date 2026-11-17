@@ -29,5 +29,7 @@ export function useCatalog() {
     [q.data, preferences],
   )
   const catalog = useMemo(() => new Catalog(products), [products])
-  return { ...q, catalog, fromServer: !!q.data }
+  // Lo que se registra en «Nueva proyección»: solo las categorías que se proyectan (la brasa).
+  const projection = useMemo(() => catalog.forProjection(), [catalog])
+  return { ...q, catalog, projection, fromServer: !!q.data }
 }

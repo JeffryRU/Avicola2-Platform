@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { RotateCcw } from 'lucide-react'
+import { Link } from 'react-router'
 import { dShort } from '@/shared/domain/dates'
 import { nf0, keepDigits, RECORD_MAX_DIGITS } from '@/shared/domain/format'
 import { paths } from '@/app/routes'
@@ -17,6 +18,14 @@ import {
   ACCURACY_NAIVE,
   ACCURACY_NOTE,
   ACCURACY_TITLE,
+  accuracyVerdict,
+  BAR_LEGEND_A,
+  GO_PRODUCTION_LABEL,
+  BAR_LEGEND_B,
+  BARS_NOTE,
+  REQUEST_UNIT,
+  WHAT_BODY,
+  WHAT_TITLE,
   BY_DAY_TITLE,
   CHECK_COLUMNS,
   CHECK_TITLE,
@@ -92,9 +101,21 @@ export function ForecastPage() {
       <PageBody>
         <SyncStatus queries={[query]} />
         {!forecast.available ? (
-          <Section>
-            <EmptyState title={NO_HISTORY_TITLE}>{noHistoryBody(forecast.min_days)}</EmptyState>
-          </Section>
+          <div className="grid max-w-3xl gap-4">
+            <Section title={WHAT_TITLE}>
+              <p className="px-4 py-3 text-sm text-ink-2 dsk:px-5">{WHAT_BODY}</p>
+            </Section>
+            <Section>
+              <EmptyState title={NO_HISTORY_TITLE}>
+                {noHistoryBody(forecast.min_days)}
+                <span className="mt-4 block">
+                  <Button asChild variant="outline">
+                    <Link to={paths.production}>{GO_PRODUCTION_LABEL}</Link>
+                  </Button>
+                </span>
+              </EmptyState>
+            </Section>
+          </div>
         ) : (
           <Projector
             // Al llegar los datos, el formulario parte de lo último que se pidió.
@@ -133,6 +154,9 @@ function Projector({
   return (
     <div className={splitCls}>
       <div className="grid min-w-0 gap-4">
+        <Section title={WHAT_TITLE}>
+          <p className="px-4 py-3 text-sm text-ink-2 dsk:px-5">{WHAT_BODY}</p>
+        </Section>
         <Section
           title={REQUEST_TITLE}
           aside={
@@ -152,7 +176,9 @@ function Projector({
           <div className="grid gap-3 px-4 pt-3 pb-2 sm:grid-cols-3 dsk:px-5">
             {forecast.groups.map((g) => (
               <label key={g.name} className="block min-w-0">
-                <span className="mb-1 block text-sm font-medium text-ink-2">{g.name}</span>
+                <span className="mb-1 block text-sm font-medium text-ink-2">
+                  {g.name} <span className="font-normal text-muted-foreground">({REQUEST_UNIT})</span>
+                </span>
                 <input
                   inputMode="numeric"
                   placeholder="0"
@@ -194,6 +220,15 @@ function Projector({
 
         <Section title={RESULT_TITLE}>
           <div className="pb-1">
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-rule px-4 py-2 text-xs text-muted-foreground dsk:px-5">
+              <span className="flex items-center gap-1.5">
+                <i aria-hidden className="size-2.5 bg-chart-1" /> {BAR_LEGEND_A}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <i aria-hidden className="size-2.5 bg-chart-2" /> {BAR_LEGEND_B}
+              </span>
+              <span>{BARS_NOTE}</span>
+            </p>
             {/* En angosto cada cifra lleva su etiqueta encima; la cabecera solo va en ancho. */}
             <div className="hidden sm:block">
               <div className={cn(rowCls, headCls, 'px-4 py-2.5 dsk:px-5')}>
@@ -354,7 +389,8 @@ function Accuracy({ accuracy }: { accuracy: AccuracyData }) {
             </dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-muted-foreground">{ACCURACY_NOTE}</p>
+        <p className="mt-3 text-sm font-medium">{accuracyVerdict(accuracy.error, accuracy.naive_error)}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{ACCURACY_NOTE}</p>
         <h3 className="eyebrow mt-4">{BY_DAY_TITLE}</h3>
         <div className="mt-2 flex h-24 items-end gap-1 border-b border-rule-strong">
           {accuracy.by_day.map((d) => (

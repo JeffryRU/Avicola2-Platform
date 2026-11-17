@@ -172,13 +172,12 @@ def test_seller_only_sees_himself_in_lists(tokens) -> None:
 
 
 def test_team_confirmation_for_a_day(tokens) -> None:
-    submit("rnavarro", 1, {"P0001": 10})
-    submit("rnavarro", 1, {"P0011": 4}, category="Pollo de mercado")
+    submit("rnavarro", 1, {"P0001": 10, "P0002": 4})
     team = ok(tokens["supervisor"], "confirmacion_del_equipo", {"fecha": day(1)})
     assert team["vendedores"] == 7 and team["registraron"] == 1
     [done] = team["con_proyeccion"]
     assert done["usuario"] == "rnavarro" and done["unidades"] == 14
-    assert sorted(done["categorias"]) == ["BRASA", "Pollo de mercado"]
+    assert done["categorias"] == ["BRASA"]
     assert "hdias" in {p["usuario"] for p in team["sin_proyeccion"]}
 
 

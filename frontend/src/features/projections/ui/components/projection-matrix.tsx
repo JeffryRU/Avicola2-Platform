@@ -1,7 +1,8 @@
 import { Fragment } from 'react'
+import { Wand2 } from 'lucide-react'
 import { dShort, relativeDay, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1, parseCell } from '@/shared/domain/format'
-import { bySubcategory, type Product } from '@/shared/domain/products'
+import { bySubcategory, type Product, type Units } from '@/shared/domain/products'
 import type { Draft } from '@/features/projections/domain/draft'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgPerUnitLabel } from '@/features/catalog'
@@ -14,6 +15,10 @@ interface Props {
   invalid: IsoDate[]
   mobile: boolean
   onChange: (date: IsoDate, productId: string, units: number | null) => void
+  /** Sugerencia del modelo por día: se muestra junto a cada casilla y se usa al tocarla. */
+  suggested?: Partial<Record<IsoDate, Units>>
+  /** Llena solo ese día con la sugerencia (botón sobre cada día). */
+  onFillDay?: (date: IsoDate) => void
 }
 
 /** Navegación tipo hoja de cálculo: Enter/↓ baja, ↑ sube. */
@@ -30,8 +35,31 @@ function onCellKey(e: React.KeyboardEvent<HTMLInputElement>, columns: number) {
 }
 
 /** Matriz producto × día para escribir unidades; los kg se calculan solos. */
-export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onChange }: Props) {
+export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onChange, suggested, onFillDay }: Props) {
   const value = (d: IsoDate, p: Product) => draft.units[d]?.[p.id]
+  const hintOf = (d: IsoDate, p: Product) => suggested?.[d]?.[p.id] ?? 0
+  const daySuggested = (d: IsoDate) => products.some((p) => hintOf(d, p) > 0)
+  // Número sugerido por el modelo junto a la casilla: tocarlo lo usa. Fuera del Tab (la tabla se
+  // recorre como hoja de cálculo); con teclado se usa «Llenar» del día.
+  const hint = (d: IsoDate, p: Product) => {
+    const s = hintOf(d, p)
+    if (!s) return null
+    return (
+      <button
+        type="button"
+        tabIndex={-1}
+        title="Sugerencia del modelo: tócala para usarla"
+        aria-label={`Usar la sugerencia: ${nf0(s)} de ${p.name}, ${dShort(d)}`}
+        onClick={() => onChange(d, p.id, s)}
+        className={cn(
+          'num rounded px-1 text-xs font-medium whitespace-nowrap text-primary/80 transition-colors hover:bg-primary/10 hover:text-primary hc:text-primary hc:underline',
+          value(d, p) === s && 'text-faint',
+        )}
+      >
+        {nf0(s)}
+      </button>
+    )
+  }
   // Totales de los productos a la vista (con un tamaño elegido, solo los suyos).
   const dayUnits = (d: IsoDate) => products.reduce((s, p) => s + (value(d, p) ?? 0), 0)
   const dayKg = (d: IsoDate) => products.reduce((s, p) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0)
@@ -69,17 +97,35 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
         />
         {mobile && (
           <small className="num mt-0.5 block text-xs whitespace-nowrap text-muted-foreground">
-            {v ? kgAmount(v * p.kg_per_unit) : ' '}
+            {v ? kgAmount(v * p.kg_per_unit) : (hint(d, p) ?? ' ')}
           </small>
         )}
       </>
     )
   }
+  const deskCell = (d: IsoDate, p: Product) => (
+    <div className="flex items-center justify-center gap-1">
+      {cell(d, p)}
+      {suggested && <span className="inline-flex w-8 justify-start">{hint(d, p)}</span>}
+    </div>
+  )
 
   const th =
     'border-b border-rule-strong bg-surface px-2 py-2 text-center text-xs font-medium whitespace-nowrap text-muted-foreground hc:border-b-heavy hc:border-foreground hc:text-sm hc:font-bold hc:text-foreground'
   const head = (d: IsoDate) => (
     <>
+      {onFillDay && (
+        <button
+          type="button"
+          onClick={() => onFillDay(d)}
+          disabled={!daySuggested(d)}
+          title={daySuggested(d) ? 'Llenar este día con la sugerencia del modelo' : 'Sin sugerencia para este día'}
+          aria-label={`Llenar ${dShort(d)} con la sugerencia`}
+          className="mx-auto mb-1 flex min-h-7 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-40 hc:border-foreground"
+        >
+          <Wand2 aria-hidden className="size-3.5" /> Llenar
+        </button>
+      )}
       <span className="block text-sm font-semibold text-foreground">{dShort(d)}</span>
       <small className="block text-xs font-medium text-primary">{relativeDay(d) ?? ' '}</small>
     </>
@@ -223,12 +269,22 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
                     <small className="text-xs text-muted-foreground">{kgPerUnitLabel(p.kg_per_unit)}</small>
                   </td>
                   {dates.map((d) => [
-                    <td key={`${d}u`}>{cell(d, p)}</td>,
-                    <td
-                      key={`${d}k`}
-                      className={cn('num min-w-14 text-sm text-muted-foreground', !value(d, p) && 'text-faint')}
-                    >
-                      {value(d, p) ? nf1((value(d, p) ?? 0) * p.kg_per_unit) : '—'}
+                    <td key={`${d}u`}>{deskCell(d, p)}</td>,
+                    <td key={`${d}k`} className="num min-w-14 text-sm text-muted-foreground">
+                      {/* Los kg de lo escrito y, debajo, los de la sugerencia (solo se muestran). */}
+                      <span className="flex flex-col items-center leading-tight">
+                        <span className={cn(!value(d, p) && 'text-faint')}>
+                          {value(d, p) ? kgAmount((value(d, p) ?? 0) * p.kg_per_unit) : '—'}
+                        </span>
+                        {hintOf(d, p) > 0 && value(d, p) !== hintOf(d, p) && (
+                          <span
+                            title="Kg según la sugerencia del modelo"
+                            className="mt-0.5 text-[0.6875rem] text-primary/80 hc:text-primary"
+                          >
+                            <span className="sr-only">Sugerencia: </span>≈ {kgAmount(hintOf(d, p) * p.kg_per_unit)}
+                          </span>
+                        )}
+                      </span>
                     </td>,
                   ])}
                   <td className="num font-semibold">{nf0(productUnits(p))}</td>

@@ -56,7 +56,9 @@ def test_dispatch_chief_permissions() -> None:
     }
     assert manageable_roles(DISPATCH_CHIEF) == ()
     assert not can(SELLER, Permission.VIEW_STOCK)
-    assert can(SUPERVISOR, Permission.VIEW_STOCK) and not can(SUPERVISOR, Permission.MANAGE_STOCK)
+    # El supervisor también corrige stock y producción si se lo piden (en la app, tras «Editar»).
+    assert can(SUPERVISOR, Permission.VIEW_STOCK) and can(SUPERVISOR, Permission.MANAGE_STOCK)
+    assert can(SUPERVISOR, Permission.MANAGE_PRODUCTION)
     assert can(GENERAL_SUPERVISOR, Permission.MANAGE_STOCK)
     assert DISPATCH_CHIEF in manageable_roles(GENERAL_SUPERVISOR)
     assert DISPATCH_CHIEF not in manageable_roles(SUPERVISOR)
@@ -134,9 +136,9 @@ def test_who_sees_and_who_registers(client) -> None:
     assert client.get("/api/stock", params=_range()).status_code == 403
     assert client.put(f"/api/stock/{TODAY}", json={"lines": LINES}).status_code == 403
 
-    _login(client, "supervisor")  # el supervisor lo consulta, no lo registra
+    _login(client, "supervisor")  # lo consulta y, si se lo piden, lo corrige (tras «Editar»)
     assert len(client.get("/api/stock", params=_range()).json()) == 1
-    assert client.put(f"/api/stock/{TODAY}", json={"lines": LINES}).status_code == 403
+    assert client.put(f"/api/stock/{TODAY}", json={"lines": LINES}).status_code == 200
 
     _login(client, "general")
     assert client.put(f"/api/stock/{TODAY}", json={"lines": LINES}).status_code == 200

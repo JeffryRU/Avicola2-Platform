@@ -85,9 +85,12 @@ class SubmitProjection:
         on_submitted: Callable[[Seller, list[Projection]], None] | None = None,
         rules: EditingRules | None = None,
         history: ChangeLog | None = None,
+        projected: frozenset[str] | None = None,
     ):
         self.products, self.projections, self.clock = products, projections, clock
         self.max_days = max_days
+        # Categorías que se proyectan; None = todas (la carga de ejemplos no la usa).
+        self.projected = projected
         # Historial de cambios; la carga de ejemplos (cli seed) no lo usa.
         self.history = history
         # Ventana de registro y hora de corte; la carga de ejemplos (cli seed) no la usa.
@@ -105,6 +108,8 @@ class SubmitProjection:
     ) -> list[Projection]:
         """`seller` es quien envía (sale de la sesión); `on_behalf`, solo si es él mismo."""
         author, seller = seller, self._target(seller, on_behalf)
+        if self.projected is not None and category not in self.projected:
+            raise DomainError(f"La categoría {category} no se proyecta.")
         if not 1 <= len(days) <= self.max_days:
             raise DomainError(f"Debe enviar entre 1 y {self.max_days} días.")
         if len({d.date for d in days}) != len(days):

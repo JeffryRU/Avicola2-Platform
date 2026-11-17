@@ -73,4 +73,15 @@ describe('catálogo', () => {
     expect(c.pick({ P1: 3, P5: 1 }, chica)).toEqual({ P1: 3 })
     expect(c.others({ P1: 3, P5: 1 }, chica)).toEqual({ P5: 1 })
   })
+
+  it('para proyectar deja solo lo que se proyecta (sin el dato, sí se proyecta)', () => {
+    const c = new Catalog([
+      { id: 'B1', category: 'BRASA', name: 'Brasa 1', kg_per_unit: 1.2, sort_order: 0, projected: true },
+      { id: 'B2', category: 'BRASA', name: 'Brasa 2', kg_per_unit: 1.5, sort_order: 1 },
+      { id: 'M1', category: 'Pollo de mercado', name: 'Entero', kg_per_unit: 2, sort_order: 2, projected: false },
+    ])
+    expect(c.forProjection().categories).toEqual(['BRASA'])
+    expect(c.forProjection().products.map((p) => p.id)).toEqual(['B1', 'B2'])
+    expect(c.categories).toEqual(['BRASA', 'Pollo de mercado'])
+  })
 })
