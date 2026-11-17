@@ -2,6 +2,19 @@
 export const FORECAST_TITLE = 'Pronóstico de llegada'
 export const FORECAST_NAV_LABEL = 'Pronóstico'
 export const FORECAST_SUBTITLE = 'Escribe lo que se pedirá a granja y mira en qué rango llegará.'
+export const WHAT_TITLE = 'Qué predice'
+export const WHAT_BODY =
+  'Para cada tipo de ave, cuántas llegarán en cada rango (y cuántas serán de calidad B) según el pedido que escribas. Se calcula con la producción registrada en días anteriores.'
+export const BAR_LEGEND_A = 'Calidad A'
+export const BAR_LEGEND_B = 'Calidad B'
+export const BARS_NOTE = 'La barra de cada producto compara su tamaño con el mayor.'
+export const REQUEST_UNIT = 'aves'
+export const accuracyVerdict = (model: number, naive: number) => {
+  const gain = Math.round((naive - model) * 100)
+  if (gain > 0) return `Falla ${gain} puntos menos que suponer que llega lo pedido: sí aporta.`
+  if (gain < 0) return `Falla ${-gain} puntos más que suponer que llega lo pedido: tómalo con cautela.`
+  return 'Acierta igual que suponer que llega lo pedido: aún no aporta más.'
+}
 export const REQUEST_TITLE = 'Lo que se pedirá a granja'
 export const REQUEST_HINT = 'Parte de lo último que se pidió. Cambia las cantidades para probar otro pedido.'
 export const RESULT_TITLE = 'Lo que llegará por rango'

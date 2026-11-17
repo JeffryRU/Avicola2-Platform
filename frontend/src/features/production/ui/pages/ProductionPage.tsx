@@ -59,6 +59,9 @@ import {
   SAVED_MESSAGE,
   STATUS_EDITING,
   STATUS_PENDING,
+  STEPS,
+  STEPS_END,
+  STEPS_TITLE,
   STATUS_SAVED,
   SUMMARY_TITLE,
   UPDATE_LABEL,
@@ -471,6 +474,24 @@ function Editor({
       <div className={splitCls}>
         <Section title={dDowLongDM(day)}>
           <form id={FORM_ID} onSubmit={submit} noValidate>
+            <ol
+              aria-label={STEPS_TITLE}
+              className="grid gap-2 border-b border-rule bg-muted/50 px-4 py-3 text-sm sm:grid-cols-3 dsk:px-5"
+            >
+              {STEPS.map((s, i) => (
+                <li key={s.title} className="flex min-w-0 gap-2">
+                  <span
+                    aria-hidden
+                    className="num grid size-5 flex-none place-items-center rounded-full bg-primary text-2xs font-semibold text-primary-foreground"
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 text-muted-foreground">
+                    <b className="font-medium text-foreground">{s.title}.</b> {s.body}
+                  </span>
+                </li>
+              ))}
+            </ol>
             <Rows
               products={products}
               read={read}
@@ -478,15 +499,20 @@ function Editor({
                 <input
                   inputMode="numeric"
                   aria-label={`${FIELD_LABEL[f]} de ${p.name}`}
+                  aria-invalid={f === 'quality_b' && read(p.id, 'quality_b') > read(p.id, 'produced') ? true : undefined}
                   placeholder="0"
                   value={draft[p.id]?.[f] ?? ''}
                   onChange={(e) => set(p.id, f, keepDigits(e.target.value, RECORD_MAX_DIGITS))}
-                  className={cn(cellCls, f === 'produced' && 'font-semibold')}
+                  className={cn(
+                    cellCls,
+                    f === 'produced' && 'font-semibold',
+                    f === 'quality_b' && read(p.id, 'quality_b') > read(p.id, 'produced') && 'border-bad text-bad',
+                  )}
                 />
               )}
             />
             <p className="px-4 py-3 text-sm text-muted-foreground dsk:px-5">
-              {HINT} {DEVIATION_HINT}
+              {HINT} {DEVIATION_HINT} {STEPS_END}
             </p>
             {groups.length > 0 && (
               <fieldset className="border-t border-rule px-4 pt-3 pb-4 dsk:px-5">
