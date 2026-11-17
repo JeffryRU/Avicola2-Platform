@@ -43,6 +43,7 @@ from app.planning.infrastructure.persistence.repositories import (
     SqlProjectionRepository,
     SqlSellerRepository,
 )
+from app.planning.infrastructure.persistence.saca_snapshots import SqlSacaSnapshotRepository
 from app.planning.infrastructure.persistence.status import SqlStatusProbe
 from app.planning.infrastructure.persistence.stock import SqlStockRepository
 from app.planning.infrastructure.sales import SimulatedSalesSource
@@ -100,6 +101,7 @@ class PlanningUseCases:
     list_stock: st.ListStock
     stock_options: st.GetStockOptions
     calculate_saca: sc.CalculateSaca
+    saca_history: sc.SacaHistory
     set_saca_plus: sc.SetSacaPlus
     register_production: pr.RegisterProduction
     list_production: pr.ListProduction
@@ -215,6 +217,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             settings.saca_stock_lot_days,
         ),
         set_saca_plus=sc.SetSacaPlus(products, stored_settings, clock),
+        saca_history=sc.SacaHistory(SqlSacaSnapshotRepository(session), clock),
         register_production=pr.RegisterProduction(products, production, clock),
         list_production=pr.ListProduction(production),
         forecast_arrival=pr.ForecastArrival(products, production, clock, arrival_model),

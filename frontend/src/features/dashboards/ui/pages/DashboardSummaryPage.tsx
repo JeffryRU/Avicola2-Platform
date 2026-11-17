@@ -1,6 +1,8 @@
 import { SyncStatus } from '@/shared/ui/components/sync-status'
+import { granularityOf, sumDays } from '@/features/dashboards/domain/buckets'
+import { bucketLabels } from '@/features/dashboards/types/buckets'
 import { useNavigate } from 'react-router'
-import { dDM, dDow, dShort, rangeLabel } from '@/shared/domain/dates'
+import { rangeLabel } from '@/shared/domain/dates'
 import { nf0 } from '@/shared/domain/format'
 import { periodAgg } from '@/features/projections'
 import { previousDates } from '@/features/dashboards/domain/period'
@@ -97,22 +99,27 @@ export function DashboardSummaryPage() {
           <div className="px-4 pt-3 pb-4 dsk:px-5">
             <BarChart
               label="Unidades proyectadas por día"
-              onSelect={(d) => void navigate(dayPath(d))}
-              bars={days.map((d) => ({
-                key: d.date,
-                value: d.u,
-                label: dDow(d.date),
-                sublabel: dDM(d.date),
-                tip: (
-                  <>
-                    <b>{dShort(d.date)}</b>
-                    <br />
-                    {nf0(d.u)} unidades, {kgAmount(d.kg)}
-                    <br />
-                    {STATUS_LABEL[d.confirmed ? 'confirmed' : 'pending']}
-                  </>
-                ),
-              }))}
+              // Por día, la barra lleva al detalle del día; por semana o mes, no.
+              onSelect={granularityOf(days.length) === 'day' ? (d) => void navigate(dayPath(d)) : undefined}
+              bars={sumDays(days).map((d) => {
+                const g = granularityOf(days.length)
+                const labels = bucketLabels(d, g)
+                return {
+                  key: d.key,
+                  value: d.u,
+                  label: labels.label,
+                  sublabel: labels.sublabel,
+                  tip: (
+                    <>
+                      <b>{labels.title}</b>
+                      <br />
+                      {nf0(d.u)} unidades, {kgAmount(d.kg)}
+                      <br />
+                      {STATUS_LABEL[d.confirmed ? 'confirmed' : 'pending']}
+                    </>
+                  ),
+                }
+              })}
             />
           </div>
         </Section>

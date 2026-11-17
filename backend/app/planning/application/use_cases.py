@@ -246,8 +246,8 @@ class SuggestProjection:
         return self.forecaster.suggest(username, category, dates)
 
 
-# Hasta cuántos días se le pide al modelo de una vez (un trimestre, como los dashboards).
-MODEL_MAX_DAYS = 92
+# Hasta cuántos días se le pide al modelo de una vez (un año, como los dashboards).
+MODEL_MAX_DAYS = 366
 
 
 class ModelProjections:

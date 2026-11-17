@@ -15,6 +15,7 @@ from app.planning.domain.notifications import Event, Notification
 from app.planning.domain.orders import OrderLine
 from app.planning.domain.preferences import Preferences
 from app.planning.domain.production import DailyProduction, FittedArrival
+from app.planning.domain.saca import SacaSnapshot
 from app.planning.domain.stock import DailyStock
 
 
@@ -210,6 +211,14 @@ class EventPublisher(Protocol):
     Postgres LISTEN/NOTIFY o RabbitMQ, con otro adaptador)."""
 
     def publish(self, event: Event) -> None: ...
+
+
+class SacaSnapshotRepository(Protocol):
+    """Saca guardada de cada día (una por día; guardar de nuevo la reemplaza)."""
+
+    def save(self, snapshot: SacaSnapshot) -> None: ...
+    def get(self, day: date) -> SacaSnapshot | None: ...
+    def find(self, date_from: date, date_to: date) -> list[SacaSnapshot]: ...
 
 
 class SettingsRepository(Protocol):

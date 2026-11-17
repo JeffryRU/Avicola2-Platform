@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from app.shared.domain.errors import DomainError
 
 # Rango máximo de una consulta (proyecciones, ventas, historial, stock, producción).
-MAX_RANGE_DAYS = 400
+MAX_RANGE_DAYS = 800
 
 
 def check_order(date_from: date, date_to: date) -> None:

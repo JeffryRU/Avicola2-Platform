@@ -13,17 +13,20 @@ from app.planning.application.ports import (
     ProductionRepository,
     ProductRepository,
     ProjectionRepository,
+    SacaSnapshotRepository,
     SellerRepository,
     SettingsRepository,
     StockRepository,
 )
 from app.planning.domain.catalog import Catalog
+from app.planning.domain.dates import check_range
 from app.planning.domain.models import CONFIRMED, QUALITY_B, Seller
 from app.planning.domain.permissions import Permission, require
 from app.planning.domain.production import LOOKBACK, estimate_from
 from app.planning.domain.saca import (
     MAX_PLUS,
     SacaPlan,
+    SacaSnapshot,
     build_plan,
     orders_day,
     product_group,
@@ -80,6 +83,35 @@ class SetSacaPlus:
         )
         logger.info("Plus de la saca cambiado por %s: %s", actor.username, saved)
         return saved
+
+
+class SacaHistory:
+    """Sacas guardadas: la de hoy se guarda al verla (y al cierre, por el programador); la de un
+    día pasado se muestra tal como quedó, no recalculada."""
+
+    def __init__(self, snapshots: SacaSnapshotRepository, clock: Clock) -> None:
+        self.snapshots, self.clock = snapshots, clock
+
+    def record(self, viewer: Seller, plan: SacaPlan, payload: str) -> SacaSnapshot | None:
+        """Guarda la saca de hoy (otro día no: lo pasado no se reescribe)."""
+        require(viewer.role, Permission.VIEW_SACA)
+        if plan.date != self.clock.today():
+            return None
+        snapshot = SacaSnapshot(
+            plan.date, self.clock.now(), viewer.username, plan.farm_order, payload
+        )
+        self.snapshots.save(snapshot)
+        return snapshot
+
+    def saved(self, viewer: Seller, day: date) -> SacaSnapshot | None:
+        """La saca guardada de un día pasado (None para hoy o si no se guardó)."""
+        require(viewer.role, Permission.VIEW_SACA)
+        return self.snapshots.get(day) if day < self.clock.today() else None
+
+    def list(self, viewer: Seller, date_from: date, date_to: date) -> list[SacaSnapshot]:
+        require(viewer.role, Permission.VIEW_SACA)
+        check_range(date_from, date_to)
+        return self.snapshots.find(date_from, date_to)
 
 
 class CalculateSaca:

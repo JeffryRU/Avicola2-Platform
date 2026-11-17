@@ -29,6 +29,7 @@ export const paths = {
   history: '/historial',
   stock: '/stock',
   saca: '/saca',
+  sacaHistory: '/saca/historial',
   production: '/produccion',
   forecast: '/pronostico',
 } as const

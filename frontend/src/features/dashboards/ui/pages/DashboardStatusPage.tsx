@@ -1,4 +1,6 @@
 import { SyncStatus } from '@/shared/ui/components/sync-status'
+import { granularityOf, sumDays } from '@/features/dashboards/domain/buckets'
+import { bucketLabels } from '@/features/dashboards/types/buckets'
 import { useNavigate } from 'react-router'
 import { dDM, dDow, dFull, dShort, rangeLabel } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
@@ -84,14 +86,13 @@ export function DashboardStatusPage() {
                 width={560}
                 height={330}
                 onSelect={(d) => void navigate(dayPath(d))}
-                bars={days.map((d) => ({
-                  key: d.date,
+                bars={sumDays(days).map((d) => ({
+                  key: d.key,
                   value: d.u,
-                  label: dDow(d.date),
-                  sublabel: dDM(d.date),
+                  ...bucketLabels(d, granularityOf(days.length)),
                   tip: (
                     <>
-                      <b>{dShort(d.date)}</b>
+                      <b>{bucketLabels(d, granularityOf(days.length)).title}</b>
                       <br />
                       {nf0(d.u)} unidades, {kgAmount(d.kg)}
                     </>

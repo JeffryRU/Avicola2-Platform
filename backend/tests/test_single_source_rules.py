@@ -38,12 +38,12 @@ DAYS = st.dates(min_value=date(2020, 1, 1), max_value=date(2030, 12, 31))
 @settings(max_examples=EXAMPLES)
 @given(DAYS, DAYS)
 def test_query_range(date_from, date_to):
-    # Especificación: invertido → error; más de 400 días entre extremos → error; si no, vale.
+    # Especificación: invertido → error; más de 800 días entre extremos → error; si no, vale.
     span = date_to.toordinal() - date_from.toordinal()
     if span < 0:
         expected = "El rango de fechas está invertido."
-    elif span > 400:
-        expected = "El rango no puede superar 400 días."
+    elif span > 800:
+        expected = "El rango no puede superar 800 días."
     else:
         expected = None
     if expected is None:

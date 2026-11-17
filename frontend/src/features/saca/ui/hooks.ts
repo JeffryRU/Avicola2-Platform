@@ -9,6 +9,12 @@ export function useSacaPlan(day: IsoDate) {
   return useQuery({ queryKey: queryKeys.saca.plan(day), queryFn: () => saca.plan(day) })
 }
 
+/** Sacas guardadas del rango (Historial de sacas). */
+export function useSacaHistory(from: IsoDate, to: IsoDate) {
+  const { saca } = useContainer()
+  return useQuery({ queryKey: queryKeys.saca.history(from, to), queryFn: () => saca.history(from, to) })
+}
+
 /** Guarda el plus por tipo y recalcula todos los planes de saca. */
 export function useSetSacaPlus() {
   const { saca } = useContainer()

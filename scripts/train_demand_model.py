@@ -189,6 +189,16 @@ class Boosting:
         return self.model.predict(features(Y, self.days, day)).reshape(S, P)
 
 
+# Tamaños como en la saca: chica = Brasa 1-5, mediana = 6-7, grande = 8-10.
+SIZES = [range(0, 5), range(5, 7), range(7, 10)]
+
+
+def _sizes(X):
+    """Total del equipo por tamaño y día (lo que se pide a granja)."""
+    team = X.sum(axis=0)
+    return np.stack([team[list(r)].sum(axis=0) for r in SIZES])
+
+
 def evaluate(Y_in, Y_true, days, models):
     n = Y_in.shape[2]
     test = range(n - TEST, n)
@@ -201,6 +211,11 @@ def evaluate(Y_in, Y_true, days, models):
             "vendedor×producto×día": (P, A),
             "vendedor×día": (P.sum(axis=1), A.sum(axis=1)),
             "equipo×día": (P.sum(axis=(0, 1)), A.sum(axis=(0, 1))),
+            "equipo×semana": (
+                P.sum(axis=(0, 1))[: TEST - TEST % 7].reshape(-1, 7).sum(axis=1),
+                A.sum(axis=(0, 1))[: TEST - TEST % 7].reshape(-1, 7).sum(axis=1),
+            ),
+            "tamaño×día": (_sizes(P), _sizes(A)),
         }.items():
             res[level] = round(100 * np.abs(p - a).sum() / a.sum(), 1)
         res["sesgo"] = round(100 * (P.sum() - A.sum()) / A.sum(), 1)

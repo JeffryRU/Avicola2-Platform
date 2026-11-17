@@ -12,9 +12,15 @@ from collections.abc import AsyncIterator, Callable
 
 from app.core.config import Settings
 from app.planning.bootstrap import build_use_cases
+from app.planning.domain.models import Seller
+from app.planning.domain.permissions import GENERAL_SUPERVISOR
+from app.planning.infrastructure.clock import ZoneClock
+from app.planning.infrastructure.http.saca_view import saca_out
 from app.shared.infrastructure.database.session import SessionLocal
 
 logger = logging.getLogger(__name__)
+# Quien figura como autor de la saca guardada al cierre.
+SYSTEM_USER = "sistema"
 
 
 def check_missed_projections(settings: Settings) -> int:
@@ -27,9 +33,32 @@ def check_closing_soon(settings: Settings) -> int:
         return build_use_cases(session, settings).notify_closing_soon()
 
 
+def snapshot_saca(settings: Settings) -> int:
+    """Desde SACA_SNAPSHOT_HOUR, guarda la saca del día como la del cierre (una vez por día;
+    si alguien la vuelve a ver después, se actualiza con lo último)."""
+    clock = ZoneClock(settings.tz)
+    now = clock.now()
+    if now.hour < settings.saca_snapshot_hour:
+        return 0
+    with SessionLocal() as session:
+        use_cases = build_use_cases(session, settings)
+        today = clock.today()
+        system = Seller(SYSTEM_USER, "Sistema", None, GENERAL_SUPERVISOR)
+        saved = use_cases.saca_history.snapshots.get(today)
+        closing = now.replace(hour=settings.saca_snapshot_hour, minute=0, second=0, microsecond=0)
+        if saved and saved.saved_at >= closing:
+            return 0
+        plan = use_cases.calculate_saca(system, today)
+        use_cases.saca_history.record(system, plan, saca_out(plan).model_dump_json())
+        logger.info("Saca del %s guardada al cierre: %d aves", today, plan.farm_order)
+        return 1
+
+
 def check_cutoffs(settings: Settings) -> int:
-    """Una revisión completa: aviso previo al corte y aviso de corte pasado."""
-    return check_closing_soon(settings) + check_missed_projections(settings)
+    """Una revisión completa: aviso previo al corte, aviso de corte pasado y saca del cierre."""
+    return (
+        check_closing_soon(settings) + check_missed_projections(settings) + snapshot_saca(settings)
+    )
 
 
 async def _every(seconds: int, job: Callable[[], int]) -> None:

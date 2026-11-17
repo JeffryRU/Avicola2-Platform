@@ -416,6 +416,29 @@ class SacaOut(BaseModel):
     forecast: SacaForecastOut | None = Field(
         description="Estimación de llegada por rango; null si falta historia de producción."
     )
+    saved_at: datetime | None = Field(
+        default=None, description="Cuándo se guardó esta saca (la de un día pasado es la guardada)."
+    )
+    saved_by: str | None = Field(default=None, description="Quién la vio o «sistema» (cierre).")
+
+
+class SacaHistoryGroupOut(BaseModel):
+    name: str
+    projected: int
+    ordered: int
+    stock: int
+    plus: int
+    farm_order: int
+
+
+class SacaHistoryOut(BaseModel):
+    """Una saca guardada: el pedido a granja de ese día, por tipo."""
+
+    date: date
+    saved_at: datetime
+    saved_by: str
+    farm_order: int
+    groups: list[SacaHistoryGroupOut]
 
 
 # --- Producción diaria --------------------------------------------------------------------

@@ -74,6 +74,8 @@ export const endpoints = {
     plan: '/saca',
     /** PUT {plus} → plus (aves extra) por tipo guardado. */
     plus: '/saca/plus',
+    /** GET ?date_from&date_to → sacas guardadas (la de cada día, como quedó). */
+    history: '/saca/history',
   },
 
   stock: {

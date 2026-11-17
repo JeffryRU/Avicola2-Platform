@@ -35,10 +35,10 @@ from app.planning.domain.production import (
     DailyProduction,
     overall_error,
 )
-from app.planning.domain.saca import METHOD
 from app.planning.domain.stock import DailyStock
 from app.planning.infrastructure.exporters import WRITERS, ExportFormat
 from app.planning.infrastructure.http import schemas as s
+from app.planning.infrastructure.http.saca_view import saca_out
 from app.shared.domain.errors import AuthenticationError, ForbiddenError
 from app.shared.infrastructure.database.session import get_session
 from app.shared.infrastructure.http.params import DbIdPath
@@ -656,70 +656,49 @@ def calculate_saca(
     viewer: CurrentSeller,
     day: Annotated[date, Query(alias="date")],
 ) -> s.SacaOut:
-    """Cuánto pedir a granja, calculado el día `date` (hoy): por tipo, stock − pedidos de mañana
-    + proyección de pasado mañana + plus. `groups` trae el pedido final por tipo."""
+    """Cuánto pedir a granja, calculado el día `date`: por tipo, stock − pedidos de mañana
+    + proyección de pasado mañana + plus. La de hoy se guarda al verla; la de un día pasado es
+    la que quedó guardada (no se recalcula)."""
+    saved = use_cases.saca_history.saved(viewer, day)
+    if saved:
+        out = s.SacaOut.model_validate_json(saved.payload)
+        return out.model_copy(update={"saved_at": saved.saved_at, "saved_by": saved.saved_by})
     plan = use_cases.calculate_saca(viewer, day)
-    arrival = plan.arrival
-    return s.SacaOut(
-        date=plan.date,
-        orders_date=plan.orders_date,
-        projection_date=plan.projection_date,
-        lines=[
-            s.SacaLineOut(
-                product_id=line.product.id,
-                projected=line.projected,
-                ordered=line.ordered,
-                demand=line.balance,
-                stock=line.stock,
-                request=line.request,
-                request_kg=line.request_kg,
-                expected=arrival.expected.get(line.product.id, 0) if arrival else None,
-                expected_a=arrival.expected_a.get(line.product.id, 0) if arrival else None,
+    out = saca_out(plan)
+    snapshot = use_cases.saca_history.record(viewer, plan, out.model_dump_json())
+    if snapshot:
+        out = out.model_copy(update={"saved_at": snapshot.saved_at, "saved_by": snapshot.saved_by})
+    return out
+
+
+@saca.get("/history")
+def saca_history(
+    use_cases: UseCases, viewer: CurrentSeller, date_from: DateFrom, date_to: DateTo
+) -> list[s.SacaHistoryOut]:
+    """Sacas guardadas del rango (la más reciente primero), con el pedido a granja por tipo."""
+    found = []
+    for snap in use_cases.saca_history.list(viewer, date_from, date_to):
+        plan = s.SacaOut.model_validate_json(snap.payload)
+        found.append(
+            s.SacaHistoryOut(
+                date=snap.date,
+                saved_at=snap.saved_at,
+                saved_by=snap.saved_by,
+                farm_order=snap.farm_order,
+                groups=[
+                    s.SacaHistoryGroupOut(
+                        name=g.name,
+                        projected=g.projected,
+                        ordered=g.ordered,
+                        stock=g.stock,
+                        plus=g.plus,
+                        farm_order=g.farm_order,
+                    )
+                    for g in plan.groups
+                ],
             )
-            for line in plan.lines
-        ],
-        projected=plan.projected,
-        ordered=plan.ordered,
-        demand=plan.balance,
-        stock=plan.stock,
-        plus=plan.plus,
-        request=plan.request,
-        request_kg=plan.request_kg,
-        live_kg=plan.live_kg,
-        yield_factor=plan.yield_factor,
-        method=METHOD,
-        farm_order=plan.farm_order,
-        stock_b=plan.stock_b,
-        stock_old=plan.stock_old,
-        stock_lot_days=plan.stock_lot_days,
-        groups=[
-            s.SacaGroupOut(
-                name=g.name,
-                stock=g.stock,
-                stock_b=g.stock_b,
-                ordered=g.ordered,
-                projected=g.projected,
-                plus=g.plus,
-                balance=g.balance,
-                farm_order=g.farm_order,
-                demand=g.balance,
-                need=g.farm_order,
-            )
-            for g in plan.groups
-        ],
-        stock_date=plan.stock_date,
-        sellers_registered=plan.sellers_registered,
-        sellers_total=plan.sellers_total,
-        orders_available=plan.orders_available,
-        forecast=s.SacaForecastOut(
-            method=arrival.model,
-            days=arrival.days,
-            date_from=arrival.date_from,
-            date_to=arrival.date_to,
         )
-        if arrival
-        else None,
-    )
+    return found
 
 
 @saca.put("/plus", dependencies=[requires(Permission.MANAGE_EDITING)])

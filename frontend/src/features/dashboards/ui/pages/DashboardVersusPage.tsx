@@ -1,5 +1,6 @@
 import { SyncStatus } from '@/shared/ui/components/sync-status'
-import { dDM, dDow, dShort } from '@/shared/domain/dates'
+import { bucketsOf, granularityOf } from '@/features/dashboards/domain/buckets'
+import { GRANULARITY_NOTE, bucketLabels } from '@/features/dashboards/types/buckets'
 import { nf0, nf1, pct1 } from '@/shared/domain/format'
 import { periodAgg, useModelProjections, versusReal } from '@/features/projections'
 import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
@@ -125,11 +126,32 @@ export function DashboardVersusPage() {
     modelKg.set(row.date, (modelKg.get(row.date) ?? 0) + catalog.kg(row.units))
   }
   const hasModel = modelKg.size > 0
-  const allPoints = chartDays.map((d) => {
+  const dailyPoints = chartDays.map((d) => {
     const rk = d.real ? catalog.kg(d.real) : null
     const earlier = rounds > 1 ? sheets.kg[d.date].slice(0, -1) : []
     const mk = modelKg.get(d.date) ?? null
     return { date: d.date, confirmed: d.confirmed, pk: d.kg, rk, mk, earlier, parts: parts.kg[d.date] }
+  })
+  // Un período largo se grafica por semana o por mes (un año día a día no se lee).
+  const granularity = granularityOf(period.dates.length)
+  const allPoints = bucketsOf(period.dates, granularity).map((b) => {
+    const ps = dailyPoints.filter((p) => b.dates.includes(p.date))
+    const conf = ps.filter((p) => p.confirmed)
+    const add = (xs: number[]) => xs.reduce((a, v) => a + v, 0)
+    const known = (xs: (number | null)[]) => {
+      const vals = xs.filter((v): v is number => v != null)
+      return vals.length ? add(vals) : null
+    }
+    return {
+      date: b.start,
+      ...bucketLabels(b, granularity),
+      confirmed: conf.length > 0,
+      pk: add(conf.map((p) => p.pk)),
+      rk: known(ps.map((p) => p.rk)),
+      mk: known(ps.map((p) => p.mk)),
+      earlier: Array.from({ length: Math.max(0, rounds - 1) }, (_, r) => add(conf.map((p) => p.earlier[r] ?? p.pk))),
+      parts: parts.names.map((_, k) => add(conf.map((p) => p.parts[k] ?? 0))),
+    }
   })
   // La tabla, solo con los días que tienen proyección.
   const points = allPoints.filter((p) => p.confirmed)
@@ -249,6 +271,9 @@ export function DashboardVersusPage() {
                   Venta real (ERP)
                 </span>
               </div>
+              {GRANULARITY_NOTE[granularity] && (
+                <p className="mb-2 text-right text-xs text-muted-foreground">{GRANULARITY_NOTE[granularity]}</p>
+              )}
               {parts.names.length > 1 && points.length > 0 && (
                 <div className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span>Proyección vigente por {picked.length > 0 && picked.length <= 4 ? 'producto' : 'tamaño'}:</span>
@@ -283,8 +308,8 @@ export function DashboardVersusPage() {
                   }
                   points={allPoints.map((p) => ({
                     key: p.date,
-                    label: dDow(p.date),
-                    sublabel: dDM(p.date),
+                    label: p.label,
+                    sublabel: p.sublabel,
                     a: p.confirmed ? p.pk : null,
                     b: p.rk,
                     c: p.mk,
@@ -292,7 +317,7 @@ export function DashboardVersusPage() {
                     parts: p.confirmed && parts.names.length > 1 ? p.parts : undefined,
                     tip: (
                       <>
-                        <b>{dShort(p.date)}</b>
+                        <b>{p.title}</b>
                         {p.confirmed &&
                           p.earlier.map((kg, i) => (
                             <span key={i}>
@@ -347,9 +372,9 @@ export function DashboardVersusPage() {
                         </th>
                         {points.map((p) => (
                           <th key={p.date} className={tableCls.th}>
-                            {dDow(p.date)}
+                            {p.label}
                             <br />
-                            <span className="num">{dDM(p.date)}</span>
+                            <span className="num">{p.sublabel}</span>
                           </th>
                         ))}
                       </tr>

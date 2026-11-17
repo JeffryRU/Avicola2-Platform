@@ -124,6 +124,18 @@ settings = Table(
     Column("updated_at", DateTime(timezone=True)),
 )
 
+# Saca guardada de cada día (lo que se vio y se pidió a granja), para consultarla después.
+saca_snapshots = Table(
+    TABLES["saca_snapshots"],
+    metadata,
+    Column("date", Date, primary_key=True),
+    Column("saved_at", DateTime(timezone=True), nullable=False),
+    Column("saved_by", String(50), nullable=False),
+    Column("farm_order", Integer, nullable=False),
+    # La saca completa en JSON (texto: portable entre motores), tal como la envía la API.
+    Column("payload", Text, nullable=False),
+)
+
 edit_unlocks = Table(
     TABLES["edit_unlocks"],
     metadata,

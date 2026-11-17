@@ -1,9 +1,10 @@
 import { useState, type SyntheticEvent } from 'react'
-import { Link } from 'react-router'
-import { ArrowRight, Pencil } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router'
+import { isoDateSchema } from '@/shared/domain/schemas'
+import { ArrowRight, History, Pencil } from 'lucide-react'
 import { paths } from '@/app/routes'
 import { toast } from 'sonner'
-import { addDays, dDowLong, dShort, today, type IsoDate } from '@/shared/domain/dates'
+import { addDays, clockTime, dDowLong, dShort, today, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
 import { can } from '@/shared/domain/session'
 import { useRequiredSession } from '@/features/auth'
@@ -29,6 +30,8 @@ import {
   FORMULA,
   groupStockBNote,
   HERO_LABEL,
+  HISTORY_LINK,
+  savedNote,
   KG_LABEL,
   LIVE_LABEL,
   missingNote,
@@ -69,15 +72,25 @@ import { kgAmount, unitsCount } from '@/shared/types/labels'
 export function SacaPage() {
   const { catalog } = useCatalog()
   const ref = today()
-  const [day, setDay] = useState<IsoDate>(ref)
+  // ?fecha=AAAA-MM-DD abre la saca guardada de ese día (desde el Historial de sacas).
+  const [params] = useSearchParams()
+  const asked = params.get('fecha')
+  const [day, setDay] = useState<IsoDate>(() => (asked && isoDateSchema.safeParse(asked).success ? asked : ref))
   const query = useSacaPlan(day)
   // Sin respuesta del servidor se dibuja la saca en cero; los datos llegan cuando responde.
   const waiting = !query.data
   const plan = query.data ?? emptySaca(day, catalog.products)
+  const historyLink = (
+    <Button asChild variant="outline">
+      <Link to={paths.sacaHistory}>
+        <History /> {HISTORY_LINK}
+      </Link>
+    </Button>
+  )
 
   return (
     <div>
-      <PageHeader title={SACA_TITLE} subtitle={SACA_SUBTITLE} />
+      <PageHeader title={SACA_TITLE} subtitle={SACA_SUBTITLE} actions={historyLink} mobileActions={historyLink} />
       <PageBody>
         <DayStrip
           days={sacaDays(ref)}
@@ -87,6 +100,11 @@ export function SacaPage() {
           caption={(d) => (d === ref ? TODAY_LABEL : d === addDays(ref, 1) ? TOMORROW_LABEL : undefined)}
         />
         <SyncStatus queries={[query]} />
+        {plan.saved_at && (
+          <p className="mx-1 mb-3 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <History aria-hidden className="size-4" /> {savedNote(clockTime(plan.saved_at), plan.saved_by ?? '')}
+          </p>
+        )}
         {
           // En pantallas anchas: resumen y detalle a la izquierda, datos de origen fijos a la derecha.
           // En angostas se apilan en este orden: resumen, datos de origen, detalle.
@@ -234,7 +252,9 @@ function FarmOrder({ plan }: { plan: Saca }) {
                 <small className="block text-2xs text-muted-foreground">{groupStockBNote(g.stock_b)}</small>
               )}
             </span>
-            <span className={cn('num text-right', !g.ordered && 'text-faint')}>{g.ordered ? `−${nf0(g.ordered)}` : 0}</span>
+            <span className={cn('num text-right', !g.ordered && 'text-faint')}>
+              {g.ordered ? `−${nf0(g.ordered)}` : 0}
+            </span>
             <span className="num text-right">+{nf0(g.projected)}</span>
             {plusCell(g.name, g.plus)}
             <b className="num text-right text-lg font-semibold hc:font-extrabold">{nf0(g.farm_order)}</b>
@@ -462,8 +482,12 @@ function ByProduct({ plan, products }: { plan: Saca; products: Product[] }) {
                     </small>
                   </span>
                   <span className={cn(numCls, !l.stock && 'text-faint')}>{nf0(l.stock)}</span>
-                  <span className={cn(numCls, !l.ordered && 'text-faint')}>{l.ordered ? `−${nf0(l.ordered)}` : '0'}</span>
-                  <span className={cn(numCls, !l.projected && 'text-faint')}>{l.projected ? `+${nf0(l.projected)}` : '0'}</span>
+                  <span className={cn(numCls, !l.ordered && 'text-faint')}>
+                    {l.ordered ? `−${nf0(l.ordered)}` : '0'}
+                  </span>
+                  <span className={cn(numCls, !l.projected && 'text-faint')}>
+                    {l.projected ? `+${nf0(l.projected)}` : '0'}
+                  </span>
                   <span className="text-right">
                     <b
                       className={cn(

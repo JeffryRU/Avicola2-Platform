@@ -50,6 +50,7 @@ const ForecastPage = page(() => import('@/features/production/ui/pages/ForecastP
 const MyRequestsPage = page(() => import('@/features/editing/ui/pages/MyRequestsPage'), 'MyRequestsPage')
 const ProductionPage = page(() => import('@/features/production/ui/pages/ProductionPage'), 'ProductionPage')
 const SacaPage = page(() => import('@/features/saca/ui/pages/SacaPage'), 'SacaPage')
+const SacaHistoryPage = page(() => import('@/features/saca/ui/pages/SacaHistoryPage'), 'SacaHistoryPage')
 const StockPage = page(() => import('@/features/stock/ui/pages/StockPage'), 'StockPage')
 const SuccessPage = page(() => import('@/features/projections/ui/pages/SuccessPage'), 'SuccessPage')
 
@@ -115,6 +116,7 @@ function TeamRoutes({ session }: { session: Session }) {
       {can(session, 'manage_editing') && <Route path={paths.unlocks} element={<UnlocksPage />} />}
       {can(session, 'view_stock') && <Route path={paths.stock} element={<StockPage />} />}
       {can(session, 'view_saca') && <Route path={paths.saca} element={<SacaPage />} />}
+      {can(session, 'view_saca') && <Route path={paths.sacaHistory} element={<SacaHistoryPage />} />}
       {can(session, 'view_production') && <Route path={paths.production} element={<ProductionPage />} />}
       {can(session, 'view_production') && <Route path={paths.forecast} element={<ForecastPage />} />}
       <Route path={paths.history} element={<HistoryPage />} />

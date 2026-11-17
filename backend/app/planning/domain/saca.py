@@ -16,7 +16,7 @@ tipo. Las líneas por producto muestran el mismo cálculo sin el plus, como deta
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from app.planning.domain.models import Product
 from app.planning.domain.production import ArrivalEstimate
@@ -71,6 +71,17 @@ class SacaGroup:
     def farm_order(self) -> int:
         """stock − pedidos + proyección + plus; nunca menos de 0."""
         return max(0, self.balance + self.plus)
+
+
+@dataclass(frozen=True)
+class SacaSnapshot:
+    """La saca de un día tal como se guardó (`payload`: la respuesta de la API, en JSON)."""
+
+    date: date
+    saved_at: datetime
+    saved_by: str
+    farm_order: int
+    payload: str
 
 
 @dataclass(frozen=True)

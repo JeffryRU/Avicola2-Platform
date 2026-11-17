@@ -132,6 +132,8 @@ class Settings(BaseSettings):
     )
     # Para la saca solo cuenta el stock de lotes de hasta estos días (lo más antiguo se troza).
     saca_stock_lot_days: int = Field(3, ge=0, le=30)
+    # Hora (local) desde la que el programador guarda la saca del día como la del cierre.
+    saca_snapshot_hour: int = Field(20, ge=0, le=23)
     # Plus de la saca: aves extra por tipo que se suman al pedido a granja (regla del negocio).
     # Se cambia con SACA_GROUP_PLUS (JSON) o, desde la app, un supervisor.
     # «Carne» del negocio = el tipo «Pollo de mercado» del catálogo (SUPUESTO, docs/assumptions).

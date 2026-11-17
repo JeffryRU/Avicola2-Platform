@@ -66,7 +66,29 @@ export const sacaSchema = z.object({
   forecast: z
     .object({ method: z.string(), days: z.number().int(), date_from: isoDateSchema, date_to: isoDateSchema })
     .nullish(),
+  // Cuándo y quién la guardó (la de un día pasado es la guardada, no se recalcula).
+  saved_at: z.string().nullish(),
+  saved_by: z.string().nullish(),
 })
+
+/** Una saca guardada: el pedido a granja de ese día, por tipo. */
+export const sacaHistorySchema = z.object({
+  date: isoDateSchema,
+  saved_at: z.string(),
+  saved_by: z.string(),
+  farm_order: z.number().int(),
+  groups: z.array(
+    z.object({
+      name: z.string(),
+      projected: z.number().int(),
+      ordered: z.number().int(),
+      stock: z.number().int(),
+      plus: z.number().int(),
+      farm_order: z.number().int(),
+    }),
+  ),
+})
+export type SacaHistoryDay = z.infer<typeof sacaHistorySchema>
 export type Saca = z.infer<typeof sacaSchema>
 
 export const MAX_PLUS = 100_000

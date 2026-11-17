@@ -224,5 +224,5 @@ def test_model_projection_uses_only_earlier_history(client) -> None:
     # El mismo día de la historia no se predice con su propio dato.
     same = {"date_from": str(PAST), "date_to": str(PAST)}
     assert client.get("/api/model-projections", params=same).json() == []
-    too_long = {"date_from": str(PAST), "date_to": str(PAST + timedelta(days=120))}
+    too_long = {"date_from": str(PAST), "date_to": str(PAST + timedelta(days=400))}
     assert client.get("/api/model-projections", params=too_long).status_code == 422
