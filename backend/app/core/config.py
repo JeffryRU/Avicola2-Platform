@@ -134,6 +134,9 @@ class Settings(BaseSettings):
     saca_stock_lot_days: int = Field(3, ge=0, le=30)
     # Hora (local) desde la que el programador guarda la saca del día como la del cierre.
     saca_snapshot_hour: int = Field(20, ge=0, le=23)
+    # Hora (local) desde la que el programador reentrena el modelo de demanda (una vez por día).
+    model_train_hour: int = Field(2, ge=0, le=23)
+    model_train_enabled: bool = True
     # Plus de la saca: aves extra por tipo que se suman al pedido a granja (regla del negocio).
     # Se cambia con SACA_GROUP_PLUS (JSON) o, desde la app, un supervisor.
     # «Carne» del negocio = el tipo «Pollo de mercado» del catálogo (SUPUESTO, docs/assumptions).

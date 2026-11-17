@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { MODEL_TITLE } from '@/features/model'
 import {
   Bell,
   CalendarDays,
@@ -19,6 +20,7 @@ import {
   Users,
   Warehouse,
   type LucideIcon,
+  BrainCircuit,
 } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { InstallBanner } from '@/app/install'
@@ -58,6 +60,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   [paths.mine]: ListChecks,
   [paths.requests]: Inbox,
   [paths.saca]: Calculator,
+  [paths.model]: BrainCircuit,
   [paths.stock]: Warehouse,
   [paths.production]: Factory,
   [paths.forecast]: TrendingUp,
@@ -93,7 +96,14 @@ function navGroups(session: Session, counts: { unread: number; unlocks: number }
       },
     ]
   }
-  const dashboards: NavGroup = { title: 'Dashboards', items: DASHBOARDS.map((d) => ({ to: d.to, label: d.label })) }
+  const dashboards: NavGroup = {
+    title: 'Dashboards',
+    items: [
+      ...DASHBOARDS.map((d) => ({ to: d.to, label: d.label })),
+      // El modelo de demanda (cómo se eligió y cuánto se equivoca): solo supervisión.
+      ...(hasTeamView(session) ? [{ to: paths.model, label: MODEL_TITLE }] : []),
+    ],
+  }
   const operation: NavItem[] = [
     ...(can(session, 'view_saca') ? [{ to: paths.saca, label: SACA_TITLE }] : []),
     ...(can(session, 'view_stock') ? [{ to: paths.stock, label: STOCK_TITLE }] : []),

@@ -29,6 +29,7 @@ const FEATURE_DEPS = {
   dashboards: ['auth', 'catalog', 'editing', 'history', 'projections', 'sellers'],
   production: ['auth', 'catalog'],
   saca: ['auth', 'catalog', 'production'],
+  model: ['auth'],
   stock: ['auth', 'catalog'],
   accounts: ['auth', 'editing'],
   profile: ['auth', 'versions'],

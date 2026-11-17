@@ -9,13 +9,16 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator, Callable
+from datetime import datetime
 
 from app.core.config import Settings
 from app.planning.bootstrap import build_use_cases
 from app.planning.domain.models import Seller
 from app.planning.domain.permissions import GENERAL_SUPERVISOR
 from app.planning.infrastructure.clock import ZoneClock
+from app.planning.infrastructure.demand_model import training
 from app.planning.infrastructure.http.saca_view import saca_out
+from app.planning.infrastructure.persistence.repositories import SqlProductRepository
 from app.shared.infrastructure.database.session import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -54,10 +57,33 @@ def snapshot_saca(settings: Settings) -> int:
         return 1
 
 
+def train_demand_model(settings: Settings) -> int:
+    """Desde MODEL_TRAIN_HOUR, reentrena el modelo de demanda una vez por día (fuera de las
+    peticiones: en el hilo del programador)."""
+    if not settings.model_train_enabled:
+        return 0
+    clock = ZoneClock(settings.tz)
+    now = clock.now()
+    if now.hour < settings.model_train_hour:
+        return 0
+    with SessionLocal() as session:
+        last = training.latest(session)
+        if (
+            last
+            and datetime.fromisoformat(last["trained_at"]).astimezone(now.tzinfo).date()
+            == now.date()
+        ):
+            return 0
+        return 1 if training.train(session, SqlProductRepository(session).list_active()) else 0
+
+
 def check_cutoffs(settings: Settings) -> int:
     """Una revisión completa: aviso previo al corte, aviso de corte pasado y saca del cierre."""
     return (
-        check_closing_soon(settings) + check_missed_projections(settings) + snapshot_saca(settings)
+        check_closing_soon(settings)
+        + check_missed_projections(settings)
+        + snapshot_saca(settings)
+        + train_demand_model(settings)
     )
 
 

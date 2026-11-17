@@ -40,13 +40,17 @@ def product(material: str, kg: float, units: float) -> int:
     return max([i for i, k in enumerate(KG) if k <= w + 0.005], default=0)
 
 
-def load(paths: list[str]) -> tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, list[str]]:
+def load(paths: list[str], min_days: int = 100, unassigned: bool = False):
+    """`min_days`: días mínimos con pedidos para incluir a un vendedor. `unassigned`: las líneas
+    sin vendedor entran como una serie más («(sin vendedor)»)."""
     d = pd.concat([pd.read_csv(p, low_memory=False) for p in paths], ignore_index=True)
     b = d[d.PedidoDetalleMaterial.str.upper().str.startswith("POLLO ENTERO BRASA", na=False)].copy()
     b["p"] = [
         product(m, k, u)
         for m, k, u in zip(b.PedidoDetalleMaterial, b.PesoDespachado, b.CantidadDespachada)
     ]
+    if unassigned:
+        b["Vendedor"] = b.Vendedor.fillna("(sin vendedor)")
     b = b[(b.p >= 0) & b.Vendedor.notna()].copy()
     kgu = b.p.map(lambda i: KG[i])
     b["ordered"] = np.where(
@@ -57,7 +61,7 @@ def load(paths: list[str]) -> tuple[np.ndarray, np.ndarray, pd.DatetimeIndex, li
     b["day"] = pd.to_datetime(b.FechaEntrega)
     b["s"] = b.Vendedor.str.lower()
     keep = b.groupby("s").day.nunique()
-    sellers = sorted(keep[keep >= 100].index)
+    sellers = sorted(keep[keep >= min_days].index)
     b = b[b.s.isin(sellers)]
     days = pd.date_range(b.day.min(), b.day.max())
     idx = pd.MultiIndex.from_product([sellers, range(10)], names=["s", "p"])

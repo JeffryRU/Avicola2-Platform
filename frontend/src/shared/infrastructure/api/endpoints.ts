@@ -62,6 +62,8 @@ export const endpoints = {
   model: {
     /** GET ?date_from&date_to&seller → lo que el modelo habría sugerido cada día, por vendedor. */
     list: '/model-projections',
+    /** GET → última corrida del modelo de demanda (métricas por nivel, división y predicho vs real). */
+    summary: '/model/summary',
   },
 
   suggestions: {

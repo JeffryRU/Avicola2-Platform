@@ -22,6 +22,9 @@
     uv run python -m app.planning.infrastructure.cli tiendas <archivo.xlsx>
                         pedidos de brasa de las tiendas («Proyección tiendas»: zona, fecha,
                         CANTIDAD 2 y RANGO) para la saca de esos días; reemplaza los anteriores
+    uv run python -m app.planning.infrastructure.cli entrenar
+                        entrena los modelos de demanda (ADR 0020) con la historia de ARIS y guarda
+                        métricas y predicciones; el programador lo hace solo de madrugada
     uv run python -m app.planning.infrastructure.cli seed         3 semanas de ejemplo
     uv run python -m app.planning.infrastructure.cli show [n]     resumen y últimas n
     uv run python -m app.planning.infrastructure.cli clear --yes  borra las proyecciones
@@ -59,6 +62,7 @@ from app.planning.domain.permissions import (
     SUPERVISOR,
 )
 from app.planning.infrastructure.clock import ZoneClock
+from app.planning.infrastructure.demand_model.training import train as train_model
 from app.planning.infrastructure.history_import import load_dispatch_orders, load_store_sales
 from app.planning.infrastructure.persistence.notifications import SqlNotificationRepository
 from app.planning.infrastructure.persistence.production import SqlProductionRepository
@@ -310,6 +314,26 @@ class _DayClock:
         return datetime.combine(self.day, time(8, 30), tzinfo=UTC)
 
 
+def train_demand_model(session: Session) -> int:
+    """Entrena los modelos de demanda con la historia de ARIS y guarda métricas y predicciones."""
+    summary = train_model(session, SqlProductRepository(session).list_active())
+    if summary is None:
+        print("No hay historia suficiente de ARIS (cli historia) para entrenar.")
+        return 1
+    print(
+        f"OK: modelo entrenado con {len(summary['sellers'])} vendedores "
+        f"({summary['data_from']} a {summary['data_to']})."
+    )
+    for m in summary["models"]:
+        x = m["metrics"]
+        print(
+            f"  {m['name']:<40} vendedor×día {x['vendedor_dia']:5.1f}% · tamaño×día "
+            f"{x['tamano_dia']:5.1f}% · equipo×día {x['equipo_dia']:5.1f}% · "
+            f"semana {x['equipo_semana']:5.1f}%"
+        )
+    return 0
+
+
 def import_store_orders(session: Session, path: Path) -> int:
     """Pedidos de tiendas (Proyección tiendas.xlsx) para el cálculo de saca de esos días."""
     if not path.is_file():
@@ -466,6 +490,8 @@ def _run(argv: list[str], settings: Settings) -> int:  # noqa: PLR0911 (un caso 
             )
         elif cmd == "rol" and len(argv) == 3:
             return set_role(session, argv[1].strip().lower(), argv[2].strip())
+        elif cmd == "entrenar":
+            return train_demand_model(session)
         elif cmd == "tiendas" and len(argv) == 2:
             return import_store_orders(session, Path(argv[1]))
         elif cmd == "produccion" and len(argv) == 2:

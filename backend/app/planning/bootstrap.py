@@ -22,6 +22,7 @@ from app.planning.domain.accounts import LockoutPolicy
 from app.planning.infrastructure.aris_history import ArisHistory, ArisOrSimulatedSales
 from app.planning.infrastructure.arrival_model import AdaptiveArrivalModel
 from app.planning.infrastructure.clock import ZoneClock
+from app.planning.infrastructure.demand_model.store import SqlDemandModelStore
 from app.planning.infrastructure.events import event_bus
 from app.planning.infrastructure.forecast import OrderHistoryForecaster, WeekdayAverageForecaster
 from app.planning.infrastructure.orders import LoadedOrders
@@ -80,6 +81,7 @@ class PlanningUseCases:
     submit_projection: uc.SubmitProjection
     get_sales: uc.GetSales
     model_projections: uc.ModelProjections
+    model_summary: uc.GetModelSummary
     export_projections: ex.ExportProjections
     list_changes: uc.ListChanges
     suggest_projection: uc.SuggestProjection
@@ -175,10 +177,15 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             history=history,
         ),
         get_sales=uc.GetSales(sales),
-        model_projections=uc.ModelProjections(sellers, order_history, products),
+        model_projections=uc.ModelProjections(
+            sellers, order_history, products, SqlDemandModelStore(session)
+        ),
+        model_summary=uc.GetModelSummary(SqlDemandModelStore(session)),
         export_projections=ex.ExportProjections(products, projections, sales, sellers, clock),
         list_changes=uc.ListChanges(history),
-        suggest_projection=uc.SuggestProjection(products, forecaster, settings.planning_max_days),
+        suggest_projection=uc.SuggestProjection(
+            products, forecaster, settings.planning_max_days, SqlDemandModelStore(session)
+        ),
         status=SqlStatusProbe(session, schema),
         list_notifications=nt.ListNotifications(notifications),
         mark_notifications_read=nt.MarkNotificationsRead(notifications, clock),

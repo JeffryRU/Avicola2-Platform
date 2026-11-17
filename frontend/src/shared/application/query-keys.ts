@@ -64,6 +64,10 @@ export const queryKeys = {
     list: (from: string, to: string, seller?: string) => ['history', from, to, seller ?? null] as const,
   },
 
+  model: {
+    summary: ['model', 'summary'] as const,
+  },
+
   saca: {
     all: ['saca'] as const,
     plan: (day: string) => ['saca', day] as const,
