@@ -4,6 +4,7 @@ import { dShort, relativeDay, type IsoDate } from '@/shared/domain/dates'
 import { nf0, nf1, parseCell } from '@/shared/domain/format'
 import { bySubcategory, type Product, type Units } from '@/shared/domain/products'
 import type { Draft } from '@/features/projections/domain/draft'
+import { tableStyles } from '@/shared/ui/lib/table-styles'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgPerUnitLabel } from '@/features/catalog'
 import { kgAmount } from '@/shared/types/labels'
@@ -20,6 +21,8 @@ interface Props {
   /** Llena solo ese día con la sugerencia (botón sobre cada día). */
   onFillDay?: (date: IsoDate) => void
 }
+
+const ed = tableStyles.edit
 
 /** Navegación tipo hoja de cálculo: Enter/↓ baja, ↑ sube. */
 function onCellKey(e: React.KeyboardEvent<HTMLInputElement>, columns: number) {
@@ -71,7 +74,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
   const grouped = groups.length > 1
   const groupUnits = (d: IsoDate, ps: Product[]) => ps.reduce((s, p) => s + (value(d, p) ?? 0), 0)
   const groupKg = (d: IsoDate, ps: Product[]) => ps.reduce((s, p) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0)
-  const groupCls = '[&>td]:bg-muted [&>td]:text-xs [&>td]:font-semibold [&>td]:text-ink-2'
+  const groupCls = ed.groupRow
 
   const cell = (d: IsoDate, p: Product) => {
     const v = value(d, p)
@@ -90,9 +93,8 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
           onKeyDown={(e) => onCellKey(e, dates.length)}
           onFocus={(e) => e.target.select()}
           className={cn(
-            'num rounded-md border-control border-input bg-surface text-center font-medium text-foreground transition-colors placeholder:text-faint focus-visible:border-ring',
-            mobile ? 'h-touch w-14 text-md' : 'h-9 w-16 text-base',
-            invalid.includes(d) && 'border-bad bg-bad-soft',
+            ed.input({ size: mobile ? 'touch' : 'desktop', invalid: invalid.includes(d) }),
+            mobile ? 'w-14' : 'w-16',
           )}
         />
         {mobile && (
@@ -110,8 +112,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
     </div>
   )
 
-  const th =
-    'border-b border-rule-strong bg-surface px-2 py-2 text-center text-xs font-medium whitespace-nowrap text-muted-foreground hc:border-b-heavy hc:border-foreground hc:text-sm hc:font-bold hc:text-foreground'
+  const th = cn(ed.th, 'text-center align-bottom')
   const head = (d: IsoDate) => (
     <>
       {onFillDay && (
@@ -127,16 +128,17 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
         </button>
       )}
       <span className="block text-sm font-semibold text-foreground">{dShort(d)}</span>
-      <small className="block text-xs font-medium text-primary">{relativeDay(d) ?? ' '}</small>
+      {/* Sin «Mañana» también ocupa su línea: así todos los días quedan a la misma altura. */}
+      <small className="block text-xs font-medium text-primary">{relativeDay(d) ?? ' '}</small>
     </>
   )
 
   if (mobile) {
-    const stk = 'sticky left-0 z-[2] min-w-24 max-w-28 border-r border-rule bg-surface pl-3 text-left'
+    const stk = cn(ed.stickyCol, 'z-[2] min-w-24 max-w-28 border-r border-rule pl-3 text-left')
     return (
       <div className="panel overflow-hidden">
         <div className="relative overflow-x-auto overscroll-x-contain">
-          <table id="mx" className="min-w-full border-separate border-spacing-0 text-sm">
+          <table id="mx" className={cn(ed.table, 'min-w-full text-sm')}>
             <thead>
               <tr>
                 <th className={cn(th, stk, 'z-[3] text-left')}>
@@ -190,7 +192,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
                   ))}
                 </Fragment>
               ))}
-              <tr className="[&>td]:border-t [&>td]:border-rule-strong [&>td]:bg-muted [&>td]:py-2.5 [&>td]:text-center [&>td]:font-semibold hc:[&>td]:border-t-heavy hc:[&>td]:border-foreground">
+              <tr className={cn(ed.totalRow, '[&>td]:text-center')}>
                 <td className={cn(stk, '!bg-muted text-sm')}>Total por día</td>
                 {dates.map((d) => (
                   <td key={d}>
@@ -214,7 +216,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
 
   return (
     <div className="panel relative overflow-x-auto">
-      <table id="mx" className="w-full border-separate border-spacing-0 text-base">
+      <table id="mx" className={cn(ed.table, 'text-base')}>
         <thead>
           <tr>
             <th rowSpan={2} className={cn(th, 'pl-5 text-left')}>
@@ -295,7 +297,12 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
               ))}
             </Fragment>
           ))}
-          <tr className="[&>td]:border-t [&>td]:border-rule-strong [&>td]:bg-muted [&>td]:px-2 [&>td]:py-2.5 [&>td]:text-center [&>td]:font-semibold hc:[&>td]:border-t-heavy hc:[&>td]:border-foreground [&>td:first-child]:pl-5 [&>td:first-child]:text-left [&>td:last-child]:pr-5">
+          <tr
+            className={cn(
+              ed.totalRow,
+              '[&>td]:px-2 [&>td]:text-center [&>td:first-child]:pl-5 [&>td:first-child]:text-left [&>td:last-child]:pr-5',
+            )}
+          >
             <td>Total por día</td>
             {dates.map((d) => [
               <td key={`${d}u`} className="num">

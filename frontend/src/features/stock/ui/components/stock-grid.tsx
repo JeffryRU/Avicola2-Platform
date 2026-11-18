@@ -4,10 +4,11 @@ import type { Product } from '@/shared/domain/products'
 import { cellKey, kgOf, type StockDraft, type StockView, unitsAt } from '@/features/stock/domain/stock'
 import { COLUMNS, DISCARD_TAG, lotAgeLabel, OLD_LOT, QUALITY_B_TAG } from '@/features/stock/types/stock'
 import { kgAmount } from '@/shared/types/labels'
+import { tableStyles } from '@/shared/ui/lib/table-styles'
 import { cn } from '@/shared/ui/lib/utils'
 
-const cellCls =
-  'num h-touch w-full min-w-17 rounded-sm border-control border-input bg-surface px-1.5 text-right text-md outline-none transition-colors placeholder:text-faint focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring dsk:h-9 dsk:text-base'
+const ed = tableStyles.edit
+const cellCls = cn(ed.input({ align: 'right' }), 'w-full min-w-17')
 
 /** Artículos en filas y lotes en columnas. Con `onChange` las celdas se escriben; sin él, se leen. */
 export function Grid({
@@ -33,15 +34,14 @@ export function Grid({
   const sumKg = (items: Product[], lot?: IsoDate) =>
     items.reduce((s, p) => s + kgOf(p, lot ? unitsAt(draft, p.id, lot) : rowUnits(p)), 0)
   const rowUnits = (p: Product) => lots.reduce((s, lot) => s + unitsAt(draft, p.id, lot), 0)
-  const th =
-    'border-b border-rule-strong px-1.5 pb-2 text-right align-bottom text-xs font-medium text-muted-foreground hc:border-b-heavy hc:font-bold hc:text-foreground'
+  const th = cn(ed.th, 'px-1.5 pt-0 pb-2 text-right align-bottom')
   return (
     // La tabla se desplaza dentro de su marco; la página nunca se ensancha.
     <div className="relative overflow-x-auto px-3 pt-3 pb-3 dsk:px-4">
-      <table className="w-full border-separate border-spacing-0 text-base">
+      <table className={cn(ed.table, 'text-base')}>
         <thead>
           <tr>
-            <th className={cn(th, 'sticky left-0 z-[1] bg-surface !text-left')}>{COLUMNS.product}</th>
+            <th className={cn(th, ed.stickyCol, '!text-left')}>{COLUMNS.product}</th>
             {lots.map((lot) => {
               const age = diffDays(day, lot)
               return (
@@ -59,17 +59,17 @@ export function Grid({
         </thead>
         {groups.map((g) => (
           <tbody key={g.name}>
-            <tr>
+            <tr className={ed.groupRow}>
               <th
                 scope="rowgroup"
-                className="eyebrow sticky left-0 z-[1] border-b border-rule bg-muted px-3 py-2 text-left hc:text-foreground"
+                className={cn(ed.stickyCol, ed.cell, 'eyebrow px-3 py-2 text-left hc:text-foreground')}
               >
                 {g.name}
               </th>
               {lots.map((lot) => (
                 <td
                   key={lot}
-                  className="num border-b border-rule bg-muted px-1.5 py-2 text-right text-sm text-muted-foreground"
+                  className={cn(ed.cell, 'num px-1.5 py-2 text-right text-sm font-normal text-muted-foreground')}
                 >
                   <Amount
                     units={g.items.reduce((s, p) => s + unitsAt(draft, p.id, lot), 0)}
@@ -79,7 +79,7 @@ export function Grid({
                   />
                 </td>
               ))}
-              <td className="num border-b border-rule bg-muted px-1.5 py-2 text-right text-sm font-semibold">
+              <td className={cn(ed.cell, 'num px-1.5 py-2 text-right text-sm')}>
                 <Amount units={g.items.reduce((s, p) => s + rowUnits(p), 0)} kg={sumKg(g.items)} unit={unit} compact />
               </td>
             </tr>
@@ -87,9 +87,16 @@ export function Grid({
               <tr key={p.id}>
                 <th
                   scope="row"
-                  className="sticky left-0 z-[1] max-w-44 min-w-30 border-b border-rule bg-surface px-3 py-2 text-left font-medium"
+                  className={cn(
+                    ed.stickyCol,
+                    ed.cell,
+                    'max-w-44 min-w-30 px-3 py-2 text-left font-medium dsk:max-w-64',
+                  )}
                 >
-                  <span className="block truncate">{p.name}</span>
+                  {/* En el celular el nombre se corta (la columna queda fija); en escritorio, completo. */}
+                  <span className="block truncate dsk:whitespace-normal" title={p.name}>
+                    {p.name}
+                  </span>
                   {p.quality === 'D' && (
                     <span className="mt-0.5 block text-2xs font-medium text-muted-foreground hc:font-bold">
                       {DISCARD_TAG}
@@ -103,7 +110,7 @@ export function Grid({
                   const key = cellKey(p.id, lot)
                   const units = unitsAt(draft, p.id, lot)
                   return (
-                    <td key={lot} className="border-b border-rule px-1 py-1.5 text-right">
+                    <td key={lot} className={cn(ed.cell, 'px-1 py-1.5 text-right')}>
                       {onChange ? (
                         <>
                           <input
@@ -126,7 +133,7 @@ export function Grid({
                     </td>
                   )
                 })}
-                <td className="border-b border-rule px-1.5 py-1.5 text-right">{show(p, rowUnits(p), true)}</td>
+                <td className={cn(ed.cell, 'px-1.5 py-1.5 text-right')}>{show(p, rowUnits(p), true)}</td>
               </tr>
             ))}
           </tbody>

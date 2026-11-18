@@ -451,6 +451,7 @@ export function DashboardVersusPage() {
                     columns={[
                       {
                         key: 'series',
+                        sticky: true,
                         header: <span className="sr-only">Serie</span>,
                         cell: (r) => <span className="flex items-center gap-2">{r.label}</span>,
                       },
@@ -485,6 +486,7 @@ export function DashboardVersusPage() {
                   columns={[
                     {
                       key: 'name',
+                      sticky: true,
                       header: 'Producto',
                       cell: ({ p }) => (
                         <>
