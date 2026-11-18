@@ -15,6 +15,7 @@ import {
   zoneColumns,
   zoneOfStores,
   type MatrixEntry,
+  type MatrixRow,
 } from '@/features/dashboards/domain/product-matrix'
 import { FilterMenu } from '@/features/dashboards/ui/components/filter-bar'
 import { choiceKey, useDetailSelection, useStoreEntries } from '@/features/dashboards/ui/hooks'
@@ -40,11 +41,10 @@ import {
 } from '@/features/dashboards/types/product-detail'
 import { Section } from '@/shared/ui/components/layout'
 import { EmptyState } from '@/shared/ui/components/feedback'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Segmented } from '@/shared/ui/components/segmented'
 import { DropdownMenuCheckboxItem, DropdownMenuSeparator } from '@/shared/ui/components/shadcn/dropdown-menu'
 import { daysCount } from '@/shared/types/labels'
-import { cn } from '@/shared/ui/lib/utils'
 
 /**
  * «Detalle por producto»: filas por tamaño y producto; columnas por vendedor (agrupados por zona, con
@@ -105,7 +105,6 @@ export function ProductDetail({
   const title = f.days.length
     ? `Detalle por producto · ${f.days.length > 2 ? daysCount(f.days.length) : f.days.map(dShort).join(', ')}`
     : `Detalle por producto (${custom ? 'período' : 'semana'})`
-  const span = bySeller ? 2 : 1
   const viewSwitch = (
     <Segmented
       value={view}
@@ -122,108 +121,53 @@ export function ProductDetail({
       {m.columns.length === 0 ? (
         <EmptyState title="Sin datos">{EMPTY_DETAIL_LABEL}</EmptyState>
       ) : (
-        <div className="relative overflow-x-auto">
-          <table className={tableCls.table}>
-            <thead>
-              <tr>
-                {/* En celular el tamaño ya va en el nombre del grupo: se oculta y el producto queda fijo al deslizar. */}
-                <th rowSpan={span} className={cn(tableCls.th, 'hidden text-left dsk:table-cell')}>
-                  {SIZE_COLUMN_LABEL}
-                </th>
-                <th
-                  rowSpan={span}
-                  className={cn(tableCls.th, 'sticky left-0 z-10 bg-surface text-left dsk:static dsk:bg-transparent')}
-                >
-                  {PRODUCT_COLUMN_LABEL}
-                </th>
-                {bySeller
-                  ? m.headerGroups.map((g, i) => (
-                      <th
-                        key={`${g.name ?? ''}-${String(i)}`}
-                        colSpan={g.span}
-                        scope="colgroup"
-                        className="eyebrow border-b border-l border-rule px-3 pt-2.5 pb-1.5 text-center whitespace-nowrap hc:text-foreground"
-                      >
-                        {g.name}
-                      </th>
-                    ))
-                  : m.columns.map((c) => (
-                      <th key={c.key} className={tableCls.th}>
-                        {c.label}
-                      </th>
-                    ))}
-                <th rowSpan={span} className={tableCls.th}>
-                  {TOTAL_UNITS_LABEL}
-                </th>
-                <th rowSpan={span} className={tableCls.th}>
-                  {TOTAL_KG_LABEL}
-                </th>
-              </tr>
-              {bySeller && (
-                <tr>
-                  {m.columns.map((c) => (
-                    <th
-                      key={c.key}
-                      title={c.label}
-                      className={cn(tableCls.th, 'text-center first:pl-3 first:text-center dsk:first:pl-3')}
-                    >
-                      {c.label.split(' ')[0]}
-                    </th>
-                  ))}
-                </tr>
-              )}
-            </thead>
-            <tbody>
-              {m.groups.map((g) =>
-                g.rows.map((r, i) => (
-                  <tr key={r.product.id} className={tableCls.row}>
-                    {i === 0 && (
-                      <th
-                        scope="rowgroup"
-                        rowSpan={g.rows.length}
-                        className="hidden border-b border-rule-strong py-2.5 pr-3 pl-4 text-left align-top text-xs font-semibold whitespace-nowrap text-ink-2 uppercase dsk:table-cell dsk:pl-5"
-                      >
-                        {g.name ?? r.product.category}
-                      </th>
-                    )}
-                    <td
-                      className={cn(
-                        tableCls.td,
-                        'sticky left-0 z-10 bg-surface pl-4 text-left font-medium first:pl-4 dsk:static dsk:bg-transparent dsk:pl-3 dsk:first:pl-3',
-                      )}
-                    >
-                      {r.product.name}
-                    </td>
-                    {r.cells.map((u, j) => (
-                      <td key={m.columns[j].key} className={cn(tableCls.td, 'num', u === 0 && 'text-faint')}>
-                        {u === 0 ? '—' : nf0(u)}
-                      </td>
-                    ))}
-                    <td className={cn(tableCls.td, 'num font-semibold', r.total === 0 && 'font-normal text-faint')}>
-                      {r.total === 0 ? '—' : nf0(r.total)}
-                    </td>
-                    <td className={cn(tableCls.td, 'num', r.total === 0 && 'text-faint')}>
-                      {r.total === 0 ? '—' : nf1(r.kg)}
-                    </td>
-                  </tr>
-                )),
-              )}
-              <tr className={tableCls.total}>
-                <td className={cn(tableCls.td, 'hidden dsk:table-cell')} />
-                <td className={cn(tableCls.td, 'sticky left-0 z-10 bg-muted pl-4 text-left dsk:static dsk:pl-3')}>
-                  Total
-                </td>
-                {m.cells.map((u, j) => (
-                  <td key={m.columns[j].key} className={cn(tableCls.td, 'num')}>
-                    {nf0(u)}
-                  </td>
-                ))}
-                <td className={cn(tableCls.td, 'num')}>{nf0(m.total)}</td>
-                <td className={cn(tableCls.td, 'num')}>{nf1(m.kg)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          groups={m.groups.map((g) => ({
+            key: g.name ?? g.rows[0]?.product.category ?? '',
+            label: g.name ?? g.rows[0]?.product.category,
+            rows: g.rows,
+          }))}
+          groupHeader={SIZE_COLUMN_LABEL}
+          rowKey={(r) => r.product.id}
+          totalLabel="Total"
+          columns={[
+            // En celular el tamaño ya va en el nombre del grupo: el producto queda fijo al deslizar.
+            {
+              key: 'product',
+              header: PRODUCT_COLUMN_LABEL,
+              sticky: true,
+              className: 'font-medium',
+              cell: (r) => r.product.name,
+            },
+            ...m.columns.map((c, j) => ({
+              key: c.key,
+              // Por vendedor: el nombre de pila bajo su zona (el completo, al pasar el mouse).
+              header: bySeller ? c.label.split(' ')[0] : c.label,
+              title: c.label,
+              group: bySeller ? c.group : null,
+              numeric: true,
+              faint: (r: MatrixRow) => r.cells[j] === 0,
+              cell: (r: MatrixRow) => (r.cells[j] === 0 ? '—' : nf0(r.cells[j])),
+              total: nf0(m.cells[j]),
+            })),
+            {
+              key: 'total-units',
+              header: TOTAL_UNITS_LABEL,
+              numeric: true,
+              className: (r) => (r.total === 0 ? 'text-faint' : 'font-semibold'),
+              cell: (r) => (r.total === 0 ? '—' : nf0(r.total)),
+              total: nf0(m.total),
+            },
+            {
+              key: 'total-kg',
+              header: TOTAL_KG_LABEL,
+              numeric: true,
+              faint: (r) => r.total === 0,
+              cell: (r) => (r.total === 0 ? '—' : nf1(r.kg)),
+              total: nf1(m.kg),
+            },
+          ]}
+        />
       )}
     </Section>
   )

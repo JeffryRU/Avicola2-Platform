@@ -13,7 +13,7 @@ import { SummaryRow } from '@/shared/ui/components/summary-row'
 import { CountUp } from '@/shared/ui/components/charts'
 import { Note } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
 import { daysCount, kgAmount, unitsCount, RETRY_LABEL } from '@/shared/types/labels'
@@ -105,34 +105,24 @@ export function SuccessPage() {
             </div>
           </Section>
           <Section title="Total por día">
-            <div className="relative overflow-x-auto">
-              <table className={tableCls.table}>
-                <thead>
-                  <tr>
-                    <th className={tableCls.th}>Fecha</th>
-                    <th className={tableCls.th}>Unidades</th>
-                    <th className={tableCls.th}>Kg (aprox.)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {days.map((d) => (
-                    <tr
-                      key={d.date}
-                      className={cn(tableCls.row, 'cursor-pointer')}
-                      onClick={() => navigate(paths.day(d.date))}
-                    >
-                      <td className={tableCls.td}>
-                        <Link to={paths.day(d.date)} className="font-medium underline-offset-4 hover:underline">
-                          {dShort(d.date)}
-                        </Link>
-                      </td>
-                      <td className={cn(tableCls.td, 'num')}>{unitsCount(sumUnits(shown(d.units)))}</td>
-                      <td className={cn(tableCls.td, 'num')}>{kgAmount(catalog.kg(shown(d.units)))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              rows={days}
+              rowKey={(d) => d.date}
+              onRowClick={(d) => void navigate(paths.day(d.date))}
+              columns={[
+                {
+                  key: 'date',
+                  header: 'Fecha',
+                  cell: (d) => (
+                    <Link to={paths.day(d.date)} className="font-medium underline-offset-4 hover:underline">
+                      {dShort(d.date)}
+                    </Link>
+                  ),
+                },
+                { key: 'units', header: 'Unidades', numeric: true, cell: (d) => unitsCount(sumUnits(shown(d.units))) },
+                { key: 'kg', header: 'Kg (aprox.)', numeric: true, cell: (d) => kgAmount(catalog.kg(shown(d.units))) },
+              ]}
+            />
           </Section>
           <div className="grid gap-2.5 dsk:flex dsk:justify-end">
             <Button asChild variant="outline" className="h-12 text-md dsk:h-control dsk:text-base">

@@ -4,7 +4,7 @@ import { GRANULARITY_NOTE, bucketLabels } from '@/features/dashboards/types/buck
 import { nf0, nf1, pct1 } from '@/shared/domain/format'
 import { periodAgg, useModelProjections, versusReal } from '@/features/projections'
 import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { DataTable, type RowTone } from '@/shared/ui/components/data-table'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
 import { kgPerUnitLabel, useCatalog } from '@/features/catalog'
 import { usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
@@ -19,13 +19,23 @@ import { DropdownMenuLabel, DropdownMenuSeparator } from '@/shared/ui/components
 import { bySubcategory } from '@/shared/domain/products'
 import { toggleIn } from '@/shared/domain/format'
 import { Package } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgAmount } from '@/shared/types/labels'
 
 const tone = (v: number) => (v < 0 ? 'text-bad' : 'text-ok')
+
+/** Una fila de la tabla bajo el gráfico: una serie con su valor de cada día. */
+interface SeriesRow<P> {
+  key: string
+  label: ReactNode
+  tone?: RowTone
+  value: (p: P) => number | null
+  cell: (p: P) => ReactNode
+  className?: (p: P) => string | false | undefined
+}
 
 /**
  * Muestra de una serie: línea continua (proyección vigente), discontinua (venta real) o, para
@@ -155,6 +165,74 @@ export function DashboardVersusPage() {
   })
   // La tabla, solo con los días que tienen proyección.
   const points = allPoints.filter((p) => p.confirmed)
+  // Tabla bajo el gráfico: una fila por serie (rondas, modelo, venta real) y una columna por día.
+  type Point = (typeof points)[number]
+  const kgCell = (value: (p: Point) => number | null) => (p: Point) => {
+    const v = value(p)
+    return v == null ? '—' : nf0(v)
+  }
+  const series = (
+    key: string,
+    label: ReactNode,
+    value: (p: Point) => number | null,
+    tone?: RowTone,
+  ): SeriesRow<Point> => ({ key, label, value, tone, cell: kgCell(value) })
+  const seriesRows: SeriesRow<Point>[] = [
+    ...earlierRounds.map((r) =>
+      series(
+        `round-${String(r)}`,
+        <>
+          <SeriesKey round={r} />
+          {roundLabel(r, rounds)} (kg)
+        </>,
+        (p) => p.earlier[r - 1] ?? null,
+        'muted',
+      ),
+    ),
+    series(
+      'projected',
+      <>
+        <SeriesKey />
+        {roundLabel(rounds, rounds)} (kg)
+      </>,
+      (p) => p.pk,
+    ),
+    ...(hasModel
+      ? [
+          series(
+            'model',
+            <>
+              <SeriesKey model />
+              Modelo (kg)
+            </>,
+            (p) => p.mk ?? null,
+          ),
+        ]
+      : []),
+    series(
+      'real',
+      <>
+        <SeriesKey dashed />
+        Venta real (kg)
+      </>,
+      (p) => p.rk ?? null,
+    ),
+    {
+      key: 'diff',
+      label: 'Dif. (%)',
+      tone: 'total',
+      value: (p) => p.rk ?? null,
+      cell: (p) => (p.rk == null ? '—' : pct1(((p.rk - p.pk) / p.pk) * 100)),
+      className: (p) => p.rk != null && tone(p.rk - p.pk),
+    },
+  ]
+  const productRows = catalog.products
+    .map((p) => {
+      const pk = withReal.reduce((s, d) => s + (d.units[p.id] ?? 0) * p.kg_per_unit, 0)
+      const rk = withReal.reduce((s, d) => s + (d.real?.[p.id] ?? 0) * p.kg_per_unit, 0)
+      return { p, pk, rk, dp: pk ? ((rk - pk) / pk) * 100 : 0 }
+    })
+    .filter((r) => r.pk || r.rk)
 
   return (
     <div>
@@ -364,91 +442,33 @@ export function DashboardVersusPage() {
               </div>
               {points.length > 0 && (
                 <div className="relative -mx-4 mt-3 -mb-4 overflow-x-auto dsk:-mx-5">
-                  <table className={cn(tableCls.table, 'text-sm')}>
-                    <thead>
-                      <tr>
-                        <th className={tableCls.th}>
-                          <span className="sr-only">Serie</span>
-                        </th>
-                        {points.map((p) => (
-                          <th key={p.date} className={tableCls.th}>
+                  <DataTable
+                    dense
+                    rows={seriesRows}
+                    rowKey={(r) => r.key}
+                    rowTone={(r) => r.tone}
+                    columns={[
+                      {
+                        key: 'series',
+                        header: <span className="sr-only">Serie</span>,
+                        cell: (r) => <span className="flex items-center gap-2">{r.label}</span>,
+                      },
+                      ...points.map((p) => ({
+                        key: p.date,
+                        header: (
+                          <>
                             {p.label}
                             <br />
                             <span className="num">{p.sublabel}</span>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {earlierRounds.map((r) => (
-                        <tr key={r} className="text-muted-foreground">
-                          <td className={tableCls.td}>
-                            <span className="flex items-center gap-2">
-                              <SeriesKey round={r} />
-                              {roundLabel(r, rounds)} (kg)
-                            </span>
-                          </td>
-                          {points.map((p) => (
-                            <td key={p.date} className={cn(tableCls.td, 'num')}>
-                              {nf0(p.earlier[r - 1])}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                      <tr>
-                        <td className={tableCls.td}>
-                          <span className="flex items-center gap-2">
-                            <SeriesKey />
-                            {roundLabel(rounds, rounds)} (kg)
-                          </span>
-                        </td>
-                        {points.map((p) => (
-                          <td key={p.date} className={cn(tableCls.td, 'num')}>
-                            {nf0(p.pk)}
-                          </td>
-                        ))}
-                      </tr>
-                      {hasModel && (
-                        <tr>
-                          <td className={tableCls.td}>
-                            <span className="flex items-center gap-2">
-                              <SeriesKey model />
-                              Modelo (kg)
-                            </span>
-                          </td>
-                          {points.map((p) => (
-                            <td key={p.date} className={cn(tableCls.td, 'num', p.mk == null && 'text-faint')}>
-                              {p.mk == null ? '—' : nf0(p.mk)}
-                            </td>
-                          ))}
-                        </tr>
-                      )}
-                      <tr>
-                        <td className={tableCls.td}>
-                          <span className="flex items-center gap-2">
-                            <SeriesKey dashed />
-                            Venta real (kg)
-                          </span>
-                        </td>
-                        {points.map((p) => (
-                          <td key={p.date} className={cn(tableCls.td, 'num', p.rk == null && 'text-faint')}>
-                            {p.rk == null ? '—' : nf0(p.rk)}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr className={tableCls.total}>
-                        <td className={tableCls.td}>Dif. (%)</td>
-                        {points.map((p) => (
-                          <td
-                            key={p.date}
-                            className={cn(tableCls.td, 'num', p.rk == null ? 'text-faint' : tone(p.rk - p.pk))}
-                          >
-                            {p.rk == null ? '—' : pct1(((p.rk - p.pk) / p.pk) * 100)}
-                          </td>
-                        ))}
-                      </tr>
-                    </tbody>
-                  </table>
+                          </>
+                        ),
+                        numeric: true,
+                        faint: (r: SeriesRow<Point>) => r.value(p) == null,
+                        className: (r: SeriesRow<Point>) => r.className?.(p),
+                        cell: (r: SeriesRow<Point>) => r.cell(p),
+                      })),
+                    ]}
+                  />
                 </div>
               )}
             </div>
@@ -456,60 +476,68 @@ export function DashboardVersusPage() {
           <Section title="Desviación por producto (semana)">
             <div className="relative overflow-x-auto">
               {withReal.length ? (
-                <table className={cn(tableCls.table, 'text-sm')}>
-                  <thead>
-                    <tr>
-                      <th className={tableCls.th}>Producto</th>
-                      <th className={tableCls.th}>
-                        Proyección
-                        <br />
-                        (kg)
-                      </th>
-                      <th className={tableCls.th}>
-                        Venta real
-                        <br />
-                        (kg)
-                      </th>
-                      <th className={tableCls.th}>Dif. (kg)</th>
-                      <th className={tableCls.th}>Dif. (%)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {catalog.products
-                      .map((p) => {
-                        const pk = withReal.reduce((s, d) => s + (d.units[p.id] ?? 0) * p.kg_per_unit, 0)
-                        const rk = withReal.reduce((s, d) => s + (d.real?.[p.id] ?? 0) * p.kg_per_unit, 0)
-                        return { p, pk, rk }
-                      })
-                      .filter((r) => r.pk || r.rk)
-                      .map(({ p, pk, rk }) => {
-                        const dp = pk ? ((rk - pk) / pk) * 100 : 0
-                        return (
-                          <tr key={p.id} className={tableCls.row}>
-                            <td className={tableCls.td}>
-                              <span className="block font-medium">{p.name}</span>
-                              <small className="block text-xs text-muted-foreground">
-                                {kgPerUnitLabel(p.kg_per_unit)}
-                              </small>
-                            </td>
-                            <td className={cn(tableCls.td, 'num')}>{nf1(pk)}</td>
-                            <td className={cn(tableCls.td, 'num')}>{nf1(rk)}</td>
-                            <td className={cn(tableCls.td, 'num', tone(rk - pk))}>{nf1(rk - pk)}</td>
-                            <td className={cn(tableCls.td, 'num font-medium', tone(dp))}>{pct1(dp)}</td>
-                          </tr>
-                        )
-                      })}
-                    <tr className={tableCls.total}>
-                      <td className={tableCls.td}>Total</td>
-                      <td className={cn(tableCls.td, 'num')}>{nf1(vs.projected)}</td>
-                      <td className={cn(tableCls.td, 'num')}>{nf1(vs.real)}</td>
-                      <td className={cn(tableCls.td, 'num', tone(vs.real - vs.projected))}>
-                        {nf1(vs.real - vs.projected)}
-                      </td>
-                      <td className={cn(tableCls.td, 'num', tone(vs.deviationPct))}>{pct1(vs.deviationPct)}</td>
-                    </tr>
-                  </tbody>
-                </table>
+                <DataTable
+                  dense
+                  rows={productRows}
+                  rowKey={(r) => r.p.id}
+                  totalLabel="Total"
+                  columns={[
+                    {
+                      key: 'name',
+                      header: 'Producto',
+                      cell: ({ p }) => (
+                        <>
+                          <span className="block font-medium">{p.name}</span>
+                          <small className="block text-xs text-muted-foreground">{kgPerUnitLabel(p.kg_per_unit)}</small>
+                        </>
+                      ),
+                    },
+                    {
+                      key: 'pk',
+                      header: (
+                        <>
+                          Proyección
+                          <br />
+                          (kg)
+                        </>
+                      ),
+                      numeric: true,
+                      cell: (r) => nf1(r.pk),
+                      total: nf1(vs.projected),
+                    },
+                    {
+                      key: 'rk',
+                      header: (
+                        <>
+                          Venta real
+                          <br />
+                          (kg)
+                        </>
+                      ),
+                      numeric: true,
+                      cell: (r) => nf1(r.rk),
+                      total: nf1(vs.real),
+                    },
+                    {
+                      key: 'diff',
+                      header: 'Dif. (kg)',
+                      numeric: true,
+                      className: (r) => tone(r.rk - r.pk),
+                      cell: (r) => nf1(r.rk - r.pk),
+                      total: nf1(vs.real - vs.projected),
+                      totalClassName: tone(vs.real - vs.projected),
+                    },
+                    {
+                      key: 'pct',
+                      header: 'Dif. (%)',
+                      numeric: true,
+                      className: (r) => cn('font-medium', tone(r.dp)),
+                      cell: (r) => pct1(r.dp),
+                      total: pct1(vs.deviationPct),
+                      totalClassName: tone(vs.deviationPct),
+                    },
+                  ]}
+                />
               ) : (
                 <EmptyState title="Sin ventas registradas">Esta semana aún no tiene ventas del ERP.</EmptyState>
               )}

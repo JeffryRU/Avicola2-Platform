@@ -22,7 +22,7 @@ import {
 } from '@/features/history/types/history'
 import { EmptyState, StatusDot } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { cn } from '@/shared/ui/lib/utils'
 
@@ -94,76 +94,76 @@ export function HistoryPage() {
           {changes.isPending ? null : list.length === 0 ? (
             <EmptyState title={NO_CHANGES_LABEL} />
           ) : (
-            <div className="relative overflow-x-auto">
-              <table className={tableCls.table}>
-                <thead>
-                  <tr>
-                    <th className={tableCls.th}>{COLUMNS.when}</th>
-                    {team && <th className={cn(tableCls.th, 'text-left')}>{COLUMNS.seller}</th>}
-                    <th className={cn(tableCls.th, 'text-left')}>{COLUMNS.day}</th>
-                    <th className={cn(tableCls.th, 'text-left')}>{COLUMNS.who}</th>
-                    <th className={cn(tableCls.th, 'text-left')}>{COLUMNS.action}</th>
-                    <th className={tableCls.th}>{COLUMNS.sheet}</th>
-                    <th className={tableCls.th}>{COLUMNS.units}</th>
-                    <th className={cn(tableCls.th, 'text-left')}>{COLUMNS.detail}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((c) => (
-                    <ChangeRow
-                      key={c.id}
-                      change={c}
-                      team={team}
-                      nameOf={nameOf}
-                      lines={catalog ? changedLines(c, catalog) : []}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              rows={list}
+              rowKey={(c) => String(c.id)}
+              columns={[
+                {
+                  key: 'when',
+                  header: COLUMNS.when,
+                  cell: (c) => (
+                    <>
+                      <span className="block font-medium">{dShort(dateOf(c.changed_at))}</span>
+                      <small className="num text-xs text-muted-foreground">{clockTime(c.changed_at)}</small>
+                    </>
+                  ),
+                },
+                ...(team
+                  ? [{ key: 'seller', header: COLUMNS.seller, cell: (c: ProjectionChange) => nameOf(c.seller) }]
+                  : []),
+                { key: 'day', header: COLUMNS.day, cell: (c) => dShort(c.date) },
+                {
+                  key: 'who',
+                  header: COLUMNS.who,
+                  cell: (c) => (
+                    <span className={cn(bySupervisor(c) && 'font-semibold text-selected-foreground')}>
+                      {nameOf(c.author)}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'action',
+                  header: COLUMNS.action,
+                  cell: (c) => (
+                    <>
+                      <span className="block">{CHANGE_ACTION_LABEL[c.action]}</span>
+                      {c.after_cutoff && (
+                        <span className="mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium text-warn hc:font-bold">
+                          <StatusDot tone="warn" className="size-1.5" />
+                          {AFTER_CUTOFF_LABEL}
+                        </span>
+                      )}
+                    </>
+                  ),
+                },
+                {
+                  key: 'sheet',
+                  header: COLUMNS.sheet,
+                  numeric: true,
+                  faint: (c) => c.sheet == null,
+                  cell: (c) => c.sheet ?? '—',
+                },
+                {
+                  key: 'units',
+                  header: COLUMNS.units,
+                  numeric: true,
+                  className: 'font-medium',
+                  cell: (c) => unitsChange(c.before_total, c.after_total),
+                },
+                {
+                  key: 'detail',
+                  header: COLUMNS.detail,
+                  className: 'min-w-56 text-sm whitespace-normal text-ink-2',
+                  cell: (c) =>
+                    (catalog ? changedLines(c, catalog) : [])
+                      .map((l) => `${l.product}: ${c.before ? `${String(l.before)} → ` : ''}${String(l.after)}`)
+                      .join(' · '),
+                },
+              ]}
+            />
           )}
         </Section>
       </PageBody>
     </div>
-  )
-}
-
-function ChangeRow({
-  change: c,
-  team,
-  nameOf,
-  lines,
-}: {
-  change: ProjectionChange
-  team: boolean
-  nameOf: (u: string) => string
-  lines: ReturnType<typeof changedLines>
-}) {
-  return (
-    <tr className={tableCls.row}>
-      <td className={tableCls.td}>
-        <span className="block font-medium">{dShort(dateOf(c.changed_at))}</span>
-        <small className="num text-xs text-muted-foreground">{clockTime(c.changed_at)}</small>
-      </td>
-      {team && <td className={cn(tableCls.td, 'text-left')}>{nameOf(c.seller)}</td>}
-      <td className={cn(tableCls.td, 'text-left')}>{dShort(c.date)}</td>
-      <td className={cn(tableCls.td, 'text-left')}>
-        <span className={cn(bySupervisor(c) && 'font-semibold text-selected-foreground')}>{nameOf(c.author)}</span>
-      </td>
-      <td className={cn(tableCls.td, 'text-left')}>
-        <span className="block">{CHANGE_ACTION_LABEL[c.action]}</span>
-        {c.after_cutoff && (
-          <span className="mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium text-warn hc:font-bold">
-            <StatusDot tone="warn" className="size-1.5" />
-            {AFTER_CUTOFF_LABEL}
-          </span>
-        )}
-      </td>
-      <td className={cn(tableCls.td, 'num', c.sheet == null && 'text-faint')}>{c.sheet ?? '—'}</td>
-      <td className={cn(tableCls.td, 'num font-medium')}>{unitsChange(c.before_total, c.after_total)}</td>
-      <td className={cn(tableCls.td, 'min-w-56 text-left text-sm whitespace-normal text-ink-2')}>
-        {lines.map((l) => `${l.product}: ${c.before ? `${String(l.before)} → ` : ''}${String(l.after)}`).join(' · ')}
-      </td>
-    </tr>
   )
 }

@@ -7,7 +7,7 @@ import { nf0, nf1 } from '@/shared/domain/format'
 import { periodAgg } from '@/features/projections'
 import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
 import { useTooltip } from '@/shared/ui/hooks/use-tooltip'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
 import { useCatalog } from '@/features/catalog'
 import { BarChart } from '@/shared/ui/components/charts'
@@ -102,43 +102,46 @@ export function DashboardStatusPage() {
             </div>
           </Section>
           <Section title="Detalle por día (unidades y kg)">
-            <div className="relative overflow-x-auto">
-              <table className={tableCls.table}>
-                <thead>
-                  <tr>
-                    <th className={tableCls.th}>Fecha</th>
-                    <th className={tableCls.th}>Unidades</th>
-                    <th className={tableCls.th}>Kilos (aprox.)</th>
-                    <th className={cn(tableCls.th, 'text-left')}>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {days.map((d) => (
-                    <tr
-                      key={d.date}
-                      className={cn(tableCls.row, 'cursor-pointer')}
-                      onClick={() => void navigate(dayPath(d.date))}
-                    >
-                      <td className={tableCls.td}>
-                        {dDow(d.date)} <span className="num dsk:hidden">{dDM(d.date)}</span>
-                        <span className="num hidden dsk:inline">{dFull(d.date)}</span>
-                      </td>
-                      <td className={cn(tableCls.td, 'num', !d.u && 'text-faint')}>{nf0(d.u)}</td>
-                      <td className={cn(tableCls.td, 'num', !d.u && 'text-faint')}>{d.u ? nf1(d.kg) : '—'}</td>
-                      <td className={cn(tableCls.td, 'text-left')}>
-                        <StatusBadge kind={d.confirmed ? 'confirmed' : 'pending'} />
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className={tableCls.total}>
-                    <td className={tableCls.td}>Total</td>
-                    <td className={cn(tableCls.td, 'num')}>{nf0(units)}</td>
-                    <td className={cn(tableCls.td, 'num')}>{nf1(kg)}</td>
-                    <td className={tableCls.td} />
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              rows={days}
+              rowKey={(d) => d.date}
+              onRowClick={(d) => void navigate(dayPath(d.date))}
+              totalLabel="Total"
+              columns={[
+                {
+                  key: 'date',
+                  header: 'Fecha',
+                  cell: (d) => (
+                    <>
+                      {dDow(d.date)} <span className="num dsk:hidden">{dDM(d.date)}</span>
+                      <span className="num hidden dsk:inline">{dFull(d.date)}</span>
+                    </>
+                  ),
+                },
+                {
+                  key: 'units',
+                  header: 'Unidades',
+                  numeric: true,
+                  faint: (d) => !d.u,
+                  cell: (d) => nf0(d.u),
+                  total: nf0(units),
+                },
+                {
+                  key: 'kg',
+                  header: 'Kilos (aprox.)',
+                  numeric: true,
+                  faint: (d) => !d.u,
+                  cell: (d) => (d.u ? nf1(d.kg) : '—'),
+                  total: nf1(kg),
+                },
+                {
+                  key: 'status',
+                  header: 'Estado',
+                  cell: (d) => <StatusBadge kind={d.confirmed ? 'confirmed' : 'pending'} />,
+                  total: null,
+                },
+              ]}
+            />
           </Section>
         </div>
       </PageBody>

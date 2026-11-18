@@ -4,14 +4,14 @@ import { paths } from '@/app/routes'
 import { dDM, dDow, dFull, dShort, today } from '@/shared/domain/dates'
 import { nf0, nf1, pct1 } from '@/shared/domain/format'
 import { useRequiredSession } from '@/features/auth'
-import { sumUnits } from '@/shared/domain/products'
+import { sumUnits, type Product } from '@/shared/domain/products'
 import { isoDateSchema } from '@/shared/domain/schemas'
 import { useCatalog } from '@/features/catalog'
 import { useMyDays, useWindowData } from '@/features/projections/ui/hooks'
 import { CountUp } from '@/shared/ui/components/charts'
 import { EmptyState, Note, StatusBadge, StatusDot } from '@/shared/ui/components/feedback'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
 import { STATUS_LABEL, kgAmount, UNITS_SHORT } from '@/shared/types/labels'
@@ -64,6 +64,11 @@ export function DayDetailPage() {
   const units = sumUnits(day.units)
   const kg = catalog.kg(day.units)
   const realKg = real ? catalog.kg(real) : 0
+  // Venta real frente a lo proyectado de cada producto (%).
+  const diffOf = (p: Product) => {
+    const u = day.units[p.id] ?? 0
+    return u ? (((real?.[p.id] ?? 0) - u) / u) * 100 : 0
+  }
   const sent = new Date(day.submittedAt)
 
   return (
@@ -140,58 +145,50 @@ export function DayDetailPage() {
           </Note>
         )}
         <Section title="Detalle por producto">
-          <div className="relative overflow-x-auto">
-            <table className={tableCls.table}>
-              <thead>
-                <tr>
-                  <th className={tableCls.th}>Producto</th>
-                  <th className={tableCls.th}>Unidades</th>
-                  <th className={tableCls.th}>Kg (aprox.)</th>
-                  {real && (
-                    <>
-                      <th className={tableCls.th}>Venta real</th>
-                      <th className={tableCls.th}>Dif.</th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((p) => {
-                  const u = day.units[p.id] ?? 0
-                  const r = real?.[p.id] ?? 0
-                  const diff = u ? ((r - u) / u) * 100 : 0
-                  return (
-                    <tr key={p.id} className={tableCls.row}>
-                      <td className={tableCls.td}>{p.name}</td>
-                      <td className={cn(tableCls.td, 'num', !u && 'text-faint')}>{u}</td>
-                      <td className={cn(tableCls.td, 'num', !u && 'text-faint')}>{nf1(u * p.kg_per_unit)}</td>
-                      {real && (
-                        <>
-                          <td className={cn(tableCls.td, 'num')}>{r}</td>
-                          <td className={cn(tableCls.td, 'num font-medium', diff < 0 ? 'text-bad' : 'text-ok')}>
-                            {pct1(diff)}
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  )
-                })}
-                <tr className={tableCls.total}>
-                  <td className={tableCls.td}>Total</td>
-                  <td className={cn(tableCls.td, 'num')}>{nf0(units)}</td>
-                  <td className={cn(tableCls.td, 'num')}>{nf1(kg)}</td>
-                  {real && (
-                    <>
-                      <td className={cn(tableCls.td, 'num')}>{nf0(sumUnits(real))}</td>
-                      <td className={cn(tableCls.td, 'num', realKg < kg ? 'text-bad' : 'text-ok')}>
-                        {pct1(((sumUnits(real) - units) / units) * 100)}
-                      </td>
-                    </>
-                  )}
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={products}
+            rowKey={(p) => p.id}
+            totalLabel="Total"
+            columns={[
+              { key: 'name', header: 'Producto', cell: (p) => p.name },
+              {
+                key: 'units',
+                header: 'Unidades',
+                numeric: true,
+                faint: (p) => !day.units[p.id],
+                cell: (p) => day.units[p.id] ?? 0,
+                total: nf0(units),
+              },
+              {
+                key: 'kg',
+                header: 'Kg (aprox.)',
+                numeric: true,
+                faint: (p) => !day.units[p.id],
+                cell: (p) => nf1((day.units[p.id] ?? 0) * p.kg_per_unit),
+                total: nf1(kg),
+              },
+              ...(real
+                ? [
+                    {
+                      key: 'real',
+                      header: 'Venta real',
+                      numeric: true,
+                      cell: (p: Product) => real[p.id] ?? 0,
+                      total: nf0(sumUnits(real)),
+                    },
+                    {
+                      key: 'diff',
+                      header: 'Dif.',
+                      numeric: true,
+                      className: (p: Product) => cn('font-medium', diffOf(p) < 0 ? 'text-bad' : 'text-ok'),
+                      cell: (p: Product) => pct1(diffOf(p)),
+                      total: pct1(((sumUnits(real) - units) / units) * 100),
+                      totalClassName: realKg < kg ? 'text-bad' : 'text-ok',
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </Section>
       </PageBody>
     </div>
