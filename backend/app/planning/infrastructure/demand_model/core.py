@@ -12,7 +12,7 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 
 HORIZON = 2  # se proyecta el día anterior: lo de ayer aún no está completo
 FIRST = 42  # días de historia mínimos para armar las variables
-SIZES = (range(5), range(5, 7), range(7, 10))  # chica = Brasa 1-5, mediana = 6-7, grande = 8-10
+SIZES = (range(4), range(4, 6), range(6, 10))  # chica = Brasa 1-4, mediana = 5-6, grande = 7-10
 # Feriados de Perú (la demanda de pollo a la brasa cambia esos días y alrededor).
 HOLIDAYS = {
     date(2025, 12, 8), date(2025, 12, 25), date(2026, 1, 1), date(2026, 4, 2), date(2026, 4, 3),

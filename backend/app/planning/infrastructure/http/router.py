@@ -284,9 +284,13 @@ def api_status(use_cases: UseCases) -> s.StatusOut:
 
 @router.get("/catalog")
 def catalog(use_cases: UseCases) -> list[s.ProductOut]:
-    projected = set(get_settings().planning_projected_categories)
+    settings = get_settings()
+    categories, products = (
+        set(settings.planning_projected_categories),
+        set(settings.planning_projected_products),
+    )
     return [
-        s.ProductOut(**asdict(p), projected=p.category in projected)
+        s.ProductOut(**asdict(p), projected=p.category in categories or p.id in products)
         for p in use_cases.get_catalog()
     ]
 

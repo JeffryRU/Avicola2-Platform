@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     # Categorías que los vendedores proyectan (PLANNING_PROJECTED_CATEGORIES, JSON). Las demás
     # (p. ej. Pollo de mercado) siguen en el catálogo para el stock y la saca, pero no se registran.
     planning_projected_categories: list[str] = Field(default_factory=lambda: ["BRASA"])
+    # Productos sueltos de otras categorías que también se proyectan (PLANNING_PROJECTED_PRODUCTS,
+    # JSON): el pollo entero sin menudencia, del pollo de mercado.
+    planning_projected_products: list[str] = Field(default_factory=lambda: ["P0012"])
     # Primer día que se puede registrar: 1 = mañana (las proyecciones son de los días siguientes);
     # 0 = también hoy.
     planning_starts_in_days: int = Field(1, ge=0, le=1)

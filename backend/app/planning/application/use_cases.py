@@ -104,11 +104,14 @@ class SubmitProjection:
         rules: EditingRules | None = None,
         history: ChangeLog | None = None,
         projected: frozenset[str] | None = None,
+        projected_products: frozenset[str] = frozenset(),
     ):
         self.products, self.projections, self.clock = products, projections, clock
         self.max_days = max_days
-        # Categorías que se proyectan; None = todas (la carga de ejemplos no la usa).
+        # Categorías que se proyectan; None = todas (la carga de ejemplos no la usa). Además,
+        # productos sueltos de otras categorías (p. ej. el pollo sin menudencia).
         self.projected = projected
+        self.projected_products = projected_products
         # Historial de cambios; la carga de ejemplos (cli seed) no lo usa.
         self.history = history
         # Ventana de registro y hora de corte; la carga de ejemplos (cli seed) no la usa.
@@ -126,8 +129,6 @@ class SubmitProjection:
     ) -> list[Projection]:
         """`seller` es quien envía (sale de la sesión); `on_behalf`, solo si es él mismo."""
         author, seller = seller, self._target(seller, on_behalf)
-        if self.projected is not None and category not in self.projected:
-            raise DomainError(f"La categoría {category} no se proyecta.")
         if not 1 <= len(days) <= self.max_days:
             raise DomainError(f"Debe enviar entre 1 y {self.max_days} días.")
         if len({d.date for d in days}) != len(days):
@@ -137,6 +138,7 @@ class SubmitProjection:
             self.clock.today(),
             self.clock.now(),
         )
+        allowed = self._allowed(catalog, category)
         submission = submission_id or uuid4()
         current = self._current(seller, category, [d.date for d in days])
         result, late = [], set()
@@ -145,7 +147,7 @@ class SubmitProjection:
                 raise DomainError(f"El día {day.date:%d/%m/%Y} ya pasó.")
             if self.rules and self.rules.check(author, day.date, today, now):
                 late.add(day.date)
-            lines = catalog.lines_for(category, day.units)
+            lines = catalog.lines_for(category, day.units, allowed)
             projection = Projection(
                 uuid4(), submission, seller.username, day.date, category, lines, now
             )
@@ -172,6 +174,15 @@ class SubmitProjection:
         if self.on_submitted:
             self.on_submitted(seller, result)
         return result
+
+    def _allowed(self, catalog: Catalog, category: str) -> list[str] | None:
+        """Los productos de la categoría que se proyectan (None = todos los de la categoría)."""
+        if self.projected is None or category in self.projected:
+            return None
+        allowed = [pid for pid in catalog.of(category) if pid in self.projected_products]
+        if not allowed:
+            raise DomainError(f"La categoría {category} no se proyecta.")
+        return allowed
 
     def _target(self, author: Seller, on_behalf: str | None) -> Seller:
         """Solo el vendedor registra, y solo lo suyo. Registrar es la tarea del rol vendedor, no un

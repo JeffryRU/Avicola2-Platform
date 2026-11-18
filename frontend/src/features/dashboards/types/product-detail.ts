@@ -14,6 +14,8 @@ export const ALL = 'all'
 export const WHOLE_WEEK_LABEL = 'Toda la semana'
 export const WHOLE_PERIOD_LABEL = 'Todo el período'
 export const ALL_ZONES_LABEL = 'Todas las zonas'
+/** Filtro «Tamaño» sin elegir nada cuando se proyecta más de una categoría (brasa y pollo). */
+export const ALL_PRODUCTS_LABEL = 'Todos los productos'
 export const NO_ZONE_LABEL = 'Sin zona'
 export const SIZE_COLUMN_LABEL = 'Tamaño'
 export const PRODUCT_COLUMN_LABEL = 'Producto'

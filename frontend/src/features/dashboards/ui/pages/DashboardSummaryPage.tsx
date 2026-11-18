@@ -30,7 +30,8 @@ const NO_SELLER = '·'
 
 export function DashboardSummaryPage() {
   const { period, sellers } = useDashboardFilters()
-  const { catalog } = useCatalog()
+  // Lo que se proyecta (brasas y pollo sin menudencia); el resto del catálogo es del stock.
+  const { projection: catalog } = useCatalog()
   const data = usePeriodData(period)
   const navigate = useNavigate()
   const dayPath = useDayPath()
@@ -61,8 +62,6 @@ export function DashboardSummaryPage() {
   const units = days.reduce((s, d) => s + d.u, 0)
   const kg = days.reduce((s, d) => s + d.kg, 0)
   const confirmed = days.filter((d) => d.confirmed).length
-  const cat = catalog.categories[0]
-  const products = catalog.of(cat)
 
   return (
     <div>
@@ -104,7 +103,7 @@ export function DashboardSummaryPage() {
               </>
             }
           />
-          <Kpi label={`Productos ${cat}`} value={products.length} foot="en la proyección" />
+          <Kpi label="Productos" value={catalog.products.length} foot="en la proyección" />
         </KpiStrip>
         <Section title="Proyección por día (unidades)" aside="Elige una barra para ver el día" className="mb-4">
           <div className="px-4 pt-3 pb-4 dsk:px-5">

@@ -179,6 +179,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             on_submitted=nt.NotifyProjectionSubmitted(sellers, notifier, event_bus),
             rules=ed.EditingRules(editing, unlocks),
             projected=frozenset(settings.planning_projected_categories),
+            projected_products=frozenset(settings.planning_projected_products),
             history=history,
         ),
         get_sales=uc.GetSales(sales),
