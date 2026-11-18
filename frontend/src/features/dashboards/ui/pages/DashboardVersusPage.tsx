@@ -1,10 +1,9 @@
 import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { bucketsOf, granularityOf } from '@/features/dashboards/domain/buckets'
 import { GRANULARITY_NOTE, bucketLabels } from '@/features/dashboards/types/buckets'
-import { nf0, nf1, pct1 } from '@/shared/domain/format'
-import { periodAgg, useModelProjections, versusReal } from '@/features/projections'
+import { periodAgg, useModelProjections } from '@/features/projections'
 import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
-import { DataTable, type CellTone, type RowTone } from '@/shared/ui/components/data-table'
+import { DataTable, type CellTone, type Column, type RowTone } from '@/shared/ui/components/data-table'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
 import { kgPerUnitLabel, useCatalog } from '@/features/catalog'
 import { usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
@@ -15,30 +14,116 @@ import { onlyProducts, onlyProductsChanged, projectionParts, sheetRounds } from 
 import { PART_COLOR, PREV_COLOR } from '@/shared/ui/lib/chart-dash'
 import { FilterMenu } from '@/features/dashboards/ui/components/filter-bar'
 import { CheckItem } from '@/features/dashboards/ui/components/product-detail'
-import { DropdownMenuLabel, DropdownMenuSeparator } from '@/shared/ui/components/shadcn/dropdown-menu'
+import {
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+} from '@/shared/ui/components/shadcn/dropdown-menu'
 import { bySubcategory } from '@/shared/domain/products'
 import { toggleIn } from '@/shared/domain/format'
-import { Package } from 'lucide-react'
+import { Package, Scale } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { kgAmount } from '@/shared/types/labels'
 import { col, signTone } from '@/shared/ui/lib/table-columns'
+import {
+  DEFAULT_MEASURE,
+  MEASURES,
+  MEASURE_PARAM,
+  bucketVersus,
+  chartUnit,
+  deviationPct,
+  modelByDay,
+  parseMeasure,
+  productDeviation,
+  unitsOf,
+  versusDays,
+  versusTotals,
+  type Amount,
+  type ProductDeviation,
+  type Unit,
+  type VersusPoint,
+} from '@/features/dashboards/domain/versus'
+import {
+  ACCURACY_FOOT,
+  ACCURACY_KPI,
+  ALL_PRODUCTS_LABEL,
+  BOTH_CHART_NOTE,
+  CHART_EMPTY_BODY,
+  CHART_EMPTY_TITLE,
+  CHART_PRODUCTS_LABEL,
+  DEVIATION_KPI,
+  DIFF_LABEL,
+  DIFF_PCT_LABEL,
+  DIFF_TIP,
+  MEASURE_FILTER_LABEL,
+  MEASURE_LABEL,
+  MODEL_LABEL,
+  MODEL_LEGEND,
+  NO_PROJECTION_TIP,
+  NO_REAL_BODY,
+  NO_REAL_FOOT,
+  NO_REAL_TIP,
+  NO_REAL_TITLE,
+  PRODUCTS_TITLE,
+  PRODUCT_LABEL,
+  PROJECTED_KPI,
+  PROJECTION_LABEL,
+  REAL_ERP_LABEL,
+  REAL_LABEL,
+  SERIES_COLUMN_LABEL,
+  TOTAL_LABEL,
+  UNIT_COLUMN,
+  UNIT_SHORT,
+  VERSUS_SUBTITLE,
+  VERSUS_TITLE,
+  amountText,
+  amountsText,
+  chartAria,
+  chartTitle,
+  daysWithRealFoot,
+  inUnitsFoot,
+  measureSuffix,
+  partsLegend,
+  pctText,
+  percentText,
+  productNumber,
+  productsCount,
+  roundLabel,
+  seriesNumber,
+} from '@/features/dashboards/types/versus'
 
 const tone = (v: number) => (v < 0 ? 'text-bad' : 'text-ok')
 
 /** Una fila de la tabla bajo el gráfico: una serie con su valor de cada día. */
-interface SeriesRow<P> {
+interface SeriesRow {
   key: string
   label: ReactNode
   tone?: RowTone
-  value: (p: P) => number | null
-  cell: (p: P) => ReactNode
-  cellTone?: (p: P) => CellTone | false | undefined
+  value: (p: VersusPoint) => Amount | null
+  /** Texto de una medida en la celda (por defecto, la cifra). */
+  text?: (p: VersusPoint, unit: Unit) => string
+  cellTone?: (p: VersusPoint) => CellTone | false | undefined
+}
+
+/** Celda con una cifra por medida: la primera arriba y las demás, más tenues, debajo. */
+function Stacked({ lines }: { lines: string[] }) {
+  const [first, ...rest] = lines
+  return (
+    <>
+      {first}
+      {rest.map((line, i) => (
+        <small key={i} className="block text-xs text-muted-foreground">
+          {line}
+        </small>
+      ))}
+    </>
+  )
 }
 
 /**
- * Muestra de una serie: línea continua (proyección vigente), discontinua (venta real) o, para
+ * Muestra de una serie: línea continua (proyección vigente), discontinua (pedido real) o, para
  * una ronda anterior (`round` 1, 2…), el trazo tenue de esa ronda. No depende solo del color.
  */
 function SeriesKey({ dashed, round, model }: { dashed?: boolean; round?: number; model?: boolean }) {
@@ -64,7 +149,7 @@ function SeriesKey({ dashed, round, model }: { dashed?: boolean; round?: number;
           model ? '10 4' : prev ? EARLIER_DASH[(round - 1) % EARLIER_DASH.length] : dashed ? '5 3' : undefined
         }
       />
-      {/* El mismo marcador del gráfico: círculo (proyección; hueco si es anterior) o cuadrado (venta). */}
+      {/* El mismo marcador del gráfico: círculo (proyección; hueco si es anterior) o cuadrado (pedido). */}
       {model ? (
         <path d="M14 1.5 L18.5 6 L14 10.5 L9.5 6 Z" fill={color} stroke="var(--surface)" strokeWidth="1.25" />
       ) : dashed ? (
@@ -83,16 +168,25 @@ function SeriesKey({ dashed, round, model }: { dashed?: boolean; round?: number;
   )
 }
 
-/** Nombre de cada ronda: «Proyección 1», «Proyección 2»…; la última es la vigente. */
-const roundLabel = (r: number, rounds: number) =>
-  rounds === 1 ? 'Proyección' : r === rounds ? `Proyección ${String(r)} (vigente)` : `Proyección ${String(r)}`
+/** Cifra de un KPI con su medida al lado. */
+function KpiAmount({ value, unit }: { value: number; unit: Unit }) {
+  return (
+    <>
+      <CountUp value={value} />{' '}
+      <span className="font-sans text-md font-normal text-muted-foreground">{UNIT_SHORT[unit]}</span>
+    </>
+  )
+}
 
 export function DashboardVersusPage() {
-  const { period, sellers } = useDashboardFilters()
+  const { period, sellers, measure, setMeasure } = useDashboardFilters()
+  const units = unitsOf(measure)
+  const main = units[0]
+  const both = units.length > 1
+  const plotted = chartUnit(measure)
+  const suffix = measureSuffix(units)
   const { catalog } = useCatalog()
   const data = usePeriodData(period)
-  const title = 'Proyección vs venta real'
-  const subtitle = 'Comparativo de proyección y ventas reales por producto'
   const source = data.data ?? { projections: [], sales: [] }
 
   const days = periodAgg(period.dates, sellers, source.projections, source.sales, catalog)
@@ -120,70 +214,42 @@ export function DashboardVersusPage() {
   )
   const rounds = sheets.rounds
   const earlierRounds = Array.from({ length: rounds - 1 }, (_, i) => i + 1)
-  const vs = versusReal(days, catalog)
-  const withReal = days.filter((d) => d.real)
-  // Sin ventas del ERP no hay desviación ni exactitud que mostrar (0 % sería engañoso).
+  const vs = versusTotals(days, catalog)
+  // Sin pedidos del ERP no hay desviación ni exactitud que mostrar (0 % sería engañoso).
   const noReal = vs.daysWithReal === 0
   // De qué está hecha cada día la proyección vigente: franjas por tamaño (o por producto).
   const parts = projectionParts(period.dates, sellers, source.projections, chartProducts, picked)
-  // Todos los días del período (el gráfico ocupa la semana entera); sin dato, la línea se corta.
   // Lo que el modelo habría sugerido cada día (mediana de los pedidos de ARIS de las 4 semanas
   // anteriores), con los mismos filtros de vendedor y productos.
   const model = useModelProjections(period.from, period.to)
-  const modelKg = new Map<string, number>()
-  for (const row of onlyProducts(model.data ?? [], picked)) {
-    if (sellers.length && !sellers.includes(row.seller)) continue
-    modelKg.set(row.date, (modelKg.get(row.date) ?? 0) + catalog.kg(row.units))
-  }
-  const hasModel = modelKg.size > 0
-  const dailyPoints = chartDays.map((d) => {
-    const rk = d.real ? catalog.kg(d.real) : null
-    const earlier = rounds > 1 ? sheets.kg[d.date].slice(0, -1) : []
-    const mk = modelKg.get(d.date) ?? null
-    return { date: d.date, confirmed: d.confirmed, pk: d.kg, rk, mk, earlier, parts: parts.kg[d.date] }
-  })
+  const modelDays = modelByDay(onlyProducts(model.data ?? [], picked), sellers, catalog)
+  const hasModel = modelDays.size > 0
+  // Todos los días del período (el gráfico ocupa la semana entera); sin dato, la línea se corta.
   // Un período largo se grafica por semana o por mes (un año día a día no se lee).
   const granularity = granularityOf(period.dates.length)
-  const allPoints = bucketsOf(period.dates, granularity).map((b) => {
-    const ps = dailyPoints.filter((p) => b.dates.includes(p.date))
-    const conf = ps.filter((p) => p.confirmed)
-    const add = (xs: number[]) => xs.reduce((a, v) => a + v, 0)
-    const known = (xs: (number | null)[]) => {
-      const vals = xs.filter((v): v is number => v != null)
-      return vals.length ? add(vals) : null
-    }
-    return {
-      date: b.start,
-      ...bucketLabels(b, granularity),
-      confirmed: conf.length > 0,
-      pk: add(conf.map((p) => p.pk)),
-      rk: known(ps.map((p) => p.rk)),
-      mk: known(ps.map((p) => p.mk)),
-      earlier: Array.from({ length: Math.max(0, rounds - 1) }, (_, r) => add(conf.map((p) => p.earlier[r] ?? p.pk))),
-      parts: parts.names.map((_, k) => add(conf.map((p) => p.parts[k] ?? 0))),
-    }
-  })
+  const buckets = bucketsOf(period.dates, granularity)
+  const allPoints = bucketVersus(versusDays(chartDays, catalog, sheets, parts, modelDays), buckets).map((p, i) => ({
+    ...p,
+    ...bucketLabels(buckets[i], granularity),
+  }))
   // La tabla, solo con los días que tienen proyección.
   const points = allPoints.filter((p) => p.confirmed)
-  // Tabla bajo el gráfico: una fila por serie (rondas, modelo, venta real) y una columna por día.
   type Point = (typeof points)[number]
-  const kgCell = (value: (p: Point) => number | null) => (p: Point) => {
-    const v = value(p)
-    return v == null ? '—' : nf0(v)
-  }
-  const series = (
-    key: string,
-    label: ReactNode,
-    value: (p: Point) => number | null,
-    tone?: RowTone,
-  ): SeriesRow<Point> => ({ key, label, value, tone, cell: kgCell(value) })
-  const seriesRows: SeriesRow<Point>[] = [
+
+  // Tabla bajo el gráfico: una fila por serie (rondas, modelo, pedido real) y una columna por día.
+  const series = (key: string, label: ReactNode, value: (p: VersusPoint) => Amount | null, rowTone?: RowTone) => ({
+    key,
+    label,
+    value,
+    tone: rowTone,
+  })
+  const seriesRows: SeriesRow[] = [
     ...earlierRounds.map((r) =>
       series(
         `round-${String(r)}`,
         <>
           <SeriesKey round={r} />
-          {roundLabel(r, rounds)} (kg)
+          {roundLabel(r, rounds)} {suffix}
         </>,
         (p) => p.earlier[r - 1] ?? null,
         'muted',
@@ -193,9 +259,9 @@ export function DashboardVersusPage() {
       'projected',
       <>
         <SeriesKey />
-        {roundLabel(rounds, rounds)} (kg)
+        {roundLabel(rounds, rounds)} {suffix}
       </>,
-      (p) => p.pk,
+      (p) => p.projected,
     ),
     ...(hasModel
       ? [
@@ -203,9 +269,9 @@ export function DashboardVersusPage() {
             'model',
             <>
               <SeriesKey model />
-              Modelo (kg)
+              {MODEL_LABEL} {suffix}
             </>,
-            (p) => p.mk ?? null,
+            (p) => p.model,
           ),
         ]
       : []),
@@ -213,99 +279,198 @@ export function DashboardVersusPage() {
       'real',
       <>
         <SeriesKey dashed />
-        Venta real (kg)
+        {REAL_LABEL} {suffix}
       </>,
-      (p) => p.rk ?? null,
+      (p) => p.real,
     ),
     {
       key: 'diff',
-      label: 'Dif. (%)',
+      label: both ? `${DIFF_PCT_LABEL} ${suffix}` : DIFF_PCT_LABEL,
       tone: 'total',
-      value: (p) => p.rk ?? null,
-      cell: (p) => (p.rk == null ? '—' : pct1(((p.rk - p.pk) / p.pk) * 100)),
-      cellTone: (p) => p.rk != null && signTone(p.rk - p.pk),
+      value: (p) => p.real,
+      text: (p, u) => {
+        const pct = p.real ? deviationPct(p.projected[u], p.real[u]) : null
+        return pct == null ? '—' : pctText(pct)
+      },
+      cellTone: (p) => p.real != null && signTone(p.real[main] - p.projected[main]),
     },
   ]
-  const productRows = catalog.products
-    .map((p) => {
-      const pk = withReal.reduce((s, d) => s + (d.units[p.id] ?? 0) * p.kg_per_unit, 0)
-      const rk = withReal.reduce((s, d) => s + (d.real?.[p.id] ?? 0) * p.kg_per_unit, 0)
-      return { p, pk, rk, dp: pk ? ((rk - pk) / pk) * 100 : 0 }
-    })
-    .filter((r) => r.pk || r.rk)
-  type ProductRow = (typeof productRows)[number]
+  const seriesCell = (r: SeriesRow, p: Point) => {
+    const v = r.value(p)
+    if (v == null) return '—'
+    return <Stacked lines={units.map((u) => (r.text ? r.text(p, u) : seriesNumber(v[u])))} />
+  }
+
+  // Tabla por producto: todos los que se proyectan, en el orden del catálogo.
+  const productRows = productDeviation(days, catalog)
+  const hasData = (r: ProductDeviation) => r.projected.units > 0 || r.real.units > 0
+  /** Columna de kg (un decimal) o de unidades (enteras). */
+  const numberCol =
+    (unit: Unit) =>
+    (...args: Parameters<typeof col.kg<ProductDeviation>>) =>
+      unit === 'kg' ? col.kg(...args) : col.units(...args)
+  /** Una columna por medida: con una sola, el encabezado lleva la medida; con dos, van agrupadas. */
+  const perUnit = (
+    key: string,
+    name: string,
+    build: (unit: Unit, header: ReactNode, group: string | null) => Column<ProductDeviation>,
+  ) =>
+    units
+      .map((u) =>
+        both
+          ? build(u, UNIT_COLUMN[u], name)
+          : build(
+              u,
+              <>
+                {name}
+                <br />({UNIT_SHORT[u]})
+              </>,
+              null,
+            ),
+      )
+      .map((c) => ({ ...c, key: `${key}-${c.key}` }))
+  const productColumns: Column<ProductDeviation>[] = [
+    {
+      key: 'name',
+      sticky: true,
+      header: PRODUCT_LABEL,
+      cell: ({ product: p }) => (
+        <>
+          <span className="block font-medium">{p.name}</span>
+          <small className="block text-xs text-muted-foreground">{kgPerUnitLabel(p.kg_per_unit)}</small>
+        </>
+      ),
+    },
+    ...perUnit('projected', PROJECTION_LABEL, (u, header, group) =>
+      numberCol(u)(u, header, (r) => r.projected[u], { group, total: productNumber(vs.projected[u], u) }),
+    ),
+    ...perUnit('real', REAL_LABEL, (u, header, group) =>
+      numberCol(u)(u, header, (r) => r.real[u], { group, total: productNumber(vs.real[u], u) }),
+    ),
+    ...perUnit('diff', DIFF_LABEL, (u, header, group) =>
+      numberCol(u)(u, header, (r) => r.diff[u], {
+        group,
+        faint: (r) => !hasData(r),
+        tone: (r) => hasData(r) && signTone(r.diff[u]),
+        total: productNumber(vs.diff[u], u),
+        totalTone: signTone(vs.diff[u]),
+      }),
+    ),
+    ...perUnit('pct', DIFF_PCT_LABEL, (u, header, group) =>
+      col.change<ProductDeviation>(u, both ? header : DIFF_PCT_LABEL, (r) => r.pct[u], {
+        group,
+        className: 'font-medium',
+        total: pctText(vs.deviationPct[u]),
+        totalTone: signTone(vs.deviationPct[u]),
+      }),
+    ),
+  ]
+
+  // La medida: con «Limpiar» vuelve a kg.
+  const measureChips =
+    measure === DEFAULT_MEASURE
+      ? []
+      : [{ key: MEASURE_PARAM, label: MEASURE_LABEL[measure], onClear: () => setMeasure(DEFAULT_MEASURE) }]
 
   return (
     <div>
-      <PageHeader title={title} subtitle={subtitle} sticky={false} />
-      <DashboardFilterBar />
+      <PageHeader title={VERSUS_TITLE} subtitle={VERSUS_SUBTITLE} sticky={false} />
+      <DashboardFilterBar
+        chips={measureChips}
+        extra={
+          <FilterMenu
+            icon={<Scale />}
+            title={MEASURE_FILTER_LABEL}
+            label={MEASURE_LABEL[measure]}
+            active={measure !== DEFAULT_MEASURE}
+          >
+            <DropdownMenuRadioGroup value={measure} onValueChange={(v) => setMeasure(parseMeasure(v))}>
+              {MEASURES.map((m) => (
+                <DropdownMenuRadioItem key={m} value={m}>
+                  {MEASURE_LABEL[m]}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </FilterMenu>
+        }
+      />
       <DashboardTabs />
       <PageBody>
         <SyncStatus queries={[data, history, model]} />
         <KpiStrip className="mb-4">
           <Kpi
-            label="Proyección"
-            value={
+            label={PROJECTED_KPI}
+            value={<KpiAmount value={vs.projected[main]} unit={main} />}
+            foot={
               <>
-                <CountUp value={vs.projected} />{' '}
-                <span className="font-sans text-md font-normal text-muted-foreground">kg</span>
-              </>
-            }
-            foot={`${vs.daysWithReal} días con venta registrada`}
-          />
-          <Kpi
-            label="Venta real (ERP)"
-            value={
-              <>
-                <CountUp value={vs.real} />{' '}
-                <span className="font-sans text-md font-normal text-muted-foreground">kg</span>
+                {both && <span>{amountText(vs.projected.units, 'units')}</span>}
+                <span>{daysWithRealFoot(vs.daysWithReal)}</span>
               </>
             }
           />
           <Kpi
-            label="Desviación"
+            label={REAL_ERP_LABEL}
+            value={<KpiAmount value={vs.real[main]} unit={main} />}
+            foot={both ? amountText(vs.real.units, 'units') : undefined}
+          />
+          <Kpi
+            label={DEVIATION_KPI}
             value={
               noReal ? (
                 <span className="text-faint">—</span>
               ) : (
-                <span className={tone(vs.deviationPct)}>
-                  <CountUp value={vs.deviationPct} decimals={1} suffix="%" />
+                <span className={tone(vs.deviationPct[main])}>
+                  <CountUp value={vs.deviationPct[main]} decimals={1} suffix="%" />
                 </span>
               )
             }
-            foot={noReal ? 'sin ventas del ERP' : `${nf0(vs.real - vs.projected)} kg`}
+            foot={
+              noReal ? (
+                NO_REAL_FOOT
+              ) : (
+                <>
+                  <span>{amountsText(vs.diff, units)}</span>
+                  {both && <span>{inUnitsFoot(pctText(vs.deviationPct.units))}</span>}
+                </>
+              )
+            }
           />
           <Kpi
-            label="Exactitud"
+            label={ACCURACY_KPI}
             value={
               noReal ? (
                 <span className="text-faint">—</span>
               ) : (
-                <CountUp value={vs.accuracyPct} decimals={1} suffix="%" />
+                <CountUp value={vs.accuracyPct[main]} decimals={1} suffix="%" />
               )
             }
-            foot="según días con venta"
+            foot={
+              <>
+                {both && !noReal && <span>{inUnitsFoot(percentText(vs.accuracyPct.units))}</span>}
+                <span>{ACCURACY_FOOT}</span>
+              </>
+            }
           />
         </KpiStrip>
         <div className="grid grid-cols-1 items-start gap-4 @7xl/main:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
           <Section
             className="flex flex-col overflow-hidden"
-            title="Evolución semanal (kg)"
+            title={chartTitle(measure)}
             aside={
               <FilterMenu
                 icon={<Package />}
-                title="Productos del gráfico"
+                title={CHART_PRODUCTS_LABEL}
                 label={
                   !picked.length
-                    ? 'Total de productos'
+                    ? ALL_PRODUCTS_LABEL
                     : picked.length > 2
-                      ? `${String(picked.length)} productos`
+                      ? productsCount(picked.length)
                       : pickedNames.join(', ')
                 }
                 active={picked.length > 0}
               >
                 <CheckItem checked={!picked.length} onToggle={() => setPicked([])}>
-                  Total de productos
+                  {ALL_PRODUCTS_LABEL}
                 </CheckItem>
                 {bySubcategory(chartProducts).map((g) => (
                   <div key={g.name ?? ''}>
@@ -342,20 +507,21 @@ export function DashboardVersusPage() {
                 {hasModel && (
                   <span className="flex items-center gap-1.5">
                     <SeriesKey model />
-                    Modelo (sugerencia)
+                    {MODEL_LEGEND}
                   </span>
                 )}
                 <span className="flex items-center gap-1.5">
                   <SeriesKey dashed />
-                  Venta real (ERP)
+                  {REAL_ERP_LABEL}
                 </span>
               </div>
+              {both && <p className="mb-2 text-right text-xs text-muted-foreground">{BOTH_CHART_NOTE}</p>}
               {GRANULARITY_NOTE[granularity] && (
                 <p className="mb-2 text-right text-xs text-muted-foreground">{GRANULARITY_NOTE[granularity]}</p>
               )}
               {parts.names.length > 1 && points.length > 0 && (
                 <div className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span>Proyección vigente por {picked.length > 0 && picked.length <= 4 ? 'producto' : 'tamaño'}:</span>
+                  <span>{partsLegend(picked.length > 0 && picked.length <= 4)}</span>
                   {parts.names.map((name, k) => (
                     <span key={name} className="flex items-center gap-1.5">
                       <svg aria-hidden width="12" height="12" viewBox="0 0 12 12" className="flex-none">
@@ -376,62 +542,69 @@ export function DashboardVersusPage() {
               {/* Ocupa el alto que deja la tarjeta (con un mínimo): sin huecos blancos. */}
               <div className="relative min-h-64 flex-1 dsk:min-h-80">
                 <LineChart
-                  label="Kilogramos proyectados y vendidos por día"
+                  label={chartAria(plotted)}
                   empty={
                     <>
-                      <b className="block font-semibold text-foreground">Sin proyecciones en este período</b>
-                      <span className="text-sm text-muted-foreground">
-                        Cuando se registren, verás aquí la proyección y la venta real de cada día.
-                      </span>
+                      <b className="block font-semibold text-foreground">{CHART_EMPTY_TITLE}</b>
+                      <span className="text-sm text-muted-foreground">{CHART_EMPTY_BODY}</span>
                     </>
                   }
                   points={allPoints.map((p) => ({
                     key: p.date,
                     label: p.label,
                     sublabel: p.sublabel,
-                    a: p.confirmed ? p.pk : null,
-                    b: p.rk,
-                    c: p.mk,
-                    earlier: p.confirmed ? p.earlier : undefined,
-                    parts: p.confirmed && parts.names.length > 1 ? p.parts : undefined,
+                    a: p.confirmed ? p.projected[plotted] : null,
+                    b: p.real?.[plotted] ?? null,
+                    c: p.model?.[plotted] ?? null,
+                    earlier: p.confirmed ? p.earlier.map((e) => e[plotted]) : undefined,
+                    parts: p.confirmed && parts.names.length > 1 ? p.parts.map((x) => x[plotted]) : undefined,
                     tip: (
                       <>
                         <b>{p.title}</b>
                         {p.confirmed &&
-                          p.earlier.map((kg, i) => (
+                          p.earlier.map((e, i) => (
                             <span key={i}>
                               <br />
-                              {roundLabel(i + 1, rounds)}: {kgAmount(kg)}
+                              {roundLabel(i + 1, rounds)}: {amountsText(e, units)}
                             </span>
                           ))}
                         <br />
-                        {p.confirmed ? `${roundLabel(rounds, rounds)}: ${kgAmount(p.pk)}` : 'Sin proyección'}
+                        {p.confirmed
+                          ? `${roundLabel(rounds, rounds)}: ${amountsText(p.projected, units)}`
+                          : NO_PROJECTION_TIP}
                         {p.confirmed &&
                           parts.names.length > 1 &&
                           parts.names.map((name, k) => (
                             <span key={name}>
                               <br />
                               <span className="opacity-80">
-                                · {name}: {kgAmount(p.parts[k])}
+                                · {name}: {amountsText(p.parts[k], units)}
                               </span>
                             </span>
                           ))}
-                        {p.mk != null && (
+                        {p.model != null && (
                           <>
                             <br />
-                            Modelo: {kgAmount(p.mk)}
+                            {MODEL_LABEL}: {amountsText(p.model, units)}
                           </>
                         )}
                         <br />
-                        {p.rk == null ? (
-                          'Venta real: sin datos aún'
+                        {p.real == null ? (
+                          NO_REAL_TIP
                         ) : (
                           <>
-                            Venta real: {kgAmount(p.rk)}
-                            {p.confirmed && p.pk > 0 && (
+                            {REAL_LABEL}: {amountsText(p.real, units)}
+                            {p.confirmed && p.projected[main] > 0 && (
                               <>
                                 <br />
-                                Diferencia: {pct1(((p.rk - p.pk) / p.pk) * 100)}
+                                {DIFF_TIP}:{' '}
+                                {units
+                                  .map((u) => {
+                                    const pct = deviationPct(p.projected[u], p.real?.[u] ?? 0)
+                                    const text = pct == null ? '—' : pctText(pct)
+                                    return both ? `${text} ${UNIT_SHORT[u]}` : text
+                                  })
+                                  .join(' · ')}
                               </>
                             )}
                           </>
@@ -452,7 +625,7 @@ export function DashboardVersusPage() {
                       {
                         key: 'series',
                         sticky: true,
-                        header: <span className="sr-only">Serie</span>,
+                        header: <span className="sr-only">{SERIES_COLUMN_LABEL}</span>,
                         cell: (r) => <span className="flex items-center gap-2">{r.label}</span>,
                       },
                       ...points.map((p) => ({
@@ -465,9 +638,9 @@ export function DashboardVersusPage() {
                           </>
                         ),
                         numeric: true,
-                        faint: (r: SeriesRow<Point>) => r.value(p) == null,
-                        tone: (r: SeriesRow<Point>) => r.cellTone?.(p),
-                        cell: (r: SeriesRow<Point>) => r.cell(p),
+                        faint: (r: SeriesRow) => r.value(p) == null,
+                        tone: (r: SeriesRow) => r.cellTone?.(p),
+                        cell: (r: SeriesRow) => seriesCell(r, p),
                       })),
                     ]}
                   />
@@ -475,67 +648,18 @@ export function DashboardVersusPage() {
               )}
             </div>
           </Section>
-          <Section title="Desviación por producto (semana)">
+          <Section title={PRODUCTS_TITLE}>
             <div className="relative overflow-x-auto">
-              {withReal.length ? (
+              {vs.daysWithReal ? (
                 <DataTable
                   density="compact"
                   rows={productRows}
-                  rowKey={(r) => r.p.id}
-                  totalLabel="Total"
-                  columns={[
-                    {
-                      key: 'name',
-                      sticky: true,
-                      header: 'Producto',
-                      cell: ({ p }) => (
-                        <>
-                          <span className="block font-medium">{p.name}</span>
-                          <small className="block text-xs text-muted-foreground">{kgPerUnitLabel(p.kg_per_unit)}</small>
-                        </>
-                      ),
-                    },
-                    {
-                      key: 'pk',
-                      header: (
-                        <>
-                          Proyección
-                          <br />
-                          (kg)
-                        </>
-                      ),
-                      numeric: true,
-                      cell: (r) => nf1(r.pk),
-                      total: nf1(vs.projected),
-                    },
-                    {
-                      key: 'rk',
-                      header: (
-                        <>
-                          Venta real
-                          <br />
-                          (kg)
-                        </>
-                      ),
-                      numeric: true,
-                      cell: (r) => nf1(r.rk),
-                      total: nf1(vs.real),
-                    },
-                    col.kg<ProductRow>('diff', 'Dif. (kg)', (r) => r.rk - r.pk, {
-                      faint: undefined,
-                      tone: (r) => signTone(r.rk - r.pk),
-                      total: nf1(vs.real - vs.projected),
-                      totalTone: signTone(vs.real - vs.projected),
-                    }),
-                    col.change<ProductRow>('pct', 'Dif. (%)', (r) => r.dp, {
-                      className: 'font-medium',
-                      total: pct1(vs.deviationPct),
-                      totalTone: signTone(vs.deviationPct),
-                    }),
-                  ]}
+                  rowKey={(r) => r.product.id}
+                  totalLabel={TOTAL_LABEL}
+                  columns={productColumns}
                 />
               ) : (
-                <EmptyState title="Sin ventas registradas">Esta semana aún no tiene ventas del ERP.</EmptyState>
+                <EmptyState title={NO_REAL_TITLE}>{NO_REAL_BODY}</EmptyState>
               )}
             </div>
           </Section>

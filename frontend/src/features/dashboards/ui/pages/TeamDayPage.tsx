@@ -102,7 +102,7 @@ export function TeamDayView({
                 }
               />
               <Kpi
-                label="Venta real (ERP)"
+                label="Pedido real (ERP)"
                 value={
                   day.realKg === null ? (
                     <span className="font-sans text-md font-normal text-muted-foreground">Sin datos todavía</span>
@@ -110,7 +110,7 @@ export function TeamDayView({
                     kgAmount(day.realKg)
                   )
                 }
-                foot={day.realKg === null ? undefined : 'de los vendedores con venta'}
+                foot={day.realKg === null ? undefined : 'de los vendedores con pedido'}
               />
             </KpiStrip>
 
@@ -207,7 +207,7 @@ export function TeamDayView({
                     },
                     {
                       key: 'real',
-                      header: 'Venta real (kg)',
+                      header: 'Pedido real (kg)',
                       numeric: true,
                       faint: (r) => r.realKg === null,
                       cell: (r) => (r.realKg === null ? '—' : nf1(r.realKg)),
@@ -250,7 +250,7 @@ export function TeamDayView({
                         ? [
                             {
                               key: 'real',
-                              header: 'Venta real (unid.)',
+                              header: 'Pedido real (unid.)',
                               numeric: true,
                               cell: (p: Product) => nf0(day.real?.[p.id] ?? 0),
                               total: nf0(sumUnits(day.real)),

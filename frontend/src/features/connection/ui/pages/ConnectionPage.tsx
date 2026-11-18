@@ -106,7 +106,7 @@ export function ConnectionPage() {
               <li>Sin conexión, cada envío queda en este dispositivo y se reenvía solo al volver la red.</li>
             </ul>
             <p className="mt-2.5">
-              La venta real (ERP) de los dashboards todavía es simulada; las proyecciones sí son reales.
+              El pedido real (ERP) de los dashboards todavía es simulada; las proyecciones sí son reales.
             </p>
           </div>
         </Section>

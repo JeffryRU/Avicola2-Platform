@@ -9,7 +9,7 @@ export const ARIS_TRAINING = 'Datos de ARIS cargados: el modelo se está reentre
 /** El aviso: qué falta y por qué conviene subirlo (no es obligatorio). */
 export function arisNoticeText(s: ArisStatus): { title: string; detail: string } {
   const detail =
-    'Con el export de DESPACHO de ARIS el modelo aprende la venta real y sugiere mejor la proyección. ' +
+    'Con el export de DESPACHO de ARIS el modelo aprende el pedido real y sugiere mejor la proyección. ' +
     `No es obligatorio. Desde aquí, hasta ${ARIS_MAX_MB} MB (un día o una semana); ` +
     'el export completo, por la carpeta de Google Drive o por el bot de Telegram o de WhatsApp.'
   if (!s.last_dispatch) return { title: 'Todavía no hay datos de ARIS cargados', detail }

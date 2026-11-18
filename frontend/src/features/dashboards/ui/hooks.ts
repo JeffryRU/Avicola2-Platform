@@ -3,6 +3,7 @@ import { addDays, dShort, type IsoDate } from '@/shared/domain/dates'
 import { useSearchParams } from 'react-router'
 import { checkPeriod, customPeriod, weekPeriod, type Period } from '@/features/dashboards/domain/period'
 import { weekOptions } from '@/features/dashboards/domain/weeks'
+import { DEFAULT_MEASURE, MEASURE_PARAM, parseMeasure, type Measure } from '@/features/dashboards/domain/versus'
 import { isoDateSchema } from '@/shared/domain/schemas'
 import { dataWindow, useRangeData, useStoreOrders } from '@/features/projections'
 import { isSupervisor } from '@/shared/domain/session'
@@ -29,7 +30,8 @@ export function useStoreEntries(dates: IsoDate[], sellers: readonly string[], zo
 
 /**
  * Filtros de los dashboards guardados en la URL para poder compartirla:
- * ?semana= o ?desde=&hasta= (rango personalizado), &vendedor=a,b (vacío = todos)&dia=&zona=&tamano=.
+ * ?semana= o ?desde=&hasta= (rango personalizado), &vendedor=a,b (vacío = todos)&dia=&zona=&tamano=
+ * y &medida=kg|unidades|ambos (Proyección vs pedido real; kg si falta).
  */
 export function useDashboardFilters() {
   const [params, setParams] = useSearchParams()
@@ -41,6 +43,7 @@ export function useDashboardFilters() {
   const to = params.get('hasta') ?? ''
   const valid = isoDateSchema.safeParse(from).success && isoDateSchema.safeParse(to).success
   const period = valid && !checkPeriod(from, to) ? customPeriod(from, to) : weekPeriod(week)
+  const measure = parseMeasure(params.get(MEASURE_PARAM))
   /** Cambia varios filtros a la vez (null o '' los quita). Se puede llamar varias veces seguidas. */
   const update = (patch: Record<string, string | null>) => {
     setParams(
@@ -59,11 +62,13 @@ export function useDashboardFilters() {
     week,
     period,
     sellers,
+    measure,
     param: (key: string) => params.get(key),
     update,
     setWeek: (w: string) => update({ semana: w, desde: null, hasta: null }),
     setCustom: (a: string, b: string) => update({ desde: a, hasta: b }),
     setSellers: (list: string[]) => update({ vendedor: list.join(',') || null }),
+    setMeasure: (m: Measure) => update({ [MEASURE_PARAM]: m === DEFAULT_MEASURE ? null : m }),
   }
 }
 

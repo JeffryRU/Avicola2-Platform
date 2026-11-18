@@ -17,7 +17,7 @@ const COLUMNS: ExportColumn[] = [
   { label: 'Kg por unidad', width: 9, numeric: true },
   { label: 'Unidades', width: 9, numeric: true },
   { label: 'Kg', width: 9, numeric: true },
-  { label: 'Venta real (unid.)', width: 11, numeric: true },
+  { label: 'Pedido real (unid.)', width: 11, numeric: true },
   { label: 'Estado', width: 14 },
   { label: 'Enviado', width: 17 },
 ]
