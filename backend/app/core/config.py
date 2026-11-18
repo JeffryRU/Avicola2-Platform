@@ -133,7 +133,14 @@ class Settings(BaseSettings):
     # (SUPUESTO: las zonas con más pedidos) se eligen si se cuenta por ubicación. Con una sola
     # ubicación, la app no muestra el filtro.
     stock_locations: list[str] = Field(
-        default_factory=lambda: ["General", "Trujillo", "Piura", "Chiclayo", "Chimbote", "San Martín"]
+        default_factory=lambda: [
+            "General",
+            "Trujillo",
+            "Piura",
+            "Chiclayo",
+            "Chimbote",
+            "San Martín",
+        ]
     )
     # Para la saca solo cuenta el stock de lotes de hasta estos días (lo más antiguo se troza).
     saca_stock_lot_days: int = Field(3, ge=0, le=30)
