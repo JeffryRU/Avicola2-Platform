@@ -17,6 +17,7 @@ import { DataTable } from '@/shared/ui/components/data-table'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
 import { NOT_REGISTERED, UNITS_SHORT, kgAmount } from '@/shared/types/labels'
+import { col } from '@/shared/ui/lib/table-columns'
 
 /** Ruta /dashboards/dia/:date: detalle de un día para el supervisor. */
 export function TeamDayPage() {
@@ -162,7 +163,7 @@ export function TeamDayView({
                   wrapperClassName="hidden dsk:block"
                   rows={day.rows}
                   rowKey={(r) => r.seller.username}
-                  rowClassName={(r) => !r.confirmed && 'hc:bg-warn-soft'}
+                  rowTone={(r) => !r.confirmed && 'attention'}
                   totalLabel="Total"
                   columns={[
                     {
@@ -179,13 +180,12 @@ export function TeamDayView({
                       key: 'status',
                       header: 'Estado',
                       cell: (r) => <StatusBadge kind={r.confirmed ? 'confirmed' : 'pending'} />,
-                      total: `${String(day.confirmed)}/${String(day.rows.length)}`,
-                      totalClassName: 'num',
+                      total: <span className="num">{`${String(day.confirmed)}/${String(day.rows.length)}`}</span>,
                     },
                     {
                       key: 'category',
                       header: 'Categoría',
-                      className: (r) => !r.category && 'text-muted-foreground',
+                      tone: (r) => !r.category && 'muted',
                       cell: (r) => (r.category ? catalog.dayLabel(r.category, r.units) : NOT_REGISTERED),
                       total: null,
                     },
@@ -217,7 +217,7 @@ export function TeamDayView({
                       key: 'sent',
                       header: 'Enviado',
                       numeric: true,
-                      className: 'text-muted-foreground',
+                      tone: 'muted',
                       cell: (r) => (r.submittedAt ? clockTime(r.submittedAt) : '—'),
                       total: null,
                     },
@@ -242,20 +242,10 @@ export function TeamDayView({
                           </>
                         ),
                       },
-                      {
-                        key: 'units',
-                        header: 'Unidades',
-                        numeric: true,
-                        cell: (p) => nf0(day.units[p.id] ?? 0),
-                        total: nf0(day.u),
-                      },
-                      {
-                        key: 'kg',
-                        header: 'Kg aprox.',
-                        numeric: true,
-                        cell: (p) => nf1((day.units[p.id] ?? 0) * p.kg_per_unit),
+                      col.units<Product>('units', 'Unidades', (p) => day.units[p.id] ?? 0, { total: nf0(day.u) }),
+                      col.kg<Product>('kg', 'Kg aprox.', (p) => (day.units[p.id] ?? 0) * p.kg_per_unit, {
                         total: nf1(day.kg),
-                      },
+                      }),
                       ...(day.real
                         ? [
                             {

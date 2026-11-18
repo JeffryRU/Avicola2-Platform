@@ -1,17 +1,21 @@
-import type { ReactNode } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import { headerGroups } from '@/shared/ui/lib/data-table'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { tableStyles as ts, type Align, type CellTone, type Density, type RowTone } from '@/shared/ui/lib/table-styles'
 import { cn } from '@/shared/ui/lib/utils'
 
 /**
- * Tabla de solo lectura del sistema: cada pantalla declara sus columnas (en su `types/` o junto a
- * la pantalla) y esta tabla pone el resto igual en todas: encabezados agrupados, filas agrupadas
- * por un encabezado lateral, columna fija al deslizar en el celular, cifras alineadas, «—» para
- * lo vacío y fila de total. Las tablas que se editan (proyección y stock) usan `tableCls`.
+ * Tabla del sistema. Cada módulo declara sus columnas (a mano o con los atajos de `table-columns`:
+ * unidades, kg, porcentaje…) y elige las opciones que necesita (`density`, `striped`,
+ * `stickyHeader`, `hover`, `flush`); esta tabla resuelve lo común igual en todas: encabezados
+ * agrupados con los nombres centrados, filas agrupadas por un encabezado lateral, columna fija al
+ * deslizar en el celular, cifras alineadas, fila de total y filas que se abren con el teclado.
+ *
+ * Los estilos salen de una sola fuente: `shared/ui/lib/table-styles.ts`.
  */
 
-type Align = 'left' | 'right' | 'center'
 type Maybe = string | false | null | undefined
+
+export type { Align, CellTone, Density, RowTone }
 
 export interface Column<T> {
   key: string
@@ -23,13 +27,15 @@ export interface Column<T> {
   numeric?: boolean
   /** Por defecto: las cifras a la derecha y el resto a la izquierda. */
   align?: Align
-  /** Clase de la celda (o según la fila: tono, atenuado…). */
-  className?: Maybe | ((row: T) => Maybe)
-  /** Valor atenuado (p. ej. un cero). */
+  /** Lo que significa el valor (bien, mal, atenuado, destacado…); el color lo pone el tema. */
+  tone?: CellTone | ((row: T) => CellTone | null | undefined | false)
+  /** Valor atenuado (p. ej. un cero). Atajo de `tone: 'faint'`. */
   faint?: (row: T) => boolean
+  /** Clase extra de la celda (si un tono no alcanza). */
+  className?: Maybe | ((row: T) => Maybe)
   /** Valor de la fila de total (si ninguna columna lo tiene, no hay fila de total). */
   total?: ReactNode
-  totalClassName?: Maybe
+  totalTone?: CellTone | null
   /** Encabezado superior: las columnas seguidas del mismo grupo comparten uno (p. ej. la zona). */
   group?: string | null
   /** Queda fija a la izquierda al deslizar la tabla en el celular. */
@@ -46,9 +52,7 @@ export interface RowGroup<T> {
   rows: T[]
 }
 
-export type RowTone = 'total' | 'muted'
-
-interface Props<T> {
+export interface DataTableProps<T> {
   columns: Column<T>[]
   rowKey: (row: T) => string
   /** Las filas, o `groups` para filas agrupadas. */
@@ -58,12 +62,19 @@ interface Props<T> {
   groupHeader?: ReactNode
   /** Rótulo de la fila de total (va en la primera columna). */
   totalLabel?: ReactNode
+  /** Abre el detalle de la fila (también con Enter o Espacio). */
   onRowClick?: (row: T) => void
+  /** Fila con estilo propio: total, atenuada o que pide atención. */
+  rowTone?: (row: T) => RowTone | null | undefined | false
   rowClassName?: (row: T) => Maybe
-  /** Una fila con estilo propio: «total» (como la de total) o «muted» (texto secundario). */
-  rowTone?: (row: T) => RowTone | undefined
-  /** Texto más chico (tablas con muchas columnas). */
-  dense?: boolean
+  /** Separación de filas: `compact` para tablas con muchas columnas. */
+  density?: Density
+  /** Filas alternadas (tablas largas). */
+  striped?: boolean
+  /** Resalta la fila bajo el mouse (por defecto, sí). */
+  hover?: boolean
+  /** La cabecera queda visible al bajar (la tabla desliza dentro de su caja). */
+  stickyHeader?: boolean
   /** Sin margen a los lados (dentro de un diálogo). */
   flush?: boolean
   /** Descripción para lectores de pantalla. */
@@ -73,17 +84,13 @@ interface Props<T> {
   wrapperClassName?: string
 }
 
-const ALIGN: Record<Align, string> = {
-  left: 'text-left first:text-left',
-  right: 'text-right first:text-right',
-  center: 'text-center first:text-center',
+const toneOf = <T,>(c: Column<T>, row: T): CellTone | undefined => {
+  if (c.faint?.(row)) return 'faint'
+  const tone = typeof c.tone === 'function' ? c.tone(row) : c.tone
+  return tone === false || tone == null ? undefined : tone
 }
 
-function alignOf<T>(c: Column<T>): string {
-  return ALIGN[c.align ?? (c.numeric ? 'right' : 'left')]
-}
-
-const STICKY = 'sticky left-0 z-10 bg-surface dsk:static dsk:bg-transparent'
+const alignOf = <T,>(c: Column<T>): Align => c.align ?? (c.numeric ? 'right' : 'left')
 
 export function DataTable<T>({
   columns,
@@ -93,118 +100,106 @@ export function DataTable<T>({
   groupHeader,
   totalLabel,
   onRowClick,
-  rowClassName,
   rowTone,
-  dense,
-  flush,
+  rowClassName,
+  density = 'normal',
+  striped = false,
+  hover = true,
+  stickyHeader = false,
+  flush = false,
   caption,
   className,
   wrapperClassName,
-}: Props<T>) {
+}: DataTableProps<T>) {
   const sections: RowGroup<T>[] = groups ?? [{ key: '', label: null, rows: rows ?? [] }]
   const grouped = !!groups
   const tops = headerGroups(columns.map((c) => c.group ?? null))
   const twoRows = tops.some((g) => g.name !== null)
-  const span = twoRows ? 2 : 1
   const hasTotal = columns.some((c) => c.total !== undefined)
-  const desk = (c: Column<T>) => c.desktopOnly && 'hidden dsk:table-cell'
 
-  const headerCell = (c: Column<T>, rowSpan?: number) => (
+  const th = (c: Column<T>, extra?: { rowSpan?: number; center?: boolean }) => (
     <th
       key={c.key}
-      rowSpan={rowSpan}
+      rowSpan={extra?.rowSpan}
       scope="col"
       title={c.title}
-      className={cn(tableCls.th, alignOf(c), c.sticky && STICKY, desk(c), c.headerClassName)}
+      className={cn(
+        ts.th({ density, stickyHeader, align: extra?.center ? (c.align ?? 'center') : alignOf(c) }),
+        extra?.center && 'first:pl-3 dsk:first:pl-3',
+        c.sticky && ts.sticky,
+        c.desktopOnly && ts.desktopOnly,
+        c.headerClassName,
+      )}
     >
       {c.header}
     </th>
   )
 
+  const topRow = () => {
+    if (!twoRows) return columns.map((c) => th(c))
+    let at = 0
+    return tops.map((g) => {
+      const first = at
+      at += g.span
+      // Columnas sin grupo: ocupan las dos filas del encabezado.
+      if (g.name === null) return columns.slice(first, first + g.span).map((c) => th(c, { rowSpan: 2 }))
+      return (
+        <th
+          key={`group-${g.name}-${String(first)}`}
+          colSpan={g.span}
+          scope="colgroup"
+          className={ts.groupTh({ stickyHeader })}
+        >
+          {g.name}
+        </th>
+      )
+    })
+  }
+
+  const open = (row: T) => (e: KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onRowClick?.(row)
+    }
+  }
+
   return (
-    <div className={cn('relative overflow-x-auto', wrapperClassName)}>
-      <table
-        className={cn(
-          tableCls.table,
-          dense && 'text-sm',
-          flush && '[&_td:first-child]:pl-0 [&_td:last-child]:pr-0 [&_th:first-child]:pl-0 [&_th:last-child]:pr-0',
-          className,
-        )}
-      >
+    <div className={cn(ts.wrapper({ stickyHeader }), wrapperClassName)}>
+      <table className={cn(ts.table({ density, flush }), className)}>
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
           <tr>
             {grouped && (
-              <th rowSpan={span} scope="col" className={cn(tableCls.th, 'hidden text-left dsk:table-cell')}>
+              <th
+                rowSpan={twoRows ? 2 : 1}
+                scope="col"
+                className={cn(ts.th({ density, stickyHeader }), ts.desktopOnly)}
+              >
                 {groupHeader}
               </th>
             )}
-            {twoRows
-              ? (() => {
-                  let at = 0
-                  return tops.map((g) => {
-                    const first = at
-                    at += g.span
-                    // Columnas sin grupo: ocupan las dos filas del encabezado.
-                    if (g.name === null) {
-                      return columns.slice(first, first + g.span).map((c) => headerCell(c, 2))
-                    }
-                    return (
-                      <th
-                        key={`group-${g.name}-${String(first)}`}
-                        colSpan={g.span}
-                        scope="colgroup"
-                        className="eyebrow border-b border-l border-rule px-3 pt-2.5 pb-1.5 text-center whitespace-nowrap hc:text-foreground"
-                      >
-                        {g.name}
-                      </th>
-                    )
-                  })
-                })()
-              : columns.map((c) => headerCell(c))}
+            {topRow()}
           </tr>
-          {twoRows && (
-            <tr>
-              {columns
-                .filter((c) => (c.group ?? null) !== null)
-                .map((c) => (
-                  <th
-                    key={c.key}
-                    scope="col"
-                    title={c.title}
-                    className={cn(
-                      tableCls.th,
-                      ALIGN[c.align ?? 'center'],
-                      'first:pl-3 dsk:first:pl-3',
-                      c.headerClassName,
-                    )}
-                  >
-                    {c.header}
-                  </th>
-                ))}
-            </tr>
-          )}
+          {twoRows && <tr>{columns.filter((c) => (c.group ?? null) !== null).map((c) => th(c, { center: true }))}</tr>}
         </thead>
         <tbody>
           {sections.map((section) =>
             section.rows.map((row, r) => {
-              const tone = rowTone?.(row)
+              const asked = rowTone?.(row)
+              const tone = asked === false || asked == null ? undefined : asked
               return (
                 <tr
                   key={rowKey(row)}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  onKeyDown={onRowClick ? open(row) : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
                   className={cn(
-                    tone === 'total' ? tableCls.total : tone === 'muted' ? 'text-muted-foreground' : tableCls.row,
-                    onRowClick && 'cursor-pointer',
+                    ts.row({ hover: hover && tone !== 'total', striped, clickable: !!onRowClick, tone }),
                     rowClassName?.(row),
                   )}
                 >
                   {grouped && r === 0 && (
-                    <th
-                      scope="rowgroup"
-                      rowSpan={section.rows.length}
-                      className="hidden border-b border-rule-strong py-2.5 pr-3 pl-4 text-left align-top text-xs font-semibold whitespace-nowrap text-ink-2 uppercase dsk:table-cell dsk:pl-5"
-                    >
+                    <th scope="rowgroup" rowSpan={section.rows.length} className={ts.rowGroupTh}>
                       {section.label}
                     </th>
                   )}
@@ -212,14 +207,11 @@ export function DataTable<T>({
                     <td
                       key={c.key}
                       className={cn(
-                        tableCls.td,
-                        alignOf(c),
-                        c.numeric && 'num',
-                        c.sticky && STICKY,
-                        // Con grupos, la primera columna visible en el celular es esta: su margen.
+                        ts.td({ density, align: alignOf(c), numeric: !!c.numeric, tone: toneOf(c, row) }),
+                        c.sticky && ts.sticky,
+                        // Con grupos, en el celular la primera columna visible es esta: su margen.
                         grouped && i === 0 && 'pl-4 first:pl-4 dsk:pl-3 dsk:first:pl-3',
-                        desk(c),
-                        c.faint?.(row) && 'text-faint',
+                        c.desktopOnly && ts.desktopOnly,
                         typeof c.className === 'function' ? c.className(row) : c.className,
                       )}
                     >
@@ -231,18 +223,15 @@ export function DataTable<T>({
             }),
           )}
           {hasTotal && (
-            <tr className={tableCls.total}>
-              {grouped && <td className={cn(tableCls.td, 'hidden dsk:table-cell')} />}
+            <tr className={ts.row({ hover: false, tone: 'total' })}>
+              {grouped && <td className={cn(ts.td({ density }), ts.desktopOnly)} />}
               {columns.map((c, i) => (
                 <td
                   key={c.key}
                   className={cn(
-                    tableCls.td,
-                    alignOf(c),
-                    c.numeric && 'num',
-                    c.sticky && 'sticky left-0 z-10 bg-muted dsk:static',
-                    desk(c),
-                    c.totalClassName,
+                    ts.td({ density, align: alignOf(c), numeric: !!c.numeric, tone: c.totalTone ?? undefined }),
+                    c.sticky && ts.stickyTotal,
+                    c.desktopOnly && ts.desktopOnly,
                   )}
                 >
                   {i === 0 && c.total === undefined ? totalLabel : c.total}

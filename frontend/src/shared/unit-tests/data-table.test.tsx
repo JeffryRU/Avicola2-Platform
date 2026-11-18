@@ -62,3 +62,47 @@ describe('DataTable', () => {
     expect(html({ columns: plain })).not.toContain('>Total</td>')
   })
 })
+
+describe('opciones de la tabla', () => {
+  it('cada módulo elige densidad, rayado, cabecera fija y hover', () => {
+    const out = html({ density: 'compact', striped: true, stickyHeader: true, hover: false })
+    expect(out).toContain('text-sm')
+    expect(out).toContain('even:bg-muted/50')
+    expect(out).toContain('sticky top-0')
+    expect(out).not.toContain('hover:bg-muted')
+  })
+
+  it('las filas que se abren se pueden abrir con el teclado', () => {
+    const out = html({ onRowClick: () => undefined })
+    expect(out.match(/tabindex="0"/gi)).toHaveLength(2)
+    expect(out).toContain('cursor-pointer')
+  })
+
+  it('tonos de celda y de fila salen de la misma fuente de estilos', () => {
+    const toned: Column<Row>[] = [
+      { key: 'name', header: 'Producto', cell: (r) => r.name },
+      { key: 'a', header: 'A', numeric: true, tone: (r) => (r.a ? 'best' : 'bad'), cell: (r) => r.a },
+    ]
+    const out = html({ columns: toned, rowTone: (r) => r.id === '2' && 'attention' })
+    expect(out).toContain('bg-ok-soft')
+    expect(out).toContain('text-bad')
+    expect(out).toContain('hc:bg-warn-soft')
+  })
+})
+
+describe('columnas listas', () => {
+  it('unidades, kg y variación con su formato, «—» y tono', async () => {
+    const { col, signTone } = await import('@/shared/ui/lib/table-columns')
+    const units = col.units<Row>('a', 'A', (r) => r.a, { dashZero: true })
+    expect(units.cell(ROWS[0], 0)).toBe('3')
+    expect(units.cell(ROWS[1], 0)).toBe('—')
+    expect(units.faint?.(ROWS[1])).toBe(true)
+    const kg = col.kg<Row>('k', 'Kg', (r) => r.a * 1.25)
+    expect(kg.cell(ROWS[0], 0)).toBe('3.8')
+    const change = col.change<Row>('c', '%', (r) => r.b - r.a)
+    expect(change.cell(ROWS[0], 0)).toBe('-3.0%')
+    expect(typeof change.tone === 'function' && change.tone(ROWS[0])).toBe('bad')
+    expect(typeof change.tone === 'function' && change.tone(ROWS[1])).toBe('ok')
+    expect(signTone(-1)).toBe('bad')
+  })
+})

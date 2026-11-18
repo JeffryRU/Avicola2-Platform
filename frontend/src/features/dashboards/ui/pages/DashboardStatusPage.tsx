@@ -16,6 +16,7 @@ import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgAmount, STATUS_LABEL, unitsCount } from '@/shared/types/labels'
 import { useDayPath, usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
+import { col } from '@/shared/ui/lib/table-columns'
 
 export function DashboardStatusPage() {
   const { period, sellers } = useDashboardFilters()
@@ -29,6 +30,7 @@ export function DashboardStatusPage() {
   const source = data.data ?? { projections: [], sales: [] }
 
   const days = periodAgg(period.dates, sellers, source.projections, source.sales, catalog)
+  type Day = (typeof days)[number]
   const units = days.reduce((s, d) => s + d.u, 0)
   const kg = days.reduce((s, d) => s + d.kg, 0)
 
@@ -118,22 +120,8 @@ export function DashboardStatusPage() {
                     </>
                   ),
                 },
-                {
-                  key: 'units',
-                  header: 'Unidades',
-                  numeric: true,
-                  faint: (d) => !d.u,
-                  cell: (d) => nf0(d.u),
-                  total: nf0(units),
-                },
-                {
-                  key: 'kg',
-                  header: 'Kilos (aprox.)',
-                  numeric: true,
-                  faint: (d) => !d.u,
-                  cell: (d) => (d.u ? nf1(d.kg) : '—'),
-                  total: nf1(kg),
-                },
+                col.units<Day>('units', 'Unidades', (d) => d.u, { total: nf0(units) }),
+                col.kg<Day>('kg', 'Kilos (aprox.)', (d) => (d.u ? d.kg : null), { total: nf1(kg) }),
                 {
                   key: 'status',
                   header: 'Estado',
