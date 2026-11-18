@@ -108,6 +108,9 @@ export function shownLots(day: IsoDate, offsets: number[], lines: StockLine[]): 
 }
 
 /** Ubicaciones a ofrecer: las configuradas y cualquiera que ya tenga stock registrado. */
+/** La ubicación única, si solo se configuró una (el stock se sube de forma general); si no, null. */
+export const singleLocation = (configured: string[]): string | null => (configured.length === 1 ? configured[0] : null)
+
 export const locationsOf = (configured: string[], days: StockDay[]) => [
   ...new Set([...configured, ...days.flatMap((d) => d.lines.map((l) => l.location))]),
 ]

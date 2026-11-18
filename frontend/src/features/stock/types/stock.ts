@@ -35,6 +35,8 @@ export const REGISTER_STEPS = [
   'Escribe las unidades que quedaron; los kg se calculan solos.',
   'Toca «Guardar stock». Puedes volver a corregirlo hasta 7 días después.',
 ] as const
+/** Los mismos pasos cuando el stock es general (no se elige ubicación). */
+export const REGISTER_STEPS_GENERAL = ['Elige el día arriba.', ...REGISTER_STEPS.slice(1)] as const
 export const BY_LOCATION_TITLE = 'Por ubicación'
 
 export const COLUMNS = {

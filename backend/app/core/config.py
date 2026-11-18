@@ -128,11 +128,10 @@ class Settings(BaseSettings):
     # Conversión de kg de producto a saca (pollo vivo). Valores de referencia por validar.
     yield_factor: float = Field(DEFAULT_YIELD_FACTOR, gt=0, le=1)
     avg_live_weight_kg: float = Field(DEFAULT_AVG_LIVE_WEIGHT_KG, gt=0)
-    # Ubicaciones donde se cuenta el stock de despacho (STOCK_LOCATIONS, JSON). SUPUESTO: las
-    # zonas con más pedidos; falta la lista real del negocio.
-    stock_locations: list[str] = Field(
-        default_factory=lambda: ["Trujillo", "Piura", "Chiclayo", "Chimbote", "San Martín"]
-    )
+    # Ubicaciones donde se cuenta el stock de despacho (STOCK_LOCATIONS, JSON). Por defecto una
+    # sola, «General»: el negocio sube el stock de forma general y la app no pide elegir dónde.
+    # Con varias (p. ej. ["Trujillo", "Piura"]) vuelve el filtro y se registra por ubicación.
+    stock_locations: list[str] = Field(default_factory=lambda: ["General"])
     # Para la saca solo cuenta el stock de lotes de hasta estos días (lo más antiguo se troza).
     saca_stock_lot_days: int = Field(3, ge=0, le=30)
     # Hora (local) desde la que el programador guarda la saca del día como la del cierre.

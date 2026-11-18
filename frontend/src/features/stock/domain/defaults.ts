@@ -43,5 +43,5 @@ export const DEFAULT_QUALITY_B: Product[] = [
 ]
 
 /** Ubicaciones de respaldo (las de STOCK_LOCATIONS por defecto en el backend). */
-export const DEFAULT_LOCATIONS = ['Trujillo', 'Piura', 'Chiclayo', 'Chimbote', 'San Martín']
+export const DEFAULT_LOCATIONS = ['General']
 export const DEFAULT_LOT_DAYS = 3
