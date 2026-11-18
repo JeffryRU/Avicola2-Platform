@@ -8,9 +8,10 @@ import { today } from '@/shared/domain/dates'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { Note } from '@/shared/ui/components/feedback'
 import { useRequiredSession } from '@/features/auth'
-import { ARIS_ACCEPT, needsUpload } from '@/features/aris/domain/aris'
+import { ARIS_ACCEPT, needsUpload, tooBig } from '@/features/aris/domain/aris'
 import {
   ARIS_LATER_LABEL,
+  ARIS_TOO_BIG,
   ARIS_TRAINING,
   ARIS_UPLOAD_LABEL,
   ARIS_UPLOADING,
@@ -49,6 +50,11 @@ export function ArisNotice() {
 
   const pick = async (file: File | undefined) => {
     if (!file) return
+    if (tooBig(file)) {
+      toast.error(ARIS_TOO_BIG(file.size / 1024 / 1024), { duration: 10_000 })
+      if (input.current) input.current.value = ''
+      return
+    }
     setProgress(0)
     try {
       const loads = await upload.mutateAsync({ file, onProgress: setProgress })

@@ -22,6 +22,14 @@ export const arisLoadSchema = z.object({
 export type ArisLoad = z.infer<typeof arisLoadSchema>
 export const arisLoadsSchema = z.array(arisLoadSchema)
 
+/**
+ * Tamaño máximo desde la app: la subida pasa por Vercel, que corta los cuerpos de más de 4,5 MB.
+ * Un día o una semana de ARIS pesan bastante menos; lo más grande va por Drive, Telegram o WhatsApp.
+ */
+export const ARIS_MAX_MB = 4
+export const ARIS_MAX_BYTES = ARIS_MAX_MB * 1024 * 1024
+export const tooBig = (file: Pick<File, 'size'>) => file.size > ARIS_MAX_BYTES
+
 /** Formatos que acepta la carga (el mismo export de ARIS). */
 export const ARIS_ACCEPT = '.xlsx,.xlsm,.csv'
 

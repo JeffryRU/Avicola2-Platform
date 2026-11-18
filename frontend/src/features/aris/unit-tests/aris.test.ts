@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arisStatusSchema, needsUpload, type ArisStatus } from '@/features/aris/domain/aris'
+import { ARIS_MAX_BYTES, arisStatusSchema, needsUpload, tooBig, type ArisStatus } from '@/features/aris/domain/aris'
 import { arisLoadSummary, arisNoticeText } from '@/features/aris/types/aris'
 
 const status = (over: Partial<ArisStatus> = {}): ArisStatus => ({
@@ -31,6 +31,12 @@ describe('datos de ARIS', () => {
     ])
     expect(text).toMatch(/líneas de despacho del/)
     expect(text).toMatch(/2 filas no se pudieron leer/)
+  })
+
+  it('desde la app solo entran archivos de hasta 4 MB', () => {
+    expect(tooBig({ size: ARIS_MAX_BYTES })).toBe(false)
+    expect(tooBig({ size: ARIS_MAX_BYTES + 1 })).toBe(true)
+    expect(tooBig({ size: 58 * 1024 * 1024 })).toBe(true)
   })
 
   it('rechaza un estado con forma inválida', () => {

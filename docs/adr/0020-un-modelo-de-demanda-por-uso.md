@@ -41,6 +41,6 @@ Un modelo por uso, elegido con validación + prueba:
 
 - **El modelo de cada uso ya no está fijo.** Cada entrenamiento elige el de menor error en su nivel. Con la historia hasta el 17/11/2026 ganó el alumno destilado para la sugerencia (26,3 %) y para la saca (22,3 %), y el boosting para la semana (6,7 %, antes 9,7 %).
 - **La venta real llega de ARIS,** porque la app no registra lo despachado a cada vendedor y cliente. Hay dos formas de cargarla:
-  - Desde el aviso de la app (`POST /api/aris/import`). El aviso aparece solo a quien tiene `load_aris` y solo cuando faltan días; no es obligatorio.
-  - Dejando el archivo en una carpeta de Google Drive que vigila n8n (`04_drive_aris` → `POST /api/internal/aris`).
+  - Desde el aviso de la app (`POST /api/aris/import`), hasta 4 MB (un día o una semana), porque la subida pasa por Vercel, que corta los cuerpos de más de 4,5 MB. El aviso aparece solo a quien tiene `load_aris` y solo cuando faltan días; no es obligatorio.
+  - Por n8n, a `POST /api/internal/aris`, desde tres medios: una carpeta de Google Drive (`04_drive_aris`), un bot de Telegram (`05_telegram_aris`, hasta 20 MB) o WhatsApp Business (`06_whatsapp_aris`, hasta 100 MB). Los bots solo aceptan los chats y números autorizados (`ARIS_TELEGRAM_CHAT_IDS`, `ARIS_WHATSAPP_NUMBERS`) y responden con lo cargado o con el error.
 - **Cada carga reemplaza solo las fechas que trae el archivo** y pide el reentrenamiento. El programador lo atiende en su próxima vuelta, fuera de la petición y con 2 núcleos, aunque no sea de madrugada.

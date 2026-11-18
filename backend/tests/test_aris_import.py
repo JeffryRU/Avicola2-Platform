@@ -131,6 +131,21 @@ def test_excel_from_aris_loads_dispatch_and_sales(client) -> None:
         assert sale.date == day and sale.quantity == 3 and sale.grouping is None
 
 
+def test_files_without_a_name_are_recognized_by_content(client, monkeypatch) -> None:
+    """WhatsApp y Telegram pueden mandar el archivo sin nombre ni extensión."""
+    monkeypatch.setattr(get_settings(), "ingest_api_token", "secreto")
+    day = TODAY - timedelta(days=1)
+    for content, source in ((_xlsx(day, 130), "whatsapp"), (_csv(_line(day, 9)), "telegram")):
+        r = client.post(
+            "/api/internal/aris",
+            files={"file": ("archivo", content)},
+            data={"source": source},
+            headers={"X-Api-Token": "secreto"},
+        )
+        assert r.status_code == 200, r.text
+    assert _units_by_day() == {day: 9}
+
+
 def test_unknown_files_are_rejected_without_touching_history(client) -> None:
     _login(client, "supervisor")
     day = TODAY - timedelta(days=1)
