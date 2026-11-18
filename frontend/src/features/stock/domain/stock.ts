@@ -107,10 +107,22 @@ export function shownLots(day: IsoDate, offsets: number[], lines: StockLine[]): 
   return [...new Set([...chosen, ...withData])].sort()
 }
 
-/** Ubicaciones a ofrecer: las configuradas y cualquiera que ya tenga stock registrado. */
-/** La ubicación única, si solo se configuró una (el stock se sube de forma general); si no, null. */
-export const singleLocation = (configured: string[]): string | null => (configured.length === 1 ? configured[0] : null)
+/** El stock que se sube de forma general (en la app, «Todas las ubicaciones»). */
+export const GENERAL_LOCATION = 'General'
 
+/**
+ * Según la ubicación elegida en el filtro: dónde se guarda lo que se escribe (`write`, null si no se
+ * escribe) y qué se muestra (`show`). «Todas las ubicaciones» muestra la suma y, al registrar,
+ * guarda el stock general. Con una sola ubicación configurada no hay filtro (`single`).
+ */
+export function locationPlan(configured: string[], choice: string, editable: boolean) {
+  const single = configured.length === 1 ? configured[0] : null
+  const general = configured.includes(GENERAL_LOCATION) ? GENERAL_LOCATION : null
+  const write = !editable ? null : (single ?? (choice === ALL ? (general ?? configured[0] ?? null) : choice))
+  return { single, write, show: write ?? (single ? ALL : choice) }
+}
+
+/** Ubicaciones a ofrecer: las configuradas y cualquiera que ya tenga stock registrado. */
 export const locationsOf = (configured: string[], days: StockDay[]) => [
   ...new Set([...configured, ...days.flatMap((d) => d.lines.map((l) => l.location))]),
 ]

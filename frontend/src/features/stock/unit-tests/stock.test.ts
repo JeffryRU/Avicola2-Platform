@@ -134,3 +134,16 @@ describe('descartes', () => {
     expect(t).toEqual({ units: 10, kg: 15, unitsA: 0, unitsB: 0 })
   })
 })
+
+describe('ubicación del stock', () => {
+  it('«Todas las ubicaciones» muestra la suma y registra el stock general', async () => {
+    const { ALL, locationPlan } = await import('@/features/stock/domain/stock')
+    const places = ['General', 'Trujillo', 'Piura']
+    expect(locationPlan(places, ALL, false)).toEqual({ single: null, write: null, show: ALL })
+    expect(locationPlan(places, ALL, true)).toEqual({ single: null, write: 'General', show: 'General' })
+    expect(locationPlan(places, 'Piura', true)).toEqual({ single: null, write: 'Piura', show: 'Piura' })
+    // Con una sola ubicación no hay filtro: se registra ahí y se consulta todo.
+    expect(locationPlan(['General'], ALL, false)).toEqual({ single: 'General', write: null, show: ALL })
+    expect(locationPlan(['General'], 'Piura', true)).toEqual({ single: 'General', write: 'General', show: 'General' })
+  })
+})
