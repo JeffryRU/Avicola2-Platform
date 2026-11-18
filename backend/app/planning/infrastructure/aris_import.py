@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app.planning.application.ports import ArisLoad
 from app.planning.infrastructure.history_import import BATCH, Row, _order, _sale
 from app.planning.infrastructure.persistence.tables import dispatch_orders, store_sales
+from app.planning.infrastructure.store_orders_import import STORE_CODE_PREFIX
 from app.shared.domain.errors import DomainError
 
 DISPATCH, SALES = "despacho", "ventas"
@@ -107,6 +108,10 @@ def _xlsx_tables(content: bytes) -> Iterator[tuple[str, Iterator[dict[str, str]]
         workbook.close()
 
 
+# Los pedidos de tiendas (`cli tiendas`) comparten la tabla de despacho pero no son de ARIS.
+_NOT_STORES = ~dispatch_orders.c.material_code.startswith(STORE_CODE_PREFIX, autoescape=True)
+
+
 class _Merger:
     """Inserta por lotes reemplazando cada fecha la primera vez que aparece en el archivo."""
 
@@ -130,7 +135,10 @@ class _Merger:
             self.dates.add(day)
             self._flush()  # lo pendiente de otras fechas, antes de borrar esta
             column = self.table.c[self.date_col]
-            self.session.execute(delete(self.table).where(column == day))
+            query = delete(self.table).where(column == day)
+            if self.table is dispatch_orders:
+                query = query.where(_NOT_STORES)  # los pedidos de tiendas no vienen de ARIS
+            self.session.execute(query)
         self.batch.append(row)
         if len(self.batch) >= BATCH:
             self._flush()
@@ -179,7 +187,9 @@ class SqlArisData:
     def coverage(self) -> tuple[date | None, date | None]:
         """Último día con despacho y último día con ventas en tienda."""
         return (
-            self.session.scalar(select(func.max(dispatch_orders.c.delivery_date))),
+            self.session.scalar(
+                select(func.max(dispatch_orders.c.delivery_date)).where(_NOT_STORES)
+            ),
             self.session.scalar(select(func.max(store_sales.c.date))),
         )
 

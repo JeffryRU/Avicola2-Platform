@@ -94,3 +94,23 @@ def test_sellers_cannot_see_store_orders(client) -> None:
     _login(client, "rnavarro")
     r = client.get("/api/store-orders", params={"date_from": str(TODAY), "date_to": str(TODAY)})
     assert r.status_code == 403
+
+
+def test_aris_loads_keep_store_orders_and_ignore_them_in_the_coverage(client) -> None:
+    _login(client, "supervisor")
+    header = (
+        "PedidoCliente,NumeroPedido,PedidoDetalleMaterialCodigo,PedidoDetalleMaterial,"
+        "PedidoDetalleKilos,PesoDespachado,PedidoDetalleCantidad,CantidadDespachada,PedidoZona,"
+        "FechaRegistro,FechaEntrega,Vendedor"
+    )
+    past = TODAY - timedelta(days=2)
+    line = f"C,1,M1,POLLO ENTERO BRASA (1.60-1.69),0,0,4,4,TRUJILLO,{TODAY},{TODAY},Rnavarro"
+    old = f"C,2,M1,POLLO ENTERO BRASA (1.60-1.69),0,0,4,4,TRUJILLO,{past},{past},Rnavarro"
+    content = "\n".join([header, line, old, ""]).encode()
+    r = client.post("/api/aris/import", files={"file": ("a.csv", content)})
+    assert r.status_code == 200, r.text
+    # La carga de ARIS de hoy no borró los pedidos de tiendas de hoy.
+    r = client.get("/api/store-orders", params={"date_from": str(TODAY), "date_to": str(TODAY)})
+    assert {d["zone"] for d in r.json()} == {"San Martín", "Trujillo"}
+    # La cobertura de ARIS no cuenta los pedidos de tiendas de mañana.
+    assert client.get("/api/aris/status").json()["last_dispatch"] == str(TODAY)
