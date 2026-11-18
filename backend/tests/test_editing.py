@@ -415,7 +415,11 @@ def test_closing_soon_follows_the_configured_cutoff(client, from_tomorrow) -> No
     assert client.post(run).json()["created"] == 7  # aviso con la hora nueva
 
 
-def test_periodic_check_covers_both_notices(client) -> None:
+def test_periodic_check_covers_both_notices(client, monkeypatch) -> None:
+    from app.planning.infrastructure import scheduler
     from app.planning.infrastructure.scheduler import check_cutoffs
 
+    # Solo los avisos: la saca del cierre (desde las 20:00) y el modelo dependen de la hora.
+    monkeypatch.setattr(scheduler, "snapshot_saca", lambda _settings: 0)
+    monkeypatch.setattr(scheduler, "train_demand_model", lambda _settings: 0)
     assert check_cutoffs(get_settings()) == 0

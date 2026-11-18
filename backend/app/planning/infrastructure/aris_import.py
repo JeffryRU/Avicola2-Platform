@@ -11,6 +11,7 @@ por las columnas, no por el nombre del archivo.
 
 import csv
 import io
+import zipfile
 from collections.abc import Callable, Iterable, Iterator
 from datetime import date, datetime
 from typing import Any
@@ -34,6 +35,7 @@ ISO_DATE = len("2026-01-01")
 ZIP_MAGIC = b"PK"
 # Cuántas filas mirar arriba de la hoja buscando la fila de títulos.
 HEADER_SCAN = 20
+UNREADABLE = "No se pudo leer el archivo: puede estar dañado o no ser el export de ARIS."
 NOT_RECOGNIZED = (
     "No se reconoce el archivo: debe ser el export de ARIS de DESPACHO o de VENTAS "
     "(CSV, o Excel con esas hojas)."
@@ -68,7 +70,7 @@ def _csv_tables(content: bytes) -> Iterator[tuple[str, Iterator[dict[str, str]]]
         text = content.decode("latin-1")
     sample = text[:4096]
     delimiter = ";" if sample.count(";") > sample.count(",") else ","
-    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+    reader = csv.DictReader(io.StringIO(text, newline=""), delimiter=delimiter)
     kind = _kind(h.strip() for h in reader.fieldnames or [])
     if kind:
         yield kind, ({k.strip(): _cell(v) for k, v in r.items() if k} for r in reader)
@@ -192,12 +194,17 @@ class SqlArisData:
         else:
             raise DomainError("Sube el export de ARIS en Excel (.xlsx) o CSV.")
         results = []
-        for kind, rows in tables:
-            table, date_col, convert, unique = TARGETS[kind]
-            merger = _Merger(self.session, table, date_col, unique)
-            for raw in rows:
-                merger.add(_convert(convert, raw))
-            results.append(merger.result(kind))
+        try:
+            for kind, rows in tables:
+                table, date_col, convert, unique = TARGETS[kind]
+                merger = _Merger(self.session, table, date_col, unique)
+                for raw in rows:
+                    merger.add(_convert(convert, raw))
+                results.append(merger.result(kind))
+        except (csv.Error, zipfile.BadZipFile, KeyError, ValueError, TypeError) as exc:
+            # Un archivo dañado o que no es lo que dice ser: no se guarda nada.
+            self.session.rollback()
+            raise DomainError(UNREADABLE) from exc
         if not results:
             raise DomainError(NOT_RECOGNIZED)
         if not any(r.rows for r in results):
