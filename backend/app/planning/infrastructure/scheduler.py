@@ -17,6 +17,7 @@ from app.planning.domain.models import Seller
 from app.planning.domain.permissions import GENERAL_SUPERVISOR
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.demand_model import training
+from app.planning.infrastructure.demand_model.store import SqlDemandModelStore
 from app.planning.infrastructure.http.saca_view import saca_out
 from app.planning.infrastructure.persistence.repositories import SqlProductRepository
 from app.shared.infrastructure.database.session import SessionLocal
@@ -60,17 +61,24 @@ def snapshot_saca(settings: Settings) -> int:
 
 
 def train_demand_model(settings: Settings) -> int:
-    """Desde MODEL_TRAIN_HOUR, reentrena el modelo de demanda una vez por día (fuera de las
-    peticiones: en el hilo del programador)."""
+    """Reentrena el modelo de demanda fuera de las peticiones (en el hilo del programador):
+    en cuanto alguien sube datos nuevos de ARIS, o si no, una vez por día de madrugada."""
     if not settings.model_train_enabled:
         return 0
     clock = ZoneClock(settings.tz)
     now = clock.now()
-    # Solo de madrugada (3 horas desde MODEL_TRAIN_HOUR): nunca en horario de uso, aunque se
-    # despliegue de día y no haya corrida de hoy.
-    if not settings.model_train_hour <= now.hour < settings.model_train_hour + TRAIN_WINDOW_HOURS:
-        return 0
     with SessionLocal() as session:
+        store = SqlDemandModelStore(session)
+        products = SqlProductRepository(session).list_active()
+        if store.training_pending():
+            logger.info("Reentrenando el modelo de demanda: llegaron datos nuevos de ARIS")
+            training.train(session, products)
+            return 1
+        # Si no, solo de madrugada (3 horas desde MODEL_TRAIN_HOUR): nunca en horario de uso,
+        # aunque se despliegue de día y no haya corrida de hoy.
+        hour = settings.model_train_hour
+        if not hour <= now.hour < hour + TRAIN_WINDOW_HOURS:
+            return 0
         last = training.latest(session)
         if (
             last
@@ -78,7 +86,7 @@ def train_demand_model(settings: Settings) -> int:
             == now.date()
         ):
             return 0
-        return 1 if training.train(session, SqlProductRepository(session).list_active()) else 0
+        return 1 if training.train(session, products) else 0
 
 
 def check_cutoffs(settings: Settings) -> int:

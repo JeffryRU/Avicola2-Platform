@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { MODEL_TITLE } from '@/features/model'
+import { ArisNotice } from '@/features/aris'
 import {
   Bell,
   CalendarDays,
@@ -370,6 +371,8 @@ export function AppShell() {
             key={pathname}
             className={cn('mx-auto max-w-7xl animate-enter dsk:px-9 dsk:pt-7 dsk:pb-12', flow ? 'pb-6' : 'pb-24')}
           >
+            {/* Aviso de datos de ARIS: solo a quien los sube y solo si faltan días. */}
+            {!flow && <ArisNotice />}
             <Outlet />
           </div>
         </main>

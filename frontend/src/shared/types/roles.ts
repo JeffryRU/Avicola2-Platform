@@ -36,4 +36,5 @@ export const PERMISSIONS = [
   'view_saca',
   'view_production',
   'manage_production',
+  'load_aris',
 ] as const

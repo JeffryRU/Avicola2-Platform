@@ -36,3 +36,11 @@ Un modelo por uso, elegido con validación + prueba:
 - **Las mejoras son de 1 a 4 puntos**, salvo en el nivel semanal (13,0 % → 8,7 %). Con más semanas de historia, las proyecciones de los vendedores guardadas en la app y los pedidos adelantados de tiendas, el reentrenamiento diario las irá mejorando solo.
 - **Sin historia reciente de ARIS, el pronóstico de los próximos días no existe.** Si el último dato es de hace meses, no hay forma de pronosticar hoy, y la sugerencia sigue con la mediana.
 - **Para repetir la comparación:** `notebooks/modelo_demanda.ipynb`, `scripts/train_demand_model.py` y `scripts/tune_demand_model.py`.
+
+## Actualización: datos nuevos de ARIS y modelo elegido en cada corrida
+
+- **El modelo de cada uso ya no está fijo.** Cada entrenamiento elige el de menor error en su nivel. Con la historia hasta el 17/11/2026 ganó el alumno destilado para la sugerencia (26,3 %) y para la saca (22,3 %), y el boosting para la semana (6,7 %, antes 9,7 %).
+- **La venta real llega de ARIS,** porque la app no registra lo despachado a cada vendedor y cliente. Hay dos formas de cargarla:
+  - Desde el aviso de la app (`POST /api/aris/import`). El aviso aparece solo a quien tiene `load_aris` y solo cuando faltan días; no es obligatorio.
+  - Dejando el archivo en una carpeta de Google Drive que vigila n8n (`04_drive_aris` → `POST /api/internal/aris`).
+- **Cada carga reemplaza solo las fechas que trae el archivo** y pide el reentrenamiento. El programador lo atiende en su próxima vuelta, fuera de la petición y con 2 núcleos, aunque no sea de madrugada.

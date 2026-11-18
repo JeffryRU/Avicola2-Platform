@@ -36,6 +36,8 @@ import type { ProductionGateway } from '@/features/production'
 import { HttpProductionGateway } from '@/features/production/infrastructure/http-production-gateway'
 import type { SacaGateway } from '@/features/saca'
 import type { ModelGateway } from '@/features/model'
+import type { ArisGateway } from '@/features/aris'
+import { HttpArisGateway } from '@/features/aris/infrastructure/http-aris-gateway'
 import { HttpModelGateway } from '@/features/model/infrastructure/http-model-gateway'
 import { HttpSacaGateway } from '@/features/saca/infrastructure/http-saca-gateway'
 import { BrowserTableExporter } from '@/shared/infrastructure/table-exporter'
@@ -64,6 +66,7 @@ export interface Container {
   versions: VersionsGateway
   saca: SacaGateway
   model: ModelGateway
+  aris: ArisGateway
   production: ProductionGateway
   installer: AppInstaller
 }
@@ -117,6 +120,7 @@ export function createContainer(): Container {
     versions: new GithubVersionsGateway(),
     saca: new HttpSacaGateway(http),
     model: new HttpModelGateway(http),
+    aris: new HttpArisGateway(http),
     production: new HttpProductionGateway(http),
     installer: new BrowserAppInstaller(window, import.meta.env.VITE_ANDROID_APK_URL),
   }

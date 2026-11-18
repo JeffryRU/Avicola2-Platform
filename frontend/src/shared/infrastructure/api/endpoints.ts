@@ -59,6 +59,13 @@ export const endpoints = {
     list: '/sales',
   },
 
+  aris: {
+    /** GET → hasta qué día llegan los datos de ARIS y si conviene subir los que faltan. */
+    status: '/aris/status',
+    /** POST multipart (file) → carga el export de ARIS (solo las fechas que trae). */
+    import: '/aris/import',
+  },
+
   model: {
     /** GET ?date_from&date_to&seller → lo que el modelo habría sugerido cada día, por vendedor. */
     list: '/model-projections',

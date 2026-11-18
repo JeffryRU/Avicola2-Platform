@@ -68,6 +68,10 @@ export const queryKeys = {
     summary: ['model', 'summary'] as const,
   },
 
+  aris: {
+    status: ['aris', 'status'] as const,
+  },
+
   saca: {
     all: ['saca'] as const,
     plan: (day: string) => ['saca', day] as const,

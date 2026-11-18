@@ -6,6 +6,7 @@ Se versionan como JSON exportado. Para importarlos en el n8n del compose, ejecut
 docker compose exec n8n n8n import:workflow --input=/data/workflows/01_ingesta_excel.json
 docker compose exec n8n n8n import:workflow --input=/data/workflows/02_recordatorio_proyeccion.json
 docker compose exec n8n n8n import:workflow --input=/data/workflows/03_agente_chatbot.json
+docker compose exec n8n n8n import:workflow --input=/data/workflows/04_drive_aris.json
 docker compose exec n8n n8n publish:workflow --id=avicola2IngestaExcel01
 docker compose exec n8n n8n publish:workflow --id=avicola2Recordatorio02
 docker compose restart n8n
@@ -116,3 +117,23 @@ Cualquier workflow puede notificar a los usuarios de la app con un *HTTP Request
   ```
 
 `audience` acepta `all`, `sellers`, `supervisors` o el usuario de una persona. `link` es opcional y solo admite rutas internas de la app (empiezan con `/`).
+
+## 04_drive_aris
+
+```
+Google Drive Trigger (carpeta, cada 15 min) → ¿Excel o CSV? → Descargar → POST /api/internal/aris → ¿200?
+                                                    └→ ignorar                         ├→ aviso «Datos de ARIS cargados»
+                                                                                       └→ aviso «No se pudo cargar»
+```
+
+Quien tenga el export de ARIS (DESPACHO y/o VENTAS, en Excel o CSV) lo deja en una carpeta de Google Drive y se carga solo, igual que si lo subiera desde el aviso de la app.
+
+- **Solo reemplaza las fechas que trae el archivo:** se puede dejar el export de un día, de una semana o el completo, y volver a dejar el mismo sin duplicar nada.
+- **Después de cargar,** el backend pide al programador que reentrene el modelo de demanda (tarda alrededor de un minuto). A los supervisores les llega un aviso con lo cargado o con el error.
+- **Una hoja de cálculo de Google** se descarga como Excel.
+
+### Para activarlo
+
+1. **Carpeta.** Crea una carpeta en Google Drive y pon su URL en `ARIS_DRIVE_FOLDER_URL` del `.env` de n8n (en Coolify, en las variables del servicio). Después reinicia n8n.
+2. **Credencial.** En n8n, abre el workflow, entra a *Archivo nuevo en la carpeta de Drive* y conecta una credencial **Google Drive OAuth2** de una cuenta con acceso a esa carpeta. Usa la misma credencial en *Descargar de Drive*.
+3. **Publicar.** Activa el workflow: `docker compose exec n8n n8n publish:workflow --id=avicola2DriveAris04`, o actívalo desde el editor.
