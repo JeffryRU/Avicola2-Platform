@@ -51,3 +51,15 @@ Un modelo por uso, elegido con validación + prueba:
 - **Pollo sin menudencia (P0012):** también se proyecta, así que el modelo lo aprende como un producto más del cubo. Sus pedidos se reconocen en ARIS por el material «POLLO ENTERO CARNE SIN MENUDENCIA» (`EXTRA_MATERIALS` en `domain/orders.py`).
   - Las métricas y la serie del equipo siguen siendo solo de la brasa, para poder compararlas con las corridas anteriores.
   - La sugerencia de cada categoría toma de la predicción guardada solo sus productos.
+
+## Actualización (18/11/2026): sugerencia general para vendedores nuevos
+
+Cada día de la sugerencia sale de lo más propio a lo más general:
+
+1. El modelo entrenado para ese vendedor.
+2. Sus propios pedidos de ARIS (mediana de 4 semanas).
+3. El modelo para un **vendedor típico del equipo**: el promedio de los vendedores que aprende, guardado como `*equipo*`.
+4. Los pedidos de un vendedor típico, para los días que el modelo no pronostica.
+5. El promedio de sus propias proyecciones.
+
+Así, un vendedor nuevo (o uno cuyo nombre en ARIS no coincide con su cuenta) tiene sugerencia desde el primer día. A medida que llegan sus pedidos pasa solo a la mediana propia (4 semanas) y luego a su propio modelo (100 días con pedidos).

@@ -132,3 +132,25 @@ def test_without_history_there_is_nothing_to_train() -> None:
     with SessionLocal() as session:
         cli.init(session, get_settings())
         assert training.train(session, SqlProductRepository(session).list_active()) is None
+
+
+def test_a_new_seller_gets_the_general_suggestion(trained) -> None:
+    """Sin pedidos propios en ARIS (un vendedor nuevo): el modelo para un vendedor típico en los
+    días que pronostica, y los pedidos de un vendedor típico en los demás."""
+    client = TestClient(app)
+    _login(client, "gfernandez")
+    first = trained["forecast_dates"][0]
+    r = client.get("/api/suggestions", params={"category": "BRASA", "start": first, "days": 2})
+    assert r.status_code == 200, r.text
+    assert r.json()["method"] == "modelo_general"
+    assert all(day["units"] for day in r.json()["days"])
+    # El típico es el promedio del equipo: menos que el vendedor más grande.
+    _login(client, "rnavarro")
+    own = client.get("/api/suggestions", params={"category": "BRASA", "start": first, "days": 1})
+    _login(client, "gfernandez")
+    assert sum(r.json()["days"][0]["units"].values()) < sum(own.json()["days"][0]["units"].values())
+    # Pasados los días pronosticados, el historial de un vendedor típico (no queda vacío).
+    later = str(START + timedelta(days=DAYS + 5))
+    r = client.get("/api/suggestions", params={"category": "BRASA", "start": later, "days": 1})
+    assert r.json()["method"] == "historial_general"
+    assert r.json()["days"][0]["units"]

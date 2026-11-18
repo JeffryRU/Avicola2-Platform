@@ -17,6 +17,13 @@ ORDER_CATEGORY = BRASA_CATEGORY
 # Otros productos que se proyectan, con el material de ARIS de sus pedidos (el modelo de demanda
 # también los aprende): el pollo entero sin menudencia.
 EXTRA_MATERIALS = {"P0012": "POLLO ENTERO CARNE SIN MENUDENCIA"}
+# Clave de la predicción general del modelo: lo de un vendedor típico del equipo (el promedio de los
+# vendedores que aprende). La recibe quien aún no tiene historia propia en ARIS (un vendedor nuevo).
+GENERAL_SELLER = "*equipo*"
+# Cómo se armó una sugerencia (la API informa el del primer día).
+PERSONAL_HISTORY_METHOD = "order_history_median"  # sus pedidos de ARIS (mediana de 4 semanas)
+GENERAL_MODEL_METHOD = "modelo_general"  # el modelo, para un vendedor típico del equipo
+GENERAL_HISTORY_METHOD = "historial_general"  # los pedidos del equipo, para un vendedor típico
 # Semanas del mismo día de la semana que se miran. La mediana de 4 fue la mejor regla simple en
 # la validación con pedidos reales (ADR 0012): 53,1 % de error contra 56,9 % del promedio.
 MEDIAN_WEEKS = 4

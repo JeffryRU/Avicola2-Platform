@@ -27,7 +27,16 @@ from app.planning.domain.catalog import Catalog
 from app.planning.domain.dates import check_range
 from app.planning.domain.history import CREATED, UPDATED, ProjectionChange
 from app.planning.domain.models import SELLER, DailyUnits, Product, Projection, Seller
-from app.planning.domain.orders import ORDER_CATEGORY, OrderLine, daily_units, weekday_median
+from app.planning.domain.orders import (
+    GENERAL_HISTORY_METHOD,
+    GENERAL_MODEL_METHOD,
+    GENERAL_SELLER,
+    ORDER_CATEGORY,
+    PERSONAL_HISTORY_METHOD,
+    OrderLine,
+    daily_units,
+    weekday_median,
+)
 from app.planning.domain.permissions import Permission, require
 from app.planning.domain.store_orders import StoreOrderDay, sales_zone
 from app.shared.domain.errors import DomainError, ForbiddenError
@@ -270,8 +279,16 @@ class GetStoreOrders:
 
 
 class SuggestProjection:
-    """Sugerencia: la del modelo entrenado (el elegido para sugerir, ADR 0020) si ya
-    pronosticó esos días; si no, la del pronosticador (mediana de 4 semanas o promedio propio)."""
+    """Sugerencia de cada día, de lo más propio a lo más general (ADR 0020):
+
+    1. el modelo entrenado para ese vendedor (si ya tiene historia suficiente en ARIS);
+    2. sus propios pedidos de ARIS (mediana de los últimos 4 días iguales);
+    3. el modelo para un vendedor típico del equipo (un vendedor nuevo la recibe desde el día 1);
+    4. los pedidos de un vendedor típico (para los días que el modelo no pronostica);
+    5. el promedio de sus propias proyecciones.
+
+    A medida que llegan sus pedidos en ARIS, el vendedor pasa solo a las sugerencias propias.
+    """
 
     STORED_METHOD = "modelo_entrenado"
 
@@ -281,9 +298,10 @@ class SuggestProjection:
         forecaster: DemandForecaster,
         max_days: int,
         store: DemandModelStore | None = None,
+        general: DemandForecaster | None = None,
     ):
         self.products, self.forecaster, self.max_days = products, forecaster, max_days
-        self.store = store
+        self.store, self.general = store, general
         # Con qué se armó la última sugerencia (la API lo informa).
         self.method = forecaster.name
 
@@ -296,23 +314,42 @@ class SuggestProjection:
             raise DomainError(f"Debe pedir entre 1 y {self.max_days} días.")
         ids = set(Catalog(self.products.list_active()).of(category))  # valida la categoría
         dates = [start + timedelta(days=i) for i in range(days)]
-        if self.store:
-            # El modelo guarda, por vendedor y día, todos los productos que aprende (la brasa y el
-            # pollo sin menudencia): de cada día se toman solo los de esta categoría.
-            model = suggestion_model(self.store)
-            stored = (
-                {
-                    d.date: {pid: n for pid, n in d.units.items() if pid in ids}
-                    for d in self.store.predictions(model, dates[0], dates[-1], username)
-                }
-                if model
-                else {}
+
+        def only_category(units: dict[str, int]) -> dict[str, int]:
+            # El modelo guarda todos los productos que aprende (brasa y pollo sin menudencia).
+            return {pid: n for pid, n in units.items() if pid in ids}
+
+        own: dict[date, dict[str, int]] = {}
+        general: dict[date, dict[str, int]] = {}
+        model = suggestion_model(self.store) if self.store else None
+        if self.store and model:
+            found = self.store.predictions(model, dates[0], dates[-1], username)
+            own = {d.date: only_category(d.units) for d in found}
+            typical = self.store.predictions(model, dates[0], dates[-1], GENERAL_SELLER)
+            general = {d.date: only_category(d.units) for d in typical}
+        mine = {d.date: d.units for d in self.forecaster.suggest(username, category, dates)}
+        from_orders = self.forecaster.name == PERSONAL_HISTORY_METHOD
+        team = (
+            {d.date: d.units for d in self.general.suggest(username, category, dates)}
+            if self.general
+            else {}
+        )
+        sources = [
+            (self.STORED_METHOD, own),
+            (PERSONAL_HISTORY_METHOD, mine if from_orders else {}),
+            (GENERAL_MODEL_METHOD, general),
+            (GENERAL_HISTORY_METHOD, team),
+            (self.forecaster.name, {} if from_orders else mine),
+        ]
+        result, used = [], []
+        for day in dates:
+            method, units = next(
+                ((m, by_day[day]) for m, by_day in sources if by_day.get(day)), (None, {})
             )
-            if stored and all(d in stored for d in dates) and any(stored.values()):
-                self.method = self.STORED_METHOD
-                return [DailyUnits(username, d, stored[d]) for d in dates]
-        result = self.forecaster.suggest(username, category, dates)
-        self.method = self.forecaster.name
+            result.append(DailyUnits(username, day, units))
+            if method:
+                used.append(method)
+        self.method = used[0] if used else self.forecaster.name
         return result
 
 
