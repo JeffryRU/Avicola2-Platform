@@ -192,6 +192,22 @@ def test_store_orders_report_feeds_the_orders_of_that_day(tmp_path: Path) -> Non
         units = LoadedOrders(session, SqlProductRepository(session)).units(TODAY)
     assert units == {"P0007": 10, "P0001": 20}
 
+    # Un reporte del día siguiente solo reemplaza ese día; los anulados no cuentan.
+    next_day = (TODAY + timedelta(days=1)).strftime("%d/%m/%Y")
+    for row in ws.iter_rows(min_row=5):
+        row[5].value = next_day
+    ws.cell(row=5, column=16, value="Aprobado")
+    ws.cell(row=6, column=16, value="Anulado")
+    ws.cell(row=4, column=16, value="ESTADO")
+    later = tmp_path / "tiendas-2.xlsx"
+    wb.save(later)
+    with SessionLocal() as session:
+        products = SqlProductRepository(session).list_active()
+        assert load_store_orders(session, later, products) == (1, 0)
+        session.commit()
+        days = session.execute(select(dispatch_orders.c.delivery_date)).scalars().all()
+    assert sorted(days) == [TODAY, TODAY, TODAY + timedelta(days=1)]
+
 
 def test_model_projection_uses_only_earlier_history(client) -> None:
     # El modelo mira los últimos 4 días iguales de la semana: 3 semanas más de pedidos.

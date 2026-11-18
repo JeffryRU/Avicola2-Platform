@@ -95,6 +95,9 @@ files:
     table: dispatch_orders
     keep_if:
       - {field: material, contains: [POLLO ENTERO, BRASA]}
+    # Pedidos anulados: no cuentan.
+    drop_if:
+      - {field: status, contains: [ANULADO]}
     columns:
       zone: {source: ZONA, nullable: true}
       store: {source: TIENDA}

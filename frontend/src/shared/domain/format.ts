@@ -27,8 +27,8 @@ export function parseDigits(raw: string, maxDigits: number): number | null {
   return digits === '' ? null : Number(digits)
 }
 
-/** Celda de proyección: hasta 4 dígitos (9999 unidades, MAX_UNITS de projections/domain/draft.ts). */
-export const CELL_MAX_DIGITS = 4
+/** Celda de proyección: hasta 5 dígitos (99,999 unidades, MAX_UNITS de projections/domain/draft.ts). */
+export const CELL_MAX_DIGITS = 5
 export const parseCell = (raw: string): number | null => parseDigits(raw, CELL_MAX_DIGITS)
 
 /** Stock, producción y pedidos a granja: hasta 7 dígitos y nunca más de RECORD_MAX_UNITS. */

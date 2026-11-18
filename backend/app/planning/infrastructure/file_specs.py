@@ -28,6 +28,7 @@ def _spec(key: str, raw: dict[str, Any]) -> FileSpec:
         date_field=raw.get("date_field"),
         unique=raw.get("unique"),
         keep_if=_KEEP.validate_python(raw.get("keep_if", ())),
+        drop_if=_KEEP.validate_python(raw.get("drop_if", ())),
     )
 
 

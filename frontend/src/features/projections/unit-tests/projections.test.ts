@@ -49,13 +49,13 @@ describe('borrador de proyección', () => {
 
   it('rechaza más de 7 días o unidades fuera de rango', () => {
     expect(submittableDraft(TODAY).safeParse({ ...newDraft(TODAY, 'BRASA'), days: 8 }).success).toBe(false)
-    const big = { ...newDraft(TODAY, 'BRASA'), days: 1, units: { [TODAY]: { B1: 10000 } } }
+    const big = { ...newDraft(TODAY, 'BRASA'), days: 1, units: { [TODAY]: { B1: 100_000 } } }
     expect(submittableDraft(TODAY).safeParse(big).success).toBe(false)
   })
 
-  it('las celdas aceptan solo dígitos (máximo 4)', () => {
+  it('las celdas aceptan solo dígitos (máximo 5)', () => {
     expect(parseCell('12a3')).toBe(123)
-    expect(parseCell('123456')).toBe(1234)
+    expect(parseCell('123456')).toBe(12345)
     expect(parseCell('')).toBeNull()
   })
 
