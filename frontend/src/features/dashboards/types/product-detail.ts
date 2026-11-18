@@ -17,6 +17,8 @@ export const ALL_ZONES_LABEL = 'Todas las zonas'
 export const NO_ZONE_LABEL = 'Sin zona'
 export const SIZE_COLUMN_LABEL = 'Tamaño'
 export const PRODUCT_COLUMN_LABEL = 'Producto'
+/** Columna de cada zona con lo que piden sus tiendas (no es un vendedor). */
+export const STORES_COLUMN_LABEL = 'Tiendas'
 export const TOTAL_UNITS_LABEL = 'Total (unid.)'
 export const TOTAL_KG_LABEL = 'Total (kg)'
 export const EMPTY_DETAIL_LABEL = 'No hay vendedores para este filtro.'

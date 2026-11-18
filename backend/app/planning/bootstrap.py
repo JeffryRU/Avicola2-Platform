@@ -27,7 +27,7 @@ from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.demand_model.store import SqlDemandModelStore
 from app.planning.infrastructure.events import event_bus
 from app.planning.infrastructure.forecast import OrderHistoryForecaster, WeekdayAverageForecaster
-from app.planning.infrastructure.orders import LoadedOrders
+from app.planning.infrastructure.orders import LoadedOrders, LoadedStoreOrders
 from app.planning.infrastructure.persistence.cached import (
     CachedProductRepository,
     CachedSellerRepository,
@@ -83,6 +83,7 @@ class PlanningUseCases:
     submit_projection: uc.SubmitProjection
     get_sales: uc.GetSales
     model_projections: uc.ModelProjections
+    store_orders: uc.GetStoreOrders
     model_summary: uc.GetModelSummary
     aris_status: ar.GetArisStatus
     import_aris: ar.ImportArisData
@@ -184,6 +185,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         model_projections=uc.ModelProjections(
             sellers, order_history, products, SqlDemandModelStore(session)
         ),
+        store_orders=uc.GetStoreOrders(LoadedStoreOrders(session), sellers, products),
         model_summary=uc.GetModelSummary(SqlDemandModelStore(session)),
         aris_status=ar.GetArisStatus(
             SqlArisData(session), SqlDemandModelStore(session), clock, settings.aris_warn_days

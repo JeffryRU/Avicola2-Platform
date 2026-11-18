@@ -7,9 +7,17 @@ import { nf0, nf1, toggleIn } from '@/shared/domain/format'
 import { isSupervisor } from '@/shared/domain/session'
 import { useRequiredSession } from '@/features/auth'
 import type { Catalog } from '@/features/catalog'
-import { dayColumns, productMatrix, sellerColumns, zoneColumns } from '@/features/dashboards/domain/product-matrix'
+import {
+  dayColumns,
+  isStores,
+  productMatrix,
+  sellerColumns,
+  zoneColumns,
+  zoneOfStores,
+  type MatrixEntry,
+} from '@/features/dashboards/domain/product-matrix'
 import { FilterMenu } from '@/features/dashboards/ui/components/filter-bar'
-import { choiceKey, useDetailSelection } from '@/features/dashboards/ui/hooks'
+import { choiceKey, useDetailSelection, useStoreEntries } from '@/features/dashboards/ui/hooks'
 import type { Projection } from '@/features/projections'
 import {
   ALL_ZONES_LABEL,
@@ -20,6 +28,7 @@ import {
   PRODUCT_COLUMN_LABEL,
   SIZE_COLUMN_LABEL,
   SIZE_FILTER_LABEL,
+  STORES_COLUMN_LABEL,
   TOTAL_KG_LABEL,
   TOTAL_UNITS_LABEL,
   WHOLE_PERIOD_LABEL,
@@ -37,7 +46,10 @@ import { DropdownMenuCheckboxItem, DropdownMenuSeparator } from '@/shared/ui/com
 import { daysCount } from '@/shared/types/labels'
 import { cn } from '@/shared/ui/lib/utils'
 
-/** «Detalle por producto»: filas por tamaño y producto; columnas por vendedor (agrupados por zona) o por día. */
+/**
+ * «Detalle por producto»: filas por tamaño y producto; columnas por vendedor (agrupados por zona, con
+ * las tiendas de cada zona al final) o por día.
+ */
 export function ProductDetail({
   dates: periodDates,
   custom,
@@ -66,24 +78,30 @@ export function ProductDetail({
       )
     : [me]
   const dates = f.days.length ? f.days : f.weekDays
+  // Las tiendas no son vendedores: si se filtra por vendedor, no van.
+  const stores = useStoreEntries(periodDates, sellers, f.zones)
+  // Solo las zonas con pedidos en los días que se muestran (el hook trae también el período anterior).
+  const storeZones = [...new Set(stores.filter((e) => dates.includes(e.date)).map((e) => zoneOfStores(e.seller)))]
+  const entries: MatrixEntry[] = [...projections, ...stores]
+  const inScope = (p: MatrixEntry) => isStores(p.seller) || shown.some((s) => s.username === p.seller)
 
   const columns = bySeller
-    ? sellerColumns(shown, dates, NO_ZONE_LABEL)
+    ? sellerColumns(shown, dates, NO_ZONE_LABEL, [], { zones: storeZones, label: STORES_COLUMN_LABEL })
     : supervisor && view === 'zone'
-      ? zoneColumns(shown, dates, NO_ZONE_LABEL)
+      ? zoneColumns(shown, dates, NO_ZONE_LABEL, [], storeZones)
       : granularityOf(dates.length) === 'day'
         ? dayColumns(dates, null, dShort).map((c) => ({
             ...c,
-            match: (p: Projection) => c.match(p) && shown.some((s) => s.username === p.seller),
+            match: (p: MatrixEntry) => c.match(p) && inScope(p),
           }))
         : // Período largo: una columna por semana o por mes.
           bucketsOf(dates).map((b) => ({
             key: b.key,
             label: bucketLabels(b, granularityOf(dates.length)).title,
             group: null,
-            match: (p: Projection) => b.dates.includes(p.date) && shown.some((s) => s.username === p.seller),
+            match: (p: MatrixEntry) => b.dates.includes(p.date) && inScope(p),
           }))
-  const m = productMatrix(columns, f.products, projections)
+  const m = productMatrix(columns, f.products, entries)
   const title = f.days.length
     ? `Detalle por producto · ${f.days.length > 2 ? daysCount(f.days.length) : f.days.map(dShort).join(', ')}`
     : `Detalle por producto (${custom ? 'período' : 'semana'})`
@@ -144,7 +162,11 @@ export function ProductDetail({
               {bySeller && (
                 <tr>
                   {m.columns.map((c) => (
-                    <th key={c.key} title={c.label} className={tableCls.th}>
+                    <th
+                      key={c.key}
+                      title={c.label}
+                      className={cn(tableCls.th, 'text-center first:pl-3 first:text-center dsk:first:pl-3')}
+                    >
                       {c.label.split(' ')[0]}
                     </th>
                   ))}

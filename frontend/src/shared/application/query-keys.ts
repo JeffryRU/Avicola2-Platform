@@ -51,6 +51,8 @@ export const queryKeys = {
     range: (from: string, to: string) => ['projections', from, to] as const,
     /** Lo que el modelo habría sugerido (GET /model-projections). */
     model: (from: string, to: string) => ['projections', 'model', from, to] as const,
+    /** Pedidos de las tiendas por zona (GET /store-orders). */
+    stores: (from: string, to: string) => ['projections', 'stores', from, to] as const,
   },
 
   suggestions: {

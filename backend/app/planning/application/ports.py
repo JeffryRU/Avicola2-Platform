@@ -132,6 +132,12 @@ class ConfirmedOrdersSource(Protocol):
     def units(self, day: date) -> dict[str, int]: ...
 
 
+class StoreOrderSource(Protocol):
+    """Líneas de los pedidos de las tiendas con entrega en el rango, con la zona del reporte."""
+
+    def lines(self, date_from: date, date_to: date) -> list[tuple[str | None, OrderLine]]: ...
+
+
 class SalesSource(Protocol):
     """Venta real por vendedor, día y producto (hoy simulada; luego, ERP o lakehouse)."""
 

@@ -42,6 +42,16 @@ export function useModelProjections(from: string, to: string) {
   })
 }
 
+/** Pedidos de las tiendas por zona y día (solo para quien ve al equipo). */
+export function useStoreOrders(from: string, to: string, enabled: boolean) {
+  const { projections: gateway } = useContainer()
+  return useQuery({
+    queryKey: queryKeys.projections.stores(from, to),
+    queryFn: () => gateway.storeOrders({ from, to }),
+    enabled,
+  })
+}
+
 export function useQueue() {
   const { queue } = useContainer()
   return useSyncExternalStore(

@@ -59,6 +59,11 @@ export const endpoints = {
     list: '/sales',
   },
 
+  storeOrders: {
+    /** GET ?date_from&date_to → lo que piden las tiendas por zona y día (solo supervisión). */
+    list: '/store-orders',
+  },
+
   aris: {
     /** GET → hasta qué día llegan los datos de ARIS y si conviene subir los que faltan. */
     status: '/aris/status',

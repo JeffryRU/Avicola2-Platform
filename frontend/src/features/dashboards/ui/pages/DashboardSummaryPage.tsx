@@ -11,10 +11,18 @@ import { useCatalog } from '@/features/catalog'
 import { BarChart, CountUp } from '@/shared/ui/components/charts'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { STATUS_LABEL, kgAmount, UNITS_SHORT } from '@/shared/types/labels'
-import { useDayPath, useDetailSelection, usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
+import {
+  useDayPath,
+  useDetailSelection,
+  usePeriodData,
+  useDashboardFilters,
+  useStoreEntries,
+} from '@/features/dashboards/ui/hooks'
+import { addStores } from '@/features/dashboards/domain/product-matrix'
 import { DetailFilterMenus, ProductDetail } from '@/features/dashboards/ui/components/product-detail'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
 import { onlyProducts } from '@/features/dashboards/domain/sheets'
+import type { Units } from '@/shared/domain/products'
 import { NO_ZONE_LABEL } from '@/features/dashboards/types/product-detail'
 
 /** Vendedor que no existe: para que un filtro sin coincidencias no muestre a todos. */
@@ -41,9 +49,12 @@ export function DashboardSummaryPage() {
   const ids = detail.selectedSizes.length ? detail.products.map((p) => p.id) : []
   const projections = onlyProducts(source.projections, ids)
   const sales = onlyProducts(source.sales, ids)
-  const allDays = periodAgg(period.dates, scope, projections, sales, catalog)
+  // Lo que piden las tiendas se suma a los totales y al gráfico (no a los días confirmados).
+  const stores = onlyProducts(useStoreEntries(period.dates, sellers, detail.zones), ids)
+  const kgOf = (u: Units) => catalog.kg(u)
+  const allDays = addStores(periodAgg(period.dates, scope, projections, sales, catalog), stores, kgOf)
   const days = detail.days.length ? allDays.filter((d) => detail.days.includes(d.date)) : allDays
-  const prevAll = periodAgg(previousDates(period), scope, projections, sales, catalog)
+  const prevAll = addStores(periodAgg(previousDates(period), scope, projections, sales, catalog), stores, kgOf)
   const prev = detail.days.length ? prevAll.filter((_, i) => detail.days.includes(allDays[i].date)) : prevAll
   // Variación contra los mismos días confirmados del período anterior.
   const same = prev.filter((_, i) => days[i].confirmed)
