@@ -33,14 +33,14 @@ describe('lectura de números escritos a mano', () => {
     )
   })
 
-  it('una celda de proyección acepta hasta 4 dígitos (máximo 9999)', () => {
+  it('una celda de proyección acepta hasta 5 dígitos (máximo 99,999)', () => {
     fc.assert(
       fc.property(typed, (raw) => {
-        const digits = typedDigits(raw).slice(0, 4)
+        const digits = typedDigits(raw).slice(0, 5)
         expect(parseCell(raw)).toBe(digits === '' ? null : Number(digits))
       }),
     )
-    expect(parseCell('12a345')).toBe(1234)
+    expect(parseCell('12a3456')).toBe(12345)
     expect(parseCell('  ')).toBeNull()
   })
 
@@ -56,7 +56,7 @@ describe('lectura de números escritos a mano', () => {
     expect(parseUnits('1 2a3')).toBe(123)
     expect(parseUnits('9999999')).toBe(1_000_000)
     expect(parseUnits('00012345678')).toBe(1234) // solo los 7 primeros dígitos
-    expect([CELL_MAX_DIGITS, RECORD_MAX_DIGITS, RECORD_MAX_UNITS]).toEqual([4, 7, 1_000_000])
+    expect([CELL_MAX_DIGITS, RECORD_MAX_DIGITS, RECORD_MAX_UNITS]).toEqual([5, 7, 1_000_000])
     expect(parseUnits('')).toBeNull()
   })
 })

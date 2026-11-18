@@ -111,7 +111,8 @@ def _number(value: Any, text: str, name: str) -> float:
 
 @dataclass(frozen=True)
 class KeepIf:
-    """Solo se toman las filas cuyo campo contiene todos estos textos (sin mirar mayúsculas)."""
+    """Solo se toman las filas cuyo campo contiene todos estos textos (sin mirar mayúsculas).
+    En `drop_if`, al revés: se descartan las que los contienen."""
 
     field: str
     contains: tuple[str, ...]
@@ -134,12 +135,13 @@ class FileSpec:
     # Campo que identifica la línea: el export la repite y se guarda una vez.
     unique: str | None = None
     keep_if: tuple[KeepIf, ...] = ()
+    drop_if: tuple[KeepIf, ...] = ()
     description: str = ""
     header_scan: int = 20
 
     def __post_init__(self) -> None:
         known = set(self.columns)
-        used = {*self.detect, *(k.field for k in self.keep_if)}
+        used = {*self.detect, *(k.field for k in (*self.keep_if, *self.drop_if))}
         used |= {f for f in (self.date_field, self.unique) if f}
         if unknown := used - known:
             raise ValueError(f"{self.key}: campos sin columna definida: {sorted(unknown)}")
@@ -167,7 +169,8 @@ class FileSpec:
         return positions
 
     def convert(self, cells: Sequence[Any], positions: dict[str, int]) -> dict[str, Any] | None:
-        """La fila con sus campos ya convertidos; None si no pasa `keep_if`. RowError si un
+        """La fila con sus campos ya convertidos; None si no pasa `keep_if` o cae en `drop_if`.
+        RowError si un
         valor no sirve."""
         row: dict[str, Any] = {}
         for name, spec in self.columns.items():
@@ -176,6 +179,10 @@ class FileSpec:
         for rule in self.keep_if:
             text = str(row[rule.field] or "").upper()
             if not all(part.upper() in text for part in rule.contains):
+                return None
+        for rule in self.drop_if:
+            text = str(row[rule.field] or "").upper()
+            if all(part.upper() in text for part in rule.contains):
                 return None
         return row
 

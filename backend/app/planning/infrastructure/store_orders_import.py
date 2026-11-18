@@ -5,8 +5,8 @@ unidades (CANTIDAD 2), kg (CANTIDAD 1) y RANGO («B7» = Brasa 7). Se guardan en
 pedidos de despacho, sin vendedor, para que el cálculo de saca los cuente como pedidos de ese día.
 
 SUPUESTOS (docs/assumptions.md): el rango Bn es la Brasa n; «Chico Tipo B» (B0 o sin rango) va a
-la Brasa 1, el producto más chico del catálogo. Cada carga reemplaza los pedidos de tiendas que ya
-estuvieran (los de ARIS no se tocan).
+la Brasa 1, el producto más chico del catálogo. Cada carga reemplaza los pedidos de tiendas de las
+fechas que trae el archivo; los de otras fechas y los de ARIS no se tocan. Los anulados no cuentan.
 """
 
 import re
@@ -40,7 +40,7 @@ def _brasa(rango: str | None, material: str, brasa: dict[int, Product]) -> Produ
 
 
 def load_store_orders(session: Session, path: Path, products: list[Product]) -> tuple[int, int]:
-    """Reemplaza los pedidos de tiendas con los del archivo. Devuelve (cargadas, descartadas).
+    """Reemplaza los pedidos de tiendas de las fechas del archivo. Devuelve (cargadas, descartadas).
 
     Las columnas del reporte están en config/imports.yaml (archivo «tiendas»)."""
     spec = file_spec("tiendas")
@@ -89,7 +89,13 @@ def load_store_orders(session: Session, path: Path, products: list[Product]) -> 
             }
         )
     t = dispatch_orders.c
-    session.execute(delete(dispatch_orders).where(t.material_code.startswith(STORE_CODE_PREFIX)))
+    days = {r["date"] for r in lines}
+    if days:
+        session.execute(
+            delete(dispatch_orders).where(
+                t.material_code.startswith(STORE_CODE_PREFIX), t.delivery_date.in_(days)
+            )
+        )
     if batch:
         session.execute(insert(dispatch_orders), batch)
     return len(batch), skipped

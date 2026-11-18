@@ -21,7 +21,7 @@
                         (producción). Antes ejecuta `init`. Reemplaza lo ya cargado
     uv run python -m app.planning.infrastructure.cli tiendas <archivo.xlsx>
                         pedidos de brasa de las tiendas («Proyección tiendas»: zona, fecha,
-                        CANTIDAD 2 y RANGO) para la saca de esos días; reemplaza los anteriores
+                        CANTIDAD 2 y RANGO) para la saca de esos días; reemplaza los de esas fechas
     uv run python -m app.planning.infrastructure.cli entrenar
                         entrena los modelos de demanda (ADR 0020) con la historia de ARIS y guarda
                         métricas y predicciones; el programador lo hace solo de madrugada

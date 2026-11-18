@@ -6,7 +6,7 @@ import type { Catalog } from '@/features/catalog'
 import type { MyDay } from '@/features/projections/domain/aggregation'
 
 export const MAX_DAYS = 7
-export const MAX_UNITS = 9999
+export const MAX_UNITS = 99_999
 
 /** Borrador de una nueva proyección (paso 1: fechas y categoría; paso 2: unidades). */
 export const draftSchema = z.object({

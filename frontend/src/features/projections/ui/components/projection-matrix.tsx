@@ -1,7 +1,7 @@
 import { Fragment } from 'react'
 import { Wand2 } from 'lucide-react'
 import { dShort, relativeDay, type IsoDate } from '@/shared/domain/dates'
-import { nf0, nf1, parseCell } from '@/shared/domain/format'
+import { CELL_MAX_DIGITS, nf0, nf1, parseCell } from '@/shared/domain/format'
 import { bySubcategory, type Product, type Units } from '@/shared/domain/products'
 import type { Draft } from '@/features/projections/domain/draft'
 import { tableStyles } from '@/shared/ui/lib/table-styles'
@@ -84,7 +84,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
           data-cell={`${d}|${p.id}`}
           inputMode="numeric"
           pattern="[0-9]*"
-          maxLength={4}
+          maxLength={CELL_MAX_DIGITS}
           placeholder={mobile ? '0' : undefined}
           value={v ?? ''}
           aria-label={`${p.name}, ${dShort(d)}, unidades`}
@@ -94,7 +94,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
           onFocus={(e) => e.target.select()}
           className={cn(
             ed.input({ size: mobile ? 'touch' : 'desktop', invalid: invalid.includes(d) }),
-            mobile ? 'w-14' : 'w-16',
+            mobile ? 'w-16' : 'w-[4.5rem]',
           )}
         />
         {mobile && (
