@@ -30,13 +30,16 @@ export const QUALITY_B_TAG = 'Calidad B'
 export const DISCARD_TAG = 'Descarte · no entra a la saca'
 export const REGISTER_STEPS_TITLE = 'Cómo registrar el stock'
 export const REGISTER_STEPS = [
-  'Elige el día arriba y la ubicación donde está el pollo.',
+  'Elige el día arriba. Por defecto se registra el stock general («Todas las ubicaciones»).',
   'Cada fila es un producto y cada columna un lote (su fecha de beneficio).',
   'Escribe las unidades que quedaron; los kg se calculan solos.',
   'Toca «Guardar stock». Puedes volver a corregirlo hasta 7 días después.',
 ] as const
-/** Los mismos pasos cuando el stock es general (no se elige ubicación). */
+/** Los mismos pasos cuando hay una sola ubicación (no se elige). */
 export const REGISTER_STEPS_GENERAL = ['Elige el día arriba.', ...REGISTER_STEPS.slice(1)] as const
+/** Al registrar con «Todas las ubicaciones»: se guarda el stock general. */
+export const GENERAL_STOCK_NOTE =
+  'Con «Todas las ubicaciones» se registra el stock general. Elige una ubicación solo si cuentas por ubicación.'
 export const BY_LOCATION_TITLE = 'Por ubicación'
 
 export const COLUMNS = {

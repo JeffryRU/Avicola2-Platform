@@ -177,10 +177,11 @@ def test_only_the_general_supervisor_creates_dispatch_chiefs(client) -> None:
 
 
 def test_stock_is_general_by_default(client) -> None:
+    """«General» va primero (en la app, «Todas las ubicaciones»); una ubicación que no existe no."""
     _login(client, "despacho")
-    assert client.get("/api/stock/options").json()["locations"] == ["General"]
+    assert client.get("/api/stock/options").json()["locations"][:2] == ["General", "Trujillo"]
     lines = [{"product_id": "P0001", "units": 5}]
-    r = client.put(f"/api/stock/{TODAY}", json={"location": "Trujillo", "lines": lines})
+    r = client.put(f"/api/stock/{TODAY}", json={"location": "Lima", "lines": lines})
     assert r.status_code == 422
 
 
