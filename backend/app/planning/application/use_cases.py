@@ -294,18 +294,23 @@ class SuggestProjection:
         username = visible_seller(seller, on_behalf) or seller.username
         if not 1 <= days <= self.max_days:
             raise DomainError(f"Debe pedir entre 1 y {self.max_days} días.")
-        Catalog(self.products.list_active()).of(category)  # valida la categoría
+        ids = set(Catalog(self.products.list_active()).of(category))  # valida la categoría
         dates = [start + timedelta(days=i) for i in range(days)]
-        if self.store and category == ORDER_CATEGORY:
+        if self.store:
+            # El modelo guarda, por vendedor y día, todos los productos que aprende (la brasa y el
+            # pollo sin menudencia): de cada día se toman solo los de esta categoría.
             model = suggestion_model(self.store)
             stored = (
-                {d.date: d for d in self.store.predictions(model, dates[0], dates[-1], username)}
+                {
+                    d.date: {pid: n for pid, n in d.units.items() if pid in ids}
+                    for d in self.store.predictions(model, dates[0], dates[-1], username)
+                }
                 if model
                 else {}
             )
-            if stored and all(d in stored for d in dates):
+            if stored and all(d in stored for d in dates) and any(stored.values()):
                 self.method = self.STORED_METHOD
-                return [DailyUnits(username, d, stored[d].units) for d in dates]
+                return [DailyUnits(username, d, stored[d]) for d in dates]
         result = self.forecaster.suggest(username, category, dates)
         self.method = self.forecaster.name
         return result

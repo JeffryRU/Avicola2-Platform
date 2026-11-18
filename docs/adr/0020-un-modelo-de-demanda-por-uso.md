@@ -44,3 +44,10 @@ Un modelo por uso, elegido con validación + prueba:
   - Desde el aviso de la app (`POST /api/aris/import`), hasta 4 MB (un día o una semana), porque la subida pasa por Vercel, que corta los cuerpos de más de 4,5 MB. El aviso aparece solo a quien tiene `load_aris` y solo cuando faltan días; no es obligatorio.
   - Por n8n, a `POST /api/internal/aris`, desde tres medios: una carpeta de Google Drive (`04_drive_aris`), un bot de Telegram (`05_telegram_aris`, hasta 20 MB) o WhatsApp Business (`06_whatsapp_aris`, hasta 100 MB). Los bots solo aceptan los chats y números autorizados (`ARIS_TELEGRAM_CHAT_IDS`, `ARIS_WHATSAPP_NUMBERS`) y responden con lo cargado o con el error.
 - **Cada carga reemplaza solo las fechas que trae el archivo** y pide el reentrenamiento. El programador lo atiende en su próxima vuelta, fuera de la petición y con 2 núcleos, aunque no sea de madrugada.
+
+## Actualización (18/11/2026): grupos del negocio y pollo sin menudencia
+
+- **Tamaños:** el modelo de saca por tamaño suma con los grupos del negocio: chica = Brasa 1–4, mediana = 5–6, grande = 7–10.
+- **Pollo sin menudencia (P0012):** también se proyecta, así que el modelo lo aprende como un producto más del cubo. Sus pedidos se reconocen en ARIS por el material «POLLO ENTERO CARNE SIN MENUDENCIA» (`EXTRA_MATERIALS` en `domain/orders.py`).
+  - Las métricas y la serie del equipo siguen siendo solo de la brasa, para poder compararlas con las corridas anteriores.
+  - La sugerencia de cada categoría toma de la predicción guardada solo sus productos.
