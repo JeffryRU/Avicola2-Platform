@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.planning.domain.file_specs import RowIssues
 from app.planning.domain.models import Product
+from app.planning.domain.orders import ORDER_CATEGORY
 from app.planning.infrastructure.file_specs import file_spec
 from app.planning.infrastructure.persistence.tables import dispatch_orders
 from app.planning.infrastructure.tabular import match, open_workbook, records
@@ -46,7 +47,7 @@ def load_store_orders(session: Session, path: Path, products: list[Product]) -> 
     brasa = {}
     for p in products:
         number = re.search(r"(\d+)$", p.name)
-        if p.category == "BRASA" and number and p.is_projectable:
+        if p.category == ORDER_CATEGORY and number and p.is_projectable:
             brasa[int(number.group(1))] = p
     book = open_workbook(path)
     try:

@@ -1,0 +1,21 @@
+# Feriados de Perú que usa el modelo de demanda: la demanda de pollo a la brasa cambia esos días
+# y alrededor. Agregar los del año siguiente cuando se publiquen (formato AAAA-MM-DD).
+feriados:
+  - 2025-12-08
+  - 2025-12-25
+  - 2026-01-01
+  - 2026-04-02
+  - 2026-04-03
+  - 2026-05-01
+  - 2026-06-07
+  - 2026-06-29
+  - 2026-07-23
+  - 2026-07-28
+  - 2026-07-29
+  - 2026-08-06
+  - 2026-08-30
+  - 2026-10-08
+  - 2026-11-01
+  - 2026-12-08
+  - 2026-12-09
+  - 2026-12-25

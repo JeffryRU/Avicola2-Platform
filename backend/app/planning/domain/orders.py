@@ -14,9 +14,6 @@ from app.planning.domain.models import BRASA_CATEGORY, Product
 # Solo el pollo entero para brasa: los marinados y macerados son otros productos.
 ORDER_MATERIAL_PREFIX = "POLLO ENTERO BRASA"
 ORDER_CATEGORY = BRASA_CATEGORY
-# Otros productos que se proyectan, con el material de ARIS de sus pedidos (el modelo de demanda
-# también los aprende): el pollo entero sin menudencia.
-EXTRA_MATERIALS = {"P0012": "POLLO ENTERO CARNE SIN MENUDENCIA"}
 # Clave de la predicción general del modelo: lo de un vendedor típico del equipo (el promedio de los
 # vendedores que aprende). La recibe quien aún no tiene historia propia en ARIS (un vendedor nuevo).
 GENERAL_SELLER = "*equipo*"

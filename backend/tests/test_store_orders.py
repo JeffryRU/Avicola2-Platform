@@ -22,7 +22,9 @@ ZONES = ["Chiclayo", "Piura", "San Martín", "Trujillo"]
 
 
 def test_report_zones_take_the_sellers_names() -> None:
-    assert sales_zone("LA LIBERTAD", ZONES) == "Trujillo"
+    aliases = {"LA LIBERTAD": "Trujillo"}  # STORE_ZONE_ALIASES
+    assert sales_zone("LA LIBERTAD", ZONES, aliases) == "Trujillo"
+    assert sales_zone("LA LIBERTAD", ZONES) == "La Libertad"  # sin el alias, queda tal cual
     assert sales_zone("SAN MARTIN", ZONES) == "San Martín"
     assert sales_zone(" piura ", ZONES) == "Piura"
     assert sales_zone("LIMA NORTE", ZONES) == "Lima Norte"

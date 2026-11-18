@@ -128,20 +128,19 @@ class Settings(BaseSettings):
     # Conversión de kg de producto a saca (pollo vivo). Valores de referencia por validar.
     yield_factor: float = Field(DEFAULT_YIELD_FACTOR, gt=0, le=1)
     avg_live_weight_kg: float = Field(DEFAULT_AVG_LIVE_WEIGHT_KG, gt=0)
-    # Ubicaciones del stock de despacho (STOCK_LOCATIONS, JSON). «General» es el stock que se sube
-    # de forma general: en la app es «Todas las ubicaciones», la opción por defecto. Las demás
-    # (SUPUESTO: las zonas con más pedidos) se eligen si se cuenta por ubicación. Con una sola
-    # ubicación, la app no muestra el filtro.
-    stock_locations: list[str] = Field(
-        default_factory=lambda: [
-            "General",
-            "Trujillo",
-            "Piura",
-            "Chiclayo",
-            "Chimbote",
-            "San Martín",
-        ]
+    # Otros productos que se proyectan y el modelo de demanda también aprende, con el material de
+    # ARIS de sus pedidos (DEMAND_EXTRA_MATERIALS, JSON): el pollo entero sin menudencia.
+    demand_extra_materials: dict[str, str] = Field(
+        default_factory=lambda: {"P0012": "POLLO ENTERO CARNE SIN MENUDENCIA"}
     )
+    # Zonas que el reporte de pedidos en tienda nombra distinto que los vendedores
+    # (STORE_ZONE_ALIASES, JSON): la región por la zona de venta.
+    store_zone_aliases: dict[str, str] = Field(default_factory=lambda: {"LA LIBERTAD": "Trujillo"})
+    # Ubicaciones del stock de despacho, además de «General» (el stock que se sube de forma
+    # general; en la app, «Todas las ubicaciones») y de las zonas de los vendedores activos, que se
+    # suman solas (una zona nueva, p. ej. Huaraz, aparece sin configurar nada). STOCK_LOCATIONS
+    # (JSON) es para lugares que no son la zona de ningún vendedor.
+    stock_locations: list[str] = Field(default_factory=list)
     # Para la saca solo cuenta el stock de lotes de hasta estos días (lo más antiguo se troza).
     saca_stock_lot_days: int = Field(3, ge=0, le=30)
     # Hora (local) desde la que el programador guarda la saca del día como la del cierre.

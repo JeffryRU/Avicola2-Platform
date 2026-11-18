@@ -68,3 +68,16 @@ def check_lot_date(lot: date, day: date) -> None:
         raise DomainError("Un lote no puede ser posterior al día del stock.")
     if lot < day - timedelta(days=MAX_LOT_AGE_DAYS):
         raise DomainError(f"Un lote no puede tener más de {MAX_LOT_AGE_DAYS} días.")
+
+
+def stock_locations(configured: list[str], zones: list[str | None]) -> list[str]:
+    """Ubicaciones del stock: «General» (el stock que se sube de forma general), las configuradas
+    y las zonas de los vendedores activos. Una zona nueva (p. ej. Huaraz) aparece sola."""
+    seen: dict[str, str] = {}
+    for place in [
+        DEFAULT_LOCATION,
+        *configured,
+        *sorted(z.strip() for z in zones if z and z.strip()),
+    ]:
+        seen.setdefault(place.casefold(), place)
+    return list(seen.values())

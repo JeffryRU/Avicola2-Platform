@@ -190,7 +190,9 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         model_projections=uc.ModelProjections(
             sellers, order_history, products, SqlDemandModelStore(session)
         ),
-        store_orders=uc.GetStoreOrders(LoadedStoreOrders(session), sellers, products),
+        store_orders=uc.GetStoreOrders(
+            LoadedStoreOrders(session), sellers, products, settings.store_zone_aliases
+        ),
         model_summary=uc.GetModelSummary(SqlDemandModelStore(session)),
         aris_status=ar.GetArisStatus(
             SqlArisData(session), SqlDemandModelStore(session), clock, settings.aris_warn_days
@@ -225,10 +227,10 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         update_cutoff=ed.UpdateCutoff(editing, event_bus, clock),
         grant_editing=ed.GrantEditing(editing, unlocks, sellers, notifier, event_bus, clock),
         revoke_editing=ed.RevokeEditing(unlocks, sellers, notifier, event_bus, clock),
-        register_stock=st.RegisterStock(products, stock, clock, settings.stock_locations),
+        register_stock=st.RegisterStock(products, stock, clock, settings.stock_locations, sellers),
         list_stock=st.ListStock(stock),
         stock_options=st.GetStockOptions(
-            products, settings.stock_locations, settings.saca_stock_lot_days
+            products, settings.stock_locations, settings.saca_stock_lot_days, sellers
         ),
         calculate_saca=sc.CalculateSaca(
             products,

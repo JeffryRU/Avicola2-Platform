@@ -257,9 +257,14 @@ class GetStoreOrders:
     """Lo que piden las tiendas por zona y día, en unidades de los productos de brasa."""
 
     def __init__(
-        self, source: StoreOrderSource, sellers: SellerRepository, products: ProductRepository
+        self,
+        source: StoreOrderSource,
+        sellers: SellerRepository,
+        products: ProductRepository,
+        zone_aliases: dict[str, str] | None = None,
     ):
         self.source, self.sellers, self.products = source, sellers, products
+        self.zone_aliases = zone_aliases or {}
 
     def __call__(self, viewer: Seller, date_from: date, date_to: date) -> list[StoreOrderDay]:
         require(viewer.role, Permission.VIEW_TEAM)
@@ -268,7 +273,7 @@ class GetStoreOrders:
         products = [p for p in self.products.list_active() if p.category == ORDER_CATEGORY]
         by_zone: dict[str | None, list[OrderLine]] = {}
         for raw, line in self.source.lines(date_from, date_to):
-            by_zone.setdefault(sales_zone(raw, zones), []).append(line)
+            by_zone.setdefault(sales_zone(raw, zones, self.zone_aliases), []).append(line)
         out = []
         for zone, lines in sorted(by_zone.items(), key=lambda kv: kv[0] or ""):
             for day, units in sorted(daily_units(lines, products).items()):
