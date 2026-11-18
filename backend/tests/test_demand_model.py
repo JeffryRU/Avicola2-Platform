@@ -19,7 +19,12 @@ from app.shared.infrastructure.database.session import SessionLocal, engine
 
 START = date(2026, 1, 5)
 DAYS = 160
-MATERIALS = ["POLLO ENTERO BRASA (1.60-1.69)", "POLLO ENTERO BRASA (1.80-1.89)"]
+MATERIALS = [
+    "POLLO ENTERO BRASA (1.60-1.69)",
+    "POLLO ENTERO BRASA (1.80-1.89)",
+    # El pollo sin menudencia también se proyecta: el modelo lo aprende por su material.
+    "POLLO ENTERO CARNE SIN MENUDENCIA (-)",
+]
 
 
 def _history(session) -> None:
@@ -106,6 +111,15 @@ def test_summary_is_for_supervision_and_suggestion_uses_the_model(trained) -> No
     assert r.status_code == 200, r.text
     assert r.json()["method"] == "modelo_entrenado"
     assert any(day["units"] for day in r.json()["days"])
+    assert all("P0012" not in day["units"] for day in r.json()["days"])
+    # El pollo sin menudencia tiene su propia sugerencia del modelo (solo con su producto).
+    params = {"category": "Pollo de mercado", "start": first, "days": 2}
+    r = client.get("/api/suggestions", params=params)
+    assert r.status_code == 200, r.text
+    assert r.json()["method"] == "modelo_entrenado"
+    days = r.json()["days"]
+    assert any(day["units"].get("P0012") for day in days)
+    assert all(set(day["units"]) <= {"P0012"} for day in days)
     # Fuera de los días pronosticados, la sugerencia de siempre.
     later = str(START + timedelta(days=DAYS + 30))
     r = client.get("/api/suggestions", params={"category": "BRASA", "start": later, "days": 1})

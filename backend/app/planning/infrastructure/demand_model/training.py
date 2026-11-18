@@ -17,12 +17,18 @@ from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 
 import numpy as np
-from sqlalchemy import delete, func, insert, select
+from sqlalchemy import delete, func, insert, or_, select
 from sqlalchemy.orm import Session
 from threadpoolctl import threadpool_limits
 
 from app.planning.domain.models import Product
-from app.planning.domain.orders import ORDER_CATEGORY, ORDER_MATERIAL_PREFIX, OrderLine, product_for
+from app.planning.domain.orders import (
+    EXTRA_MATERIALS,
+    ORDER_CATEGORY,
+    ORDER_MATERIAL_PREFIX,
+    OrderLine,
+    product_for,
+)
 from app.planning.infrastructure.demand_model import core
 from app.planning.infrastructure.persistence.tables import (
     dispatch_orders,
@@ -64,22 +70,37 @@ def choose(metrics: dict[str, dict[str, float]]) -> dict[str, str]:
     return {use: min(candidates, key=lambda k: metrics[k][level]) for use, level in USES.items()}
 
 
+def _extra_product(material: str, extras: list[Product]) -> Product | None:
+    text = material.upper()
+    return next((p for p in extras if text.startswith(EXTRA_MATERIALS[p.id])), None)
+
+
 def _cubes(session: Session, products: list[Product]):
-    """Unidades despachadas por (vendedor, producto, día) y por (cliente, producto, día)."""
+    """Unidades despachadas por (vendedor, producto, día) y por (cliente, producto, día).
+
+    Los productos son las brasas (por peso) y, al final, los otros que se proyectan
+    (`EXTRA_MATERIALS`): sus líneas de ARIS se reconocen por el material."""
     brasa = sorted(
         (p for p in products if p.category == ORDER_CATEGORY), key=lambda p: p.kg_per_unit
     )
-    pos = {p.id: i for i, p in enumerate(brasa)}
+    extras = [p for p in products if p.id in EXTRA_MATERIALS]
+    items = [*brasa, *extras]
+    pos = {p.id: i for i, p in enumerate(items)}
     t = dispatch_orders.c
+    upper = func.upper(t.material)
+    wanted = or_(
+        upper.startswith(ORDER_MATERIAL_PREFIX, autoescape=True),
+        *(upper.startswith(EXTRA_MATERIALS[p.id], autoescape=True) for p in extras),
+    )
     rows = session.execute(
         select(
             t.seller, t.customer, t.delivery_date, t.material, t.ordered_kg, t.ordered_units,
             t.dispatched_kg, t.dispatched_units,
-        ).where(func.upper(t.material).startswith(ORDER_MATERIAL_PREFIX, autoescape=True))
+        ).where(wanted)
     ).all()  # fmt: skip
     lines = []
     for seller, customer, day, *rest in rows:
-        product = product_for(OrderLine(day, *rest), brasa)
+        product = _extra_product(rest[0], extras) or product_for(OrderLine(day, *rest), brasa)
         if product is None:
             continue
         units = rest[4] or rest[3] / product.kg_per_unit  # despachado (o kg / peso)
@@ -96,7 +117,7 @@ def _cubes(session: Session, products: list[Product]):
         active[s].add(d)
     every = sorted(active)
     core_sellers = [s for s in every if s != UNASSIGNED.lower() and len(active[s]) >= MIN_DAYS]
-    YA = np.zeros((len(every), len(brasa), len(days)))
+    YA = np.zeros((len(every), len(items), len(days)))
     for s, _, d, p, u in lines:
         YA[every.index(s), p, at[d]] += u
     # Clientes de los vendedores principales (su vendedor más frecuente).
@@ -105,7 +126,7 @@ def _cubes(session: Session, products: list[Product]):
         if s in core_sellers:
             owner_count[c][s] += 1
     customers = sorted(owner_count)
-    C = np.zeros((len(customers), len(brasa), len(days)))
+    C = np.zeros((len(customers), len(items), len(days)))
     cidx = {c: i for i, c in enumerate(customers)}
     for s, c, d, p, u in lines:
         if c in cidx and s in core_sellers:
@@ -114,7 +135,7 @@ def _cubes(session: Session, products: list[Product]):
         [core_sellers.index(max(owner_count[c], key=owner_count[c].get)) for c in customers]
     )
     idx = np.array([every.index(s) for s in core_sellers])
-    return YA, idx, core_sellers, days, C, owner, brasa
+    return YA, idx, core_sellers, days, C, owner, items, len(brasa)
 
 
 def train(session: Session, products: list[Product], threads: int = TRAIN_THREADS) -> dict | None:
@@ -130,7 +151,7 @@ def _train(session: Session, products: list[Product]) -> dict | None:
     cubes = _cubes(session, products)
     if cubes is None:
         return None
-    YA, idx, sellers, days, C, owner, brasa = cubes
+    YA, idx, sellers, days, C, owner, items, n_brasa = cubes
     Y = YA[idx]
     S, P, N = Y.shape
     usable = list(range(core.FIRST, N))
@@ -202,8 +223,13 @@ def _train(session: Session, products: list[Product]) -> dict | None:
         preds["robusta"][d] = np.mean([preds[k][d] for k in ROBUST], axis=0)
 
     evaluated = val_d + test_d
-    A = Y[:, :, evaluated]
-    metrics = {k: core.wape(np.stack([preds[k][d] for d in evaluated], axis=2), A) for k in MODELS}
+    # Las métricas y la serie del equipo son de la brasa (comparables con las corridas anteriores);
+    # los otros productos se predicen igual y se guardan para la sugerencia.
+    B = slice(0, n_brasa)
+    A = Y[:, B, evaluated]
+    metrics = {
+        k: core.wape(np.stack([preds[k][d][:, B] for d in evaluated], axis=2), A) for k in MODELS
+    }
     chosen = choose(metrics)
     summary = {
         "trained_at": datetime.now(UTC).isoformat(),
@@ -226,15 +252,15 @@ def _train(session: Session, products: list[Product]) -> dict | None:
         "series": [
             {
                 "date": days[d].isoformat(),
-                "real": float(Y[:, :, d].sum()),
-                "actual": float(preds[BASELINE][d].sum()),
-                **{use: float(preds[k][d].sum()) for use, k in chosen.items()},
+                "real": float(Y[:, B, d].sum()),
+                "actual": float(preds[BASELINE][d][:, B].sum()),
+                **{use: float(preds[k][d][:, B].sum()) for use, k in chosen.items()},
             }
             for d in evaluated
         ],
     }
     stored = sorted({BASELINE, *chosen.values()})
-    _save(session, summary, preds, stored, evaluated + future, days, sellers, brasa)
+    _save(session, summary, preds, stored, evaluated + future, days, sellers, items)
     logger.info(
         "Modelo de demanda entrenado: %d vendedores, %s a %s",
         S, summary["data_from"], summary["data_to"],
