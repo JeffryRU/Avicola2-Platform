@@ -23,6 +23,10 @@ export type Projection = z.infer<typeof projectionSchema>
 export const dailyUnitsSchema = z.object({ seller: z.string(), date: isoDateSchema, units: unitsSchema })
 export type DailyUnits = z.infer<typeof dailyUnitsSchema>
 
+/** Lo que piden las tiendas de una zona un día (reporte de pedidos en tienda). */
+export const storeOrderSchema = z.object({ zone: z.string().nullable(), date: isoDateSchema, units: unitsSchema })
+export type StoreOrder = z.infer<typeof storeOrderSchema>
+
 export const suggestionSchema = z.object({ method: z.string(), days: z.array(dailyUnitsSchema) })
 export type Suggestion = z.infer<typeof suggestionSchema>
 

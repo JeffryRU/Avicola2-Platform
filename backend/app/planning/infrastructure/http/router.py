@@ -410,6 +410,16 @@ def model_projections(
     return [s.DailyUnitsOut(**asdict(d)) for d in found]
 
 
+@router.get("/store-orders")
+def store_orders(
+    use_cases: UseCases, viewer: CurrentSeller, date_from: DateFrom, date_to: DateTo
+) -> list[s.StoreOrderDayOut]:
+    """Lo que piden las tiendas por zona y día (reporte de pedidos en tienda): en los
+    dashboards va como una columna «Tiendas» junto a los vendedores de cada zona."""
+    found = use_cases.store_orders(viewer, date_from, date_to)
+    return [s.StoreOrderDayOut(**asdict(d)) for d in found]
+
+
 @router.get("/aris/status")
 def aris_status(use_cases: UseCases, viewer: CurrentSeller) -> dict[str, Any]:
     """Hasta qué día llegan los datos de ARIS y si conviene subir los que faltan (no es

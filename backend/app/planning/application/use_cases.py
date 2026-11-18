@@ -21,13 +21,15 @@ from app.planning.application.ports import (
     ProjectionRepository,
     SalesSource,
     SellerRepository,
+    StoreOrderSource,
 )
 from app.planning.domain.catalog import Catalog
 from app.planning.domain.dates import check_range
 from app.planning.domain.history import CREATED, UPDATED, ProjectionChange
 from app.planning.domain.models import SELLER, DailyUnits, Product, Projection, Seller
-from app.planning.domain.orders import ORDER_CATEGORY, daily_units, weekday_median
+from app.planning.domain.orders import ORDER_CATEGORY, OrderLine, daily_units, weekday_median
 from app.planning.domain.permissions import Permission, require
+from app.planning.domain.store_orders import StoreOrderDay, sales_zone
 from app.shared.domain.errors import DomainError, ForbiddenError
 
 logger = logging.getLogger(__name__)
@@ -229,6 +231,31 @@ class GetSales:
     ) -> list[DailyUnits]:
         check_range(date_from, date_to)
         return self.sales.daily_units(date_from, date_to, visible_seller(viewer, seller))
+
+
+class GetStoreOrders:
+    """Lo que piden las tiendas por zona y día, en unidades de los productos de brasa."""
+
+    def __init__(
+        self, source: StoreOrderSource, sellers: SellerRepository, products: ProductRepository
+    ):
+        self.source, self.sellers, self.products = source, sellers, products
+
+    def __call__(self, viewer: Seller, date_from: date, date_to: date) -> list[StoreOrderDay]:
+        require(viewer.role, Permission.VIEW_TEAM)
+        check_range(date_from, date_to)
+        zones = sorted({s.zone for s in self.sellers.list_active() if s.zone})
+        products = [p for p in self.products.list_active() if p.category == ORDER_CATEGORY]
+        by_zone: dict[str | None, list[OrderLine]] = {}
+        for raw, line in self.source.lines(date_from, date_to):
+            by_zone.setdefault(sales_zone(raw, zones), []).append(line)
+        out = []
+        for zone, lines in sorted(by_zone.items(), key=lambda kv: kv[0] or ""):
+            for day, units in sorted(daily_units(lines, products).items()):
+                rounded = {pid: round(n) for pid, n in units.items() if round(n) > 0}
+                if rounded:
+                    out.append(StoreOrderDay(zone, day, rounded))
+        return out
 
 
 class SuggestProjection:

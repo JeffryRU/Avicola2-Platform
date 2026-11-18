@@ -3,6 +3,7 @@ import type { Draft } from '@/features/projections/domain/draft'
 import type {
   DailyUnits,
   Projection,
+  StoreOrder,
   Submission,
   SubmissionResult,
   Suggestion,
@@ -20,6 +21,8 @@ export interface ProjectionsGateway {
   sales(range: DateRange): Promise<DailyUnits[]>
   /** Lo que el modelo habría sugerido cada día, con la historia anterior (por vendedor). */
   modelProjections(range: DateRange): Promise<DailyUnits[]>
+  /** Pedidos de las tiendas por zona y día (solo supervisión). */
+  storeOrders(range: DateRange): Promise<StoreOrder[]>
   /** `seller`: solo el supervisor, para la sugerencia de un vendedor. */
   suggestions(category: string, start: IsoDate, days: number, seller?: string): Promise<Suggestion>
   submit(submission: Submission): Promise<SubmissionResult>

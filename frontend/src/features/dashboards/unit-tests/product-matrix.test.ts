@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Seller } from '@/shared/domain/session'
 import { Catalog } from '@/features/catalog'
 import { dayColumns, productMatrix, sellerColumns, zonesOf } from '@/features/dashboards/domain/product-matrix'
-import type { Projection } from '@/features/projections'
+import type { Projection, StoreOrder } from '@/features/projections'
 
 const catalog = new Catalog([
   { id: 'P1', category: 'BRASA', name: 'Brasa 1', kg_per_unit: 1, sort_order: 0, subcategory: 'Brasa chica' },
@@ -108,5 +108,40 @@ describe('columnas por zona', () => {
     const products = [{ id: 'P1', category: 'BRASA', name: 'Brasa 1', kg_per_unit: 1, sort_order: 0 }]
     const m = productMatrix(cols, products, [p('a', 2), p('b', 3), p('c', 4)])
     expect(m.cells).toEqual([4, 5])
+  })
+})
+
+describe('tiendas en el detalle', () => {
+  const ORDERS: StoreOrder[] = [
+    { zone: 'Trujillo', date: TUE, units: { P1: 7 } },
+    { zone: 'Chiclayo', date: TUE, units: { P5: 2 } },
+  ]
+
+  it('cada zona con pedidos suma una columna «Tiendas» al final de sus vendedores', async () => {
+    const { storeEntries } = await import('@/features/dashboards/domain/product-matrix')
+    const stores = { zones: ['Trujillo', 'Chiclayo'], label: 'Tiendas' }
+    const cols = sellerColumns(SELLERS, [MON, TUE], 'Sin zona', [], stores)
+    expect(cols.map((c) => [c.group, c.label])).toEqual([
+      ['Chiclayo', 'Tiendas'],
+      ['Piura', 'Miguel'],
+      ['Trujillo', 'César'],
+      ['Trujillo', 'Roberto'],
+      ['Trujillo', 'Tiendas'],
+    ])
+    const m = productMatrix(cols, catalog.products, [...DATA, ...storeEntries(ORDERS, 'Sin zona')])
+    expect(m.cells).toEqual([2, 0, 5, 6, 7])
+    expect(m.headerGroups).toEqual([
+      { name: 'Chiclayo', span: 1 },
+      { name: 'Piura', span: 1 },
+      { name: 'Trujillo', span: 3 },
+    ])
+  })
+
+  it('por zona, las tiendas se suman a la zona', async () => {
+    const { storeEntries, zoneColumns } = await import('@/features/dashboards/domain/product-matrix')
+    const cols = zoneColumns(SELLERS, [TUE], 'Sin zona', [], ['Trujillo', 'Chiclayo'])
+    const m = productMatrix(cols, catalog.products, [...DATA, ...storeEntries(ORDERS, 'Sin zona')])
+    expect(cols.map((c) => c.label)).toEqual(['Chiclayo', 'Piura', 'Trujillo'])
+    expect(m.cells).toEqual([2, 0, 13])
   })
 })

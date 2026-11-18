@@ -161,6 +161,12 @@ class DailyUnitsOut(BaseModel):
     units: dict[str, int]
 
 
+class StoreOrderDayOut(BaseModel):
+    zone: str | None
+    date: date
+    units: dict[str, int]
+
+
 class SuggestionOut(BaseModel):
     method: str
     days: list[DailyUnitsOut]

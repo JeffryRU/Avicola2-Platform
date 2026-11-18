@@ -2,14 +2,35 @@ import type { IsoDate } from '@/shared/domain/dates'
 import type { Seller } from '@/shared/domain/session'
 import { bySubcategory, type Product } from '@/shared/domain/products'
 import { CONFIRMED } from '@/shared/types/labels'
-import type { Projection } from '@/features/projections'
+import type { Projection, StoreOrder } from '@/features/projections'
 
-/** Una columna de la tabla: qué proyecciones suma y bajo qué encabezado agrupado va. */
+/** Lo que suma la tabla: la proyección de un vendedor o lo que piden las tiendas de una zona. */
+export type MatrixEntry = Pick<Projection, 'seller' | 'date' | 'status' | 'units'>
+
+/** Una columna de la tabla: qué entradas suma y bajo qué encabezado agrupado va. */
 export interface MatrixColumn {
   key: string
   label: string
   group: string | null
-  match: (p: Projection) => boolean
+  match: (p: MatrixEntry) => boolean
+}
+
+/** Las tiendas de cada zona van como un «vendedor» más de la zona (no es una cuenta). */
+const STORES_PREFIX = 'tiendas:'
+export const storesOf = (zone: string) => `${STORES_PREFIX}${zone}`
+export const isStores = (seller: string) => seller.startsWith(STORES_PREFIX)
+/** Zona de una entrada de tiendas. */
+export const zoneOfStores = (seller: string) => seller.slice(STORES_PREFIX.length)
+
+/** Los pedidos de tiendas como entradas confirmadas de la zona (`zone` vacía → `noZone`). */
+export const storeEntries = (orders: StoreOrder[], noZone: string): MatrixEntry[] =>
+  orders.map((o) => ({ seller: storesOf(o.zone ?? noZone), date: o.date, status: CONFIRMED, units: o.units }))
+
+/** Columna «Tiendas» de una zona. */
+export interface StoresColumns {
+  /** Zonas con pedidos de tiendas. */
+  zones: readonly string[]
+  label: string
 }
 
 export interface MatrixRow {
@@ -31,7 +52,7 @@ export interface ProductMatrix {
 }
 
 /** Suma las proyecciones confirmadas de cada producto en cada columna. */
-export function productMatrix(columns: MatrixColumn[], products: Product[], projections: Projection[]): ProductMatrix {
+export function productMatrix(columns: MatrixColumn[], products: Product[], projections: MatrixEntry[]): ProductMatrix {
   const confirmed = projections.filter((p) => p.status === CONFIRMED)
   const perColumn = columns.map((c) => confirmed.filter(c.match))
   const row = (product: Product): MatrixRow => {
@@ -57,38 +78,56 @@ export function productMatrix(columns: MatrixColumn[], products: Product[], proj
   }
 }
 
-/** Una columna por vendedor, agrupadas por zona (zonas y nombres en orden alfabético). `zones` vacía = todas. */
+/**
+ * Una columna por vendedor, agrupadas por zona (zonas y nombres en orden alfabético), y al final
+ * de cada zona la de sus tiendas si tiene pedidos. `zones` vacía = todas.
+ */
 export function sellerColumns(
   sellers: Seller[],
   dates: IsoDate[],
   noZone: string,
   zones: readonly string[] = [],
+  stores?: StoresColumns,
 ): MatrixColumn[] {
   const days = new Set(dates)
   const pick = new Set(zones)
-  return sellers
-    .filter((s) => pick.size === 0 || pick.has(s.zone ?? noZone))
-    .sort((a, b) => (a.zone ?? noZone).localeCompare(b.zone ?? noZone) || a.name.localeCompare(b.name))
-    .map((s) => ({
-      key: s.username,
-      label: s.name,
-      group: s.zone ?? noZone,
-      match: (p) => p.seller === s.username && days.has(p.date),
-    }))
+  const storeZones = new Set(stores?.zones)
+  const all = [...new Set([...sellers.map((s) => s.zone ?? noZone), ...storeZones])]
+    .filter((z) => pick.size === 0 || pick.has(z))
+    .sort((a, b) => a.localeCompare(b))
+  return all.flatMap((zone) => {
+    const members: MatrixColumn[] = sellers
+      .filter((s) => (s.zone ?? noZone) === zone)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((s) => ({
+        key: s.username,
+        label: s.name,
+        group: zone,
+        match: (p) => p.seller === s.username && days.has(p.date),
+      }))
+    if (stores && storeZones.has(zone)) {
+      const key = storesOf(zone)
+      members.push({ key, label: stores.label, group: zone, match: (p) => p.seller === key && days.has(p.date) })
+    }
+    return members
+  })
 }
 
-/** Una columna por zona (Trujillo, Chimbote…): suma a sus vendedores. `zones` vacía = todas. */
+/** Una columna por zona (Trujillo, Chimbote…): suma a sus vendedores y sus tiendas. `zones` vacía = todas. */
 export function zoneColumns(
   sellers: Seller[],
   dates: IsoDate[],
   noZone: string,
   zones: readonly string[] = [],
+  storeZones: readonly string[] = [],
 ): MatrixColumn[] {
   const days = new Set(dates)
-  return zonesOf(sellers, noZone)
+  return [...new Set([...zonesOf(sellers, noZone), ...storeZones])]
+    .sort((a, b) => a.localeCompare(b))
     .filter((z) => zones.length === 0 || zones.includes(z))
     .map((zone) => {
       const members = new Set(sellers.filter((s) => (s.zone ?? noZone) === zone).map((s) => s.username))
+      if (storeZones.includes(zone)) members.add(storesOf(zone))
       return { key: zone, label: zone, group: null, match: (p) => members.has(p.seller) && days.has(p.date) }
     })
 }

@@ -18,6 +18,7 @@ from app.planning.domain.orders import (
     daily_units,
 )
 from app.planning.infrastructure.persistence.tables import dispatch_orders
+from app.planning.infrastructure.store_orders_import import STORE_CODE_PREFIX
 
 
 class NoConfirmedOrders:
@@ -53,3 +54,26 @@ class LoadedOrders:
         units = daily_units(lines, products).get(day, {})
         self.available = bool(lines)
         return {product: round(n) for product, n in units.items() if round(n) > 0}
+
+
+class LoadedStoreOrders:
+    """Pedidos de las tiendas cargados con `cli tiendas` (filas TIENDA- de la tabla de despacho)."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def lines(self, date_from: date, date_to: date) -> list[tuple[str | None, OrderLine]]:
+        t = dispatch_orders.c
+        query = select(
+            t.zone,
+            t.delivery_date,
+            t.material,
+            t.ordered_kg,
+            t.ordered_units,
+            t.dispatched_kg,
+            t.dispatched_units,
+        ).where(
+            t.delivery_date.between(date_from, date_to),
+            t.material_code.startswith(STORE_CODE_PREFIX, autoescape=True),
+        )
+        return [(row[0], OrderLine(*row[1:])) for row in self.session.execute(query)]
