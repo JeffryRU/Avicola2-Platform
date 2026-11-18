@@ -37,6 +37,7 @@ export function Filters({
   locations,
   day,
   allowAll,
+  showLocation = true,
 }: {
   view: StockView
   setView: (patch: Partial<StockView>) => void
@@ -45,18 +46,27 @@ export function Filters({
   day: IsoDate
   /** Quien registra debe elegir una ubicación concreta; solo la consulta junta todas. */
   allowAll: boolean
+  /** Con stock general (una sola ubicación) el filtro no aparece. */
+  showLocation?: boolean
 }) {
   return (
     <Section className="mb-4">
-      <div className="grid grid-cols-1 gap-3 px-4 pt-4 sm:grid-cols-2 dsk:px-5 @4xl/main:grid-cols-4">
-        <Pick label={LOCATION_LABEL} value={view.location} onChange={(location) => setView({ location })}>
-          {allowAll && <option value={ALL}>{ALL_LOCATIONS}</option>}
-          {locations.map((l) => (
-            <option key={l} value={l}>
-              {l}
-            </option>
-          ))}
-        </Pick>
+      <div
+        className={cn(
+          'grid grid-cols-1 gap-3 px-4 pt-4 sm:grid-cols-2 dsk:px-5',
+          showLocation ? '@4xl/main:grid-cols-4' : '@4xl/main:grid-cols-3',
+        )}
+      >
+        {showLocation && (
+          <Pick label={LOCATION_LABEL} value={view.location} onChange={(location) => setView({ location })}>
+            {allowAll && <option value={ALL}>{ALL_LOCATIONS}</option>}
+            {locations.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </Pick>
+        )}
         <Pick label={TYPE_LABEL} value={view.type} onChange={(type) => setView({ type })}>
           <option value={ALL}>{ALL_TYPES}</option>
           {typesOf(options.items).map((t) => (

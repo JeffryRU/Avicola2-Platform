@@ -87,8 +87,9 @@ def test_register_and_view_daily_stock(client) -> None:
     day = r.json()
     assert day["date"] == str(TODAY) and day["recorded_by"] == "despacho"
     assert day["total_units"] == 160
-    # Los kg se calculan con el peso promedio; sin lote ni ubicación: el día y la primera.
-    lot = {"location": "Trujillo", "lot_date": str(TODAY)}
+    # Los kg se calculan con el peso promedio; sin lote ni ubicación: el día y la general (por
+    # defecto el stock se sube de forma general, sin elegir ubicación).
+    lot = {"location": "General", "lot_date": str(TODAY)}
     assert day["lines"] == [
         {"product_id": "P0001", "units": 120, "kg": 120.0, **lot},
         {"product_id": "P0006", "units": 40, "kg": 64.0, **lot},
@@ -175,7 +176,18 @@ def test_only_the_general_supervisor_creates_dispatch_chiefs(client) -> None:
     assert client.post("/api/admin/accounts", json=new).status_code == 201
 
 
-def test_stock_by_lot_and_location(client) -> None:
+def test_stock_is_general_by_default(client) -> None:
+    _login(client, "despacho")
+    assert client.get("/api/stock/options").json()["locations"] == ["General"]
+    lines = [{"product_id": "P0001", "units": 5}]
+    r = client.put(f"/api/stock/{TODAY}", json={"location": "Trujillo", "lines": lines})
+    assert r.status_code == 422
+
+
+def test_stock_by_lot_and_location(client, monkeypatch) -> None:
+    # Con varias ubicaciones configuradas se registra por ubicación.
+    places = ["Trujillo", "Piura", "Chiclayo", "Chimbote", "San Martín"]
+    monkeypatch.setattr(get_settings(), "stock_locations", places)
     _login(client, "despacho")
     options = client.get("/api/stock/options").json()
     assert options["locations"][:2] == ["Trujillo", "Piura"] and options["lot_days"] == 3

@@ -14,6 +14,7 @@ import {
   isEditableDay,
   linesAt,
   locationsOf,
+  singleLocation,
   shownLots,
   STOCK_BACK_DAYS,
   type StockDay,
@@ -31,6 +32,7 @@ import {
   NOT_REGISTERED_BODY,
   NOT_REGISTERED_TITLE,
   PICK_LOCATION,
+  REGISTER_STEPS_GENERAL,
   REGISTER_STEPS,
   REGISTER_STEPS_TITLE,
   REGISTERED_LABEL,
@@ -110,6 +112,7 @@ export function StockPage() {
             day={day}
             options={options}
             locations={locationsOf(options.locations, days)}
+            general={singleLocation(options.locations)}
             record={record}
             view={current}
             setView={setView}
@@ -127,6 +130,7 @@ function Board({
   day,
   options,
   locations,
+  general,
   record,
   view,
   setView,
@@ -137,6 +141,8 @@ function Board({
   day: IsoDate
   options: StockOptions
   locations: string[]
+  /** Stock general (una sola ubicación configurada): no se elige ubicación. */
+  general: string | null
   record?: StockDay
   view: StockView
   setView: (patch: Partial<StockView>) => void
@@ -148,7 +154,9 @@ function Board({
   // Una ubicación guardada que ya no existe se trata como «todas».
   // Quien registra parte de la primera ubicación: sin ubicación concreta no hay formulario.
   const saved = view.location === ALL || locations.includes(view.location) ? view.location : ALL
-  const location = saved === ALL && editable ? (locations[0] ?? ALL) : saved
+  // Stock general: se registra en la ubicación única y se consulta todo junto (también lo que se
+  // guardó antes por ubicación).
+  const location = general ? (editable ? general : ALL) : saved === ALL && editable ? (locations[0] ?? ALL) : saved
   const lines = linesAt(record, location)
   const [initial] = useState<StockDraft>(() => draftOf(lines))
   const [draft, setDraft] = useState<StockDraft>(initial)
@@ -176,7 +184,7 @@ function Board({
       {writing && (
         <Section title={REGISTER_STEPS_TITLE} className="mb-4">
           <ol className="grid list-decimal gap-1 px-4 py-3 pl-9 text-sm text-ink-2 dsk:px-5 dsk:pl-10">
-            {REGISTER_STEPS.map((step) => (
+            {(general ? REGISTER_STEPS_GENERAL : REGISTER_STEPS).map((step) => (
               <li key={step}>{step}</li>
             ))}
           </ol>
@@ -189,9 +197,10 @@ function Board({
         locations={locations}
         day={day}
         allowAll={!editable}
+        showLocation={!general}
       />
       <div className={splitCls}>
-        <Section title={dDowLongDM(day)} aside={<Scope location={location} />}>
+        <Section title={dDowLongDM(day)} aside={general ? undefined : <Scope location={location} />}>
           {!writing && lines.length === 0 ? (
             <EmptyState title={NOT_REGISTERED_TITLE}>{editable ? PICK_LOCATION : NOT_REGISTERED_BODY}</EmptyState>
           ) : (
@@ -218,7 +227,7 @@ function Board({
             record={lines.length ? record : undefined}
             dirty={dirty}
             note={readOnlyNote}
-            byPlace={location === ALL ? byLocation(record) : undefined}
+            byPlace={location === ALL && !general ? byLocation(record) : undefined}
             action={
               writing && (
                 <div className="hidden border-t border-rule px-4 py-3 dsk:px-5 @4xl/main:grid">{save('w-full')}</div>
