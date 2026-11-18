@@ -58,7 +58,8 @@ def test_seller_sees_only_himself(client) -> None:
     catalog = client.get("/api/catalog").json()
     assert {p["category"] for p in catalog} == {"BRASA", "Pollo de mercado"}
     # Solo la brasa se proyecta; el pollo de mercado queda para el stock y la saca.
-    assert {p["category"] for p in catalog if p["projected"]} == {"BRASA"}
+    # Se proyecta la brasa y, del pollo de mercado, solo el sin menudencia.
+    assert {p["id"] for p in catalog if p["projected"] and p["category"] != "BRASA"} == {"P0012"}
     assert {p["quality"] for p in catalog} == {"A"}  # la calidad B solo existe en el stock
     assert [s["username"] for s in client.get("/api/sellers").json()] == ["rnavarro"]
 
@@ -151,11 +152,27 @@ def test_history_records_who_changed_what(client) -> None:
     assert client.get("/api/projections/history", params=params).json() == []
 
 
-def test_only_brasa_is_projected(client) -> None:
+def test_brasa_and_chicken_without_giblets_are_projected(client) -> None:
+    """Se proyecta la brasa y, del pollo de mercado, solo el entero sin menudencia (P0012)."""
     _login(client)
+    projected = {p["id"] for p in client.get("/api/catalog").json() if p["projected"]}
+    assert "P0012" in projected and "P0011" not in projected and "P0001" in projected
     body = {"category": "Pollo de mercado", "days": [{"date": _day(1), "units": {"P0011": 4}}]}
     r = client.post("/api/projections", json=body)
-    assert r.status_code == 422 and "no se proyecta" in r.json()["detail"]
+    assert (
+        r.status_code == 422 and "No se proyecta: Pollo entero con menudencia" in r.json()["detail"]
+    )
+    body["days"][0]["units"] = {"P0012": 6}
+    r = client.post("/api/projections", json=body)
+    assert r.status_code == 201, r.text
+    # Es otra proyección del mismo día: no reemplaza la de brasa.
+    brasa = {"category": "BRASA", "days": [{"date": _day(1), "units": {"P0001": 3}}]}
+    assert client.post("/api/projections", json=brasa).status_code == 201
+    saved = client.get("/api/projections", params={"date_from": _day(1), "date_to": _day(1)}).json()
+    assert {(p["category"], p["total_units"]) for p in saved} == {
+        ("Pollo de mercado", 6),
+        ("BRASA", 3),
+    }
 
 
 def test_submit_validation_errors_are_422(client) -> None:

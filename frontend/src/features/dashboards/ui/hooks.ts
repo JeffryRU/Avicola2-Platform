@@ -11,7 +11,7 @@ import type { Catalog } from '@/features/catalog'
 import { storeEntries, zoneOfStores, zonesOf, type MatrixEntry } from '@/features/dashboards/domain/product-matrix'
 import { useRequiredSession } from '@/features/auth'
 import { useTeamSellers } from '@/features/sellers'
-import { ALL, NO_ZONE_LABEL, type FilterChip } from '@/features/dashboards/types/product-detail'
+import { ALL, ALL_PRODUCTS_LABEL, NO_ZONE_LABEL, type FilterChip } from '@/features/dashboards/types/product-detail'
 
 /**
  * Pedidos de las tiendas del período y del anterior (para comparar), como entradas de la tabla.
@@ -106,17 +106,19 @@ export function useDetailSelection(dates: IsoDate[], catalog: Catalog | null | u
   const days = weekDays.filter((d) => f.days.includes(d))
   const zones = allZones.filter((z) => f.zones.includes(z))
   const choices = catalog?.choices ?? []
-  // «Todas las brasas» es no elegir ninguno; las opciones marcables son los tamaños.
+  // «Todas las brasas» (o «Todos los productos») es no elegir ninguno; las opciones marcables son los
+  // tamaños y las categorías sin tamaños (el pollo sin menudencia).
   const allSizes = choices.at(0)
-  const sizeOptions = choices.filter((c) => c.subcategory !== null)
+  const several = (catalog?.categories.length ?? 0) > 1
+  const sizeOptions = choices.filter(
+    (c) => c.subcategory !== null || (catalog?.subcategories(c.category).length ?? 0) === 0,
+  )
   const sizes = sizeOptions.filter((c) => f.sizes.includes(choiceKey(c.category, c.subcategory)))
   const products = !catalog
     ? []
     : sizes.length
       ? catalog.products.filter((p) => sizes.some((c) => c.category === p.category && c.subcategory === p.subcategory))
-      : allSizes
-        ? catalog.selected(allSizes)
-        : catalog.products
+      : catalog.products
   const chips: FilterChip[] = [
     ...(days.length ? [{ key: 'dia', label: days.map(dShort).join(', '), onClear: () => f.setDays([]) }] : []),
     ...(zones.length ? [{ key: 'zona', label: zones.join(', '), onClear: () => f.setZones([]) }] : []),
@@ -131,7 +133,7 @@ export function useDetailSelection(dates: IsoDate[], catalog: Catalog | null | u
     allZones,
     days,
     zones,
-    allSizesLabel: allSizes?.label ?? '',
+    allSizesLabel: several ? ALL_PRODUCTS_LABEL : (allSizes?.label ?? ''),
     sizeOptions,
     selectedSizes: sizes,
     products,

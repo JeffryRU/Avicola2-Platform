@@ -35,11 +35,20 @@ export class Catalog {
     return [...new Set(this.of(category).flatMap((p) => (p.subcategory ? [p.subcategory] : [])))]
   }
 
+  /**
+   * Nombre de una categoría sin tamaños: si tiene un solo producto, el del producto (del pollo de
+   * mercado solo se proyecta el sin menudencia: la opción se llama como él).
+   */
+  private plainLabel(category: string): string {
+    const products = this.of(category)
+    return products.length === 1 ? products[0].name : category
+  }
+
   /** Opciones del selector: por categoría, «Todas las brasas» y luego cada tamaño. */
   get choices(): ProductChoice[] {
     return this.categories.flatMap((category) => {
       const subs = this.subcategories(category)
-      if (!subs.length) return [{ category, subcategory: null, label: category }]
+      if (!subs.length) return [{ category, subcategory: null, label: this.plainLabel(category) }]
       return [
         { category, subcategory: null, label: allOfLabel(category) },
         ...subs.map((subcategory) => ({ category, subcategory, label: subcategory })),
@@ -55,7 +64,7 @@ export class Catalog {
   /** Nombre corto de la selección: "Todas las brasas" o "Brasa chica". */
   label(sel: ProductSelection): string {
     if (sel.subcategory) return sel.subcategory
-    return this.subcategories(sel.category).length ? allOfLabel(sel.category) : sel.category
+    return this.subcategories(sel.category).length ? allOfLabel(sel.category) : this.plainLabel(sel.category)
   }
 
   /** Para resúmenes: "Todas las brasas (chica, mediana y grande)" o "Brasa chica". */

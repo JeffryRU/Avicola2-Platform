@@ -77,7 +77,9 @@ export function projectionParts(
 ): { names: string[]; kg: Record<IsoDate, number[]>; units: Record<IsoDate, number[]> } {
   const byProduct = picked.length > 0 && picked.length <= 4
   const shown = products.filter((p) => !picked.length || picked.includes(p.id))
-  const nameOf = (p: Product) => (byProduct ? p.name : productType(p))
+  // Una categoría con un solo producto (el pollo sin menudencia) se llama como él, no como la categoría.
+  const alone = (p: Product) => !p.subcategory && shown.filter((q) => q.category === p.category).length === 1
+  const nameOf = (p: Product) => (byProduct || alone(p) ? p.name : productType(p))
   const names = [...new Set(shown.map(nameOf))]
   const part = new Map(shown.map((p) => [p.id, { k: names.indexOf(nameOf(p)), kg: p.kg_per_unit }]))
   const inDates = new Set(dates)

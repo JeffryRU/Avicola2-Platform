@@ -31,7 +31,9 @@ describe('catálogo', () => {
     expect(c.label({ category: 'BRASA', subcategory: null })).toBe('Todas las brasas')
     expect(c.detailedLabel({ category: 'BRASA', subcategory: null })).toBe('Todas las brasas (chica, mediana y grande)')
     expect(c.detailedLabel({ category: 'BRASA', subcategory: 'Brasa chica' })).toBe('Brasa chica')
-    expect(catalog.choices.map((x) => x.label)).toEqual(['BRASA', 'OTRA'])
+    // Una categoría con un solo producto se llama como él (el pollo sin menudencia).
+    expect(catalog.choices.map((x) => x.label)).toEqual(['BRASA', 'Otro 1'])
+    expect(catalog.label({ category: 'OTRA', subcategory: null })).toBe('Otro 1')
   })
 
   it('agrupa por subcategoría respetando el orden', () => {
