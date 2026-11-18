@@ -28,7 +28,7 @@ const projection: Projection = {
 }
 
 describe('Excel del equipo', () => {
-  it('una fila por producto, la venta real y «Sin proyección» para quien no registró', () => {
+  it('una fila por producto, el pedido real y «Sin proyección» para quien no registró', () => {
     const table = teamProjectionsTable({
       dates: ['2026-11-05'],
       sellers,

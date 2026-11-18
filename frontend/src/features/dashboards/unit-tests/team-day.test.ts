@@ -48,7 +48,7 @@ describe('día del equipo', () => {
     expect(day.rows[0].real).toBeNull()
   })
 
-  it('sin ventas, la venta real queda vacía', () => {
+  it('sin pedidos, el pedido real queda vacío', () => {
     expect(teamDay(DAY, SELLERS, [], [], catalog).real).toBeNull()
   })
 })

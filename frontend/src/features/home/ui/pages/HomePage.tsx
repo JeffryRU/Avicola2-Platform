@@ -60,7 +60,7 @@ export function HomePage() {
   const links = [
     { to: paths.mine, title: 'Mis proyecciones', sub: 'Lo que ya confirmaste, día por día' },
     { to: paths.requests, title: MY_REQUESTS_TITLE, sub: MY_REQUESTS_SUBTITLE },
-    { to: paths.dashVersus, title: 'Historial y seguimiento', sub: 'Ventas reales vs. proyección' },
+    { to: paths.dashVersus, title: 'Historial y seguimiento', sub: 'Pedido real vs. proyección' },
     { to: paths.products, title: 'Productos', sub: 'Presentaciones y conversión a kilos' },
     { to: paths.notifications, title: 'Notificaciones', sub: unread ? `${unread} sin leer` : 'Alertas y mensajes' },
   ]

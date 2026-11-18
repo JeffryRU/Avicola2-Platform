@@ -45,7 +45,7 @@ export function LoginShowcase() {
         <div>
           <h2 className="max-w-[18ch] text-4xl font-semibold hc:font-extrabold">Planifica la demanda de cada día</h2>
           <p className="mt-3 max-w-[44ch] text-md text-head-foreground/85 hc:text-head-muted">
-            Registra tu proyección por producto, aunque no tengas señal, y compárala con la venta real.
+            Registra tu proyección por producto, aunque no tengas señal, y compárala con el pedido real.
           </p>
         </div>
       </div>

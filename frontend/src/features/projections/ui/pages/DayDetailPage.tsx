@@ -139,7 +139,7 @@ export function DayDetailPage() {
         {real && (
           <Note icon={<ShoppingCart />} className="mb-4">
             <div className="min-w-0 flex-1">
-              Venta real (ERP): <b className="num">{kgAmount(realKg)}</b>,{' '}
+              Pedido real (ERP): <b className="num">{kgAmount(realKg)}</b>,{' '}
               <span className="num">{pct1(((realKg - kg) / kg) * 100)}</span> frente a lo proyectado.
             </div>
           </Note>
@@ -159,7 +159,7 @@ export function DayDetailPage() {
                 ? [
                     {
                       key: 'real',
-                      header: 'Venta real',
+                      header: 'Pedido real',
                       numeric: true,
                       cell: (p: Product) => real[p.id] ?? 0,
                       total: nf0(sumUnits(real)),
