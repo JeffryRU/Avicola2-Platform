@@ -106,7 +106,14 @@ def test_upload_replaces_only_the_dates_in_the_file(client) -> None:
     r = _upload(client, _csv(_line(d1, 10), _line(d2, 20), _line(d2, 5, order=2)), "base.csv")
     assert r.status_code == 200, r.text
     assert r.json() == [
-        {"kind": "despacho", "rows": 3, "skipped": 0, "date_from": str(d1), "date_to": str(d2)}
+        {
+            "kind": "despacho",
+            "rows": 3,
+            "skipped": 0,
+            "date_from": str(d1),
+            "date_to": str(d2),
+            "issues": [],
+        }
     ]
     # El día 2 se corrige y llega el día 3; el día 1 queda como estaba.
     r = _upload(

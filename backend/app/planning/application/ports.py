@@ -289,6 +289,8 @@ class ArisLoad:
     skipped: int
     date_from: date | None
     date_to: date | None
+    # Las primeras filas descartadas, con su número y el motivo (para corregir el archivo).
+    issues: tuple[str, ...] = ()
 
 
 class ArisData(Protocol):

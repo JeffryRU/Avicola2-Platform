@@ -25,6 +25,9 @@
     uv run python -m app.planning.infrastructure.cli entrenar
                         entrena los modelos de demanda (ADR 0020) con la historia de ARIS y guarda
                         métricas y predicciones; el programador lo hace solo de madrugada
+    uv run python -m app.planning.infrastructure.cli archivos
+                        qué archivos acepta la app, sus columnas y qué módulos usan cada uno
+                        (config/imports.yaml)
     uv run python -m app.planning.infrastructure.cli seed         3 semanas de ejemplo
     uv run python -m app.planning.infrastructure.cli show [n]     resumen y últimas n
     uv run python -m app.planning.infrastructure.cli clear --yes  borra las proyecciones
@@ -63,6 +66,7 @@ from app.planning.domain.permissions import (
 )
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.demand_model.training import train as train_model
+from app.planning.infrastructure.file_specs import file_specs
 from app.planning.infrastructure.history_import import load_dispatch_orders, load_store_sales
 from app.planning.infrastructure.persistence.notifications import SqlNotificationRepository
 from app.planning.infrastructure.persistence.production import SqlProductionRepository
@@ -80,6 +84,7 @@ from app.planning.infrastructure.persistence.tables import (
 from app.planning.infrastructure.production_import import SHEET, read_production
 from app.planning.infrastructure.security import RandomTemporaryPasswords, ScryptPasswordHasher
 from app.planning.infrastructure.store_orders_import import load_store_orders
+from app.shared.domain.errors import DomainError
 from app.shared.infrastructure.database.session import SessionLocal
 from app.shared.infrastructure.logging.setup import configure_from_settings
 
@@ -463,11 +468,35 @@ def clear(session: Session) -> None:
     print("OK: Proyecciones borradas.")
 
 
+TYPE_LABELS = {"string": "texto", "int": "entero", "float": "número", "date": "fecha"}
+
+
+def show_files() -> None:
+    """Catálogo de datos: cada archivo, para qué se usa y sus columnas (de imports.yaml)."""
+    for spec in file_specs().values():
+        where = f" · hoja {spec.sheet}" if spec.sheet else ""
+        print()
+        print(f"{spec.label} [{spec.key}]{where}")
+        if spec.description:
+            print(f"  {spec.description}")
+        for use in spec.used_by:
+            print(f"  · {use}")
+        for name, col in spec.columns.items():
+            flags = [TYPE_LABELS[col.type], "obligatoria" if col.required else "opcional"]
+            if col.aliases:
+                flags.append("alias: " + ", ".join(col.aliases))
+            print(f"    {col.source:<34} → {name:<18} ({'; '.join(flags)})")
+
+
 def main(argv: list[str]) -> int:
     settings = get_settings()
     configure_from_settings(settings)
     try:
         return _run(argv, settings)
+    except DomainError as exc:
+        # Un archivo al que le falta una columna, por ejemplo: se explica y no se carga nada.
+        print(f"No se cargó: {exc}")
+        return 1
     finally:
         # La CLI escribe productos, cuentas y configuración por fuera de los repositorios con
         # caché. Con Redis, esto la limpia también para la API; en memoria, la API lo verá al
@@ -475,7 +504,7 @@ def main(argv: list[str]) -> int:
         planning_cache.invalidate()
 
 
-def _run(argv: list[str], settings: Settings) -> int:  # noqa: PLR0911 (un caso por comando)
+def _run(argv: list[str], settings: Settings) -> int:  # noqa: PLR0911, PLR0912 (un caso por comando)
     cmd = argv[0] if argv else ""
     with SessionLocal() as session:
         if cmd == "init":
@@ -499,6 +528,8 @@ def _run(argv: list[str], settings: Settings) -> int:  # noqa: PLR0911 (un caso 
         elif cmd == "historia" and len(argv) <= 2:
             folder = Path(argv[1]) if len(argv) == 2 else REPO_ROOT / "data" / "inbox"
             return load_history(session, settings, folder)
+        elif cmd == "archivos":
+            show_files()
         elif cmd == "show":
             show(session, int(argv[1]) if len(argv) > 1 else 20)
         elif cmd == "clear" and "--yes" in argv:

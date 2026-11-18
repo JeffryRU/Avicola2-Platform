@@ -26,8 +26,8 @@ describe('datos de ARIS', () => {
 
   it('resume lo cargado', () => {
     const text = arisLoadSummary([
-      { kind: 'despacho', rows: 1250, skipped: 0, date_from: '2026-11-16', date_to: '2026-11-16' },
-      { kind: 'ventas', rows: 30, skipped: 2, date_from: '2026-11-10', date_to: '2026-11-16' },
+      { kind: 'despacho', rows: 1250, skipped: 0, date_from: '2026-11-16', date_to: '2026-11-16', issues: [] },
+      { kind: 'ventas', rows: 30, skipped: 2, date_from: '2026-11-10', date_to: '2026-11-16', issues: [] },
     ])
     expect(text).toMatch(/líneas de despacho del/)
     expect(text).toMatch(/2 filas no se pudieron leer/)
@@ -41,5 +41,25 @@ describe('datos de ARIS', () => {
 
   it('rechaza un estado con forma inválida', () => {
     expect(arisStatusSchema.safeParse({ level: 'raro' }).success).toBe(false)
+  })
+})
+
+describe('filas descartadas', () => {
+  it('dice qué filas no se usaron y por qué', async () => {
+    const { arisIssuesText } = await import('@/features/aris/types/aris')
+    const { arisLoadsSchema } = await import('@/features/aris/domain/aris')
+    const ok = arisLoadsSchema.parse([{ kind: 'despacho', rows: 3, skipped: 0, date_from: null, date_to: null }])
+    expect(arisIssuesText(ok)).toBeNull()
+    const bad = arisLoadsSchema.parse([
+      {
+        kind: 'despacho',
+        rows: 1,
+        skipped: 1,
+        date_from: null,
+        date_to: null,
+        issues: ['Fila 3: «FechaRegistro» no es una fecha: ayer'],
+      },
+    ])
+    expect(arisIssuesText(bad)).toBe('Revisa en el archivo: Fila 3: «FechaRegistro» no es una fecha: ayer')
   })
 })
