@@ -242,3 +242,13 @@ def test_model_projection_uses_only_earlier_history(client) -> None:
     assert client.get("/api/model-projections", params=same).json() == []
     too_long = {"date_from": str(PAST), "date_to": str(PAST + timedelta(days=400))}
     assert client.get("/api/model-projections", params=too_long).status_code == 422
+
+
+def test_store_range_written_in_full_is_the_same_brasa() -> None:
+    from app.planning.infrastructure.store_orders_import import _brasa
+
+    brasa = {n: f"Brasa {n}" for n in range(1, 11)}
+    assert _brasa("BRASA 3", "Pollo Entero Brasa Chico", brasa) == "Brasa 3"
+    assert _brasa("B8", "Pollo Entero Brasa Grande", brasa) == "Brasa 8"
+    assert _brasa("", "Pollo Entero Brasa Chico Tipo B", brasa) == "Brasa 1"
+    assert _brasa(None, "Pollo Entero Brasa Chico", brasa) is None

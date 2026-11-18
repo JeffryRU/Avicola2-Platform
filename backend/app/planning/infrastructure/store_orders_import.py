@@ -25,7 +25,8 @@ from app.shared.domain.errors import DomainError
 
 # Marca de las filas que vienen del reporte de tiendas (para reemplazarlas en la siguiente carga).
 STORE_CODE_PREFIX = "TIENDA-"
-_RANGE = re.compile(r"B\s*(\d+)", re.IGNORECASE)
+# «B7» o «BRASA 7» (a veces el rango viene escrito completo).
+_RANGE = re.compile(r"\bB(?:RASA)?\s*(\d+)", re.IGNORECASE)
 
 
 def _brasa(rango: str | None, material: str, brasa: dict[int, Product]) -> Product | None:
