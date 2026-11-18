@@ -1,6 +1,6 @@
 import type { IsoDate } from '@/shared/domain/dates'
 import type { Seller } from '@/shared/domain/session'
-import { bySubcategory, type Product } from '@/shared/domain/products'
+import { addUnits, bySubcategory, sumUnits, type Product, type Units } from '@/shared/domain/products'
 import { CONFIRMED } from '@/shared/types/labels'
 import type { Projection, StoreOrder } from '@/features/projections'
 
@@ -25,6 +25,19 @@ export const zoneOfStores = (seller: string) => seller.slice(STORES_PREFIX.lengt
 /** Los pedidos de tiendas como entradas confirmadas de la zona (`zone` vacía → `noZone`). */
 export const storeEntries = (orders: StoreOrder[], noZone: string): MatrixEntry[] =>
   orders.map((o) => ({ seller: storesOf(o.zone ?? noZone), date: o.date, status: CONFIRMED, units: o.units }))
+
+/** Suma a cada día lo que piden las tiendas (por producto, en unidades y en kg). */
+export function addStores<T extends { date: IsoDate; units: Units; u: number; kg: number }>(
+  days: T[],
+  stores: MatrixEntry[],
+  kg: (units: Units) => number,
+): T[] {
+  return days.map((d) => {
+    const extra = stores.filter((s) => s.date === d.date).reduce<Units>((acc, s) => addUnits(acc, s.units), {})
+    const units = addUnits(d.units, extra)
+    return { ...d, units, u: sumUnits(units), kg: kg(units) }
+  })
+}
 
 /** Columna «Tiendas» de una zona. */
 export interface StoresColumns {

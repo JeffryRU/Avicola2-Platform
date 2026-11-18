@@ -145,3 +145,19 @@ describe('tiendas en el detalle', () => {
     expect(m.cells).toEqual([2, 0, 13])
   })
 })
+
+describe('tiendas en los totales', () => {
+  it('suma a cada día lo que piden las tiendas', async () => {
+    const { addStores, storeEntries } = await import('@/features/dashboards/domain/product-matrix')
+    const days: { date: string; units: Record<string, number>; u: number; kg: number }[] = [
+      { date: MON, units: { P1: 2 }, u: 2, kg: 2 },
+      { date: TUE, units: {}, u: 0, kg: 0 },
+    ]
+    const stores = storeEntries([{ zone: 'Piura', date: TUE, units: { P5: 4 } }], 'Sin zona')
+    const out = addStores(days, stores, (u) => catalog.kg(u))
+    expect(out.map((d) => [d.u, d.kg])).toEqual([
+      [2, 2],
+      [4, 6],
+    ])
+  })
+})

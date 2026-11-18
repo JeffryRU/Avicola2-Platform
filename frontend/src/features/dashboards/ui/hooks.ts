@@ -4,13 +4,28 @@ import { useSearchParams } from 'react-router'
 import { checkPeriod, customPeriod, weekPeriod, type Period } from '@/features/dashboards/domain/period'
 import { weekOptions } from '@/features/dashboards/domain/weeks'
 import { isoDateSchema } from '@/shared/domain/schemas'
-import { dataWindow, useRangeData } from '@/features/projections'
+import { dataWindow, useRangeData, useStoreOrders } from '@/features/projections'
 import { isSupervisor } from '@/shared/domain/session'
 import type { Catalog } from '@/features/catalog'
-import { zonesOf } from '@/features/dashboards/domain/product-matrix'
+import { storeEntries, zoneOfStores, zonesOf, type MatrixEntry } from '@/features/dashboards/domain/product-matrix'
 import { useRequiredSession } from '@/features/auth'
 import { useTeamSellers } from '@/features/sellers'
 import { ALL, NO_ZONE_LABEL, type FilterChip } from '@/features/dashboards/types/product-detail'
+
+/**
+ * Pedidos de las tiendas del período y del anterior (para comparar), como entradas de la tabla.
+ * Solo para supervisión y sin filtro de vendedor (las tiendas no son vendedores); `zones` vacía = todas.
+ */
+export function useStoreEntries(dates: IsoDate[], sellers: readonly string[], zones: readonly string[]): MatrixEntry[] {
+  const enabled = isSupervisor(useRequiredSession().seller) && sellers.length === 0 && dates.length > 0
+  const from = dates.length ? addDays(dates[0], -dates.length) : ''
+  const orders = useStoreOrders(from, dates.at(-1) ?? '', enabled)
+  if (!enabled) return []
+  const pick = new Set(zones)
+  return storeEntries(orders.data ?? [], NO_ZONE_LABEL).filter(
+    (e) => pick.size === 0 || pick.has(zoneOfStores(e.seller)),
+  )
+}
 
 /**
  * Filtros de los dashboards guardados en la URL para poder compartirla:

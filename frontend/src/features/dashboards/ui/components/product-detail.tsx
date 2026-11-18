@@ -12,14 +12,13 @@ import {
   isStores,
   productMatrix,
   sellerColumns,
-  storeEntries,
   zoneColumns,
   zoneOfStores,
   type MatrixEntry,
 } from '@/features/dashboards/domain/product-matrix'
 import { FilterMenu } from '@/features/dashboards/ui/components/filter-bar'
-import { choiceKey, useDetailSelection } from '@/features/dashboards/ui/hooks'
-import { useStoreOrders, type Projection } from '@/features/projections'
+import { choiceKey, useDetailSelection, useStoreEntries } from '@/features/dashboards/ui/hooks'
+import type { Projection } from '@/features/projections'
 import {
   ALL_ZONES_LABEL,
   DAY_FILTER_LABEL,
@@ -80,14 +79,9 @@ export function ProductDetail({
     : [me]
   const dates = f.days.length ? f.days : f.weekDays
   // Las tiendas no son vendedores: si se filtra por vendedor, no van.
-  const withStores = supervisor && sellers.length === 0
-  const storeOrders = useStoreOrders(periodDates[0], periodDates[periodDates.length - 1], withStores)
-  const stores = withStores
-    ? storeEntries(storeOrders.data ?? [], NO_ZONE_LABEL).filter(
-        (e) => pickZones.size === 0 || pickZones.has(zoneOfStores(e.seller)),
-      )
-    : []
-  const storeZones = [...new Set(stores.map((e) => zoneOfStores(e.seller)))]
+  const stores = useStoreEntries(periodDates, sellers, f.zones)
+  // Solo las zonas con pedidos en los días que se muestran (el hook trae también el período anterior).
+  const storeZones = [...new Set(stores.filter((e) => dates.includes(e.date)).map((e) => zoneOfStores(e.seller)))]
   const entries: MatrixEntry[] = [...projections, ...stores]
   const inScope = (p: MatrixEntry) => isStores(p.seller) || shown.some((s) => s.username === p.seller)
 
