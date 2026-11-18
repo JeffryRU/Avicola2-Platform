@@ -53,6 +53,7 @@ def test_dispatch_chief_permissions() -> None:
         Permission.MANAGE_STOCK,
         Permission.VIEW_PRODUCTION,
         Permission.MANAGE_PRODUCTION,
+        Permission.LOAD_ARIS,
     }
     assert manageable_roles(DISPATCH_CHIEF) == ()
     assert not can(SELLER, Permission.VIEW_STOCK)
@@ -72,6 +73,7 @@ def test_dispatch_chief_logs_in_with_only_dispatch_permissions(client) -> None:
         "manage_stock",
         "view_production",
         "manage_production",
+        "load_aris",
     ]
     assert session["manageable_roles"] == []
 

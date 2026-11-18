@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.planning.application import accounts as acc
+from app.planning.application import aris as ar
 from app.planning.application import editing as ed
 from app.planning.application import export as ex
 from app.planning.application import notifications as nt
@@ -20,6 +21,7 @@ from app.planning.application import stock as st
 from app.planning.application import use_cases as uc
 from app.planning.domain.accounts import LockoutPolicy
 from app.planning.infrastructure.aris_history import ArisHistory, ArisOrSimulatedSales
+from app.planning.infrastructure.aris_import import SqlArisData
 from app.planning.infrastructure.arrival_model import AdaptiveArrivalModel
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.demand_model.store import SqlDemandModelStore
@@ -82,6 +84,8 @@ class PlanningUseCases:
     get_sales: uc.GetSales
     model_projections: uc.ModelProjections
     model_summary: uc.GetModelSummary
+    aris_status: ar.GetArisStatus
+    import_aris: ar.ImportArisData
     export_projections: ex.ExportProjections
     list_changes: uc.ListChanges
     suggest_projection: uc.SuggestProjection
@@ -181,6 +185,10 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             sellers, order_history, products, SqlDemandModelStore(session)
         ),
         model_summary=uc.GetModelSummary(SqlDemandModelStore(session)),
+        aris_status=ar.GetArisStatus(
+            SqlArisData(session), SqlDemandModelStore(session), clock, settings.aris_warn_days
+        ),
+        import_aris=ar.ImportArisData(SqlArisData(session), SqlDemandModelStore(session)),
         export_projections=ex.ExportProjections(products, projections, sales, sellers, clock),
         list_changes=uc.ListChanges(history),
         suggest_projection=uc.SuggestProjection(

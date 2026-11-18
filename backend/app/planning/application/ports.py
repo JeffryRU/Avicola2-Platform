@@ -65,6 +65,11 @@ class DemandModelStore(Protocol):
     """La última corrida del modelo de demanda: métricas y predicciones fuera de muestra."""
 
     def latest(self) -> dict | None: ...
+    def request_training(self, by: str) -> None:
+        """Pide al programador que reentrene en cuanto pueda (llegaron datos nuevos)."""
+        ...
+
+    def training_pending(self) -> bool: ...
     def predictions(
         self, model: str, date_from: date, date_to: date, seller: str | None
     ) -> list[DailyUnits]: ...
@@ -266,4 +271,27 @@ class ChangeLog(Protocol):
 
     def list(self, date_from: date, date_to: date, seller: str | None) -> list[ProjectionChange]:
         """Cambios hechos entre esas fechas (de un vendedor o de todos), recientes primero."""
+        ...
+
+
+@dataclass(frozen=True)
+class ArisLoad:
+    """Resultado de cargar una hoja o archivo de ARIS."""
+
+    kind: str  # despacho | ventas
+    rows: int
+    skipped: int
+    date_from: date | None
+    date_to: date | None
+
+
+class ArisData(Protocol):
+    """La venta real de ARIS guardada en la app (historia del modelo de demanda)."""
+
+    def coverage(self) -> tuple[date | None, date | None]:
+        """Último día con despacho y último día con ventas en tienda."""
+        ...
+
+    def load(self, content: bytes, filename: str) -> list[ArisLoad]:
+        """Carga el export reemplazando solo las fechas que trae."""
         ...

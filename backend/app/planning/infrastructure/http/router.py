@@ -11,7 +11,18 @@ from dataclasses import asdict
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Cookie, Depends, Header, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Cookie,
+    Depends,
+    File,
+    Header,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -24,6 +35,7 @@ from app.planning.domain.editing import CutoffPolicy, EditUnlock
 from app.planning.domain.models import Projection, Seller, SellerAccount
 from app.planning.domain.permissions import (
     FORBIDDEN,
+    GENERAL_SUPERVISOR,
     Permission,
     assignable_roles,
     can_manage,
@@ -39,11 +51,17 @@ from app.planning.domain.stock import DailyStock
 from app.planning.infrastructure.exporters import WRITERS, ExportFormat
 from app.planning.infrastructure.http import schemas as s
 from app.planning.infrastructure.http.saca_view import saca_out
-from app.shared.domain.errors import AuthenticationError, ForbiddenError
+from app.shared.domain.errors import AuthenticationError, DomainError, ForbiddenError
 from app.shared.infrastructure.database.session import get_session
 from app.shared.infrastructure.http.params import DbIdPath
 from app.shared.infrastructure.http.paths import API_PREFIX
 from app.shared.infrastructure.http.service_token import require_service_token
+
+# El export de ARIS: un día pesa unos cientos de KB; el completo de varios meses, decenas de MB.
+MAX_ARIS_MB = 80
+MAX_ARIS_BYTES = MAX_ARIS_MB * 1024 * 1024
+# Autor de las cargas que llegan por n8n (carpeta de Google Drive).
+ARIS_SERVICE_USER = "n8n"
 
 SESSION_COOKIE = "nv_session"
 COOKIE_PATH = API_PREFIX
@@ -388,6 +406,34 @@ def model_projections(
     """Lo que el modelo habría sugerido cada día (con la historia anterior), por vendedor."""
     found = use_cases.model_projections(viewer, date_from, date_to, seller)
     return [s.DailyUnitsOut(**asdict(d)) for d in found]
+
+
+@router.get("/aris/status")
+def aris_status(use_cases: UseCases, viewer: CurrentSeller) -> dict[str, Any]:
+    """Hasta qué día llegan los datos de ARIS y si conviene subir los que faltan (no es
+    obligatorio: la app solo avisa)."""
+    return asdict(use_cases.aris_status(viewer))
+
+
+@router.post("/aris/import")
+def aris_import(
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    file: Annotated[UploadFile, File(description="Export de ARIS: Excel o CSV")],
+) -> list[dict[str, Any]]:
+    """Carga el export de ARIS (solo las fechas que trae) y pide reentrenar el modelo."""
+    return [
+        asdict(r) for r in use_cases.import_aris(viewer, _read_upload(file), file.filename or "")
+    ]
+
+
+def _read_upload(file: UploadFile) -> bytes:
+    content = file.file.read(MAX_ARIS_BYTES + 1)
+    if len(content) > MAX_ARIS_BYTES:
+        raise DomainError(
+            f"El archivo pesa más de {MAX_ARIS_MB} MB: exporta menos días (un día o una semana)."
+        )
+    return content
 
 
 @router.get("/model/summary")
@@ -828,3 +874,15 @@ def register_production(
         for line in body.lines
     ]
     return _production_out(use_cases.register_production(actor, day, entries, body.weights))
+
+
+@internal.post("/aris")
+def aris_ingest(
+    use_cases: UseCases,
+    file: Annotated[UploadFile, File(description="Export de ARIS: Excel o CSV")],
+) -> list[dict[str, Any]]:
+    """Lo mismo, para n8n (archivo nuevo en la carpeta de Google Drive), con X-Api-Token."""
+    system = Seller(ARIS_SERVICE_USER, "n8n (Google Drive)", None, GENERAL_SUPERVISOR)
+    return [
+        asdict(r) for r in use_cases.import_aris(system, _read_upload(file), file.filename or "")
+    ]

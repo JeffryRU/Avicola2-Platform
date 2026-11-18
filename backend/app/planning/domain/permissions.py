@@ -46,6 +46,8 @@ class Permission(StrEnum):
     VIEW_PRODUCTION = "view_production"
     # Registrar o corregir la producción diaria.
     MANAGE_PRODUCTION = "manage_production"
+    # Subir el export de ARIS (venta real despachada) con el que aprende el modelo de demanda.
+    LOAD_ARIS = "load_aris"
 
 
 _SUPERVISION = frozenset(
@@ -55,6 +57,7 @@ _SUPERVISION = frozenset(
         Permission.MANAGE_ACCOUNTS,
         Permission.VIEW_SACA,
         Permission.VIEW_PRODUCTION,
+        Permission.LOAD_ARIS,
     }
 )
 
@@ -66,6 +69,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
             Permission.MANAGE_STOCK,
             Permission.VIEW_PRODUCTION,
             Permission.MANAGE_PRODUCTION,
+            Permission.LOAD_ARIS,
         }
     ),
     # El supervisor consulta el stock (lo necesita para la saca) y, si se lo piden, corrige el

@@ -137,6 +137,8 @@ class Settings(BaseSettings):
     # Hora (local) desde la que el programador reentrena el modelo de demanda (una vez por día).
     model_train_hour: int = Field(2, ge=0, le=23)
     model_train_enabled: bool = True
+    # Días sin datos de ARIS desde los que el aviso pasa de informativo a advertencia.
+    aris_warn_days: int = Field(3, ge=1, le=60)
     # Plus de la saca: aves extra por tipo que se suman al pedido a granja (regla del negocio).
     # Se cambia con SACA_GROUP_PLUS (JSON) o, desde la app, un supervisor.
     # «Carne» del negocio = el tipo «Pollo de mercado» del catálogo (SUPUESTO, docs/assumptions).
