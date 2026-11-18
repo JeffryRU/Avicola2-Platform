@@ -13,9 +13,9 @@ import { EmptyState, Note, StatusBadge, StatusDot } from '@/shared/ui/components
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { DataTable } from '@/shared/ui/components/data-table'
 import { Button } from '@/shared/ui/components/shadcn/button'
-import { cn } from '@/shared/ui/lib/utils'
 import { STATUS_LABEL, kgAmount, UNITS_SHORT } from '@/shared/types/labels'
 import { useFirstEditableDay } from '@/features/editing'
+import { col, signTone } from '@/shared/ui/lib/table-columns'
 
 export function DayDetailPage() {
   const { date = '' } = useParams()
@@ -151,22 +151,10 @@ export function DayDetailPage() {
             totalLabel="Total"
             columns={[
               { key: 'name', header: 'Producto', cell: (p) => p.name },
-              {
-                key: 'units',
-                header: 'Unidades',
-                numeric: true,
-                faint: (p) => !day.units[p.id],
-                cell: (p) => day.units[p.id] ?? 0,
-                total: nf0(units),
-              },
-              {
-                key: 'kg',
-                header: 'Kg (aprox.)',
-                numeric: true,
-                faint: (p) => !day.units[p.id],
-                cell: (p) => nf1((day.units[p.id] ?? 0) * p.kg_per_unit),
+              col.units<Product>('units', 'Unidades', (p) => day.units[p.id] ?? 0, { total: nf0(units) }),
+              col.kg<Product>('kg', 'Kg (aprox.)', (p) => (day.units[p.id] ?? 0) * p.kg_per_unit, {
                 total: nf1(kg),
-              },
+              }),
               ...(real
                 ? [
                     {
@@ -176,15 +164,11 @@ export function DayDetailPage() {
                       cell: (p: Product) => real[p.id] ?? 0,
                       total: nf0(sumUnits(real)),
                     },
-                    {
-                      key: 'diff',
-                      header: 'Dif.',
-                      numeric: true,
-                      className: (p: Product) => cn('font-medium', diffOf(p) < 0 ? 'text-bad' : 'text-ok'),
-                      cell: (p: Product) => pct1(diffOf(p)),
+                    col.change<Product>('diff', 'Dif.', diffOf, {
+                      className: 'font-medium',
                       total: pct1(((sumUnits(real) - units) / units) * 100),
-                      totalClassName: realKg < kg ? 'text-bad' : 'text-ok',
-                    },
+                      totalTone: signTone(realKg - kg),
+                    }),
                   ]
                 : []),
             ]}

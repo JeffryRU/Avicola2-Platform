@@ -202,13 +202,13 @@ export function NewProjectionPage() {
               <DataTable
                 rows={products}
                 rowKey={(p) => p.id}
-                rowClassName={() => 'hover:bg-transparent'}
+                hover={false}
                 columns={[
                   { key: 'name', header: 'Producto', cell: (p) => p.name },
                   {
                     key: 'kg',
                     header: 'Presentación',
-                    className: 'text-muted-foreground',
+                    tone: 'muted',
                     cell: (p) => kgPerUnitLabel(p.kg_per_unit),
                   },
                 ]}

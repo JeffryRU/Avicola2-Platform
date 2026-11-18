@@ -130,7 +130,7 @@ export function ModelPage() {
 
         <Section title={TABLE_TITLE} aside={TABLE_NOTE} className="mb-4">
           <DataTable
-            dense
+            density="compact"
             rows={s.models}
             rowKey={(m) => m.key}
             rowClassName={(m) => chosen.has(m.key) && 'font-semibold'}
@@ -149,15 +149,14 @@ export function ModelPage() {
                 key: l,
                 header: LEVEL_LABEL[l],
                 numeric: true,
-                className: (m: (typeof s.models)[number]) =>
-                  best[l] === m.key && 'bg-ok-soft font-semibold text-ok hc:text-foreground',
+                tone: (m: (typeof s.models)[number]) => best[l] === m.key && 'best',
                 cell: (m: (typeof s.models)[number]) => pct(m.metrics[l]),
               })),
               {
                 key: 'bias',
                 header: BIAS_LABEL,
                 numeric: true,
-                className: 'text-muted-foreground',
+                tone: 'muted',
                 cell: (m) => `${m.metrics.sesgo > 0 ? '+' : ''}${pct(m.metrics.sesgo)}`,
               },
             ]}

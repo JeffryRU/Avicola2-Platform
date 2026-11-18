@@ -103,7 +103,7 @@ export function DispatchHomePage() {
         <div className="grid items-start gap-4 dsk:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
           <Section title="Últimos días" aside={`${dShort(from)} – ${dShort(now)}`}>
             <DataTable
-              dense
+              density="compact"
               rows={days}
               rowKey={(d) => d}
               columns={[

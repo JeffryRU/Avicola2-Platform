@@ -45,7 +45,7 @@ export function SacaHistoryPage() {
             <EmptyState title={HISTORY_EMPTY_TITLE}>{HISTORY_EMPTY_BODY}</EmptyState>
           ) : (
             <DataTable
-              dense
+              density="compact"
               rows={rows}
               rowKey={(r) => r.date}
               columns={[
@@ -72,13 +72,13 @@ export function SacaHistoryPage() {
                   key: 'total',
                   header: HISTORY_COLUMNS.total,
                   numeric: true,
-                  className: 'font-semibold',
+                  tone: 'strong',
                   cell: (r) => nf0(r.farm_order),
                 },
                 {
                   key: 'saved',
                   header: HISTORY_COLUMNS.saved,
-                  className: 'text-muted-foreground',
+                  tone: 'muted',
                   cell: (r) => `${clockTime(r.saved_at)} · ${r.saved_by}`,
                 },
               ]}

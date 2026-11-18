@@ -154,7 +154,7 @@ export function ProductDetail({
               key: 'total-units',
               header: TOTAL_UNITS_LABEL,
               numeric: true,
-              className: (r) => (r.total === 0 ? 'text-faint' : 'font-semibold'),
+              tone: (r) => (r.total === 0 ? 'faint' : 'strong'),
               cell: (r) => (r.total === 0 ? '—' : nf0(r.total)),
               total: nf0(m.total),
             },

@@ -4,7 +4,7 @@ import { GRANULARITY_NOTE, bucketLabels } from '@/features/dashboards/types/buck
 import { nf0, nf1, pct1 } from '@/shared/domain/format'
 import { periodAgg, useModelProjections, versusReal } from '@/features/projections'
 import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
-import { DataTable, type RowTone } from '@/shared/ui/components/data-table'
+import { DataTable, type CellTone, type RowTone } from '@/shared/ui/components/data-table'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
 import { kgPerUnitLabel, useCatalog } from '@/features/catalog'
 import { usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
@@ -22,8 +22,8 @@ import { Package } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { cn } from '@/shared/ui/lib/utils'
 import { kgAmount } from '@/shared/types/labels'
+import { col, signTone } from '@/shared/ui/lib/table-columns'
 
 const tone = (v: number) => (v < 0 ? 'text-bad' : 'text-ok')
 
@@ -34,7 +34,7 @@ interface SeriesRow<P> {
   tone?: RowTone
   value: (p: P) => number | null
   cell: (p: P) => ReactNode
-  className?: (p: P) => string | false | undefined
+  cellTone?: (p: P) => CellTone | false | undefined
 }
 
 /**
@@ -223,7 +223,7 @@ export function DashboardVersusPage() {
       tone: 'total',
       value: (p) => p.rk ?? null,
       cell: (p) => (p.rk == null ? '—' : pct1(((p.rk - p.pk) / p.pk) * 100)),
-      className: (p) => p.rk != null && tone(p.rk - p.pk),
+      cellTone: (p) => p.rk != null && signTone(p.rk - p.pk),
     },
   ]
   const productRows = catalog.products
@@ -233,6 +233,7 @@ export function DashboardVersusPage() {
       return { p, pk, rk, dp: pk ? ((rk - pk) / pk) * 100 : 0 }
     })
     .filter((r) => r.pk || r.rk)
+  type ProductRow = (typeof productRows)[number]
 
   return (
     <div>
@@ -443,7 +444,7 @@ export function DashboardVersusPage() {
               {points.length > 0 && (
                 <div className="relative -mx-4 mt-3 -mb-4 overflow-x-auto dsk:-mx-5">
                   <DataTable
-                    dense
+                    density="compact"
                     rows={seriesRows}
                     rowKey={(r) => r.key}
                     rowTone={(r) => r.tone}
@@ -464,7 +465,7 @@ export function DashboardVersusPage() {
                         ),
                         numeric: true,
                         faint: (r: SeriesRow<Point>) => r.value(p) == null,
-                        className: (r: SeriesRow<Point>) => r.className?.(p),
+                        tone: (r: SeriesRow<Point>) => r.cellTone?.(p),
                         cell: (r: SeriesRow<Point>) => r.cell(p),
                       })),
                     ]}
@@ -477,7 +478,7 @@ export function DashboardVersusPage() {
             <div className="relative overflow-x-auto">
               {withReal.length ? (
                 <DataTable
-                  dense
+                  density="compact"
                   rows={productRows}
                   rowKey={(r) => r.p.id}
                   totalLabel="Total"
@@ -518,24 +519,17 @@ export function DashboardVersusPage() {
                       cell: (r) => nf1(r.rk),
                       total: nf1(vs.real),
                     },
-                    {
-                      key: 'diff',
-                      header: 'Dif. (kg)',
-                      numeric: true,
-                      className: (r) => tone(r.rk - r.pk),
-                      cell: (r) => nf1(r.rk - r.pk),
+                    col.kg<ProductRow>('diff', 'Dif. (kg)', (r) => r.rk - r.pk, {
+                      faint: undefined,
+                      tone: (r) => signTone(r.rk - r.pk),
                       total: nf1(vs.real - vs.projected),
-                      totalClassName: tone(vs.real - vs.projected),
-                    },
-                    {
-                      key: 'pct',
-                      header: 'Dif. (%)',
-                      numeric: true,
-                      className: (r) => cn('font-medium', tone(r.dp)),
-                      cell: (r) => pct1(r.dp),
+                      totalTone: signTone(vs.real - vs.projected),
+                    }),
+                    col.change<ProductRow>('pct', 'Dif. (%)', (r) => r.dp, {
+                      className: 'font-medium',
                       total: pct1(vs.deviationPct),
-                      totalClassName: tone(vs.deviationPct),
-                    },
+                      totalTone: signTone(vs.deviationPct),
+                    }),
                   ]}
                 />
               ) : (
