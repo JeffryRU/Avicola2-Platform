@@ -43,7 +43,7 @@ export const routePatterns = {
 
 export const DASHBOARDS = [
   { to: paths.dashSummary, label: 'Resumen semanal', short: 'Resumen' },
-  { to: paths.dashVersus, label: 'Proyección vs venta real', short: 'Vs. venta' },
+  { to: paths.dashVersus, label: 'Proyección vs pedido real', short: 'Vs. pedido' },
   { to: paths.dashStatus, label: 'Estado por día', short: 'Estado' },
 ] as const
 
