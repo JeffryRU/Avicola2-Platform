@@ -4,7 +4,7 @@ import { nf0 } from '@/shared/domain/format'
 import type { Catalog } from '@/features/catalog'
 import { sumUnits } from '@/shared/domain/products'
 import type { Draft } from '@/features/projections/domain/draft'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import {
   Dialog,
@@ -50,26 +50,17 @@ export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onC
           {nf0(units)} unidades<small>{kgAmount(kg, true)}</small>
         </SummaryRow>
       </div>
-      <table
-        className={`${tableCls.table} mt-2 mb-4 [&_td:first-child]:pl-0 [&_td:last-child]:pr-0 [&_th:first-child]:pl-0 [&_th:last-child]:pr-0`}
-      >
-        <thead>
-          <tr>
-            <th className={tableCls.th}>Fecha</th>
-            <th className={tableCls.th}>Unidades</th>
-            <th className={tableCls.th}>Kg (aprox.)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {dates.map((d) => (
-            <tr key={d}>
-              <td className={tableCls.td}>{dShort(d)}</td>
-              <td className={`${tableCls.td} num`}>{unitsCount(sumUnits(dayUnits(d)))}</td>
-              <td className={`${tableCls.td} num`}>{kgAmount(catalog.kg(dayUnits(d)))}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <DataTable
+        flush
+        wrapperClassName="mt-2 mb-4"
+        rows={dates}
+        rowKey={(d) => d}
+        columns={[
+          { key: 'date', header: 'Fecha', cell: (d) => dShort(d) },
+          { key: 'units', header: 'Unidades', numeric: true, cell: (d) => unitsCount(sumUnits(dayUnits(d))) },
+          { key: 'kg', header: 'Kg (aprox.)', numeric: true, cell: (d) => kgAmount(catalog.kg(dayUnits(d))) },
+        ]}
+      />
       {kept > 0 && (
         <p className="-mt-2 mb-4 text-sm text-muted-foreground">
           Se mantienen {nf0(kept)} unidades que ya registraste de otros tamaños.

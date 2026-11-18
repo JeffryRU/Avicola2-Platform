@@ -9,6 +9,7 @@ import { StatusDot } from '@/shared/ui/components/feedback'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { kgAmount, unitsCount } from '@/shared/types/labels'
 import { cn } from '@/shared/ui/lib/utils'
+import { DataTable } from '@/shared/ui/components/data-table'
 
 /** Días que muestra la tabla «Últimos días». */
 const DAYS = 7
@@ -101,43 +102,43 @@ export function DispatchHomePage() {
 
         <div className="grid items-start gap-4 dsk:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
           <Section title="Últimos días" aside={`${dShort(from)} – ${dShort(now)}`}>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-rule text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-2 font-medium dsk:px-5">Día</th>
-                  <th className="px-2 py-2 font-medium">Stock</th>
-                  <th className="px-2 py-2 font-medium">Producción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {days.map((d) => {
-                  const s = stockByDay.get(d)
-                  const p = prodByDay.get(d)
-                  return (
-                    <tr key={d} className="border-b border-rule last:border-0">
-                      <td className="px-4 py-2.5 dsk:px-5">
-                        <b className="font-medium">{d === now ? 'Hoy' : dShort(d)}</b>
-                      </td>
-                      <td className="px-2 py-2.5">
-                        {s ? (
-                          <span className="num">
-                            {unitsCount(s.total_units)}
-                            <small className="block text-xs text-muted-foreground">
-                              {s.recorded_by} · {clockTime(s.recorded_at)}
-                            </small>
-                          </span>
-                        ) : (
-                          <State done={false} />
-                        )}
-                      </td>
-                      <td className="px-2 py-2.5">
-                        {p ? <span className="num">{unitsCount(p.produced)}</span> : <State done={false} />}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <DataTable
+              dense
+              rows={days}
+              rowKey={(d) => d}
+              columns={[
+                {
+                  key: 'day',
+                  header: 'Día',
+                  cell: (d) => <b className="font-medium">{d === now ? 'Hoy' : dShort(d)}</b>,
+                },
+                {
+                  key: 'stock',
+                  header: 'Stock',
+                  cell: (d) => {
+                    const s = stockByDay.get(d)
+                    return s ? (
+                      <span className="num">
+                        {unitsCount(s.total_units)}
+                        <small className="block text-xs text-muted-foreground">
+                          {s.recorded_by} · {clockTime(s.recorded_at)}
+                        </small>
+                      </span>
+                    ) : (
+                      <State done={false} />
+                    )
+                  },
+                },
+                {
+                  key: 'production',
+                  header: 'Producción',
+                  cell: (d) => {
+                    const p = prodByDay.get(d)
+                    return p ? <span className="num">{unitsCount(p.produced)}</span> : <State done={false} />
+                  },
+                },
+              ]}
+            />
           </Section>
 
           <Section title="Accesos directos">

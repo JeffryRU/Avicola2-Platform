@@ -5,7 +5,7 @@ import { paths } from '@/app/routes'
 import { addDays, dDowLong, dFull, today, type IsoDate, clockTime } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
 import { isoDateSchema } from '@/shared/domain/schemas'
-import { sumUnits } from '@/shared/domain/products'
+import { sumUnits, type Product } from '@/shared/domain/products'
 import { useCatalog } from '@/features/catalog'
 import { teamDay } from '@/features/dashboards/domain/team-day'
 import { useSellers } from '@/features/sellers'
@@ -13,7 +13,7 @@ import { dataWindow, useWindowData } from '@/features/projections'
 import { CountUp } from '@/shared/ui/components/charts'
 import { EmptyState, Note, StatusBadge } from '@/shared/ui/components/feedback'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
 import { NOT_REGISTERED, UNITS_SHORT, kgAmount } from '@/shared/types/labels'
@@ -158,102 +158,117 @@ export function TeamDayView({
                     </span>
                   </li>
                 </ul>
-                <div className="relative hidden overflow-x-auto dsk:block">
-                  <table className={tableCls.table}>
-                    <thead>
-                      <tr>
-                        <th className={tableCls.th}>Vendedor</th>
-                        <th className={cn(tableCls.th, 'text-left')}>Estado</th>
-                        <th className={cn(tableCls.th, 'text-left')}>Categoría</th>
-                        <th className={tableCls.th}>Unidades</th>
-                        <th className={tableCls.th}>Kg aprox.</th>
-                        <th className={tableCls.th}>Venta real (kg)</th>
-                        <th className={tableCls.th}>Enviado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {day.rows.map((r) => (
-                        <tr key={r.seller.username} className={cn(tableCls.row, !r.confirmed && 'hc:bg-warn-soft')}>
-                          <td className={tableCls.td}>
-                            <span className="block font-medium hc:font-semibold">{r.seller.name}</span>
-                            <small className="text-xs text-muted-foreground">
-                              {r.seller.zone ?? r.seller.username}
-                            </small>
-                          </td>
-                          <td className={cn(tableCls.td, 'text-left')}>
-                            <StatusBadge kind={r.confirmed ? 'confirmed' : 'pending'} />
-                          </td>
-                          <td className={cn(tableCls.td, 'text-left', !r.category && 'text-muted-foreground')}>
-                            {r.category ? catalog.dayLabel(r.category, r.units) : NOT_REGISTERED}
-                          </td>
-                          <td className={cn(tableCls.td, 'num', !r.confirmed && 'text-faint')}>
-                            {r.confirmed ? nf0(r.u) : '—'}
-                          </td>
-                          <td className={cn(tableCls.td, 'num', !r.confirmed && 'text-faint')}>
-                            {r.confirmed ? nf1(r.kg) : '—'}
-                          </td>
-                          <td className={cn(tableCls.td, 'num', r.realKg === null && 'text-faint')}>
-                            {r.realKg === null ? '—' : nf1(r.realKg)}
-                          </td>
-                          <td className={cn(tableCls.td, 'num text-muted-foreground')}>
-                            {r.submittedAt ? clockTime(r.submittedAt) : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                      <tr className={tableCls.total}>
-                        <td className={tableCls.td}>Total</td>
-                        <td className={cn(tableCls.td, 'num text-left')}>
-                          {day.confirmed}/{day.rows.length}
-                        </td>
-                        <td className={tableCls.td} />
-                        <td className={cn(tableCls.td, 'num')}>{nf0(day.u)}</td>
-                        <td className={cn(tableCls.td, 'num')}>{nf1(day.kg)}</td>
-                        <td className={cn(tableCls.td, 'num')}>{day.realKg === null ? '—' : nf1(day.realKg)}</td>
-                        <td className={tableCls.td} />
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable
+                  wrapperClassName="hidden dsk:block"
+                  rows={day.rows}
+                  rowKey={(r) => r.seller.username}
+                  rowClassName={(r) => !r.confirmed && 'hc:bg-warn-soft'}
+                  totalLabel="Total"
+                  columns={[
+                    {
+                      key: 'seller',
+                      header: 'Vendedor',
+                      cell: (r) => (
+                        <>
+                          <span className="block font-medium hc:font-semibold">{r.seller.name}</span>
+                          <small className="text-xs text-muted-foreground">{r.seller.zone ?? r.seller.username}</small>
+                        </>
+                      ),
+                    },
+                    {
+                      key: 'status',
+                      header: 'Estado',
+                      cell: (r) => <StatusBadge kind={r.confirmed ? 'confirmed' : 'pending'} />,
+                      total: `${String(day.confirmed)}/${String(day.rows.length)}`,
+                      totalClassName: 'num',
+                    },
+                    {
+                      key: 'category',
+                      header: 'Categoría',
+                      className: (r) => !r.category && 'text-muted-foreground',
+                      cell: (r) => (r.category ? catalog.dayLabel(r.category, r.units) : NOT_REGISTERED),
+                      total: null,
+                    },
+                    {
+                      key: 'units',
+                      header: 'Unidades',
+                      numeric: true,
+                      faint: (r) => !r.confirmed,
+                      cell: (r) => (r.confirmed ? nf0(r.u) : '—'),
+                      total: nf0(day.u),
+                    },
+                    {
+                      key: 'kg',
+                      header: 'Kg aprox.',
+                      numeric: true,
+                      faint: (r) => !r.confirmed,
+                      cell: (r) => (r.confirmed ? nf1(r.kg) : '—'),
+                      total: nf1(day.kg),
+                    },
+                    {
+                      key: 'real',
+                      header: 'Venta real (kg)',
+                      numeric: true,
+                      faint: (r) => r.realKg === null,
+                      cell: (r) => (r.realKg === null ? '—' : nf1(r.realKg)),
+                      total: day.realKg === null ? '—' : nf1(day.realKg),
+                    },
+                    {
+                      key: 'sent',
+                      header: 'Enviado',
+                      numeric: true,
+                      className: 'text-muted-foreground',
+                      cell: (r) => (r.submittedAt ? clockTime(r.submittedAt) : '—'),
+                      total: null,
+                    },
+                  ]}
+                />
               </Section>
 
               <Section title="Por producto" aside="Todo el equipo">
                 {products.length ? (
-                  <div className="relative overflow-x-auto">
-                    <table className={tableCls.table}>
-                      <thead>
-                        <tr>
-                          <th className={tableCls.th}>Producto</th>
-                          <th className={tableCls.th}>Unidades</th>
-                          <th className={tableCls.th}>Kg aprox.</th>
-                          {day.real && <th className={tableCls.th}>Venta real (unid.)</th>}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {products.map((p) => {
-                          const u = day.units[p.id] ?? 0
-                          return (
-                            <tr key={p.id} className={tableCls.row}>
-                              <td className={tableCls.td}>
-                                <span className="block font-medium">{p.name}</span>
-                                {p.subcategory && (
-                                  <small className="text-xs text-muted-foreground">{p.subcategory}</small>
-                                )}
-                              </td>
-                              <td className={cn(tableCls.td, 'num')}>{nf0(u)}</td>
-                              <td className={cn(tableCls.td, 'num')}>{nf1(u * p.kg_per_unit)}</td>
-                              {day.real && <td className={cn(tableCls.td, 'num')}>{nf0(day.real[p.id] ?? 0)}</td>}
-                            </tr>
-                          )
-                        })}
-                        <tr className={tableCls.total}>
-                          <td className={tableCls.td}>Total</td>
-                          <td className={cn(tableCls.td, 'num')}>{nf0(day.u)}</td>
-                          <td className={cn(tableCls.td, 'num')}>{nf1(day.kg)}</td>
-                          {day.real && <td className={cn(tableCls.td, 'num')}>{nf0(sumUnits(day.real))}</td>}
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                    rows={products}
+                    rowKey={(p) => p.id}
+                    totalLabel="Total"
+                    columns={[
+                      {
+                        key: 'name',
+                        header: 'Producto',
+                        cell: (p) => (
+                          <>
+                            <span className="block font-medium">{p.name}</span>
+                            {p.subcategory && <small className="text-xs text-muted-foreground">{p.subcategory}</small>}
+                          </>
+                        ),
+                      },
+                      {
+                        key: 'units',
+                        header: 'Unidades',
+                        numeric: true,
+                        cell: (p) => nf0(day.units[p.id] ?? 0),
+                        total: nf0(day.u),
+                      },
+                      {
+                        key: 'kg',
+                        header: 'Kg aprox.',
+                        numeric: true,
+                        cell: (p) => nf1((day.units[p.id] ?? 0) * p.kg_per_unit),
+                        total: nf1(day.kg),
+                      },
+                      ...(day.real
+                        ? [
+                            {
+                              key: 'real',
+                              header: 'Venta real (unid.)',
+                              numeric: true,
+                              cell: (p: Product) => nf0(day.real?.[p.id] ?? 0),
+                              total: nf0(sumUnits(day.real)),
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
                 ) : (
                   <EmptyState title="Sin proyecciones">Nadie registró proyección para este día.</EmptyState>
                 )}

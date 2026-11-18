@@ -3,12 +3,11 @@ import { parseCell } from '@/shared/domain/format'
 import { Segmented } from '@/shared/ui/components/segmented'
 import { useCatalog } from '@/features/catalog/ui/hooks'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Input } from '@/shared/ui/components/shadcn/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
 import { kgAmount } from '@/shared/types/labels'
-import { cn } from '@/shared/ui/lib/utils'
 
 export function ProductsPage() {
   const { catalog } = useCatalog()
@@ -87,31 +86,24 @@ export function ProductsPage() {
               </span>
             }
           >
-            <div className="relative overflow-x-auto">
-              <table className={tableCls.table}>
-                <thead>
-                  <tr>
-                    <th className={tableCls.th}>Producto</th>
-                    <th className={tableCls.th}>Kg por unidad</th>
-                    <th className={tableCls.th}>10 unidades</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((p) => (
-                    <tr key={p.id} className={tableCls.row}>
-                      <td className={tableCls.td}>
-                        <span className="font-medium">{p.name}</span>
-                        {p.subcategory && (
-                          <small className="block text-xs text-muted-foreground">{p.subcategory}</small>
-                        )}
-                      </td>
-                      <td className={cn(tableCls.td, 'num')}>{p.kg_per_unit.toFixed(2)}</td>
-                      <td className={cn(tableCls.td, 'num')}>{kgAmount(p.kg_per_unit * 10)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              rows={products}
+              rowKey={(p) => p.id}
+              columns={[
+                {
+                  key: 'name',
+                  header: 'Producto',
+                  cell: (p) => (
+                    <>
+                      <span className="font-medium">{p.name}</span>
+                      {p.subcategory && <small className="block text-xs text-muted-foreground">{p.subcategory}</small>}
+                    </>
+                  ),
+                },
+                { key: 'kg', header: 'Kg por unidad', numeric: true, cell: (p) => p.kg_per_unit.toFixed(2) },
+                { key: 'ten', header: '10 unidades', numeric: true, cell: (p) => kgAmount(p.kg_per_unit * 10) },
+              ]}
+            />
           </Section>
         </div>
       </PageBody>

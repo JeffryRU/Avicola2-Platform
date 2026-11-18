@@ -25,7 +25,7 @@ import { ReviewDialog } from '@/features/projections/ui/components/review-dialog
 import { useMyDays, useSubmitProjection, useSuggestion } from '@/features/projections/ui/hooks'
 import { LoadingOverlay, Note } from '@/shared/ui/components/feedback'
 import { FooterActions, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
@@ -77,13 +77,7 @@ export function NewProjectionPage() {
 
   const dates = useMemo(() => draftDates(draft), [draft])
   // Sugerencia del modelo: se pide sola en la tabla (paso 2) y va junto a cada casilla.
-  const suggestion = useSuggestion(
-    draft.category,
-    draft.start,
-    draft.days,
-    undefined,
-    draft.step === 1 && !!owner,
-  )
+  const suggestion = useSuggestion(draft.category, draft.start, draft.days, undefined, draft.step === 1 && !!owner)
   if (!catalog) return <PageHeader title="Nueva proyección" />
   const loaded = catalog
 
@@ -205,26 +199,20 @@ export function NewProjectionPage() {
               aside={<span className="num">{products.length}</span>}
               className="hidden @3xl/main:block"
             >
-              <div className="relative overflow-x-auto">
-                <table className={tableCls.table}>
-                  <thead>
-                    <tr>
-                      <th className={tableCls.th}>Producto</th>
-                      <th className={cn(tableCls.th, 'text-left')}>Presentación</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {products.map((p) => (
-                      <tr key={p.id}>
-                        <td className={tableCls.td}>{p.name}</td>
-                        <td className={cn(tableCls.td, 'text-left text-muted-foreground')}>
-                          {kgPerUnitLabel(p.kg_per_unit)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                rows={products}
+                rowKey={(p) => p.id}
+                rowClassName={() => 'hover:bg-transparent'}
+                columns={[
+                  { key: 'name', header: 'Producto', cell: (p) => p.name },
+                  {
+                    key: 'kg',
+                    header: 'Presentación',
+                    className: 'text-muted-foreground',
+                    cell: (p) => kgPerUnitLabel(p.kg_per_unit),
+                  },
+                ]}
+              />
             </Section>
           </div>
           <FooterActions>

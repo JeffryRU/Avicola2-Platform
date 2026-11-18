@@ -16,8 +16,10 @@ import { EmptyState } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Segmented } from '@/shared/ui/components/segmented'
 import { SyncStatus } from '@/shared/ui/components/sync-status'
-import { tableCls } from '@/shared/ui/lib/table-styles'
-import { cn } from '@/shared/ui/lib/utils'
+import { DataTable } from '@/shared/ui/components/data-table'
+
+type SacaRecord = NonNullable<ReturnType<typeof useSacaHistory>['data']>[number]
+const farmOrder = (r: SacaRecord, group: string) => r.groups.find((x) => x.name === group)?.farm_order ?? 0
 
 /** Las sacas guardadas: lo que se pidió a granja cada día, por tipo (la más reciente arriba). */
 export function SacaHistoryPage() {
@@ -42,48 +44,45 @@ export function SacaHistoryPage() {
           {query.data && rows.length === 0 ? (
             <EmptyState title={HISTORY_EMPTY_TITLE}>{HISTORY_EMPTY_BODY}</EmptyState>
           ) : (
-            <div className="relative overflow-x-auto">
-              <table className={cn(tableCls.table, 'text-sm')}>
-                <thead>
-                  <tr>
-                    <th className={cn(tableCls.th, 'text-left')}>{HISTORY_COLUMNS.date}</th>
-                    {groups.map((g) => (
-                      <th key={g} className={tableCls.th}>
-                        {g}
-                      </th>
-                    ))}
-                    <th className={tableCls.th}>{HISTORY_COLUMNS.total}</th>
-                    <th className={cn(tableCls.th, 'text-left')}>{HISTORY_COLUMNS.saved}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.date} className={tableCls.row}>
-                      <td className={tableCls.td}>
-                        <Link
-                          to={`${paths.saca}?fecha=${r.date}`}
-                          className="font-medium text-primary underline-offset-4 hover:underline"
-                        >
-                          {dDow(r.date)} {dShort(r.date)}
-                        </Link>
-                      </td>
-                      {groups.map((g) => {
-                        const n = r.groups.find((x) => x.name === g)?.farm_order ?? 0
-                        return (
-                          <td key={g} className={cn(tableCls.td, 'num', !n && 'text-faint')}>
-                            {nf0(n)}
-                          </td>
-                        )
-                      })}
-                      <td className={cn(tableCls.td, 'num font-semibold')}>{nf0(r.farm_order)}</td>
-                      <td className={cn(tableCls.td, 'text-muted-foreground')}>
-                        {clockTime(r.saved_at)} · {r.saved_by}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              dense
+              rows={rows}
+              rowKey={(r) => r.date}
+              columns={[
+                {
+                  key: 'date',
+                  header: HISTORY_COLUMNS.date,
+                  cell: (r) => (
+                    <Link
+                      to={`${paths.saca}?fecha=${r.date}`}
+                      className="font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      {dDow(r.date)} {dShort(r.date)}
+                    </Link>
+                  ),
+                },
+                ...groups.map((g) => ({
+                  key: g,
+                  header: g,
+                  numeric: true,
+                  cell: (r: SacaRecord) => nf0(farmOrder(r, g)),
+                  faint: (r: SacaRecord) => !farmOrder(r, g),
+                })),
+                {
+                  key: 'total',
+                  header: HISTORY_COLUMNS.total,
+                  numeric: true,
+                  className: 'font-semibold',
+                  cell: (r) => nf0(r.farm_order),
+                },
+                {
+                  key: 'saved',
+                  header: HISTORY_COLUMNS.saved,
+                  className: 'text-muted-foreground',
+                  cell: (r) => `${clockTime(r.saved_at)} · ${r.saved_by}`,
+                },
+              ]}
+            />
           )}
         </Section>
       </PageBody>

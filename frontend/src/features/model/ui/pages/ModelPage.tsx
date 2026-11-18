@@ -26,7 +26,7 @@ import { LineChart } from '@/shared/ui/components/charts'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { SyncStatus } from '@/shared/ui/components/sync-status'
-import { tableCls } from '@/shared/ui/lib/table-styles'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { cn } from '@/shared/ui/lib/utils'
 
 const pct = (v: number) => `${v.toFixed(1)} %`
@@ -129,47 +129,39 @@ export function ModelPage() {
         </Section>
 
         <Section title={TABLE_TITLE} aside={TABLE_NOTE} className="mb-4">
-          <div className="relative overflow-x-auto">
-            <table className={cn(tableCls.table, 'text-sm')}>
-              <thead>
-                <tr>
-                  <th className={cn(tableCls.th, 'text-left')}>{MODEL_COLUMN}</th>
-                  {LEVELS.map((l) => (
-                    <th key={l} className={tableCls.th}>
-                      {LEVEL_LABEL[l]}
-                    </th>
-                  ))}
-                  <th className={tableCls.th}>{BIAS_LABEL}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {s.models.map((m) => (
-                  <tr key={m.key} className={cn(tableCls.row, chosen.has(m.key) && 'font-semibold')}>
-                    <td className={tableCls.td}>
-                      {chosen.has(m.key) && <span aria-label="en uso">★ </span>}
-                      {m.name}
-                    </td>
-                    {LEVELS.map((l) => (
-                      <td
-                        key={l}
-                        className={cn(
-                          tableCls.td,
-                          'num',
-                          best[l] === m.key && 'bg-ok-soft font-semibold text-ok hc:text-foreground',
-                        )}
-                      >
-                        {pct(m.metrics[l])}
-                      </td>
-                    ))}
-                    <td className={cn(tableCls.td, 'num text-muted-foreground')}>
-                      {m.metrics.sesgo > 0 ? '+' : ''}
-                      {pct(m.metrics.sesgo)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            dense
+            rows={s.models}
+            rowKey={(m) => m.key}
+            rowClassName={(m) => chosen.has(m.key) && 'font-semibold'}
+            columns={[
+              {
+                key: 'model',
+                header: MODEL_COLUMN,
+                cell: (m) => (
+                  <>
+                    {chosen.has(m.key) && <span aria-label="en uso">★ </span>}
+                    {m.name}
+                  </>
+                ),
+              },
+              ...LEVELS.map((l) => ({
+                key: l,
+                header: LEVEL_LABEL[l],
+                numeric: true,
+                className: (m: (typeof s.models)[number]) =>
+                  best[l] === m.key && 'bg-ok-soft font-semibold text-ok hc:text-foreground',
+                cell: (m: (typeof s.models)[number]) => pct(m.metrics[l]),
+              })),
+              {
+                key: 'bias',
+                header: BIAS_LABEL,
+                numeric: true,
+                className: 'text-muted-foreground',
+                cell: (m) => `${m.metrics.sesgo > 0 ? '+' : ''}${pct(m.metrics.sesgo)}`,
+              },
+            ]}
+          />
         </Section>
 
         <Section title={CHART_TITLE} className="mb-4">
