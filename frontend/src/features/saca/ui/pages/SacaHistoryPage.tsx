@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { paths } from '@/app/routes'
-import { addDays, clockTime, dDow, dShort, today } from '@/shared/domain/dates'
+import { addDays, clockTime, dShort, today } from '@/shared/domain/dates'
 import { nf0 } from '@/shared/domain/format'
 import { useSacaHistory } from '@/features/saca/ui/hooks'
 import {
@@ -51,13 +51,14 @@ export function SacaHistoryPage() {
               columns={[
                 {
                   key: 'date',
+                  sticky: true,
                   header: HISTORY_COLUMNS.date,
                   cell: (r) => (
                     <Link
                       to={`${paths.saca}?fecha=${r.date}`}
                       className="font-medium text-primary underline-offset-4 hover:underline"
                     >
-                      {dDow(r.date)} {dShort(r.date)}
+                      {dShort(r.date)}
                     </Link>
                   ),
                 },

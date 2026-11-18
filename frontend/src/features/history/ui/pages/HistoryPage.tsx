@@ -100,6 +100,7 @@ export function HistoryPage() {
               columns={[
                 {
                   key: 'when',
+                  sticky: true,
                   header: COLUMNS.when,
                   cell: (c) => (
                     <>

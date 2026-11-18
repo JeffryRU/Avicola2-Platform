@@ -88,7 +88,7 @@ export const tableStyles = {
 
   row: cva('', {
     variants: {
-      hover: { true: 'transition-colors hover:bg-muted', false: '' },
+      hover: { true: 'group/row transition-colors hover:bg-muted', false: '' },
       striped: { true: 'even:bg-muted/50', false: '' },
       clickable: {
         true: 'cursor-pointer focus-visible:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
@@ -104,8 +104,38 @@ export const tableStyles = {
     defaultVariants: { hover: true, striped: false, clickable: false },
   }),
 
+  /**
+   * Tablas que se editan (registrar proyección y stock): las mismas reglas y colores, con casillas
+   * para escribir. Bordes separados para que la columna fija no pierda su borde al deslizar.
+   */
+  edit: {
+    table: 'w-full border-separate border-spacing-0',
+    th: 'border-b border-rule-strong bg-surface px-2 py-2 text-xs font-medium whitespace-nowrap text-muted-foreground hc:border-b-heavy hc:border-foreground hc:text-sm hc:font-bold hc:text-foreground',
+    /** Columna fija a la izquierda (el producto) en todos los tamaños. */
+    stickyCol: 'sticky left-0 z-[1] bg-surface',
+    /** Fila de subtotal de un grupo (p. ej. «Brasa chica»). */
+    groupRow: '[&>*]:bg-muted [&>*]:text-xs [&>*]:font-semibold [&>*]:text-ink-2',
+    /** Fila de total por día. */
+    totalRow:
+      '[&>td]:border-t [&>td]:border-rule-strong [&>td]:bg-muted [&>td]:py-2.5 [&>td]:font-semibold hc:[&>td]:border-t-heavy hc:[&>td]:border-foreground',
+    cell: 'border-b border-rule',
+    input: cva(
+      'num rounded-md border-control border-input bg-surface font-medium text-foreground outline-none transition-colors placeholder:text-faint focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring',
+      {
+        variants: {
+          // touch: celular (alto cómodo para el dedo); desktop: escritorio.
+          size: { touch: 'h-touch text-md', desktop: 'h-9 text-base', fluid: 'h-touch text-md dsk:h-9 dsk:text-base' },
+          align: { center: 'text-center', right: 'px-1.5 text-right' },
+          invalid: { true: 'border-bad bg-bad-soft', false: '' },
+        },
+        defaultVariants: { size: 'fluid', align: 'center', invalid: false },
+      },
+    ),
+  },
+
   /** Columna fija a la izquierda al deslizar en el celular (en escritorio, normal). */
-  sticky: 'sticky left-0 z-10 bg-surface dsk:static dsk:bg-transparent',
+  // Con hover, la celda fija se pinta igual que su fila (si no, quedaría blanca al pasar el mouse).
+  sticky: 'sticky left-0 z-10 bg-surface group-hover/row:bg-muted dsk:static dsk:bg-transparent',
   stickyTotal: 'sticky left-0 z-10 bg-muted dsk:static',
   desktopOnly: 'hidden dsk:table-cell',
 }

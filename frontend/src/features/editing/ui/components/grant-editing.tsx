@@ -96,8 +96,11 @@ function GrantForm({
                 checked={checked}
                 onChange={() => toggle(d.date)}
               />
-              <b className="flex-1 font-medium">{dShort(d.date)}</b>
-              <small className={cn('text-sm', closed ? 'font-medium text-bad' : 'text-muted-foreground')}>
+              {/* El día no se parte en dos líneas; si falta espacio, se ajusta la nota de cierre. */}
+              <b className="flex-1 font-medium whitespace-nowrap">{dShort(d.date)}</b>
+              <small
+                className={cn('min-w-0 text-right text-sm', closed ? 'font-medium text-bad' : 'text-muted-foreground')}
+              >
                 {closed ? PAST_CUTOFF_LABEL : closesLabel(d.closes_at, true, now)}
               </small>
             </label>

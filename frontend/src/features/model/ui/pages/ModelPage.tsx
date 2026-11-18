@@ -137,6 +137,7 @@ export function ModelPage() {
             columns={[
               {
                 key: 'model',
+                sticky: true,
                 header: MODEL_COLUMN,
                 cell: (m) => (
                   <>
