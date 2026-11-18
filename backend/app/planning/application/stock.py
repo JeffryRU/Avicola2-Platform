@@ -4,17 +4,22 @@ import logging
 from dataclasses import dataclass
 from datetime import date
 
-from app.planning.application.ports import Clock, ProductRepository, StockRepository
+from app.planning.application.ports import (
+    Clock,
+    ProductRepository,
+    SellerRepository,
+    StockRepository,
+)
 from app.planning.domain.dates import check_range
 from app.planning.domain.models import Product, Seller
 from app.planning.domain.permissions import Permission, require
 from app.planning.domain.stock import (
-    DEFAULT_LOCATION,
     MAX_UNITS,
     DailyStock,
     StockLine,
     check_lot_date,
     check_stock_date,
+    stock_locations,
 )
 from app.shared.domain.errors import DomainError
 
@@ -49,17 +54,24 @@ class RegisterStock:
         stock: StockRepository,
         clock: Clock,
         locations: list[str] | None = None,
+        sellers: SellerRepository | None = None,
     ):
         self.products, self.stock, self.clock = products, stock, clock
-        self.locations = locations or [DEFAULT_LOCATION]
+        self.configured, self.sellers = locations or [], sellers
+
+    @property
+    def locations(self) -> list[str]:
+        zones = [s.zone for s in self.sellers.list_active()] if self.sellers else []
+        return stock_locations(self.configured, zones)
 
     def __call__(
         self, actor: Seller, day: date, entries: list[StockEntry], location: str | None = None
     ) -> DailyStock:
         require(actor.role, Permission.MANAGE_STOCK)
         check_stock_date(day, self.clock.today())
-        place = location or self.locations[0]
-        if place not in self.locations:
+        allowed = self.locations
+        place = location or allowed[0]
+        if place not in allowed:
             raise DomainError(f"La ubicación {place} no existe.")
         if not entries:
             raise DomainError("Registra al menos un producto.")
@@ -104,12 +116,20 @@ class ListStock:
 
 
 class GetStockOptions:
-    def __init__(self, products: ProductRepository, locations: list[str], lot_days: int):
-        self.products, self.locations, self.lot_days = products, locations, lot_days
+    def __init__(
+        self,
+        products: ProductRepository,
+        locations: list[str],
+        lot_days: int,
+        sellers: SellerRepository | None = None,
+    ):
+        self.products, self.configured, self.lot_days = products, locations, lot_days
+        self.sellers = sellers
 
     def __call__(self, viewer: Seller) -> StockOptions:
         require(viewer.role, Permission.VIEW_STOCK)
         items = sorted(
             self.products.list_stock_items(), key=lambda p: (p.category, p.sort_order, p.id)
         )
-        return StockOptions(items, list(self.locations), self.lot_days)
+        zones = [s.zone for s in self.sellers.list_active()] if self.sellers else []
+        return StockOptions(items, stock_locations(self.configured, zones), self.lot_days)

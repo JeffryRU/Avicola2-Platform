@@ -6,20 +6,40 @@ con información hasta `d − HORIZON`. Ver ADR 0020.
 """
 
 from datetime import date, timedelta
+from functools import lru_cache
 
 import numpy as np
+import yaml
 from sklearn.ensemble import HistGradientBoostingRegressor
+
+from app.core.config import get_settings
 
 HORIZON = 2  # se proyecta el día anterior: lo de ayer aún no está completo
 FIRST = 42  # días de historia mínimos para armar las variables
-SIZES = (range(4), range(4, 6), range(6, 10))  # chica = Brasa 1-4, mediana = 5-6, grande = 7-10
-# Feriados de Perú (la demanda de pollo a la brasa cambia esos días y alrededor).
-HOLIDAYS = {
-    date(2025, 12, 8), date(2025, 12, 25), date(2026, 1, 1), date(2026, 4, 2), date(2026, 4, 3),
-    date(2026, 5, 1), date(2026, 6, 7), date(2026, 6, 29), date(2026, 7, 23), date(2026, 7, 28),
-    date(2026, 7, 29), date(2026, 8, 6), date(2026, 8, 30), date(2026, 10, 8), date(2026, 11, 1),
-    date(2026, 12, 8), date(2026, 12, 9), date(2026, 12, 25),
-}  # fmt: skip
+# Feriados (la demanda de pollo a la brasa cambia esos días y alrededor): config/feriados.yaml.
+FERIADOS_FILE = "feriados.yaml"
+
+
+@lru_cache
+def holidays() -> frozenset[date]:
+    path = get_settings().config_dir / FERIADOS_FILE
+    if not path.is_file():
+        return frozenset()
+    with path.open(encoding="utf-8") as fh:
+        return frozenset(date.fromisoformat(str(d)) for d in yaml.safe_load(fh)["feriados"])
+
+
+def sizes_of(groups: list[str]) -> tuple[range, ...]:
+    """Posiciones de cada tamaño, en el orden del catálogo (los productos vienen agrupados)."""
+    out: list[range] = []
+    start = 0
+    for i in range(1, len(groups) + 1):
+        if i == len(groups) or groups[i] != groups[start]:
+            out.append(range(start, i))
+            start = i
+    return tuple(out)
+
+
 GBM = {
     "loss": "poisson", "learning_rate": 0.05, "max_leaf_nodes": 31, "min_samples_leaf": 80,
     "l2_regularization": 1.0, "max_iter": 150, "categorical_features": [0, 1], "random_state": 7,
@@ -107,9 +127,10 @@ def features(Y: np.ndarray, days: list[date], day: int) -> np.ndarray:
     mix = Y[:, :, max(0, last - 55) : last + 1].sum(axis=2)
     mix = mix / np.maximum(mix.sum(axis=1, keepdims=True), 1e-9)
     d = days[day]
+    feriados = holidays()
     cal = [
-        d.weekday(), d.day, d.month, float(d in HOLIDAYS),
-        float(d + timedelta(days=1) in HOLIDAYS), float(d - timedelta(days=1) in HOLIDAYS),
+        d.weekday(), d.day, d.month, float(d in feriados),
+        float(d + timedelta(days=1) in feriados), float(d - timedelta(days=1) in feriados),
     ]  # fmt: skip
     rows = []
     for s in range(S):
@@ -125,11 +146,12 @@ def fit(X: np.ndarray, y: np.ndarray) -> HistGradientBoostingRegressor:
     return HistGradientBoostingRegressor(**GBM).fit(X, y)
 
 
-def wape(P: np.ndarray, A: np.ndarray) -> dict[str, float]:
-    """Error (WAPE, %) por nivel de la app, más el sesgo. P y A: (vendedor, producto, día)."""
+def wape(P: np.ndarray, A: np.ndarray, sizes: tuple[range, ...]) -> dict[str, float]:
+    """Error (WAPE, %) por nivel de la app, más el sesgo. P y A: (vendedor, producto, día);
+    `sizes`: las posiciones de cada tamaño (ver `sizes_of`)."""
     k = A.shape[2] // 7 * 7
     week = lambda v: v[:k].reshape(-1, 7).sum(1)  # noqa: E731
-    size = lambda X: np.stack([X.sum(0)[list(r)].sum(0) for r in SIZES])  # noqa: E731
+    size = lambda X: np.stack([X.sum(0)[list(r)].sum(0) for r in sizes])  # noqa: E731
     e = lambda p, a: float(100 * np.abs(p - a).sum() / max(a.sum(), 1e-9))  # noqa: E731
     team_p, team_a = P.sum((0, 1)), A.sum((0, 1))
     return {

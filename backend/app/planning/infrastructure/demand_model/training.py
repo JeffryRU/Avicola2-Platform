@@ -21,9 +21,9 @@ from sqlalchemy import delete, func, insert, or_, select
 from sqlalchemy.orm import Session
 from threadpoolctl import threadpool_limits
 
+from app.core.config import get_settings
 from app.planning.domain.models import Product
 from app.planning.domain.orders import (
-    EXTRA_MATERIALS,
     GENERAL_SELLER,
     ORDER_CATEGORY,
     ORDER_MATERIAL_PREFIX,
@@ -71,27 +71,30 @@ def choose(metrics: dict[str, dict[str, float]]) -> dict[str, str]:
     return {use: min(candidates, key=lambda k: metrics[k][level]) for use, level in USES.items()}
 
 
-def _extra_product(material: str, extras: list[Product]) -> Product | None:
+def _extra_product(
+    material: str, extras: list[Product], materials: dict[str, str]
+) -> Product | None:
     text = material.upper()
-    return next((p for p in extras if text.startswith(EXTRA_MATERIALS[p.id])), None)
+    return next((p for p in extras if text.startswith(materials[p.id].upper())), None)
 
 
 def _cubes(session: Session, products: list[Product]):
     """Unidades despachadas por (vendedor, producto, día) y por (cliente, producto, día).
 
     Los productos son las brasas (por peso) y, al final, los otros que se proyectan
-    (`EXTRA_MATERIALS`): sus líneas de ARIS se reconocen por el material."""
+    (DEMAND_EXTRA_MATERIALS): sus líneas de ARIS se reconocen por el material."""
+    materials = get_settings().demand_extra_materials
     brasa = sorted(
         (p for p in products if p.category == ORDER_CATEGORY), key=lambda p: p.kg_per_unit
     )
-    extras = [p for p in products if p.id in EXTRA_MATERIALS]
+    extras = [p for p in products if p.id in materials]
     items = [*brasa, *extras]
     pos = {p.id: i for i, p in enumerate(items)}
     t = dispatch_orders.c
     upper = func.upper(t.material)
     wanted = or_(
         upper.startswith(ORDER_MATERIAL_PREFIX, autoescape=True),
-        *(upper.startswith(EXTRA_MATERIALS[p.id], autoescape=True) for p in extras),
+        *(upper.startswith(materials[p.id].upper(), autoescape=True) for p in extras),
     )
     rows = session.execute(
         select(
@@ -101,7 +104,9 @@ def _cubes(session: Session, products: list[Product]):
     ).all()  # fmt: skip
     lines = []
     for seller, customer, day, *rest in rows:
-        product = _extra_product(rest[0], extras) or product_for(OrderLine(day, *rest), brasa)
+        product = _extra_product(rest[0], extras, materials) or product_for(
+            OrderLine(day, *rest), brasa
+        )
         if product is None:
             continue
         units = rest[4] or rest[3] / product.kg_per_unit  # despachado (o kg / peso)
@@ -153,6 +158,8 @@ def _train(session: Session, products: list[Product]) -> dict | None:
     if cubes is None:
         return None
     YA, idx, sellers, days, C, owner, items, n_brasa = cubes
+    # Tamaños del catálogo (Brasa chica, mediana, grande): las posiciones de sus brasas, en orden.
+    sizes = core.sizes_of([p.subcategory or p.category for p in items[:n_brasa]])
     Y = YA[idx]
     S, P, N = Y.shape
     usable = list(range(core.FIRST, N))
@@ -229,7 +236,8 @@ def _train(session: Session, products: list[Product]) -> dict | None:
     B = slice(0, n_brasa)
     A = Y[:, B, evaluated]
     metrics = {
-        k: core.wape(np.stack([preds[k][d][:, B] for d in evaluated], axis=2), A) for k in MODELS
+        k: core.wape(np.stack([preds[k][d][:, B] for d in evaluated], axis=2), A, sizes)
+        for k in MODELS
     }
     chosen = choose(metrics)
     summary = {

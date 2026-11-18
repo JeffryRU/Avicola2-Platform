@@ -8,9 +8,6 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
-# El reporte nombra algunas zonas por la región: La Libertad es la zona de Trujillo.
-ZONE_ALIASES = {"LA LIBERTAD": "TRUJILLO"}
-
 
 @dataclass(frozen=True)
 class StoreOrderDay:
@@ -25,13 +22,19 @@ def _key(text: str) -> str:
     return " ".join(plain.upper().split())
 
 
-def sales_zone(raw: str | None, zones: list[str]) -> str | None:
+def sales_zone(
+    raw: str | None, zones: list[str], aliases: dict[str, str] | None = None
+) -> str | None:
     """La zona de venta del reporte («SAN MARTIN», «LA LIBERTAD») con el nombre que usan los
-    vendedores («San Martín», «Trujillo»). Si no coincide con ninguna, queda tal cual."""
+    vendedores («San Martín», «Trujillo»). Si no coincide con ninguna, queda tal cual.
+
+    `aliases`: zonas que el reporte nombra distinto, por la región (La Libertad = Trujillo;
+    STORE_ZONE_ALIASES).
+    """
     if not raw or not raw.strip():
         return None
     key = _key(raw)
-    key = ZONE_ALIASES.get(key, key)
+    key = {_key(k): _key(v) for k, v in (aliases or {}).items()}.get(key, key)
     for zone in zones:
         if _key(zone) == key:
             return zone
