@@ -139,7 +139,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
-        "text": "={{ $json.statusCode === 200 ? '✅ Datos de ARIS cargados: ' + $json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. El modelo se reentrena en unos minutos.' : '❌ No se pudo cargar el archivo: ' + (($json.body && $json.body.detail) || ('error ' + $json.statusCode)) }}",
+        "text": "={{ $json.statusCode === 200 ? '✅ Datos de ARIS cargados: ' + $json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. ' + ($json.body.flatMap(l => l.issues || []).length ? 'Revisa en el archivo: ' + $json.body.flatMap(l => l.issues || []).join(' · ') + '. ' : '') + 'El modelo se reentrena en unos minutos.' : '❌ No se pudo cargar el archivo: ' + (($json.body && $json.body.detail) || ('error ' + $json.statusCode)) }}",
         "additionalFields": {
           "appendAttribution": false
         }
@@ -202,7 +202,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ audience: 'supervisors', title: 'Datos de ARIS cargados', body: ('Llegó por Telegram: ' + $('Cargar en el backend').item.json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. El modelo se reentrena en unos minutos.').slice(0, 500), link: '/modelo' }) }}",
+        "jsonBody": "={{ JSON.stringify({ audience: 'supervisors', title: 'Datos de ARIS cargados', body: ('Llegó por Telegram: ' + $('Cargar en el backend').item.json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. ' + ($json.body.flatMap(l => l.issues || []).length ? 'Revisa en el archivo: ' + $json.body.flatMap(l => l.issues || []).join(' · ') + '. ' : '') + 'El modelo se reentrena en unos minutos.').slice(0, 500), link: '/modelo' }) }}",
         "options": {}
       },
       "id": "d4a10005-0007-4c0e-9f00-000000000007",

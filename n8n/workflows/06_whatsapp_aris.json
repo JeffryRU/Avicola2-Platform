@@ -211,7 +211,7 @@
         "operation": "send",
         "phoneNumberId": "={{ $('Mensaje de WhatsApp').item.json.metadata.phone_number_id }}",
         "recipientPhoneNumber": "={{ $('Mensaje de WhatsApp').item.json.messages[0].from }}",
-        "textBody": "={{ $json.statusCode === 200 ? '✅ Datos de ARIS cargados: ' + $json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. El modelo se reentrena en unos minutos.' : '❌ No se pudo cargar el archivo: ' + (($json.body && $json.body.detail) || ('error ' + $json.statusCode)) }}",
+        "textBody": "={{ $json.statusCode === 200 ? '✅ Datos de ARIS cargados: ' + $json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. ' + ($json.body.flatMap(l => l.issues || []).length ? 'Revisa en el archivo: ' + $json.body.flatMap(l => l.issues || []).join(' · ') + '. ' : '') + 'El modelo se reentrena en unos minutos.' : '❌ No se pudo cargar el archivo: ' + (($json.body && $json.body.detail) || ('error ' + $json.statusCode)) }}",
         "additionalFields": {}
       },
       "id": "d4a10006-0008-4c0e-9f00-000000000008",
@@ -272,7 +272,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ audience: 'supervisors', title: 'Datos de ARIS cargados', body: ('Llegó por WhatsApp: ' + $('Cargar en el backend').item.json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. El modelo se reentrena en unos minutos.').slice(0, 500), link: '/modelo' }) }}",
+        "jsonBody": "={{ JSON.stringify({ audience: 'supervisors', title: 'Datos de ARIS cargados', body: ('Llegó por WhatsApp: ' + $('Cargar en el backend').item.json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. ' + ($json.body.flatMap(l => l.issues || []).length ? 'Revisa en el archivo: ' + $json.body.flatMap(l => l.issues || []).join(' · ') + '. ' : '') + 'El modelo se reentrena en unos minutos.').slice(0, 500), link: '/modelo' }) }}",
         "options": {}
       },
       "id": "d4a10006-0010-4c0e-9f00-000000000010",

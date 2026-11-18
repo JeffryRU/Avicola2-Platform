@@ -9,8 +9,7 @@ from collections import defaultdict
 from datetime import date, datetime
 from pathlib import Path
 
-from openpyxl import load_workbook
-
+from app.planning.domain.file_specs import RowError
 from app.planning.domain.models import Product
 from app.planning.domain.production import (
     MAX_FLOCK_KG,
@@ -19,17 +18,13 @@ from app.planning.domain.production import (
     ProductionLine,
 )
 from app.planning.domain.saca import product_group
+from app.planning.infrastructure.file_specs import file_spec
+from app.planning.infrastructure.tabular import match, open_workbook
 
-SHEET = "DB_CALIDA_B"
-COLUMNS = {"FECHA": "date", "RANGO": "range", "PEDIDO": "ordered", "PRODUCCION": "produced"}
-QUALITY_B = "CALIDAD B"
-WEIGHT = "PESO PROMEDIO"
+# Columnas y hoja: config/imports.yaml (archivo «produccion»).
+SHEET = file_spec("produccion").sheet or ""
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 IMPORTED_BY = "importacion"
-
-
-def _number(value: object) -> float:
-    return float(value) if isinstance(value, int | float) else 0.0
 
 
 def _flock_kg(value: object) -> float | None:
@@ -46,33 +41,37 @@ def read_production(
     by_range = {f"B{i}": p.id for i, p in enumerate(sorted(brasa, key=lambda p: p.sort_order))}
     group_of = {p.id: product_group(p) for p in brasa}
     weights: dict[date, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
-    sheet = load_workbook(path, read_only=True, data_only=True)[SHEET]
-    index: dict[str, int] = {}
+    spec = file_spec("produccion")
+    book = open_workbook(path)
     days: dict[date, dict[str, ProductionLine]] = defaultdict(dict)
     skipped = 0
-    for row in sheet.iter_rows(values_only=True):
-        if not index:
-            names = [str(c).strip().upper() if c is not None else "" for c in row]
-            if all(name in names for name in (*COLUMNS, QUALITY_B)):
-                # «CALIDAD B» aparece también como «Total Calidad B»: se toma la primera exacta.
-                index = {key: names.index(name) for name, key in COLUMNS.items()}
-                index["quality_b"] = names.index(QUALITY_B)
-                index["weight"] = names.index(WEIGHT) if WEIGHT in names else -1
-            continue
-        when, code = row[index["date"]], str(row[index["range"]] or "").strip().upper()
-        if not isinstance(when, datetime) or code not in by_range:
-            skipped += code not in ("", "CARNE")
-            continue
-        kg = _flock_kg(row[index["weight"]]) if index["weight"] >= 0 else None
-        if kg is not None:
-            weights[when.date()][group_of[by_range[code]]].append(kg)
-        produced = round(_number(row[index["produced"]]))
-        quality_b = min(produced, round(_number(row[index["quality_b"]])))
-        days[when.date()][by_range[code]] = ProductionLine(
-            by_range[code], round(_number(row[index["ordered"]]), 2), produced, quality_b
-        )
-    if not index:
-        raise ValueError(f"La hoja {SHEET} no tiene las columnas esperadas.")
+    try:
+        found = match(book[SHEET].iter_rows(values_only=True), [spec])
+        if found is None:
+            raise ValueError(f"La hoja {SHEET} no tiene las columnas esperadas.")
+        _, positions, rows, _ = found
+        for cells in rows:
+            col = positions["range"]
+            code = str((cells[col] if col < len(cells) else None) or "").strip().upper()
+            try:
+                row = spec.convert(cells, positions)
+            except RowError:
+                row = None  # fecha o número que no se puede leer
+            if row is None or row["date"] is None or code not in by_range:
+                # Las filas sin rango (subtotales, títulos) o de carne no cuentan como descartadas.
+                skipped += code not in ("", "CARNE")
+                continue
+            day = row["date"]
+            kg = _flock_kg(row["weight"])
+            if kg is not None:
+                weights[day][group_of[by_range[code]]].append(kg)
+            produced = round(row["produced"])
+            quality_b = min(produced, round(row["quality_b"]))
+            days[day][by_range[code]] = ProductionLine(
+                by_range[code], round(row["ordered"], 2), produced, quality_b
+            )
+    finally:
+        book.close()
     result = [
         DailyProduction(
             day,

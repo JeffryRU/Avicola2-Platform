@@ -18,6 +18,8 @@ export const arisLoadSchema = z.object({
   skipped: z.number().int(),
   date_from: z.string().nullable(),
   date_to: z.string().nullable(),
+  /** Las primeras filas descartadas, con su número y el motivo («Fila 3: …»). */
+  issues: z.array(z.string()).default([]),
 })
 export type ArisLoad = z.infer<typeof arisLoadSchema>
 export const arisLoadsSchema = z.array(arisLoadSchema)

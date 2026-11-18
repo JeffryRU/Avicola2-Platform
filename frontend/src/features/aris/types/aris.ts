@@ -41,6 +41,12 @@ export function arisLoadSummary(loads: ArisLoad[]): string {
   return `${verb} ${parts.join(' y ')}.`
 }
 
+/** Qué filas no se pudieron usar y por qué (para corregir el archivo), o null si no hubo. */
+export function arisIssuesText(loads: ArisLoad[]): string | null {
+  const issues = loads.flatMap((l) => l.issues)
+  return issues.length ? `Revisa en el archivo: ${issues.join(' · ')}` : null
+}
+
 /** El archivo no entra por la app: a dónde mandarlo. */
 export const ARIS_TOO_BIG = (mb: number) =>
   `El archivo pesa ${mb.toFixed(1)} MB y desde la app se suben hasta ${ARIS_MAX_MB} MB. ` +

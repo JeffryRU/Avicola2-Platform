@@ -15,6 +15,7 @@ import {
   ARIS_TRAINING,
   ARIS_UPLOAD_LABEL,
   ARIS_UPLOADING,
+  arisIssuesText,
   arisLoadSummary,
   arisNoticeText,
 } from '@/features/aris/types/aris'
@@ -58,7 +59,9 @@ export function ArisNotice() {
     setProgress(0)
     try {
       const loads = await upload.mutateAsync({ file, onProgress: setProgress })
-      toast.success(arisLoadSummary(loads), { description: ARIS_TRAINING, duration: 10_000 })
+      const issues = arisIssuesText(loads)
+      if (issues) toast.warning(arisLoadSummary(loads), { description: issues, duration: 20_000 })
+      else toast.success(arisLoadSummary(loads), { description: ARIS_TRAINING, duration: 10_000 })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo cargar el archivo.')
     } finally {
