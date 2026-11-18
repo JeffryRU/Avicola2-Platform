@@ -24,6 +24,7 @@ from threadpoolctl import threadpool_limits
 from app.planning.domain.models import Product
 from app.planning.domain.orders import (
     EXTRA_MATERIALS,
+    GENERAL_SELLER,
     ORDER_CATEGORY,
     ORDER_MATERIAL_PREFIX,
     OrderLine,
@@ -278,10 +279,15 @@ def _save(session, summary, preds, stored, evaluated, days, sellers, brasa) -> N
     rows = []
     for k in stored:
         for d in evaluated:
-            for s, seller in enumerate(sellers):
+            # Cada vendedor y, aparte, el vendedor típico (promedio del equipo) para los demás.
+            typical = preds[k][d].mean(axis=0)
+            for seller, values in [
+                *zip(sellers, preds[k][d], strict=True),
+                (GENERAL_SELLER, typical),
+            ]:
                 units = {
                     brasa[p].id: round(float(v))
-                    for p, v in enumerate(preds[k][d][s])
+                    for p, v in enumerate(values)
                     if round(float(v)) > 0
                 }
                 if units:

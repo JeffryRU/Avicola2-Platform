@@ -15,7 +15,13 @@ from app.planning.application.ports import (
     ProjectionRepository,
 )
 from app.planning.domain.models import CONFIRMED, DailyUnits
-from app.planning.domain.orders import ORDER_CATEGORY, daily_units, weekday_median
+from app.planning.domain.orders import (
+    GENERAL_HISTORY_METHOD,
+    ORDER_CATEGORY,
+    PERSONAL_HISTORY_METHOD,
+    daily_units,
+    weekday_median,
+)
 
 
 class WeekdayAverageForecaster:
@@ -52,7 +58,7 @@ class WeekdayAverageForecaster:
 class OrderHistoryForecaster:
     """Mediana de lo que le pidieron al vendedor los últimos días iguales de la semana."""
 
-    ORDERS, FALLBACK = "order_history_median", "fallback"
+    ORDERS, FALLBACK = PERSONAL_HISTORY_METHOD, "fallback"
 
     def __init__(
         self, orders: OrderHistory, products: ProductRepository, fallback: DemandForecaster
@@ -71,4 +77,32 @@ class OrderHistoryForecaster:
         if not any(day.units for day in result):
             return self.fallback.suggest(seller, category, dates)
         self.name = self.ORDERS
+        return result
+
+
+class TeamHistoryForecaster:
+    """Sugerencia general: lo que pide un vendedor típico (la mediana del equipo de los últimos
+    4 días iguales de la semana, repartida entre los vendedores que pidieron).
+
+    Es para quien aún no tiene pedidos propios en ARIS (un vendedor nuevo) y para los días que
+    el modelo no pronostica.
+    """
+
+    name = GENERAL_HISTORY_METHOD
+
+    def __init__(self, orders: OrderHistory, products: ProductRepository) -> None:
+        self.orders, self.products = orders, products
+
+    def suggest(self, seller: str, category: str, dates: list[date]) -> list[DailyUnits]:
+        if category != ORDER_CATEGORY:
+            return [DailyUnits(seller, d, {}) for d in dates]
+        lines = self.orders.team_lines(min(dates))
+        team = len({who for who, _ in lines})
+        products = [p for p in self.products.list_active() if p.category == category]
+        history = daily_units([line for _, line in lines], products)
+        result = []
+        for target in dates:
+            total = weekday_median(history, target)
+            units = {pid: round(n / team) for pid, n in total.items()} if team else {}
+            result.append(DailyUnits(seller, target, {k: v for k, v in units.items() if v > 0}))
         return result

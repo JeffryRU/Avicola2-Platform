@@ -173,6 +173,10 @@ class OrderHistory(Protocol):
 
     def lines(self, seller: str, before: date) -> list[OrderLine]: ...
 
+    def team_lines(self, before: date) -> list[tuple[str, OrderLine]]:
+        """Las de todo el equipo (con su vendedor), para la sugerencia general."""
+        ...
+
 
 class PasswordHasher(Protocol):
     # Hash con el formato válido que no corresponde a ninguna contraseña: verificarlo cuesta

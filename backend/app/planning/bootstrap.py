@@ -26,7 +26,11 @@ from app.planning.infrastructure.arrival_model import AdaptiveArrivalModel
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.demand_model.store import SqlDemandModelStore
 from app.planning.infrastructure.events import event_bus
-from app.planning.infrastructure.forecast import OrderHistoryForecaster, WeekdayAverageForecaster
+from app.planning.infrastructure.forecast import (
+    OrderHistoryForecaster,
+    TeamHistoryForecaster,
+    WeekdayAverageForecaster,
+)
 from app.planning.infrastructure.orders import LoadedOrders, LoadedStoreOrders
 from app.planning.infrastructure.persistence.cached import (
     CachedProductRepository,
@@ -195,7 +199,11 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         export_projections=ex.ExportProjections(products, projections, sales, sellers, clock),
         list_changes=uc.ListChanges(history),
         suggest_projection=uc.SuggestProjection(
-            products, forecaster, settings.planning_max_days, SqlDemandModelStore(session)
+            products,
+            forecaster,
+            settings.planning_max_days,
+            SqlDemandModelStore(session),
+            general=TeamHistoryForecaster(order_history, products),
         ),
         status=SqlStatusProbe(session, schema),
         list_notifications=nt.ListNotifications(notifications),
