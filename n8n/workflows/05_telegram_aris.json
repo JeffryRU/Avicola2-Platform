@@ -1,0 +1,346 @@
+{
+  "id": "avicola2TelegramAris05",
+  "name": "05_telegram_aris",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "download": true
+        }
+      },
+      "id": "d4a10005-0001-4c0e-9f00-000000000001",
+      "name": "Mensaje de Telegram",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "d4a10005-0901-4c0e-9f00-000000000901",
+      "notes": "Credencial: el token del bot de BotFather. Solo responde a los chats de ARIS_TELEGRAM_CHAT_IDS."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10005-0102-4c0e-9f00-000000000102",
+              "leftValue": "={{ ($env.ARIS_TELEGRAM_CHAT_IDS || '').split(',').map(s => s.trim()).includes(String($json.message.chat.id)) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10005-0002-4c0e-9f00-000000000002",
+      "name": "¿Chat autorizado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10005-0103-4c0e-9f00-000000000103",
+              "leftValue": "={{ ($json.message.document && $json.message.document.file_name) || '' }}",
+              "rightValue": "\\.(xlsx|xlsm|csv)$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10005-0003-4c0e-9f00-000000000003",
+      "name": "¿Trae un Excel o CSV?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/aris",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "source",
+              "value": "telegram"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          },
+          "timeout": 600000
+        }
+      },
+      "id": "d4a10005-0004-4c0e-9f00-000000000004",
+      "name": "Cargar en el backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
+        "text": "={{ $json.statusCode === 200 ? '✅ Datos de ARIS cargados: ' + $json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. El modelo se reentrena en unos minutos.' : '❌ No se pudo cargar el archivo: ' + (($json.body && $json.body.detail) || ('error ' + $json.statusCode)) }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d4a10005-0005-4c0e-9f00-000000000005",
+      "name": "Responder con el resultado",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        -200
+      ],
+      "webhookId": "d4a10005-0905-4c0e-9f00-000000000905"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10005-0106-4c0e-9f00-000000000106",
+              "leftValue": "={{ $('Cargar en el backend').item.json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10005-0006-4c0e-9f00-000000000006",
+      "name": "¿Se cargó?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/notifications",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ audience: 'supervisors', title: 'Datos de ARIS cargados', body: ('Llegó por Telegram: ' + $('Cargar en el backend').item.json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. El modelo se reentrena en unos minutos.').slice(0, 500), link: '/modelo' }) }}",
+        "options": {}
+      },
+      "id": "d4a10005-0007-4c0e-9f00-000000000007",
+      "name": "Avisar a los supervisores",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
+        "text": "Envíame el export de ARIS (DESPACHO y/o VENTAS) como documento: Excel (.xlsx) o CSV. Reemplazo solo las fechas que trae y el modelo se reentrena solo.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d4a10005-0008-4c0e-9f00-000000000008",
+      "name": "Explicar qué enviar",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        0
+      ],
+      "webhookId": "d4a10005-0908-4c0e-9f00-000000000908"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
+        "text": "=Este chat no está autorizado para cargar datos de ARIS. Pide a un supervisor que agregue el id {{ $json.message.chat.id }} a ARIS_TELEGRAM_CHAT_IDS.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d4a10005-0009-4c0e-9f00-000000000009",
+      "name": "No autorizado",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        480,
+        160
+      ],
+      "webhookId": "d4a10005-0909-4c0e-9f00-000000000909"
+    }
+  ],
+  "connections": {
+    "Mensaje de Telegram": {
+      "main": [
+        [
+          {
+            "node": "¿Chat autorizado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Chat autorizado?": {
+      "main": [
+        [
+          {
+            "node": "¿Trae un Excel o CSV?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No autorizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Trae un Excel o CSV?": {
+      "main": [
+        [
+          {
+            "node": "Cargar en el backend",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar qué enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cargar en el backend": {
+      "main": [
+        [
+          {
+            "node": "Responder con el resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder con el resultado": {
+      "main": [
+        [
+          {
+            "node": "¿Se cargó?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Se cargó?": {
+      "main": [
+        [
+          {
+            "node": "Avisar a los supervisores",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

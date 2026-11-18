@@ -7,6 +7,8 @@ docker compose exec n8n n8n import:workflow --input=/data/workflows/01_ingesta_e
 docker compose exec n8n n8n import:workflow --input=/data/workflows/02_recordatorio_proyeccion.json
 docker compose exec n8n n8n import:workflow --input=/data/workflows/03_agente_chatbot.json
 docker compose exec n8n n8n import:workflow --input=/data/workflows/04_drive_aris.json
+docker compose exec n8n n8n import:workflow --input=/data/workflows/05_telegram_aris.json
+docker compose exec n8n n8n import:workflow --input=/data/workflows/06_whatsapp_aris.json
 docker compose exec n8n n8n publish:workflow --id=avicola2IngestaExcel01
 docker compose exec n8n n8n publish:workflow --id=avicola2Recordatorio02
 docker compose restart n8n
@@ -118,6 +120,19 @@ Cualquier workflow puede notificar a los usuarios de la app con un *HTTP Request
 
 `audience` acepta `all`, `sellers`, `supervisors` o el usuario de una persona. `link` es opcional y solo admite rutas internas de la app (empiezan con `/`).
 
+## Datos de ARIS: tres medios además de la app
+
+El export de ARIS (la venta real con la que aprende el modelo) se puede cargar por cuatro vías, y todas terminan en la misma carga del backend:
+
+| Medio | Tamaño | Para qué |
+|---|---|---|
+| Aviso en la app | hasta 4 MB (límite de Vercel) | El export de un día o de una semana |
+| Carpeta de Google Drive (04) | sin límite práctico | El export completo, o dejarlo y olvidarse |
+| Bot de Telegram (05) | hasta 20 MB (límite de la API de bots) | Mandarlo desde el celular |
+| WhatsApp (06) | hasta 100 MB | Mandarlo desde el celular |
+
+En todos los casos se reemplazan solo las fechas que trae el archivo, el modelo se reentrena en unos minutos y a los supervisores les llega un aviso en la app. En Telegram y WhatsApp, además, el bot responde con lo cargado o con el error.
+
 ## 04_drive_aris
 
 ```
@@ -137,3 +152,29 @@ Quien tenga el export de ARIS (DESPACHO y/o VENTAS, en Excel o CSV) lo deja en u
 1. **Carpeta.** Crea una carpeta en Google Drive y pon su URL en `ARIS_DRIVE_FOLDER_URL` del `.env` de n8n (en Coolify, en las variables del servicio). Después reinicia n8n.
 2. **Credencial.** En n8n, abre el workflow, entra a *Archivo nuevo en la carpeta de Drive* y conecta una credencial **Google Drive OAuth2** de una cuenta con acceso a esa carpeta. Usa la misma credencial en *Descargar de Drive*.
 3. **Publicar.** Activa el workflow: `docker compose exec n8n n8n publish:workflow --id=avicola2DriveAris04`, o actívalo desde el editor.
+
+## 05_telegram_aris
+
+```
+Telegram Trigger (mensaje, descarga el adjunto) → ¿chat autorizado? → ¿Excel o CSV? → POST /api/internal/aris → responder → ¿200? → aviso
+                                                     └→ «no autorizado» (le dice su id)  └→ explicar qué enviar
+```
+
+1. **Bot.** En Telegram, habla con **@BotFather** → `/newbot`. Copia el token.
+2. **Credencial.** En n8n, crea una credencial **Telegram API** con ese token y úsala en todos los nodos de Telegram del workflow.
+3. **Autorizados.** Activa el workflow y escríbele al bot: te contestará el id de tu chat. Ponlo en `ARIS_TELEGRAM_CHAT_IDS` (separados por comas; un grupo también sirve) y reinicia n8n.
+4. **Requisito:** n8n tiene que tener HTTPS público (`WEBHOOK_URL`), porque Telegram llama a su webhook. En develop y producción ya lo tiene.
+
+## 06_whatsapp_aris
+
+```
+WhatsApp Trigger (messages) → ¿número autorizado? → ¿documento? → enlace (Graph API) → descargar → POST /api/internal/aris → responder → ¿200? → aviso
+                                └→ «no autorizado»       └→ explicar qué enviar
+```
+
+1. **Cuenta de Meta.** En developers.facebook.com, crea una app de tipo *Business* y agrégale el producto **WhatsApp**. La prueba gratuita trae un número de prueba que acepta hasta 5 destinatarios verificados. Para usar el número de la empresa hay que verificarla en Meta.
+2. **Credenciales en n8n.**
+   - **WhatsApp API:** el token de acceso permanente (de un usuario del sistema) y el *Business Account ID*. Úsala en los nodos *Pedir el enlace del archivo*, *Descargar el archivo* y en los de respuesta.
+   - **WhatsApp OAuth API:** el *App ID* y el *App Secret*. Úsala en *Mensaje de WhatsApp*: n8n registra el webhook en Meta al activar el workflow.
+3. **Autorizados.** Pon en `ARIS_WHATSAPP_NUMBERS` los números que pueden enviar, con código de país y sin «+» (por ejemplo, `51987654321`). Reinicia n8n.
+4. **Para responder:** WhatsApp solo deja contestar en las 24 horas siguientes al mensaje de la persona. Aquí siempre es así, porque la respuesta va en el momento.

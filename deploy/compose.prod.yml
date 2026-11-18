@@ -128,6 +128,9 @@ services:
       INGEST_API_TOKEN: ${INGEST_API_TOKEN}
       # Carpeta de Google Drive donde dejan el export de ARIS (04_drive_aris).
       ARIS_DRIVE_FOLDER_URL: ${ARIS_DRIVE_FOLDER_URL:-}
+      # Quién puede mandar el export por Telegram (ids de chat) o WhatsApp (números), separados por comas.
+      ARIS_TELEGRAM_CHAT_IDS: ${ARIS_TELEGRAM_CHAT_IDS:-}
+      ARIS_WHATSAPP_NUMBERS: ${ARIS_WHATSAPP_NUMBERS:-}
       # Modelo del agente 03_agente_chatbot (ADR 0017); la clave va en una credencial de n8n.
       AGENT_MODEL: ${AGENT_MODEL:-claude-sonnet-5-5}
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"

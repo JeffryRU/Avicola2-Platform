@@ -112,6 +112,10 @@
               "parameterType": "formBinaryData",
               "name": "file",
               "inputDataFieldName": "data"
+            },
+            {
+              "name": "source",
+              "value": "drive"
             }
           ]
         },

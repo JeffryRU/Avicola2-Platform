@@ -31,6 +31,7 @@ SIGNATURES = {
     SALES: {"PedidoOdooDetalleID", "FechaPedido", "MaterialDescripcion", "Cantidad"},
 }
 ISO_DATE = len("2026-01-01")
+ZIP_MAGIC = b"PK"
 # Cuántas filas mirar arriba de la hoja buscando la fila de títulos.
 HEADER_SCAN = 20
 NOT_RECOGNIZED = (
@@ -182,9 +183,11 @@ class SqlArisData:
 
     def load(self, content: bytes, filename: str) -> list[ArisLoad]:
         name = filename.lower()
-        if name.endswith((".xlsx", ".xlsm")):
+        # WhatsApp y Telegram a veces no traen el nombre: un .xlsx es un ZIP (empieza con «PK»).
+        is_excel = name.endswith((".xlsx", ".xlsm")) or content[:2] == ZIP_MAGIC
+        if is_excel:
             tables = _xlsx_tables(content)
-        elif name.endswith((".csv", ".txt")):
+        elif name.endswith((".csv", ".txt")) or "." not in name:
             tables = _csv_tables(content)
         else:
             raise DomainError("Sube el export de ARIS en Excel (.xlsx) o CSV.")

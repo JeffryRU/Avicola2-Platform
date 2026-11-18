@@ -17,6 +17,7 @@ from fastapi import (
     Cookie,
     Depends,
     File,
+    Form,
     Header,
     Query,
     Response,
@@ -60,8 +61,9 @@ from app.shared.infrastructure.http.service_token import require_service_token
 # El export de ARIS: un día pesa unos cientos de KB; el completo de varios meses, decenas de MB.
 MAX_ARIS_MB = 80
 MAX_ARIS_BYTES = MAX_ARIS_MB * 1024 * 1024
-# Autor de las cargas que llegan por n8n (carpeta de Google Drive).
+# Autor de las cargas que llegan por n8n, según el medio.
 ARIS_SERVICE_USER = "n8n"
+ARIS_SOURCES = {"drive": "Google Drive", "telegram": "Telegram", "whatsapp": "WhatsApp"}
 
 SESSION_COOKIE = "nv_session"
 COOKIE_PATH = API_PREFIX
@@ -880,9 +882,12 @@ def register_production(
 def aris_ingest(
     use_cases: UseCases,
     file: Annotated[UploadFile, File(description="Export de ARIS: Excel o CSV")],
+    source: Annotated[str, Form(description="drive | telegram | whatsapp")] = "drive",
 ) -> list[dict[str, Any]]:
-    """Lo mismo, para n8n (archivo nuevo en la carpeta de Google Drive), con X-Api-Token."""
-    system = Seller(ARIS_SERVICE_USER, "n8n (Google Drive)", None, GENERAL_SUPERVISOR)
-    return [
-        asdict(r) for r in use_cases.import_aris(system, _read_upload(file), file.filename or "")
-    ]
+    """Lo mismo, para n8n (Google Drive, Telegram o WhatsApp), con X-Api-Token."""
+    label = ARIS_SOURCES.get(source, source)
+    system = Seller(
+        f"{ARIS_SERVICE_USER}-{source}"[:50], f"n8n ({label})", None, GENERAL_SUPERVISOR
+    )
+    content = _read_upload(file)
+    return [asdict(r) for r in use_cases.import_aris(system, content, file.filename or "")]

@@ -1,5 +1,5 @@
 import { dFull } from '@/shared/domain/dates'
-import type { ArisLoad, ArisStatus } from '@/features/aris/domain/aris'
+import { ARIS_MAX_MB, type ArisLoad, type ArisStatus } from '@/features/aris/domain/aris'
 
 export const ARIS_UPLOAD_LABEL = 'Subir datos de ARIS'
 export const ARIS_LATER_LABEL = 'Ahora no'
@@ -10,7 +10,8 @@ export const ARIS_TRAINING = 'Datos de ARIS cargados: el modelo se está reentre
 export function arisNoticeText(s: ArisStatus): { title: string; detail: string } {
   const detail =
     'Con el export de DESPACHO de ARIS el modelo aprende la venta real y sugiere mejor la proyección. ' +
-    'No es obligatorio: también puedes dejar el Excel en la carpeta de Google Drive.'
+    `No es obligatorio. Desde aquí, hasta ${ARIS_MAX_MB} MB (un día o una semana); ` +
+    'el export completo, por la carpeta de Google Drive o por el bot de Telegram o de WhatsApp.'
   if (!s.last_dispatch) return { title: 'Todavía no hay datos de ARIS cargados', detail }
   const since = `Los datos de ARIS llegan hasta el ${dFull(s.last_dispatch)}`
   const missing = s.missing_days === 1 ? 'falta el día de ayer' : `faltan ${s.missing_days} días`
@@ -39,3 +40,8 @@ export function arisLoadSummary(loads: ArisLoad[]): string {
   const verb = loads.length === 1 && loads[0]?.rows === 1 ? 'Se cargó' : 'Se cargaron'
   return `${verb} ${parts.join(' y ')}.`
 }
+
+/** El archivo no entra por la app: a dónde mandarlo. */
+export const ARIS_TOO_BIG = (mb: number) =>
+  `El archivo pesa ${mb.toFixed(1)} MB y desde la app se suben hasta ${ARIS_MAX_MB} MB. ` +
+  'Exporta menos días o envíalo por Google Drive, Telegram o WhatsApp.'
