@@ -26,7 +26,7 @@ from app.planning.domain.accounts import LockoutPolicy
 from app.planning.infrastructure.aris_history import ArisHistory, ArisOrSimulatedSales
 from app.planning.infrastructure.aris_import import SqlArisData
 from app.planning.infrastructure.arrival_model import AdaptiveArrivalModel
-from app.planning.infrastructure.assistant import N8nAssistant, load_starters
+from app.planning.infrastructure.assistant import N8nAssistant, load_guardrails, load_starters
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.demand_model.store import SqlDemandModelStore
 from app.planning.infrastructure.events import event_bus
@@ -86,6 +86,11 @@ def _assistant_starters(config_dir: Path) -> asst.AssistantStarters:
     return asst.AssistantStarters(load_starters(config_dir))
 
 
+@lru_cache
+def _assistant_guardrails(config_dir: Path) -> tuple:
+    return tuple(load_guardrails(config_dir))
+
+
 def _assistant(settings: Settings) -> asst.AskAssistant:
     gateway = (
         N8nAssistant(
@@ -104,7 +109,11 @@ def _assistant(settings: Settings) -> asst.AskAssistant:
     )
     tickets = AssistantTickets(settings.auth_secret, settings.assistant_ticket_minutes)
     return asst.AskAssistant(
-        gateway, tickets, limiter.allow, _assistant_starters(settings.config_dir)
+        gateway,
+        tickets,
+        limiter.allow,
+        _assistant_starters(settings.config_dir),
+        _assistant_guardrails(settings.config_dir),
     )
 
 

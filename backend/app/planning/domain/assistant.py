@@ -6,6 +6,7 @@ se limpian (pocas, cortas, sin repetir y sin caracteres de control).
 """
 
 import re
+import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
 
@@ -80,3 +81,59 @@ def starters(
     # Primero lo propio del rol; lo general (sin permiso ni vendedor) al final.
     mine.sort(key=lambda g: g.permission is None and not g.sellers)
     return _unique((q for g in mine for q in g.questions), MAX_STARTERS)
+
+
+# --- Guardrails (ADR 0022) -------------------------------------------------------------------
+# Antes del agente: preguntas que no se le pasan (credenciales, sacarle sus instrucciones, datos
+# personales, detalles técnicos); se responden con un texto fijo. Después: la respuesta no puede
+# traer secretos ni las instrucciones del agente (el system prompt lleva este código «canario»).
+
+INSTRUCTIONS_CANARY = "AVP-CANARIO-7Q2"
+LEAKED_REPLY = (
+    "No puedo mostrar mis instrucciones internas. Puedo ayudarte con proyecciones, pedido real, "
+    "saca, stock, producción y las reglas del registro."
+)
+REDACTED = "[oculto]"
+_SECRETS = (
+    re.compile(r"eyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{8,}"),  # JWT
+    re.compile(r"\b(?:sk|pk|rk)-[\w-]{16,}"),  # claves de API
+    re.compile(r"\b[0-9a-fA-F]{32,}\b"),  # tokens hexadecimales
+    re.compile(r"(?i)\bbearer\s+[\w.-]{16,}"),
+    re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"),  # correos
+)
+
+
+@dataclass(frozen=True)
+class GuardrailRule:
+    """Preguntas que no llegan al agente: si el texto (sin tildes, en minúsculas) coincide con
+    alguno de `patterns`, se responde `reply`."""
+
+    category: str
+    patterns: tuple[re.Pattern[str], ...]
+    reply: str
+
+
+def plain(text: str) -> str:
+    """Minúsculas y sin tildes (para comparar con los patrones de los guardrails)."""
+    folded = unicodedata.normalize("NFKD", text.lower())
+    return "".join(c for c in folded if not unicodedata.combining(c))
+
+
+def guardrail_rule(category: str, patterns: Iterable[str], reply: str) -> GuardrailRule:
+    return GuardrailRule(category, tuple(re.compile(plain(p)) for p in patterns), reply)
+
+
+def blocked_by(question: str, rules: Iterable[GuardrailRule]) -> GuardrailRule | None:
+    text = plain(question)
+    return next((r for r in rules if any(p.search(text) for p in r.patterns)), None)
+
+
+def guard_reply(text: str) -> tuple[str, bool]:
+    """(respuesta segura, ¿hubo que intervenir?): sin las instrucciones del agente y sin
+    secretos (tokens, claves, correos)."""
+    if INSTRUCTIONS_CANARY.lower() in text.lower():
+        return LEAKED_REPLY, True
+    clean = text
+    for pattern in _SECRETS:
+        clean = pattern.sub(REDACTED, clean)
+    return clean, clean != text

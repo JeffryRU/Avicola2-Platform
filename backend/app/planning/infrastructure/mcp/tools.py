@@ -10,7 +10,7 @@ Las descripciones las leen los agentes para elegir la herramienta: deben ser cla
 import secrets
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Any
 
 from mcp.server.mcpserver import MCPServer
@@ -322,11 +322,29 @@ def pedido_real(fecha_desde: DateFrom, fecha_hasta: DateTo, vendedor: SellerFilt
     return _run(work)
 
 
+_WEEKDAYS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+
+
+def _when(moment: datetime) -> str:
+    """«viernes 20/11 a las 14:00»: los agentes leen mal las fechas ISO con zona."""
+    return f"{_WEEKDAYS[moment.weekday()]} {moment:%d/%m} a las {moment:%H:%M}"
+
+
 def reglas_de_registro() -> str:
     def work(uc: PlanningUseCases, viewer: Seller) -> dict[str, Any]:
         window = uc.editing_window(viewer)
         policy = window.policy
+        same_day = policy.days_before == 0
+        rule = (
+            f"Cada día se registra hasta las {policy.cutoff:%H:%M} del mismo día."
+            if same_day
+            else f"Cada día se registra hasta las {policy.cutoff:%H:%M} de "
+            f"{policy.days_before} día(s) antes."
+        )
         return {
+            "regla": rule
+            if policy.enabled
+            else "No hay hora de corte: se puede registrar siempre.",
             "hora_de_corte": f"{policy.cutoff:%H:%M}",
             "dias_antes_del_corte": policy.days_before,
             "se_registra_desde_dentro_de_dias": policy.starts_in,
@@ -335,7 +353,8 @@ def reglas_de_registro() -> str:
             "dias": [
                 {
                     "fecha": d.date.isoformat(),
-                    "cierra": d.closes_at.isoformat(timespec="minutes"),
+                    "dia": f"{_WEEKDAYS[d.date.weekday()]} {d.date:%d/%m}",
+                    "cierra": _when(d.closes_at),
                     "abierto": d.open,
                     "habilitacion": d.unlock.status if d.unlock else None,
                 }
