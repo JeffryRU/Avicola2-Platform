@@ -9,6 +9,8 @@ RUN pnpm install --frozen-lockfile
 COPY frontend/ ./
 # Demo: el login muestra los usuarios de prueba y entra como administrador (demo1234).
 ENV VITE_SHOW_DEMO_USERS=true
+# Sin .git en la imagen: así el selector sabe que esta es la versión mvp1.
+ENV VERCEL_GIT_COMMIT_REF=mvp1
 RUN pnpm build
 
 # --- Backend ----------------------------------------------------------------------
