@@ -32,6 +32,7 @@ class N8nAssistant:
                     "name": request.name,
                     "role": request.role,
                     "permissions": list(request.permissions),
+                    "scope": request.scope,
                 },
             },
             ensure_ascii=False,
@@ -79,6 +80,8 @@ def load_starters(config_dir: Path) -> list[StarterGroup]:
                 questions=tuple(str(q) for q in g.get("preguntas", [])),
                 permission=Permission(permission) if permission else None,
                 sellers=bool(g.get("solo_vendedores", False)),
+                scope=str(g.get("alcance", "")),
+                topics=tuple(str(t) for t in g.get("temas", [])),
             )
         )
     return groups

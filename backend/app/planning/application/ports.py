@@ -211,6 +211,8 @@ class AssistantRequest:
     name: str
     role: str
     permissions: tuple[str, ...]
+    # Lo que puede consultar, en palabras (el agente no ofrece nada fuera de esto).
+    scope: str = ""
 
 
 class AssistantGateway(Protocol):

@@ -303,3 +303,20 @@ def test_reply_never_shows_secrets_or_the_instructions(agent) -> None:
     assert "eyJ" not in reply
     assert "a" * 64 not in reply
     assert "[oculto]" in reply
+
+
+def test_scope_goes_to_the_agent_and_follow_ups_stay_in_scope(agent) -> None:
+    agent.reply = (
+        "No hay stock hoy.<sugerencias>¿Cuál es la saca sugerida para hoy? | "
+        "¿Quién ya registró hoy? | ¿Y el stock de ayer?</sugerencias>"
+    )
+    r = _ask("despacho")
+    assert r.json()["suggestions"] == ["¿Y el stock de ayer?"]
+    scope = agent.requests[0].scope
+    assert "stock" in scope
+    assert "saca" not in scope
+    # Si ninguna sugerencia es de su tema, se ofrecen las de inicio de su rol.
+    agent.reply = "Listo.<sugerencias>¿Cuánto es la saca de hoy?</sugerencias>"
+    assert "¿Cuánto stock hay hoy?" in _ask("despacho").json()["suggestions"]
+    seller = _ask("rnavarro").json()["suggestions"]
+    assert not any("saca" in q for q in seller)

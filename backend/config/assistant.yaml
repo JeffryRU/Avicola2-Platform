@@ -4,25 +4,40 @@
 #
 # - permiso: solo quien lo tiene (ver app/planning/domain/permissions.py). Sin permiso: todos.
 # - solo_vendedores: solo quien registra proyecciones.
+# - alcance: qué puede consultar quien ve el tema (se le dice al agente para que no ofrezca más).
+# - temas: palabras del tema (sin tildes); una pregunta sugerida que las tenga no se ofrece a
+#   quien no ve el tema (el agente a veces propone igual, p. ej., la saca a un vendedor).
 # Se muestran como mucho 4: primero las del rol y al final las generales.
 preguntas_de_inicio:
   - solo_vendedores: true
+    alcance: sus propias proyecciones, si ya registró y su pedido real (ARIS)
     preguntas:
       - ¿Ya registré mi proyección de mañana?
       - ¿Cuánto proyecté esta semana?
       - ¿Cómo va mi pedido real contra lo que proyecté?
   - permiso: view_saca
+    alcance: la saca sugerida (cuántas aves pedir a granja)
+    temas: [saca]
     preguntas:
       - ¿Cuánto es la saca de hoy?
+  - permiso: view_team
+    alcance: las proyecciones, quién registró y el pedido real de todo el equipo
+    temas: [equipo, quien falta, quienes faltan, quien ya, quienes ya, vendedores, todos los]
+    preguntas:
       - ¿Quién falta confirmar para mañana?
       - ¿Cuánto proyectó el equipo para mañana?
   - permiso: view_stock
+    alcance: el stock de despacho
+    temas: [stock]
     preguntas:
       - ¿Cuánto stock hay hoy?
   - permiso: view_production
+    alcance: la producción diaria (aves pedidas a granja y llegadas)
+    temas: [produc, granja, llegaron]
     preguntas:
       - ¿Cuánto se produjo ayer?
-  - preguntas:
+  - alcance: las reglas del registro (hora de corte y días abiertos) y los productos
+    preguntas:
       - ¿A qué hora cierra el registro de mañana?
       - ¿Qué días se pueden registrar?
 
