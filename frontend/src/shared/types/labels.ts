@@ -41,3 +41,7 @@ export const kgAmount = (kg: number, approx = false) => `${nf1(kg)} kg${approx ?
 
 /** Botón de engranaje del menú lateral (lleva a Perfil). */
 export const PROFILE_LABEL = 'Perfil, apariencia y accesibilidad'
+
+/** Botón del asistente (chat de IA, solo supervisión). */
+export const ASSISTANT_LABEL = 'Asistente'
+export const ASSISTANT_TITLE = 'Preguntar al asistente (se abre en otra pestaña)'

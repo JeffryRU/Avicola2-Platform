@@ -82,6 +82,7 @@
 
 ## Consecuencias
 
+- **Botón en la app (opcional):** con `VITE_ASSISTANT_URL` (la Chat URL del workflow), los usuarios con vista de equipo ven un botón flotante «Asistente» que abre el chat en otra pestaña (n8n no se deja incrustar y pide su propio usuario y contraseña). Los vendedores nunca lo ven. Sin la variable no hay botón.
 - Hay un endpoint nuevo, `/mcp`, también visible desde el dominio público (Caddy o Traefik reenvían todo al backend). Sin token responde 401.
 - `AuthSettings` del SDK pide un `issuer_url`. Como no hay OAuth ni metadatos de descubrimiento, no se publica ni se usa.
 - La protección contra *DNS rebinding* del SDK está apagada: rechazaba el host real (`backend:8000` desde n8n), y sin cookies una página ajena no puede usar las credenciales de nadie.

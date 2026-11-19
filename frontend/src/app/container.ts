@@ -42,6 +42,7 @@ import { HttpModelGateway } from '@/features/model/infrastructure/http-model-gat
 import { HttpSacaGateway } from '@/features/saca/infrastructure/http-saca-gateway'
 import { BrowserTableExporter } from '@/shared/infrastructure/table-exporter'
 import { StoredDraftRepository, StoredSubmissionQueue } from '@/features/projections/infrastructure/stored-repositories'
+import { assistantUrl } from '@/shared/domain/assistant'
 
 /** Lo que la interfaz puede usar: solo casos de uso y puertos, nunca adaptadores concretos. */
 export interface Container {
@@ -69,6 +70,8 @@ export interface Container {
   aris: ArisGateway
   production: ProductionGateway
   installer: AppInstaller
+  /** Chat del asistente (n8n); null si no está configurado. */
+  assistantUrl: string | null
 }
 
 /** Raíz de composición del frontend: el único lugar que conoce los adaptadores. */
@@ -123,5 +126,6 @@ export function createContainer(): Container {
     aris: new HttpArisGateway(http),
     production: new HttpProductionGateway(http),
     installer: new BrowserAppInstaller(window, import.meta.env.VITE_ANDROID_APK_URL),
+    assistantUrl: assistantUrl(import.meta.env.VITE_ASSISTANT_URL),
   }
 }
