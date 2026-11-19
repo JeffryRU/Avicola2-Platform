@@ -1,5 +1,6 @@
 """Tareas periódicas dentro de la API: avisar antes del corte a quien aún no registró y, cuando
-pasa la hora de corte, quién no registró.
+pasa la hora de corte, quién no registró. También deja calculado el modelo de llegada (la saca
+y el pronóstico) al arrancar y cada pocos minutos, para que nadie espere su ajuste en frío.
 
 Corre en el proceso de la API (sin depender de n8n). Con varios workers cada uno revisa, pero
 los avisos llevan clave de deduplicación por día, así que el resultado es el mismo.
@@ -8,6 +9,7 @@ los avisos llevan clave de deduplicación por día, así que el resultado es el 
 import asyncio
 import contextlib
 import logging
+import time
 from collections.abc import AsyncIterator, Callable
 from datetime import datetime
 
@@ -27,6 +29,9 @@ logger = logging.getLogger(__name__)
 SYSTEM_USER = "sistema"
 # Ventana del reentrenamiento diario del modelo de demanda (horas desde MODEL_TRAIN_HOUR).
 TRAIN_WINDOW_HOURS = 3
+# Cada cuánto se vuelve a precalentar la saca (si la historia no cambió, es casi gratis).
+WARM_EVERY_SECONDS = 300
+_warmed_at = 0.0
 
 
 def check_missed_projections(settings: Settings) -> int:
@@ -89,6 +94,28 @@ def train_demand_model(settings: Settings) -> int:
         return 1 if training.train(session, products) else 0
 
 
+def warm_saca(settings: Settings, force: bool = False) -> int:
+    """Calcula la saca de hoy para dejar ajustado el modelo de llegada en este proceso: en frío
+    tarda decenas de segundos (compiten varios modelos) y no debe pagarlo quien abre la pantalla.
+    Siempre devuelve 0 (no es un aviso)."""
+    global _warmed_at  # noqa: PLW0603 (marca de tiempo por proceso)
+    if not force and time.monotonic() - _warmed_at < WARM_EVERY_SECONDS:
+        return 0
+    _warmed_at = time.monotonic()
+    started = time.perf_counter()
+    try:
+        with SessionLocal() as session:
+            system = Seller(SYSTEM_USER, "Sistema", None, GENERAL_SUPERVISOR)
+            build_use_cases(session, settings).calculate_saca(
+                system, ZoneClock(settings.tz).today()
+            )
+    except Exception:
+        logger.exception("No se pudo precalentar la saca")
+        return 0
+    logger.info("Saca precalentada en %.1f s", time.perf_counter() - started)
+    return 0
+
+
 def check_cutoffs(settings: Settings) -> int:
     """Una revisión completa: aviso previo al corte, aviso de corte pasado y saca del cierre."""
     return (
@@ -96,6 +123,7 @@ def check_cutoffs(settings: Settings) -> int:
         + check_missed_projections(settings)
         + snapshot_saca(settings)
         + train_demand_model(settings)
+        + warm_saca(settings)
     )
 
 
@@ -114,13 +142,17 @@ async def periodic_tasks(settings: Settings) -> AsyncIterator[None]:
     """Arranca las tareas al iniciar la API y las detiene al apagarla."""
     seconds = settings.planning_scheduler_seconds
     task = None
+    warm = None
     if seconds > 0:
         task = asyncio.create_task(_every(seconds, lambda: check_cutoffs(settings)))
         logger.info("Revisión de cortes cada %d s", seconds)
+        # Al arrancar (sin esperar al primer ciclo), en segundo plano: la API ya atiende.
+        warm = asyncio.create_task(asyncio.to_thread(warm_saca, settings, True))
     try:
         yield
     finally:
-        if task:
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+        for running in (task, warm):
+            if running:
+                running.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await running

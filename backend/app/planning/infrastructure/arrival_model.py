@@ -13,6 +13,7 @@ No se guarda nada entrenado: con unos cientos de días el ajuste tarda poco y se
 dato nuevo. El resultado se recuerda mientras la historia no cambie.
 """
 
+import threading
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -50,6 +51,9 @@ MIN_TRAIN_ROWS = 30
 # Lo costoso (hacer competir a los modelos) se recuerda mientras la historia no cambie.
 _CACHE: OrderedDict[tuple, "_Evaluation | None"] = OrderedDict()
 _CACHE_SIZE = 8
+# Una sola evaluación a la vez: si llegan varias peticiones juntas (o el precalentado), las
+# demás esperan el resultado en vez de repetir el mismo cálculo y competir por la CPU.
+_LOCK = threading.Lock()
 
 
 def ewma_name(half_life: float) -> str:
@@ -73,12 +77,13 @@ class AdaptiveArrivalModel:
             tuple((d.date, d.recorded_at, tuple(sorted(d.weights.items()))) for d in days),
             tuple(sorted(group_of.items())),
         )
-        if key not in _CACHE:
-            _CACHE[key] = _evaluate(days, group_of)
-            while len(_CACHE) > _CACHE_SIZE:
-                _CACHE.popitem(last=False)
-        _CACHE.move_to_end(key)
-        found = _CACHE[key]
+        with _LOCK:
+            if key not in _CACHE:
+                _CACHE[key] = _evaluate(days, group_of)
+                while len(_CACHE) > _CACHE_SIZE:
+                    _CACHE.popitem(last=False)
+            _CACHE.move_to_end(key)
+            found = _CACHE[key]
         if found is None:
             return None
         base, share, used = found.base, found.shares.get(found.best), {}
