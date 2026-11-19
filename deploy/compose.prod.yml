@@ -139,6 +139,8 @@ services:
       AGENT_MODEL: ${AGENT_MODEL:-claude-sonnet-5-5}
       # Modelo del asistente de la app (07_asistente_app, ADR 0022).
       ASSISTANT_MODEL: ${ASSISTANT_MODEL:-claude-haiku-5-5}
+      # API compatible con OpenAI del asistente (la clave, en la credencial de n8n).
+      ASSISTANT_LLM_URL: ${ASSISTANT_LLM_URL:-https://ai.devlumlabs.com/api/v1}
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:
       - n8n_data:/home/node/.n8n

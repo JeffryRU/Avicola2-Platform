@@ -16,7 +16,7 @@
 
 ```
 App (sesión) → POST /api/assistant/messages → backend: pase de 5 min de esa persona
-  → webhook de n8n (07_asistente_app, X-Assistant-Token) → AI Agent (Claude)
+  → webhook de n8n (07_asistente_app, X-Assistant-Token) → AI Agent (LLM compatible con OpenAI)
   → MCP: Bearer MCP_AGENT_TOKEN + ?ticket=<pase> → herramientas con los permisos de esa persona
   ← {reply} ← respuesta y <sugerencias>…</sugerencias> → {reply, suggestions}
 ```
@@ -38,12 +38,13 @@ App (sesión) → POST /api/assistant/messages → backend: pase de 5 min de esa
 - `ASSISTANT_RATE_LIMIT` preguntas por persona cada `ASSISTANT_RATE_WINDOW_SECONDS` (10 por minuto): **429**. Además sigue el límite del MCP por persona (las llamadas con pase cuentan a nombre de quien preguntó).
 - Si n8n no responde, tarda más de `ASSISTANT_TIMEOUT_SECONDS` o responde sin texto: **503** con un mensaje simple (el detalle queda en el log).
 - Sin `ASSISTANT_WEBHOOK_URL` no hay asistente: `GET /api/assistant` dice `enabled: false`, el botón no aparece y preguntar responde 409.
-- **Modelo:** `ASSISTANT_MODEL` en n8n, `claude-haiku-5-5` por defecto (lo usan todos). Con ~20 personas × 10 preguntas × 26 días ≈ 5.200 preguntas al mes: ~US$ 8 con Haiku, ~US$ 160 con Sonnet (mismos supuestos de tokens que el ADR 0017).
+- **Proveedor del LLM:** cualquier API compatible con OpenAI Chat Completions (`ASSISTANT_LLM_URL`, nodo OpenAI Chat Model 1.2 de n8n, sin Responses API). Por ahora **Devlum AI** (`https://ai.devlumlabs.com/api/v1`), con el saldo de la hackathon (hasta el 27/11/2026); después basta cambiar la URL y la clave de la credencial, o volver a Anthropic. El modelo tiene que soportar *tools* (en Devlum, `capabilities` de `GET /models`). Los datos de la consulta pasan por ese proveedor.
+- **Modelo:** `ASSISTANT_MODEL` en n8n, `claude-haiku-5-5` por defecto (lo usan todos; US$ 0,10 y 0,50 por millón de tokens en Devlum). Con ~20 personas × 10 preguntas × 26 días ≈ 5.200 preguntas al mes: ~US$ 8 con Haiku, ~US$ 160 con Sonnet (mismos supuestos de tokens que el ADR 0017).
 - **Auditoría:** cada herramienta queda en `app.mcp` con el usuario real (no `agente:n8n`).
 
 ## Por qué así
 
-- **El backend sigue sin llamar al LLM** (ADR 0017 y la regla de n8n como orquestador): la clave de Anthropic vive solo en n8n.
+- **El backend sigue sin llamar al LLM** (ADR 0017 y la regla de n8n como orquestador): la clave del LLM vive solo en n8n.
 - **El pase va en la URL** porque la credencial del nodo MCP Client de n8n es fija; la URL acepta expresiones por ejecución. El log HTTP guarda solo la ruta (sin la consulta) y `uvicorn.access` está apagado, así que el pase no queda escrito. Aun si se filtrara, sin el token del agente no sirve y vence en minutos.
 - **Chat propio y no el widget de n8n:** el widget no conoce la sesión de la app (cookie HttpOnly) y pediría otra contraseña.
 
