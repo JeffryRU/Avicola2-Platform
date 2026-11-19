@@ -355,9 +355,12 @@ def test_missed_projection_notifications(client, from_tomorrow) -> None:
     assert not any(n["kind"] == "projection_missed" for n in items)
 
 
-def test_periodic_check_runs_with_its_own_session(client) -> None:
+def test_periodic_check_runs_with_its_own_session(client, monkeypatch) -> None:
     from app.planning.infrastructure.scheduler import check_missed_projections
 
+    # Reloj fijo al mediodía: con la hora real, cerca de un corte habría avisos que dar.
+    clock = FixedClock()
+    monkeypatch.setattr("app.planning.bootstrap.ZoneClock", lambda _tz: clock)
     assert check_missed_projections(get_settings()) == 0
 
 
@@ -422,4 +425,6 @@ def test_periodic_check_covers_both_notices(client, monkeypatch) -> None:
     # Solo los avisos: la saca del cierre (desde las 20:00) y el modelo dependen de la hora.
     monkeypatch.setattr(scheduler, "snapshot_saca", lambda _settings: 0)
     monkeypatch.setattr(scheduler, "train_demand_model", lambda _settings: 0)
+    clock = FixedClock()  # mediodía: lejos de los cortes (la hora real depende de cuándo corra)
+    monkeypatch.setattr("app.planning.bootstrap.ZoneClock", lambda _tz: clock)
     assert check_cutoffs(get_settings()) == 0
