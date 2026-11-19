@@ -25,12 +25,21 @@ _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f  ]")
 
 @dataclass(frozen=True)
 class StarterGroup:
-    """Preguntas para empezar que ve quien tiene `permission` (None: todos; `sellers`: solo
-    quien registra proyecciones)."""
+    """Un tema del asistente para quien tiene `permission` (None: todos; `sellers`: solo quien
+    registra proyecciones): sus preguntas para empezar, qué puede consultar (`scope`, se le dice
+    al agente) y palabras del tema (`topics`): una pregunta sugerida que las tenga no se ofrece a
+    quien no ve el tema."""
 
     questions: tuple[str, ...]
     permission: Permission | None = None
     sellers: bool = False
+    scope: str = ""
+    topics: tuple[str, ...] = ()
+
+    def visible_to(self, permissions: frozenset[Permission], is_seller: bool) -> bool:
+        return (self.permission is None or self.permission in permissions) and (
+            not self.sellers or is_seller
+        )
 
 
 @dataclass(frozen=True)
@@ -73,14 +82,31 @@ def starters(
     groups: Iterable[StarterGroup], permissions: frozenset[Permission], is_seller: bool
 ) -> tuple[str, ...]:
     """Preguntas para empezar según lo que la persona puede ver (las más específicas primero)."""
-    mine = [
-        g
-        for g in groups
-        if (g.permission is None or g.permission in permissions) and (not g.sellers or is_seller)
-    ]
+    mine = [g for g in groups if g.visible_to(permissions, is_seller)]
     # Primero lo propio del rol; lo general (sin permiso ni vendedor) al final.
     mine.sort(key=lambda g: g.permission is None and not g.sellers)
     return _unique((q for g in mine for q in g.questions), MAX_STARTERS)
+
+
+def scope_of(
+    groups: Iterable[StarterGroup], permissions: frozenset[Permission], is_seller: bool
+) -> str:
+    """Lo que la persona puede consultar, en palabras (para que el agente no ofrezca más)."""
+    return "; ".join(g.scope for g in groups if g.scope and g.visible_to(permissions, is_seller))
+
+
+def within_scope(
+    suggestions: Iterable[str],
+    groups: Iterable[StarterGroup],
+    permissions: frozenset[Permission],
+    is_seller: bool,
+) -> tuple[str, ...]:
+    """Las preguntas sugeridas sin las de temas que la persona no ve (p. ej. la saca para un
+    vendedor): el agente a veces las propone igual."""
+    hidden = [
+        plain(t) for g in groups if not g.visible_to(permissions, is_seller) for t in g.topics
+    ]
+    return tuple(q for q in suggestions if not any(t in plain(q) for t in hidden))
 
 
 # --- Guardrails (ADR 0022) -------------------------------------------------------------------

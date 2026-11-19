@@ -18,8 +18,10 @@ from app.planning.domain.assistant import (
     StarterGroup,
     blocked_by,
     guard_reply,
+    scope_of,
     split_reply,
     starters,
+    within_scope,
 )
 from app.planning.domain.models import SellerAccount
 from app.planning.domain.permissions import permissions_of
@@ -50,6 +52,14 @@ class AssistantStarters:
     def __call__(self, account: SellerAccount) -> tuple[str, ...]:
         seller = account.seller
         return starters(self.groups, permissions_of(seller.role), seller.is_seller)
+
+    def scope(self, account: SellerAccount) -> str:
+        seller = account.seller
+        return scope_of(self.groups, permissions_of(seller.role), seller.is_seller)
+
+    def within_scope(self, account: SellerAccount, suggestions: Sequence[str]) -> tuple[str, ...]:
+        seller = account.seller
+        return within_scope(suggestions, self.groups, permissions_of(seller.role), seller.is_seller)
 
 
 class AskAssistant:
@@ -97,6 +107,7 @@ class AskAssistant:
             name=seller.name,
             role=seller.role,
             permissions=tuple(sorted(p.value for p in permissions_of(seller.role))),
+            scope=self.starters.scope(account),
         )
         try:
             text = self.gateway.ask(request)
@@ -111,9 +122,7 @@ class AskAssistant:
         answer = split_reply(safe)
         if not answer.reply:
             raise AssistantUnavailableError(UNAVAILABLE)
-        # Si el agente no propuso cómo seguir, se ofrecen las preguntas de inicio.
-        return (
-            answer
-            if answer.suggestions
-            else AssistantAnswer(answer.reply, self.starters(account)[:MAX_SUGGESTIONS])
-        )
+        # Las preguntas para seguir, solo de lo que la persona puede ver; si no queda ninguna,
+        # se ofrecen las de inicio.
+        follow = self.starters.within_scope(account, answer.suggestions)
+        return AssistantAnswer(answer.reply, follow or self.starters(account)[:MAX_SUGGESTIONS])
