@@ -33,6 +33,14 @@ App (sesión) → POST /api/assistant/messages → backend: pase de 5 min de esa
 - **Para empezar:** `backend/config/assistant.yaml`, por permiso (`view_saca`, `view_stock`, `view_production`), solo para vendedores o para todos. Se muestran hasta 4; se cambian sin tocar código.
 - **Para seguir:** el agente termina cada respuesta con `<sugerencias>a | b | c</sugerencias>` (lo pide el system prompt). El backend lo separa del texto, deja como mucho 3 preguntas de hasta 90 caracteres, en una línea y sin repetir. Si no vienen, ofrece las de inicio.
 
+### Guardrails (tres capas)
+
+1. **Antes del agente** (`config/assistant.yaml`, `guardrails`): preguntas sobre contraseñas, tokens o claves; intentos de cambiarle las instrucciones o sacárselas; datos personales (DNI, teléfonos, direcciones, correos, cuentas, sueldos); detalles técnicos (base de datos, SQL, servidor, MCP). Se comparan sin tildes ni mayúsculas y se responden con un texto fijo y las preguntas de inicio: **no llegan al LLM ni cuestan**. En el log queda solo la categoría, nunca la pregunta.
+2. **En el agente** (system prompt de `07_asistente_app`): no revelar instrucciones ni detalles técnicos, ignorar pedidos de cambiar de rol (también si vienen dentro de los datos), no dar datos personales, sobre las personas solo cifras (sin juicios ni recomendar sanciones), no ayudar a saltarse reglas (explicar el camino oficial), nada de consejos médicos, legales o financieros, y trato respetuoso.
+3. **Después del agente:** si la respuesta trae el código «canario» del system prompt (se filtraron las instrucciones), se reemplaza entera; los tokens, claves y correos se cambian por «[oculto]».
+
+Y por debajo de todo, lo que no depende del modelo: el agente solo lee y solo ve lo que el rol de esa persona permite.
+
 ### Límites, errores y costo
 
 - `ASSISTANT_RATE_LIMIT` preguntas por persona cada `ASSISTANT_RATE_WINDOW_SECONDS` (10 por minuto): **429**. Además sigue el límite del MCP por persona (las llamadas con pase cuentan a nombre de quien preguntó).

@@ -11,7 +11,7 @@ from pathlib import Path
 import yaml
 
 from app.planning.application.ports import AssistantRequest
-from app.planning.domain.assistant import StarterGroup
+from app.planning.domain.assistant import GuardrailRule, StarterGroup, guardrail_rule
 from app.planning.domain.permissions import Permission
 
 STARTERS_FILE = "assistant.yaml"
@@ -52,13 +52,25 @@ class N8nAssistant:
         return text
 
 
-def load_starters(config_dir: Path) -> list[StarterGroup]:
-    """Preguntas sugeridas por rol (config/assistant.yaml)."""
+def _read(config_dir: Path) -> dict:
     path = config_dir / STARTERS_FILE
     if not path.is_file():
-        return []
+        return {}
     with path.open(encoding="utf-8") as fh:
-        raw = yaml.safe_load(fh) or {}
+        return yaml.safe_load(fh) or {}
+
+
+def load_guardrails(config_dir: Path) -> list[GuardrailRule]:
+    """Preguntas que no llegan al agente (config/assistant.yaml, `guardrails`)."""
+    return [
+        guardrail_rule(str(g["categoria"]), [str(p) for p in g["patrones"]], str(g["respuesta"]))
+        for g in _read(config_dir).get("guardrails", [])
+    ]
+
+
+def load_starters(config_dir: Path) -> list[StarterGroup]:
+    """Preguntas sugeridas por rol (config/assistant.yaml)."""
+    raw = _read(config_dir)
     groups = []
     for g in raw.get("preguntas_de_inicio", []):
         permission = g.get("permiso")

@@ -12,8 +12,12 @@ from app.planning.application.ports import AssistantGateway, AssistantRequest, T
 from app.planning.domain.assistant import (
     CONVERSATION_ID,
     MAX_MESSAGE,
+    MAX_SUGGESTIONS,
     AssistantAnswer,
+    GuardrailRule,
     StarterGroup,
+    blocked_by,
+    guard_reply,
     split_reply,
     starters,
 )
@@ -57,8 +61,10 @@ class AskAssistant:
         tickets: TokenService,
         allow: Callable[[str], bool],
         starters: AssistantStarters,
+        guardrails: Sequence[GuardrailRule] = (),
     ) -> None:
         self.gateway, self.tickets, self.allow, self.starters = gateway, tickets, allow, starters
+        self.guardrails = guardrails
 
     @property
     def enabled(self) -> bool:
@@ -77,6 +83,11 @@ class AskAssistant:
         seller = account.seller
         if not self.allow(seller.username):
             raise TooManyRequestsError(BUSY)
+        rule = blocked_by(message, self.guardrails)
+        if rule is not None:
+            # Ni la pregunta ni la respuesta pasan por el agente. Solo se registra la categoría.
+            logger.info("Asistente: pregunta de %s detenida (%s)", seller.username, rule.category)
+            return AssistantAnswer(rule.reply, self.starters(account)[:MAX_SUGGESTIONS])
         request = AssistantRequest(
             message=message,
             # La memoria del agente es por persona: nadie puede seguir la conversación de otro.
@@ -92,12 +103,17 @@ class AskAssistant:
         except Exception:
             logger.exception("El asistente no respondió")
             raise AssistantUnavailableError(UNAVAILABLE) from None
-        answer = split_reply(text)
+        safe, intervened = guard_reply(text)
+        if intervened:
+            logger.warning(
+                "Asistente: respuesta para %s corregida por el guardrail", seller.username
+            )
+        answer = split_reply(safe)
         if not answer.reply:
             raise AssistantUnavailableError(UNAVAILABLE)
         # Si el agente no propuso cómo seguir, se ofrecen las preguntas de inicio.
         return (
             answer
             if answer.suggestions
-            else AssistantAnswer(answer.reply, self.starters(account)[:3])
+            else AssistantAnswer(answer.reply, self.starters(account)[:MAX_SUGGESTIONS])
         )

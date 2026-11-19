@@ -25,3 +25,68 @@ preguntas_de_inicio:
   - preguntas:
       - ¿A qué hora cierra el registro de mañana?
       - ¿Qué días se pueden registrar?
+
+# Guardrails: preguntas que NO llegan al agente y se responden con un texto fijo (no cuestan nada).
+# Los patrones son expresiones regulares sobre la pregunta en minúsculas y sin tildes. Además, el
+# agente tiene sus propias reglas (system prompt de n8n/workflows/07_asistente_app.json) y la
+# respuesta se revisa antes de mostrarla (sin secretos ni sus instrucciones).
+guardrails:
+  - categoria: credenciales
+    patrones:
+      - contrasen
+      - password
+      - \btoken
+      - api ?key
+      - clave (de |del )?(acceso|api|la cuenta|usuario|ingreso)
+      - credencial
+      - secret
+      - \bsk-
+    respuesta: >-
+      Por seguridad no manejo contraseñas, tokens ni claves de acceso. Para cambiar tu
+      contraseña entra a Perfil → Contraseña; si la olvidaste, pídele a tu supervisor que la
+      restablezca.
+  - categoria: instrucciones
+    patrones:
+      - (ignora|olvida|omite|salta(te)?) (todas |todo |tus |las |lo )*(instrucciones|reglas|anterior|restricciones)
+      - system ?prompt
+      - prompt del sistema
+      - (muestra|dime|revela|repite|copia|escribe).{0,30}(instrucciones|prompt|reglas internas|configuracion)
+      - modo (desarrollador|dios|sin restricciones|admin)
+      - jailbreak
+      - \bdan\b
+      - (actua|comportate|responde) como (si fueras|un|una|otro)
+      - finge (que|ser)
+      - (ahora )?eres (un|una|otro) (asistente|ia|modelo|bot)
+      - nuevas instrucciones
+    respuesta: >-
+      No puedo mostrar ni cambiar mis instrucciones internas. Puedo ayudarte con proyecciones,
+      pedido real, saca, stock, producción y las reglas del registro.
+  - categoria: datos_personales
+    patrones:
+      - \bdni\b
+      - documento de identidad
+      - (numero|telefono|celular|whatsapp) (de|del) (telefono|celular|cliente|vendedor|supervisor)
+      - (direccion|domicilio) (de|del)
+      - cuenta (bancaria|de banco)
+      - tarjeta de (credito|debito)
+      - \bsueldo
+      - \bsalario
+      - correo (personal |electronico )?(de|del)
+    respuesta: >-
+      No manejo datos personales (DNI, teléfonos, direcciones, correos, cuentas o sueldos).
+      Puedo ayudarte con la planificación: proyecciones, pedidos, saca, stock y producción.
+  - categoria: sistema
+    patrones:
+      - base de datos
+      - \bsql\b
+      - select .+ from
+      - (drop|delete|truncate|update|insert) .*(table|tabla|from|into)
+      - \bvps\b
+      - variables? de entorno
+      - \.env\b
+      - codigo fuente
+      - \bendpoint
+      - \bmcp\b
+    respuesta: >-
+      No doy detalles técnicos del sistema. Puedo ayudarte con los datos de planificación que tu
+      rol puede ver.
