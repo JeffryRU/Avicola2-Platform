@@ -8,7 +8,7 @@
       "ref": "mvp1",
       "branches": ["mvp1"],
       "date": "2026-11-04",
-      "url": "https://avicola2-platform-git-mvp1-jeffry25ru-gmailcoms-projects.vercel.app",
+      "url": "https://avicola-mvp1.13-140-234-184.sslip.io",
       "summary": "Primera versión: los vendedores proyectan su demanda diaria por producto y el supervisor la sigue en dashboards.",
       "highlights": [
         "Proyección diaria por producto (web instalable como app, funciona sin señal)",
@@ -27,7 +27,7 @@
       "ref": "mvp2",
       "branches": ["mvp2"],
       "date": "2026-11-12",
-      "url": "https://avicola2-platform-git-mvp2-jeffry25ru-gmailcoms-projects.vercel.app",
+      "url": "https://avicola-mvp2.13-140-234-184.sslip.io",
       "summary": "Planificación de la operación: stock de despacho, producción, pronóstico de llegada y cálculo de saca, con app Android e iOS.",
       "highlights": [
         "App móvil Android e iOS (Kotlin Multiplatform)",
