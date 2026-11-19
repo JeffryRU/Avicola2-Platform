@@ -26,6 +26,7 @@ import {
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { InstallBanner } from '@/app/install'
 import { TopControls } from '@/app/top-controls'
+import { AssistantButton } from '@/app/assistant-button'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
 import { can, hasTeamView, roleLabel, type Session } from '@/shared/domain/session'
 import { initials } from '@/shared/domain/format'
@@ -378,6 +379,7 @@ export function AppShell() {
         </main>
       </div>
       {!flow && <BottomNav />}
+      {!flow && <AssistantButton />}
       {/* Aviso de instalación solo en la pantalla de entrada de cada rol. */}
       {(pathname === paths.home || pathname === paths.dashSummary) && <InstallBanner />}
     </div>

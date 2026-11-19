@@ -14,4 +14,6 @@ interface ImportMetaEnv {
   readonly VITE_SHOW_DEMO_USERS?: string
   /** APK de la app de Android. Por defecto, la última Release de GitHub; vacío la oculta. */
   readonly VITE_ANDROID_APK_URL?: string
+  /** Chat del asistente de n8n (Chat URL del workflow 03_agente_chatbot). Vacío: sin botón. */
+  readonly VITE_ASSISTANT_URL?: string
 }
