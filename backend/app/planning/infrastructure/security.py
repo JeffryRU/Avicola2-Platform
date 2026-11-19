@@ -71,6 +71,17 @@ class JwtTokenService:
         return TokenClaims(claims["sub"], claims["ver"])
 
 
+class AssistantTickets(JwtTokenService):
+    """Pase del asistente (ADR 0022): dura minutos y solo sirve en el MCP, junto con el token
+    del agente. Otra audiencia: no abre la API ni vale como sesión."""
+
+    AUDIENCE = "aviplanner-assistant"
+    ACCEPTED_AUDIENCES = (AUDIENCE,)
+
+    def __init__(self, secret: str, ttl_minutes: int) -> None:
+        self.secret, self.ttl = secret, timedelta(minutes=ttl_minutes)
+
+
 class RandomTemporaryPasswords:
     """Contraseña temporal legible (sin caracteres ambiguos), con letras y números."""
 

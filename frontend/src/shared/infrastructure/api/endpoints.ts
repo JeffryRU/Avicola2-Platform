@@ -137,6 +137,13 @@ export const endpoints = {
     stream: '/events',
   },
 
+  assistant: {
+    /** GET → si hay asistente y las preguntas sugeridas para empezar (según el rol). */
+    info: '/assistant',
+    /** POST {message, conversation} → {reply, suggestions}: la respuesta y cómo seguir. */
+    messages: '/assistant/messages',
+  },
+
   status: {
     /** GET → estado de la base de datos (motor, nombre, tablas). */
     db: '/status',

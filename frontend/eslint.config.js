@@ -31,6 +31,7 @@ const FEATURE_DEPS = {
   saca: ['auth', 'catalog', 'production'],
   model: ['auth'],
   aris: ['auth'],
+  assistant: ['auth'],
   stock: ['auth', 'catalog'],
   accounts: ['auth', 'editing'],
   profile: ['auth', 'versions'],

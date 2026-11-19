@@ -6,12 +6,15 @@ toca solo este archivo.
 
 from dataclasses import dataclass
 from datetime import timedelta
+from functools import lru_cache
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.planning.application import accounts as acc
 from app.planning.application import aris as ar
+from app.planning.application import assistant as asst
 from app.planning.application import editing as ed
 from app.planning.application import export as ex
 from app.planning.application import notifications as nt
@@ -23,6 +26,7 @@ from app.planning.domain.accounts import LockoutPolicy
 from app.planning.infrastructure.aris_history import ArisHistory, ArisOrSimulatedSales
 from app.planning.infrastructure.aris_import import SqlArisData
 from app.planning.infrastructure.arrival_model import AdaptiveArrivalModel
+from app.planning.infrastructure.assistant import N8nAssistant, load_starters
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.demand_model.store import SqlDemandModelStore
 from app.planning.infrastructure.events import event_bus
@@ -55,6 +59,7 @@ from app.planning.infrastructure.persistence.status import SqlStatusProbe
 from app.planning.infrastructure.persistence.stock import SqlStockRepository
 from app.planning.infrastructure.sales import SimulatedSalesSource
 from app.planning.infrastructure.security import (
+    AssistantTickets,
     JwtTokenService,
     RandomTemporaryPasswords,
     ScryptPasswordHasher,
@@ -62,10 +67,45 @@ from app.planning.infrastructure.security import (
 from app.shared.infrastructure.cache import build_cache
 from app.shared.infrastructure.database.engine import physical_schema
 from app.shared.infrastructure.database.metadata import APP_SCHEMA
+from app.shared.infrastructure.mcp.limits import RateLimiter, build_rate_limiter
 
 # Una sola caché por proceso, compartida por todas las peticiones: en memoria o en Redis según
 # CACHE_BACKEND (ver shared/infrastructure/cache.py y ADR 0014).
 planning_cache = build_cache(**get_settings().cache_options())
+
+
+@lru_cache
+def _assistant_limiter(limit: int, window: int, backend: str, redis_url: str | None) -> RateLimiter:
+    """Un límite por proceso (o global con Redis) para las preguntas al asistente."""
+    namespace = get_settings().cache_options()["namespace"] + "assistant:"
+    return build_rate_limiter(backend, limit, window, redis_url, namespace)
+
+
+@lru_cache
+def _assistant_starters(config_dir: Path) -> asst.AssistantStarters:
+    return asst.AssistantStarters(load_starters(config_dir))
+
+
+def _assistant(settings: Settings) -> asst.AskAssistant:
+    gateway = (
+        N8nAssistant(
+            settings.assistant_webhook_url,
+            settings.assistant_webhook_token or "",
+            settings.assistant_timeout_seconds,
+        )
+        if settings.assistant_webhook_url
+        else None
+    )
+    limiter = _assistant_limiter(
+        settings.assistant_rate_limit,
+        settings.assistant_rate_window_seconds,
+        settings.cache_backend,
+        settings.redis_url,
+    )
+    tickets = AssistantTickets(settings.auth_secret, settings.assistant_ticket_minutes)
+    return asst.AskAssistant(
+        gateway, tickets, limiter.allow, _assistant_starters(settings.config_dir)
+    )
 
 
 @dataclass(frozen=True)
@@ -117,6 +157,9 @@ class PlanningUseCases:
     register_production: pr.RegisterProduction
     list_production: pr.ListProduction
     forecast_arrival: pr.ForecastArrival
+    ask_assistant: asst.AskAssistant
+    # Cuenta dueña de un pase del asistente (lo usa el MCP cuando consulta el agente de n8n).
+    ticket_account: acc.CurrentAccount
 
 
 def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
@@ -249,4 +292,8 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         register_production=pr.RegisterProduction(products, production, clock),
         list_production=pr.ListProduction(production),
         forecast_arrival=pr.ForecastArrival(products, production, clock, arrival_model),
+        ask_assistant=_assistant(settings),
+        ticket_account=acc.CurrentAccount(
+            sellers, AssistantTickets(settings.auth_secret, settings.assistant_ticket_minutes)
+        ),
     )

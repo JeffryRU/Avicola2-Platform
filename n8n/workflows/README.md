@@ -107,6 +107,40 @@ Sin la cabecera `Authorization`, o con un token inválido, responde 401.
 - **Fecha de hoy:** el system prompt la toma de `$now` en hora de Lima, para entender «hoy», «mañana» y «el jueves».
 - **Otro cliente MCP** (por ejemplo Claude Desktop): usa la misma URL con el token de la persona (`POST /api/auth/token`). Así ve solo lo que su rol permite.
 
+## 07_asistente_app
+
+```
+Pregunta desde la app (webhook, X-Assistant-Token) → Agente de la app ← Claude (ASSISTANT_MODEL)
+                                                    ← Memoria (por usuario y conversación)
+                                                    ← AviPlanner MCP ({{ $env.BACKEND_URL }}/mcp?ticket=<pase>)
+                                  → Responder a la app {reply}
+```
+
+El chat dentro de la app (botón «Asistente»), para **todos los roles**: cada persona ve solo lo suyo, porque el agente consulta el MCP con un pase de quien preguntó. Al final de cada respuesta propone preguntas para seguir. Decisión en el [ADR 0022](../../docs/adr/0022-asistente-en-la-app-para-todos.md).
+
+### Antes de importarlo
+
+1. Lo de `03_agente_chatbot`: `MCP_AGENT_TOKEN` en el backend y las credenciales `Anthropic (AviPlanner)` y `AviPlanner MCP (agente)`.
+2. **Secreto del webhook:** genera uno (`openssl rand -hex 32`) y ponlo en `ASSISTANT_WEBHOOK_TOKEN` del backend, con `ASSISTANT_WEBHOOK_URL=http://n8n:5678/webhook/aviplanner-asistente`. Reinicia el backend.
+3. **Credencial** `AviPlanner asistente (backend)`, tipo Header Auth: nombre `X-Assistant-Token`, valor = `ASSISTANT_WEBHOOK_TOKEN`.
+4. **Modelo (opcional):** `ASSISTANT_MODEL` en n8n (`claude-haiku-5-5` por defecto).
+
+### Importar y activar
+
+```bash
+docker compose exec n8n n8n import:workflow --input=/data/workflows/07_asistente_app.json
+docker compose exec n8n n8n publish:workflow --id=aviplannerAsistente07
+docker compose restart n8n
+```
+
+En el editor, elige en cada nodo la credencial correspondiente y guarda. El webhook no es para personas: solo lo llama el backend.
+
+### Probarlo
+
+1. Entra a la app como vendedor, abre «Asistente» y toca «¿Ya registré mi proyección de mañana?». Debe responder con sus datos y proponer otras preguntas.
+2. Pregunta por la saca: como vendedor debe decir que no está disponible para su rol; como supervisor, dar la cifra.
+3. En `logs/app.log`, las líneas `app.mcp` llevan el usuario de quien preguntó (no `agente:n8n`).
+
 ## Avisos propios desde n8n
 
 Cualquier workflow puede notificar a los usuarios de la app con un *HTTP Request*:

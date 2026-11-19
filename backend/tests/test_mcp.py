@@ -37,6 +37,9 @@ TOOLS = {
     "stock",
     "produccion",
     "cargas_de_archivos",
+    "reglas_de_registro",
+    "productos",
+    "pedido_real",
 }
 STOCK_LINES = [{"product_id": "P0001", "units": 120}, {"product_id": "P0006", "units": 40}]
 PRODUCTION_LINES = [{"product_id": "P0003", "ordered": 4050, "produced": 1174, "quality_b": 120}]

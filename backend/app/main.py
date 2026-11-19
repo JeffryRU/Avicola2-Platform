@@ -51,7 +51,7 @@ mcp_server = build_server(
 )
 planning_mcp.register(mcp_server)
 ingest_mcp.register(mcp_server, may_view=planning_mcp.sees_team)
-mcp_endpoint = McpEndpoint(mcp_server, MCP_PATH, mcp_verifier)
+mcp_endpoint = McpEndpoint(mcp_server, MCP_PATH, mcp_verifier, planning_mcp.identify_ticket)
 
 
 @asynccontextmanager

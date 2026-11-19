@@ -74,6 +74,11 @@ export const queryKeys = {
     status: ['aris', 'status'] as const,
   },
 
+  assistant: {
+    /** GET /assistant (por usuario: las preguntas dependen del rol). */
+    info: (username: string) => ['assistant', username] as const,
+  },
+
   saca: {
     all: ['saca'] as const,
     plan: (day: string) => ['saca', day] as const,

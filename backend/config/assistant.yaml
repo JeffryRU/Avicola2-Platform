@@ -1,0 +1,27 @@
+# Asistente de la app (ADR 0022): preguntas sugeridas para empezar, según lo que cada persona
+# puede ver. Se muestran como botones en el chat; después de cada respuesta, el agente propone
+# otras según lo que se preguntó.
+#
+# - permiso: solo quien lo tiene (ver app/planning/domain/permissions.py). Sin permiso: todos.
+# - solo_vendedores: solo quien registra proyecciones.
+# Se muestran como mucho 4: primero las del rol y al final las generales.
+preguntas_de_inicio:
+  - solo_vendedores: true
+    preguntas:
+      - ¿Ya registré mi proyección de mañana?
+      - ¿Cuánto proyecté esta semana?
+      - ¿Cómo va mi pedido real contra lo que proyecté?
+  - permiso: view_saca
+    preguntas:
+      - ¿Cuánto es la saca de hoy?
+      - ¿Quién falta confirmar para mañana?
+      - ¿Cuánto proyectó el equipo para mañana?
+  - permiso: view_stock
+    preguntas:
+      - ¿Cuánto stock hay hoy?
+  - permiso: view_production
+    preguntas:
+      - ¿Cuánto se produjo ayer?
+  - preguntas:
+      - ¿A qué hora cierra el registro de mañana?
+      - ¿Qué días se pueden registrar?

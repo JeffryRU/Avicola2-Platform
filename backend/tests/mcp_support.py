@@ -80,24 +80,31 @@ def http_client(bearer: str | None) -> httpx2.AsyncClient:
     )
 
 
-async def _call(bearer: str, tool: str, args: dict[str, Any]) -> tuple[bool, str]:
+async def _call(
+    bearer: str, tool: str, args: dict[str, Any], ticket: str | None = None
+) -> tuple[bool, str]:
+    url = f"{URL}?ticket={ticket}" if ticket else URL
     async with (
         mcp_endpoint.lifespan(),
         http_client(bearer) as http,
-        Client(streamable_http_client(URL, http_client=http)) as client,
+        Client(streamable_http_client(url, http_client=http)) as client,
     ):
         result = await client.call_tool(tool, args)
     text = "".join(getattr(c, "text", "") for c in result.content)
     return bool(result.is_error), text
 
 
-def call(bearer: str, tool: str, args: dict[str, Any] | None = None) -> tuple[bool, str]:
-    """(¿error?, texto) de una llamada a la herramienta."""
-    return anyio.run(_call, bearer, tool, args or {})
+def call(
+    bearer: str, tool: str, args: dict[str, Any] | None = None, ticket: str | None = None
+) -> tuple[bool, str]:
+    """(¿error?, texto) de una llamada a la herramienta (con `ticket`: un pase del asistente)."""
+    return anyio.run(_call, bearer, tool, args or {}, ticket)
 
 
-def ok(bearer: str, tool: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
-    failed, text = call(bearer, tool, args)
+def ok(
+    bearer: str, tool: str, args: dict[str, Any] | None = None, ticket: str | None = None
+) -> dict[str, Any]:
+    failed, text = call(bearer, tool, args, ticket)
     assert not failed, text
     return json.loads(text)
 
@@ -115,12 +122,14 @@ def list_tools(bearer: str) -> list[Any]:
     return anyio.run(_list, bearer)
 
 
-async def _post(headers: dict[str, str], body: Any) -> httpx2.Response:
+async def _post(headers: dict[str, str], body: Any, path: str) -> httpx2.Response:
     async with mcp_endpoint.lifespan(), http_client(None) as http:
-        return await http.post("/mcp", json=body, headers={**ACCEPT, **headers})
+        return await http.post(path, json=body, headers={**ACCEPT, **headers})
 
 
-def raw_post(headers: dict[str, str], body: Any | None = None) -> httpx2.Response:
+def raw_post(
+    headers: dict[str, str], body: Any | None = None, path: str = "/mcp"
+) -> httpx2.Response:
     """Una petición JSON-RPC a mano (para probar la autenticación sin el cliente)."""
     default = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
-    return anyio.run(_post, headers, default if body is None else body)
+    return anyio.run(_post, headers, default if body is None else body, path)

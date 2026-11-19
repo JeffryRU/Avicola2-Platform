@@ -44,6 +44,10 @@ services:
       MCP_AGENT_TOKEN: ${MCP_AGENT_TOKEN:-}
       MCP_RATE_LIMIT: ${MCP_RATE_LIMIT:-30}
       MCP_RATE_WINDOW_SECONDS: ${MCP_RATE_WINDOW_SECONDS:-60}
+      # Asistente dentro de la app (ADR 0022). Vacío = sin asistente.
+      ASSISTANT_WEBHOOK_URL: ${ASSISTANT_WEBHOOK_URL:-}
+      ASSISTANT_WEBHOOK_TOKEN: ${ASSISTANT_WEBHOOK_TOKEN:-}
+      ASSISTANT_RATE_LIMIT: ${ASSISTANT_RATE_LIMIT:-10}
       AUTH_TOKEN_TTL_HOURS: ${AUTH_TOKEN_TTL_HOURS:-12}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-}
       # Frontend servido aparte (Vercel reenviando /api aquí): su dominio, para no bloquearlo.
@@ -133,6 +137,8 @@ services:
       ARIS_WHATSAPP_NUMBERS: ${ARIS_WHATSAPP_NUMBERS:-}
       # Modelo del agente 03_agente_chatbot (ADR 0017); la clave va en una credencial de n8n.
       AGENT_MODEL: ${AGENT_MODEL:-claude-sonnet-5-5}
+      # Modelo del asistente de la app (07_asistente_app, ADR 0022).
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-claude-haiku-5-5}
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:
       - n8n_data:/home/node/.n8n

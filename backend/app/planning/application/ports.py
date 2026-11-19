@@ -198,6 +198,27 @@ class TokenService(Protocol):
     def decode(self, token: str) -> TokenClaims | None: ...
 
 
+@dataclass(frozen=True)
+class AssistantRequest:
+    """Lo que el backend le manda al agente (n8n) por cada mensaje del chat de la app."""
+
+    message: str
+    # Conversación de esta persona (la memoria del agente se guarda por esta clave).
+    conversation: str
+    # Pase de corta duración: el agente consulta los datos como esta persona (ADR 0022).
+    ticket: str
+    username: str
+    name: str
+    role: str
+    permissions: tuple[str, ...]
+
+
+class AssistantGateway(Protocol):
+    """El agente de IA (workflow de n8n). Devuelve el texto de la respuesta."""
+
+    def ask(self, request: AssistantRequest) -> str: ...
+
+
 class TemporaryPasswords(Protocol):
     """Contraseñas temporales que entrega el supervisor (se cambian al primer ingreso)."""
 
