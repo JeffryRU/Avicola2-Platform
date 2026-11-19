@@ -7,6 +7,8 @@ WORKDIR /web
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY frontend/ ./
+# Demo: el login muestra los usuarios de prueba y entra como administrador (demo1234).
+ENV VITE_SHOW_DEMO_USERS=true
 RUN pnpm build
 
 # --- Backend ----------------------------------------------------------------------
