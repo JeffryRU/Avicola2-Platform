@@ -24,6 +24,7 @@ from app.planning.domain.permissions import AI_AGENT, Permission, permissions_of
 from app.shared.domain.errors import AuthenticationError
 from app.shared.infrastructure.database.session import SessionLocal
 from app.shared.infrastructure.mcp.server import (
+    TICKET_PREFIX,
     Identity,
     compact_json,
     current_identity,
@@ -61,18 +62,38 @@ def viewer_for(token: str, use_cases: PlanningUseCases) -> Seller:
     """Quién consulta: el agente de servicio o el dueño del token de sesión (si sigue válido)."""
     if _is_agent_token(token):
         return AGENT
+    if token.startswith(TICKET_PREFIX):
+        # Pase del asistente: consulta como quien preguntó en el chat (ADR 0022).
+        return use_cases.ticket_account(token.removeprefix(TICKET_PREFIX)).seller
     return use_cases.current_account(token).seller
 
 
+def _identity(seller: Seller, may_delegate: bool = False) -> Identity:
+    permissions = frozenset(p.value for p in permissions_of(seller.role))
+    return Identity(seller.username, seller.role, permissions, may_delegate=may_delegate)
+
+
 def identify(token: str) -> Identity | None:
-    """Verificación del token para el SDK (en cada petición HTTP al MCP)."""
+    """Verificación del token para el SDK (en cada petición HTTP al MCP). Un pase del
+    asistente no vale como token: solo llega por `identify_ticket`."""
+    if token.startswith(TICKET_PREFIX):
+        return None
     with SessionLocal() as session:
         try:
             seller = viewer_for(token, build_use_cases(session, get_settings()))
         except AuthenticationError:
             return None
-    permissions = frozenset(p.value for p in permissions_of(seller.role))
-    return Identity(seller.username, seller.role, permissions)
+    return _identity(seller, may_delegate=seller is AGENT)
+
+
+def identify_ticket(ticket: str) -> Identity | None:
+    """La persona dueña de un pase del asistente (si sigue vigente y su sesión es válida)."""
+    with SessionLocal() as session:
+        try:
+            seller = build_use_cases(session, get_settings()).ticket_account(ticket).seller
+        except AuthenticationError:
+            return None
+    return _identity(seller)
 
 
 def sees_team(identity: Identity) -> bool:
@@ -282,7 +303,91 @@ def produccion(fecha_desde: DateFrom, fecha_hasta: DateTo) -> str:
     return _run(work)
 
 
+def pedido_real(fecha_desde: DateFrom, fecha_hasta: DateTo, vendedor: SellerFilter = None) -> str:
+    def work(uc: PlanningUseCases, viewer: Seller) -> dict[str, Any]:
+        found = uc.get_sales(viewer, fecha_desde, fecha_hasta, vendedor or None)
+        names = _names(uc)
+        rows = [
+            {
+                "vendedor": d.seller,
+                "fecha": d.date.isoformat(),
+                "unidades": _units(d.units, names),
+                "total_unidades": sum(d.units.values()),
+            }
+            for d in sorted(found, key=lambda d: (d.date, d.seller))
+            if any(d.units.values())
+        ]
+        return _capped(rows, "pedidos", _span(fecha_desde, fecha_hasta))
+
+    return _run(work)
+
+
+def reglas_de_registro() -> str:
+    def work(uc: PlanningUseCases, viewer: Seller) -> dict[str, Any]:
+        window = uc.editing_window(viewer)
+        policy = window.policy
+        return {
+            "hora_de_corte": f"{policy.cutoff:%H:%M}",
+            "dias_antes_del_corte": policy.days_before,
+            "se_registra_desde_dentro_de_dias": policy.starts_in,
+            "dias_que_se_pueden_registrar": policy.open_days,
+            "corte_activo": policy.enabled,
+            "dias": [
+                {
+                    "fecha": d.date.isoformat(),
+                    "cierra": d.closes_at.isoformat(timespec="minutes"),
+                    "abierto": d.open,
+                    "habilitacion": d.unlock.status if d.unlock else None,
+                }
+                for d in window.days
+            ],
+        }
+
+    return _run(work)
+
+
+def productos() -> str:
+    def work(uc: PlanningUseCases, _viewer: Seller) -> dict[str, Any]:
+        rows = [
+            {
+                "codigo": p.id,
+                "nombre": p.name,
+                "categoria": p.category,
+                "grupo": p.subcategory,
+                "kg_por_unidad": p.kg_per_unit,
+                "se_proyecta": p.is_projectable,
+            }
+            for p in uc.get_catalog()
+        ]
+        return _capped(rows, "productos", {})
+
+    return _run(work)
+
+
 TOOLS: tuple[_Tool, ...] = (
+    _Tool(
+        pedido_real,
+        "Pedido real (ARIS)",
+        "Pedido real despachado según ARIS (unidades por producto) entre dos fechas, de un "
+        "vendedor o de todos los que puedes ver. Sirve para comparar con lo proyectado "
+        "(herramienta proyecciones). Los días sin pedido no aparecen; el último día cargado "
+        "puede estar incompleto. Un vendedor solo ve lo suyo.",
+    ),
+    _Tool(
+        reglas_de_registro,
+        "Reglas para registrar la proyección",
+        "Hora de corte, cuántos días antes cierra cada día, qué días se pueden registrar y, "
+        "día por día, hasta cuándo («cierra», hora de Lima) y si sigue abierto o tiene "
+        "habilitación. Úsala para «¿a qué hora cierra?», «¿qué días puedo registrar?» o "
+        "«¿todavía puedo registrar mañana?». La puede usar cualquiera.",
+    ),
+    _Tool(
+        productos,
+        "Productos",
+        "Catálogo de productos: código, nombre, categoría, grupo (Brasa chica, mediana, "
+        "grande) y kg por unidad. Úsala para pasar de unidades a kg o para saber qué se "
+        "proyecta. La puede usar cualquiera.",
+    ),
     _Tool(
         listar_vendedores,
         "Vendedores",

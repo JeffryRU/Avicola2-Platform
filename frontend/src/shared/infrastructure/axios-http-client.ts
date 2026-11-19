@@ -64,8 +64,8 @@ export class AxiosHttpClient implements HttpClient {
     return this.request({ url: path, method: 'GET', params: definedOnly(query) }, schema)
   }
 
-  post<T>(path: string, body: unknown, schema: z.ZodType<T>) {
-    return this.request({ url: path, method: 'POST', data: body }, schema)
+  post<T>(path: string, body: unknown, schema: z.ZodType<T>, options: { timeoutMs?: number } = {}) {
+    return this.request({ url: path, method: 'POST', data: body, timeout: options.timeoutMs }, schema)
   }
 
   patch<T>(path: string, body: unknown, schema: z.ZodType<T>) {

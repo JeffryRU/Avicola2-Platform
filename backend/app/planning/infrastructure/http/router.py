@@ -605,6 +605,26 @@ def _cutoff_out(policy: CutoffPolicy) -> s.CutoffOut:
     )
 
 
+@router.get("/assistant")
+def assistant(use_cases: UseCases, account: ActiveAccount) -> s.AssistantOut:
+    """¿Hay asistente? Y las preguntas sugeridas para empezar (ADR 0022)."""
+    ask = use_cases.ask_assistant
+    return s.AssistantOut(
+        enabled=ask.enabled,
+        suggestions=list(ask.starters(account)) if ask.enabled else [],
+    )
+
+
+@router.post("/assistant/messages")
+def ask_assistant(
+    use_cases: UseCases, account: ActiveAccount, body: s.AssistantMessageIn
+) -> s.AssistantReplyOut:
+    """Una pregunta al asistente: la respuesta y preguntas para seguir. Solo ve lo de quien
+    pregunta (el agente consulta con un pase de esta persona)."""
+    answer = use_cases.ask_assistant(account, body.message, body.conversation)
+    return s.AssistantReplyOut(reply=answer.reply, suggestions=list(answer.suggestions))
+
+
 @router.get("/editing")
 def editing_window(use_cases: UseCases, viewer: CurrentSeller) -> s.EditingWindowOut:
     """Días que se pueden registrar, hasta cuándo y si hay habilitación (pantalla Registrar)."""

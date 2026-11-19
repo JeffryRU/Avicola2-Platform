@@ -119,6 +119,18 @@ class Settings(BaseSettings):
     mcp_rate_limit: int = Field(30, ge=1)
     mcp_rate_window_seconds: int = Field(60, ge=1)
 
+    # Asistente dentro de la app (ADR 0022): webhook del workflow 07_asistente_app de n8n
+    # (p. ej. http://n8n:5678/webhook/aviplanner-asistente). Vacío = sin asistente (sin botón).
+    assistant_webhook_url: str | None = None
+    # Secreto que el backend manda en X-Assistant-Token al webhook (32+ caracteres).
+    assistant_webhook_token: str | None = None
+    assistant_timeout_seconds: int = Field(90, ge=5, le=300)
+    # Duración del pase con el que el agente consulta el MCP como quien pregunta.
+    assistant_ticket_minutes: int = Field(5, ge=1, le=30)
+    # Preguntas por persona en cada ventana de ASSISTANT_RATE_WINDOW_SECONDS.
+    assistant_rate_limit: int = Field(10, ge=1)
+    assistant_rate_window_seconds: int = Field(60, ge=1)
+
     # Carpeta con catalog.yaml, schemas.yaml, tables.yaml y planning_seed.yaml.
     config_dir: Path = BACKEND_DIR / "config"
 
@@ -222,6 +234,14 @@ class Settings(BaseSettings):
             problems.append(
                 f"MCP_AGENT_TOKEN debe tener al menos {MIN_SECRET_LENGTH} caracteres aleatorios "
                 "(`openssl rand -hex 32`), distinto de AUTH_SECRET y de INGEST_API_TOKEN."
+            )
+        token = self.assistant_webhook_token or ""
+        if self.assistant_webhook_url and (
+            len(token) < MIN_SECRET_LENGTH or token in (self.auth_secret, self.mcp_agent_token)
+        ):
+            problems.append(
+                f"ASSISTANT_WEBHOOK_TOKEN debe tener al menos {MIN_SECRET_LENGTH} caracteres "
+                "aleatorios, distinto de AUTH_SECRET y de MCP_AGENT_TOKEN."
             )
         if not self.cookie_secure:
             problems.append("AUTH_COOKIE_SECURE=false: la cookie de sesión viajaría sin HTTPS.")

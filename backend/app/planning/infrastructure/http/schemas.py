@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.planning.domain.accounts import MAX_NAME
+from app.planning.domain.assistant import MAX_MESSAGE as MAX_ASSISTANT_MESSAGE
 from app.planning.domain.editing import CUTOFF_PATTERN, MAX_DAYS_BEFORE, MAX_REASON, Decision
 from app.planning.domain.models import QUALITY_A
 from app.planning.domain.permissions import SELLER
@@ -541,3 +542,21 @@ class ArrivalForecastOut(BaseModel):
     date_to: date | None
     groups: list[ForecastGroupOut]
     accuracy: ForecastAccuracyOut | None
+
+
+class AssistantOut(BaseModel):
+    """Si hay asistente y con qué preguntas empezar (según lo que la persona puede ver)."""
+
+    enabled: bool
+    suggestions: list[str]
+
+
+class AssistantMessageIn(BaseModel):
+    message: str = Field(min_length=1, max_length=MAX_ASSISTANT_MESSAGE)
+    # Lo elige la app (un UUID) y lo mantiene mientras dura la conversación.
+    conversation: str = Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9-]+$")
+
+
+class AssistantReplyOut(BaseModel):
+    reply: str
+    suggestions: list[str]

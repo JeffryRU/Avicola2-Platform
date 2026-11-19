@@ -111,7 +111,6 @@ Las capas (`domain`, `application`, `infrastructure`, `ui`) las vigila ESLint: e
 
 - **HTTP:** axios detrás del puerto `HttpClient`. Para subir archivos con barra de progreso: `http.upload(path, file, schema, { onProgress, signal, fields })`.
 - **`VITE_ANDROID_APK_URL`:** enlace del botón "App de Android". Por defecto apunta a la última Release de GitHub; vacío lo oculta.
-- **`VITE_ASSISTANT_URL`:** Chat URL del asistente de n8n (workflow `03_agente_chatbot`). Con ella, los supervisores ven un botón flotante «Asistente» que abre el chat en otra pestaña; vacía (por defecto), no hay botón.
 
 ## Desarrollo de la app móvil
 

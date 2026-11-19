@@ -5,6 +5,9 @@
   decide el módulo de cuentas (`identify`), no este archivo.
 - **Límite y auditoría:** cada `tools/call` cuenta en el límite del usuario y deja una línea de
   log (`app.mcp`) con usuario, herramienta, argumentos resumidos y resultado.
+- **Pase del asistente (ADR 0022):** el agente de servicio puede mandar `?ticket=<pase>` para
+  consultar como la persona que preguntó en el chat de la app. Solo vale junto con un token que
+  pueda delegar (`Identity.may_delegate`); un pase solo, o mandado como Bearer, recibe 401.
 - **Sin estado:** cada petición es independiente (`stateless_http`), así funciona igual con
   varios workers de uvicorn y no hay sesiones que limpiar.
 """
@@ -18,6 +21,7 @@ from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import parse_qs
 
 import anyio.to_thread
 from mcp.server.auth.middleware.auth_context import get_access_token
@@ -44,6 +48,8 @@ NO_OAUTH_ISSUER = "http://localhost"
 # Saltos de línea y otros caracteres de control: en el log de texto fabricarían líneas falsas.
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 RATE_LIMITED = "Demasiadas consultas seguidas. Espera un minuto y vuelve a intentar."
+# Prefijo interno del token cuando se consulta con un pase: nadie puede mandarlo como Bearer.
+TICKET_PREFIX = "ticket:"
 
 
 @dataclass(frozen=True)
@@ -54,6 +60,8 @@ class Identity:
     role: str
     permissions: frozenset[str]
     token: str = ""
+    # Puede consultar en nombre de otra persona con un pase (solo el agente de servicio).
+    may_delegate: bool = False
 
     def can(self, permission: str) -> bool:
         return permission in self.permissions
@@ -94,6 +102,18 @@ def bearer_token(scope: Scope) -> str | None:
             header = value.decode("latin-1")
             return header[7:] if header.lower().startswith("bearer ") else None
     return None
+
+
+def query_ticket(scope: Scope) -> str | None:
+    """El pase del asistente (`?ticket=`), si viene."""
+    values = parse_qs(scope.get("query_string", b"").decode("latin-1")).get("ticket")
+    return values[0] if values and values[0] else None
+
+
+def _with_bearer(scope: Scope, token: str) -> Scope:
+    headers = [(k, v) for k, v in scope.get("headers", ()) if k.lower() != b"authorization"]
+    headers.append((b"authorization", f"Bearer {token}".encode("latin-1")))
+    return {**scope, "headers": headers}
 
 
 def current_identity() -> Identity:
@@ -246,8 +266,16 @@ class McpEndpoint:
     Antes de pasarle la petición al SDK resuelve el token: si la base no responde, contesta
     503 (el SDK solo sabe responder 401 o 500)."""
 
-    def __init__(self, server: MCPServer, path: str, verifier: BearerVerifier) -> None:
+    def __init__(
+        self,
+        server: MCPServer,
+        path: str,
+        verifier: BearerVerifier,
+        delegate: Callable[[str], Identity | None] | None = None,
+    ) -> None:
         self.server, self.path, self.verifier = server, path, verifier
+        # Resuelve un pase del asistente (quién preguntó); None: no se aceptan pases.
+        self.delegate = delegate
         self._app: ASGIApp | None = None
 
     @asynccontextmanager
@@ -268,6 +296,27 @@ class McpEndpoint:
             finally:
                 self._app = None
 
+    async def _identify(
+        self, scope: Scope, token: str
+    ) -> tuple[Scope, str, Identity | None] | None:
+        """(petición, token, identidad) con que sigue la llamada; None: 401 por el pase.
+
+        Con `?ticket=`, quien llama tiene que poder delegar (el agente de servicio) y la
+        identidad pasa a ser la dueña del pase."""
+        if token.startswith(TICKET_PREFIX):
+            return None
+        identity = await anyio.to_thread.run_sync(self.verifier.identify, token)
+        ticket = query_ticket(scope)
+        if ticket is None:
+            return scope, token, identity
+        if identity is None or not identity.may_delegate or self.delegate is None:
+            return None
+        person = await anyio.to_thread.run_sync(self.delegate, ticket)
+        if person is None:
+            return None
+        token = f"{TICKET_PREFIX}{ticket}"
+        return _with_bearer(scope, token), token, person
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http" and scope["method"] == "GET":
             # Sin estado no hay mensajes del servidor por SSE: un GET dejaría una conexión
@@ -285,18 +334,30 @@ class McpEndpoint:
             await self._app(scope, receive, send)  # el SDK responde 401
             return
         try:
-            identity = await anyio.to_thread.run_sync(self.verifier.identify, token)
+            found = await self._identify(scope, token)
         except Exception:
             logger.exception("No se pudo verificar el token del MCP")
             await _unavailable("No se pudo verificar el acceso. Intenta en un minuto.")(
                 scope, receive, send
             )
             return
+        if found is None:
+            await _unauthorized()(scope, receive, send)
+            return
+        scope, token, identity = found
         resolved = _resolved.set((token, identity))
         try:
             await self._app(scope, receive, send)
         finally:
             _resolved.reset(resolved)
+
+
+def _unauthorized() -> JSONResponse:
+    return JSONResponse(
+        {"detail": "Pase del asistente inválido o vencido."},
+        status_code=401,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 def _unavailable(detail: str) -> JSONResponse:

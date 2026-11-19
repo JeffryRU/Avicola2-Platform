@@ -29,7 +29,8 @@ export type QueryParams = Record<string, string | number | readonly (string | nu
 /** Cliente HTTP que valida cada respuesta con un esquema de zod. */
 export interface HttpClient {
   get<T>(path: string, schema: z.ZodType<T>, query?: QueryParams): Promise<T>
-  post<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
+  /** `timeoutMs`: para lo que tarda más que una consulta (p. ej. el asistente). */
+  post<T>(path: string, body: unknown, schema: z.ZodType<T>, options?: { timeoutMs?: number }): Promise<T>
   patch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
   put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
   /** Sube un archivo (multipart/form-data) e informa el progreso. */

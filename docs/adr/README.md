@@ -22,3 +22,4 @@ Cada decisión de arquitectura relevante o supuesto de proceso se registra aquí
 | [0019](0019-modelo-de-demanda-contra-la-venta-real.md) | Modelo de demanda medido contra la venta real: ninguno es mucho mejor; hacen falta datos nuevos | aceptado |
 | [0020](0020-un-modelo-de-demanda-por-uso.md) | Un modelo de demanda por uso (combinación robusta, alumno destilado y apilado), entrenado en la app cada noche | aceptado |
 | [0021](0021-archivos-de-carga-en-yaml.md) | Las columnas de los archivos de carga (ARIS, tiendas, producción) en `config/imports.yaml`, con un solo validador | aceptado |
+| [0022](0022-asistente-en-la-app-para-todos.md) | Asistente dentro de la app para todos los roles: n8n consulta el MCP con un pase de quien pregunta; preguntas sugeridas | aceptado |
