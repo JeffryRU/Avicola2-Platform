@@ -154,7 +154,7 @@ def _ask(username: str, message: str = "hola", conversation: str = CONVERSATION)
 
 def test_without_webhook_there_is_no_assistant(mcp_db) -> None:
     assert login("rnavarro").get("/api/assistant").json() == {"enabled": False, "suggestions": []}
-    assert _ask("rnavarro").status_code == 503
+    assert _ask("rnavarro").status_code == 409
 
 
 def test_each_role_gets_its_own_starters(agent) -> None:

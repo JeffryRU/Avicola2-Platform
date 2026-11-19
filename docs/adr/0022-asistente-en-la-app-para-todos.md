@@ -37,7 +37,7 @@ App (sesión) → POST /api/assistant/messages → backend: pase de 5 min de esa
 
 - `ASSISTANT_RATE_LIMIT` preguntas por persona cada `ASSISTANT_RATE_WINDOW_SECONDS` (10 por minuto): **429**. Además sigue el límite del MCP por persona (las llamadas con pase cuentan a nombre de quien preguntó).
 - Si n8n no responde, tarda más de `ASSISTANT_TIMEOUT_SECONDS` o responde sin texto: **503** con un mensaje simple (el detalle queda en el log).
-- Sin `ASSISTANT_WEBHOOK_URL` no hay asistente: `GET /api/assistant` dice `enabled: false` y el botón no aparece.
+- Sin `ASSISTANT_WEBHOOK_URL` no hay asistente: `GET /api/assistant` dice `enabled: false`, el botón no aparece y preguntar responde 409.
 - **Modelo:** `ASSISTANT_MODEL` en n8n, `claude-haiku-5-5` por defecto (lo usan todos). Con ~20 personas × 10 preguntas × 26 días ≈ 5.200 preguntas al mes: ~US$ 8 con Haiku, ~US$ 160 con Sonnet (mismos supuestos de tokens que el ADR 0017).
 - **Auditoría:** cada herramienta queda en `app.mcp` con el usuario real (no `agente:n8n`).
 

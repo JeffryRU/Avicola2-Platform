@@ -19,12 +19,18 @@ from app.planning.domain.assistant import (
 )
 from app.planning.domain.models import SellerAccount
 from app.planning.domain.permissions import permissions_of
-from app.shared.domain.errors import DomainError, TooManyRequestsError, UnavailableError
+from app.shared.domain.errors import (
+    ConflictError,
+    DomainError,
+    TooManyRequestsError,
+    UnavailableError,
+)
 
 logger = logging.getLogger(__name__)
 
 BUSY = "Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar."
 UNAVAILABLE = "El asistente no está disponible ahora. Intenta en unos minutos."
+DISABLED = "El asistente no está activado."
 
 
 class AssistantUnavailableError(UnavailableError):
@@ -67,7 +73,7 @@ class AskAssistant:
         if not CONVERSATION_ID.match(conversation):
             raise DomainError("Conversación inválida.")
         if self.gateway is None:
-            raise AssistantUnavailableError(UNAVAILABLE)
+            raise ConflictError(DISABLED)
         seller = account.seller
         if not self.allow(seller.username):
             raise TooManyRequestsError(BUSY)
