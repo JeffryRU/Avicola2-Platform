@@ -428,3 +428,15 @@ def test_periodic_check_covers_both_notices(client, monkeypatch) -> None:
     clock = FixedClock()  # mediodía: lejos de los cortes (la hora real depende de cuándo corra)
     monkeypatch.setattr("app.planning.bootstrap.ZoneClock", lambda _tz: clock)
     assert check_cutoffs(get_settings()) == 0
+
+
+def test_warm_saca_runs_in_the_background_and_throttles(client, monkeypatch) -> None:
+    from app.planning.infrastructure import scheduler
+
+    calls = []
+    real = scheduler.build_use_cases
+    monkeypatch.setattr(scheduler, "build_use_cases", lambda *a: calls.append(1) or real(*a))
+    monkeypatch.setattr(scheduler, "_warmed_at", 0.0)
+    assert scheduler.warm_saca(get_settings(), force=True) == 0
+    assert scheduler.warm_saca(get_settings()) == 0  # dentro de WARM_EVERY_SECONDS: no repite
+    assert calls == [1]
