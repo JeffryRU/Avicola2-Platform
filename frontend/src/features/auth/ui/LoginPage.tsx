@@ -88,7 +88,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
               name="username"
               placeholder="Usuario"
               autoComplete="username"
-              defaultValue={DEMO ? 'rnavarro' : undefined}
+              defaultValue={DEMO ? 'general' : undefined}
               aria-invalid={!!errors.username}
               className={fieldCls(errors.username)}
             />
@@ -102,6 +102,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
             <Input
               id="lp"
               name="password"
+              defaultValue={DEMO ? 'demo1234' : undefined}
               type={showPassword ? 'text' : 'password'}
               placeholder="Contraseña"
               autoComplete="current-password"
