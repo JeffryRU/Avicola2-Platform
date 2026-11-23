@@ -215,3 +215,97 @@ export function bucketVersus(daily: VersusPoint[], buckets: { start: string; dat
     }
   })
 }
+
+/** Desviación de un vendedor en los días en que tiene pedido real. */
+export interface SellerDeviation {
+  seller: string
+  daysWithReal: number
+  projected: Amount
+  real: Amount
+  /** Diferencia (pedido − proyección). */
+  diff: Amount
+  /** null si el vendedor no proyectó (no hay contra qué comparar). */
+  pct: { kg: number | null; units: number | null }
+}
+
+/**
+ * Proyección vs pedido real de cada vendedor (`bySeller`: sus días, con `periodAgg` de ese solo
+ * vendedor). Como en los totales, solo cuentan los días que tienen pedido. Se omiten los
+ * vendedores sin ningún día con pedido (no hay contra qué comparar).
+ */
+export function sellerDeviation(bySeller: { seller: string; days: DayAgg[] }[], catalog: Catalog): SellerDeviation[] {
+  return bySeller.flatMap(({ seller, days }) => {
+    const vs = versusTotals(days, catalog)
+    if (vs.daysWithReal === 0) return []
+    return [
+      {
+        seller,
+        daysWithReal: vs.daysWithReal,
+        projected: vs.projected,
+        real: vs.real,
+        diff: vs.diff,
+        pct: { kg: deviationPct(vs.projected.kg, vs.real.kg), units: deviationPct(vs.projected.units, vs.real.units) },
+      },
+    ]
+  })
+}
+
+export type SellerSortKey = 'seller' | 'projected' | 'real' | 'diff' | 'pct'
+export interface SellerSort {
+  key: SellerSortKey
+  dir: 'asc' | 'desc'
+}
+/** Al abrir: la mayor desviación (en valor absoluto) primero. */
+export const DEFAULT_SELLER_SORT: SellerSort = { key: 'pct', dir: 'desc' }
+
+/** Ordena la tabla de vendedores; `pct` va por valor absoluto y los vendedores sin proyección van al final. */
+export function sortSellerDeviation(
+  rows: SellerDeviation[],
+  sort: SellerSort,
+  unit: Unit,
+  nameOf: (seller: string) => string = (s) => s,
+): SellerDeviation[] {
+  const sign = sort.dir === 'asc' ? 1 : -1
+  const value = (r: SellerDeviation): number | null =>
+    sort.key === 'projected'
+      ? r.projected[unit]
+      : sort.key === 'real'
+        ? r.real[unit]
+        : sort.key === 'diff'
+          ? r.diff[unit]
+          : sort.key === 'pct'
+            ? r.pct[unit] == null
+              ? null
+              : Math.abs(r.pct[unit])
+            : null
+  return [...rows].sort((a, b) => {
+    if (sort.key === 'seller') return sign * nameOf(a.seller).localeCompare(nameOf(b.seller), 'es')
+    const x = value(a)
+    const y = value(b)
+    if (x == null || y == null) return x == null && y == null ? 0 : x == null ? 1 : -1
+    return sign * (x - y) || nameOf(a.seller).localeCompare(nameOf(b.seller), 'es')
+  })
+}
+
+/** Quién se equivocó y cómo: pidieron más de lo proyectado (proyectó de menos) o menos (de más). */
+export type DeviationReading = 'under' | 'over' | 'even' | 'none'
+
+export function deviationReading(pct: number | null): DeviationReading {
+  if (pct == null) return 'none'
+  const rounded = Math.round(pct * 10) / 10
+  return rounded > 0 ? 'under' : rounded < 0 ? 'over' : 'even'
+}
+
+/** Total de todos los vendedores (suma de sus filas). */
+export function sellerTotals(rows: SellerDeviation[]): Omit<SellerDeviation, 'seller'> {
+  const sum = (pick: (r: SellerDeviation) => Amount): Amount => rows.reduce((a, r) => add(a, pick(r)), zero())
+  const projected = sum((r) => r.projected)
+  const real = sum((r) => r.real)
+  return {
+    daysWithReal: rows.reduce((n, r) => n + r.daysWithReal, 0),
+    projected,
+    real,
+    diff: { kg: real.kg - projected.kg, units: real.units - projected.units },
+    pct: { kg: deviationPct(projected.kg, real.kg), units: deviationPct(projected.units, real.units) },
+  }
+}

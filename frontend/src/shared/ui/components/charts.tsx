@@ -194,6 +194,8 @@ export function LineChart({
   const ih = H - T - B
   // Cada día en el centro de su columna: con 1 solo día, igual queda centrado.
   const step = iw / Math.max(points.length, 1)
+  // Ancho de un rótulo del eje (día y fecha): si no caben todos, uno de cada `every`.
+  const every = Math.max(1, Math.ceil(52 / step))
   const x = (i: number) => L + step * (i + 0.5)
   const y = (v: number) => T + ih - (v / max) * ih
   const base = T + ih
@@ -279,12 +281,17 @@ export function LineChart({
           <g key={p.key} className="col" {...(p.a != null || p.b != null || p.c != null ? bind(p.tip) : {})}>
             <rect fill="transparent" x={x(i) - step / 2} y={T} width={step} height={ih} />
             <line className="guide" x1={x(i)} x2={x(i)} y1={T} y2={T + ih} />
-            <text className="ax2" x={x(i)} y={H - B + 20} textAnchor="middle">
-              {p.label}
-            </text>
-            <text className="ax" x={x(i)} y={H - B + 35} textAnchor="middle">
-              {p.sublabel}
-            </text>
+            {/* Con muchos puntos (un mes) se rotula uno de cada `every` para que no se encimen. */}
+            {i % every === 0 && (
+              <>
+                <text className="ax2" x={x(i)} y={H - B + 20} textAnchor="middle">
+                  {p.label}
+                </text>
+                <text className="ax" x={x(i)} y={H - B + 35} textAnchor="middle">
+                  {p.sublabel}
+                </text>
+              </>
+            )}
           </g>
         ))}
         {earlier.map(

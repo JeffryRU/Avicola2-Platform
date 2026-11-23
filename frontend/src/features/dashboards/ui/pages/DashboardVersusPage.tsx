@@ -23,7 +23,20 @@ import {
 } from '@/shared/ui/components/shadcn/dropdown-menu'
 import { bySubcategory } from '@/shared/domain/products'
 import { toggleIn } from '@/shared/domain/format'
-import { ChartLine, Columns2, Maximize2, Package, RectangleHorizontal, Scale } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChartLine,
+  Columns2,
+  Maximize2,
+  Package,
+  RectangleHorizontal,
+  Scale,
+} from 'lucide-react'
+import { useTeamSellers } from '@/features/sellers'
+import { useRequiredSession } from '@/features/auth'
+import { isSupervisor } from '@/shared/domain/session'
 import { useState, type ReactNode } from 'react'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { ChartColorsButton, type ChartSeries } from '@/shared/ui/components/chart-colors'
@@ -41,19 +54,27 @@ import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/compon
 import { col, signTone } from '@/shared/ui/lib/table-columns'
 import {
   DEFAULT_MEASURE,
+  DEFAULT_SELLER_SORT,
   MEASURES,
   MEASURE_PARAM,
   bucketVersus,
   chartUnit,
   deviationPct,
+  deviationReading,
   modelByDay,
   parseMeasure,
   productDeviation,
+  sellerDeviation,
+  sellerTotals,
+  sortSellerDeviation,
   unitsOf,
   versusDays,
   versusTotals,
   type Amount,
   type ProductDeviation,
+  type SellerDeviation,
+  type SellerSort,
+  type SellerSortKey,
   type Unit,
   type VersusPoint,
 } from '@/features/dashboards/domain/versus'
@@ -61,6 +82,15 @@ import {
   ACCURACY_FOOT,
   ACCURACY_KPI,
   ALL_LINES_LABEL,
+  SELLERS_EMPTY_BODY,
+  SELLERS_EMPTY_TITLE,
+  SELLERS_HINT,
+  SELLERS_TITLE,
+  SELLER_LABEL,
+  SELLER_PCT_TITLE,
+  SELLER_READING,
+  SELLER_READING_LABEL,
+  sortByLabel,
   ALL_PRODUCTS_LABEL,
   LINES_FILTER_LABEL,
   PARTS_LINE_LABEL,
@@ -223,8 +253,71 @@ function KpiAmount({ value, unit }: { value: number; unit: Unit }) {
   )
 }
 
+/** Columna de kg (un decimal) o de unidades (enteras). */
+const numberCol =
+  <T,>(unit: Unit) =>
+  (...args: Parameters<typeof col.kg<T>>) =>
+    unit === 'kg' ? col.kg<T>(...args) : col.units<T>(...args)
+
+/** Una columna por medida: con una sola, el encabezado lleva la medida; con dos, van agrupadas. */
+function perUnitColumns<T>(
+  units: Unit[],
+  key: string,
+  name: string,
+  build: (unit: Unit, header: ReactNode, group: string | null) => Column<T>,
+): Column<T>[] {
+  const both = units.length > 1
+  return units
+    .map((u) =>
+      both
+        ? build(u, UNIT_COLUMN[u], name)
+        : build(
+            u,
+            <>
+              {name}
+              <br />({UNIT_SHORT[u]})
+            </>,
+            null,
+          ),
+    )
+    .map((c) => ({ ...c, key: `${key}-${c.key}` }))
+}
+
+/** Encabezado de columna que ordena la tabla de vendedores al tocarlo. */
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  title,
+}: {
+  label: ReactNode
+  sortKey: SellerSortKey
+  sort: SellerSort
+  onSort: (key: SellerSortKey) => void
+  title?: string
+}) {
+  const active = sort.key === sortKey
+  const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={sortByLabel(typeof label === 'string' ? label : sortKey)}
+      onClick={() => onSort(sortKey)}
+      className={cn('inline-flex items-center gap-1 font-[inherit]', active && 'text-foreground')}
+    >
+      <span>{label}</span>
+      <Icon aria-hidden className={cn('size-3.5 flex-none', !active && 'opacity-50')} />
+    </button>
+  )
+}
+
 export function DashboardVersusPage() {
-  const { period, sellers, measure, setMeasure } = useDashboardFilters()
+  const { period, sellers, measure, setMeasure, setSellers } = useDashboardFilters()
+  const team = isSupervisor(useRequiredSession().seller)
+  const teamSellers = useTeamSellers()
+  const [sellerSort, setSellerSort] = useState<SellerSort>(DEFAULT_SELLER_SORT)
   const [wide, setWide] = useWideChart()
   const units = unitsOf(measure)
   const main = units[0]
@@ -366,31 +459,11 @@ export function DashboardVersusPage() {
   // Tabla por producto: todos los que se proyectan, en el orden del catálogo.
   const productRows = productDeviation(days, catalog)
   const hasData = (r: ProductDeviation) => r.projected.units > 0 || r.real.units > 0
-  /** Columna de kg (un decimal) o de unidades (enteras). */
-  const numberCol =
-    (unit: Unit) =>
-    (...args: Parameters<typeof col.kg<ProductDeviation>>) =>
-      unit === 'kg' ? col.kg(...args) : col.units(...args)
-  /** Una columna por medida: con una sola, el encabezado lleva la medida; con dos, van agrupadas. */
   const perUnit = (
     key: string,
     name: string,
     build: (unit: Unit, header: ReactNode, group: string | null) => Column<ProductDeviation>,
-  ) =>
-    units
-      .map((u) =>
-        both
-          ? build(u, UNIT_COLUMN[u], name)
-          : build(
-              u,
-              <>
-                {name}
-                <br />({UNIT_SHORT[u]})
-              </>,
-              null,
-            ),
-      )
-      .map((c) => ({ ...c, key: `${key}-${c.key}` }))
+  ) => perUnitColumns(units, key, name, build)
   const productColumns: Column<ProductDeviation>[] = [
     {
       key: 'name',
@@ -404,13 +477,16 @@ export function DashboardVersusPage() {
       ),
     },
     ...perUnit('projected', PROJECTION_LABEL, (u, header, group) =>
-      numberCol(u)(u, header, (r) => r.projected[u], { group, total: productNumber(vs.projected[u], u) }),
+      numberCol<ProductDeviation>(u)(u, header, (r) => r.projected[u], {
+        group,
+        total: productNumber(vs.projected[u], u),
+      }),
     ),
     ...perUnit('real', REAL_LABEL, (u, header, group) =>
-      numberCol(u)(u, header, (r) => r.real[u], { group, total: productNumber(vs.real[u], u) }),
+      numberCol<ProductDeviation>(u)(u, header, (r) => r.real[u], { group, total: productNumber(vs.real[u], u) }),
     ),
     ...perUnit('diff', DIFF_LABEL, (u, header, group) =>
-      numberCol(u)(u, header, (r) => r.diff[u], {
+      numberCol<ProductDeviation>(u)(u, header, (r) => r.diff[u], {
         group,
         faint: (r) => !hasData(r),
         tone: (r) => hasData(r) && signTone(r.diff[u]),
@@ -426,6 +502,107 @@ export function DashboardVersusPage() {
         totalTone: signTone(vs.deviationPct[u]),
       }),
     ),
+  ]
+
+  // Tabla por vendedor (solo supervisión): todos los del período, con los productos del gráfico.
+  const sellerData = {
+    projections: onlyProducts(source.projections, picked),
+    sales: onlyProducts(source.sales, picked),
+  }
+  const sellerNames = new Map(teamSellers.map((s) => [s.username, s.name]))
+  const nameOf = (username: string) => sellerNames.get(username) ?? username
+  const usernames = [
+    ...new Set([
+      ...teamSellers.map((s) => s.username),
+      ...sellerData.projections.map((p) => p.seller),
+      ...sellerData.sales.map((x) => x.seller),
+    ]),
+  ]
+  const sellerRows = team
+    ? sellerDeviation(
+        usernames.map((seller) => ({
+          seller,
+          days: periodAgg(period.dates, [seller], sellerData.projections, sellerData.sales, catalog),
+        })),
+        catalog,
+      )
+    : []
+  const sellerSorted = sortSellerDeviation(sellerRows, sellerSort, main, nameOf)
+  const sellerTotal = sellerTotals(sellerRows)
+  const onSort = (key: SellerSortKey) =>
+    setSellerSort((cur) =>
+      cur.key === key
+        ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: key === 'seller' ? 'asc' : 'desc' },
+    )
+  const sortHeader = (label: ReactNode, key: SellerSortKey, title?: string) => (
+    <SortHeader label={label} sortKey={key} sort={sellerSort} onSort={onSort} title={title} />
+  )
+  const sellerPerUnit = (
+    key: string,
+    name: string,
+    sortKey: SellerSortKey,
+    build: (unit: Unit, header: ReactNode, group: string | null) => Column<SellerDeviation>,
+  ) =>
+    perUnitColumns<SellerDeviation>(units, key, name, (u, header, group) =>
+      build(u, both ? sortHeader(UNIT_COLUMN[u], sortKey) : sortHeader(header, sortKey), group),
+    )
+  const sellerColumns: Column<SellerDeviation>[] = [
+    {
+      key: 'seller',
+      sticky: true,
+      header: sortHeader(SELLER_LABEL, 'seller'),
+      cell: (r) => (
+        <button
+          type="button"
+          onClick={() => setSellers([r.seller])}
+          className={cn(
+            'text-left font-medium underline-offset-4 hover:underline',
+            sellers.length === 1 && sellers[0] === r.seller && 'text-primary',
+          )}
+        >
+          {nameOf(r.seller)}
+        </button>
+      ),
+    },
+    ...sellerPerUnit('projected', PROJECTION_LABEL, 'projected', (u, header, group) =>
+      numberCol<SellerDeviation>(u)(u, header, (r) => r.projected[u], {
+        group,
+        total: productNumber(sellerTotal.projected[u], u),
+      }),
+    ),
+    ...sellerPerUnit('real', REAL_LABEL, 'real', (u, header, group) =>
+      numberCol<SellerDeviation>(u)(u, header, (r) => r.real[u], {
+        group,
+        total: productNumber(sellerTotal.real[u], u),
+      }),
+    ),
+    ...sellerPerUnit('diff', DIFF_LABEL, 'diff', (u, header, group) =>
+      numberCol<SellerDeviation>(u)(u, header, (r) => r.diff[u], {
+        group,
+        tone: (r) => r.projected[u] > 0 && signTone(r.diff[u]),
+        total: productNumber(sellerTotal.diff[u], u),
+        totalTone: signTone(sellerTotal.diff[u]),
+      }),
+    ),
+    ...sellerPerUnit('pct', DIFF_PCT_LABEL, 'pct', (u, header, group) =>
+      col.change<SellerDeviation>(u, header, (r) => r.pct[u], {
+        group,
+        className: 'font-medium',
+        total: sellerTotal.pct[u] == null ? '—' : pctText(sellerTotal.pct[u]),
+        totalTone: signTone(sellerTotal.pct[u] ?? 0),
+      }),
+    ),
+    {
+      key: 'reading',
+      header: SELLER_READING_LABEL,
+      title: SELLER_PCT_TITLE,
+      desktopOnly: true,
+      cell: (r) => (
+        <span className="text-sm text-muted-foreground">{SELLER_READING[deviationReading(r.pct[main])]}</span>
+      ),
+      total: null,
+    },
   ]
 
   const legend = (
@@ -841,6 +1018,24 @@ export function DashboardVersusPage() {
             </div>
           </Section>
         </div>
+        {team && (
+          <Section title={SELLERS_TITLE} className="mt-4">
+            <p className="px-4 pt-3 text-xs text-muted-foreground dsk:px-5">{SELLERS_HINT}</p>
+            <div className="relative overflow-x-auto">
+              {sellerSorted.length ? (
+                <DataTable
+                  density="compact"
+                  rows={sellerSorted}
+                  rowKey={(r) => r.seller}
+                  totalLabel={TOTAL_LABEL}
+                  columns={sellerColumns}
+                />
+              ) : (
+                <EmptyState title={SELLERS_EMPTY_TITLE}>{SELLERS_EMPTY_BODY}</EmptyState>
+              )}
+            </div>
+          </Section>
+        )}
       </PageBody>
     </div>
   )

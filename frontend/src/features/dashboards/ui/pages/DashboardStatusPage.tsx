@@ -1,6 +1,6 @@
 import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { useNavigate } from 'react-router'
-import { dDM, dDow, dFull, dShort, rangeLabel } from '@/shared/domain/dates'
+import { dDM, dDow, dFull, dShort, fromIso, rangeLabel } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
 import { periodAgg } from '@/features/projections'
 import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
@@ -30,6 +30,8 @@ export function DashboardStatusPage() {
 
   const days = periodAgg(period.dates, sellers, source.projections, source.sales, catalog)
   type Day = (typeof days)[number]
+  // Un mes se dibuja como calendario: el día 1 cae en su día de la semana.
+  const leading = period.kind === 'month' ? (fromIso(period.from).getDay() + 6) % 7 : 0
   const units = days.reduce((s, d) => s + d.u, 0)
   const kg = days.reduce((s, d) => s + d.kg, 0)
 
@@ -44,6 +46,9 @@ export function DashboardStatusPage() {
           aria-label="Estado por día"
           className="mb-4 grid grid-cols-7 gap-px overflow-hidden rounded-md border border-border bg-rule hc:rounded-none hc:border-x-0 hc:border-t-heavy hc:border-b-heavy hc:bg-foreground"
         >
+          {Array.from({ length: leading }, (_, i) => (
+            <span key={`blank-${String(i)}`} aria-hidden className="bg-surface" />
+          ))}
           {days.map((d) => (
             <button
               key={d.date}

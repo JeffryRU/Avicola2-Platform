@@ -1,8 +1,17 @@
 import { useState, type ReactNode } from 'react'
-import { Calendar, CalendarRange, SlidersHorizontal, Users } from 'lucide-react'
+import {
+  Calendar,
+  CalendarDays,
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
+  SlidersHorizontal,
+  Users,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
-import { rangeLabel, weekLabel } from '@/shared/domain/dates'
+import { monthLabel, rangeLabel, today, weekLabel } from '@/shared/domain/dates'
+import { monthAllowed, monthOf, shiftMonth } from '@/features/dashboards/domain/period'
 import type { ExportFormat } from '@/shared/domain/export'
 import { ExportMenu } from '@/shared/ui/components/export-menu'
 import { useCatalog } from '@/features/catalog'
@@ -17,6 +26,9 @@ import {
   ALL_SELLERS_LABEL,
   CLEAR_FILTERS_LABEL,
   CUSTOM_PERIOD_LABEL,
+  MONTH_FILTER_LABEL,
+  NEXT_MONTH_LABEL,
+  PREV_MONTH_LABEL,
   ONLY_MINE_LABEL,
   SELLERS_FILTER_LABEL,
   WEEK_FILTER_LABEL,
@@ -24,6 +36,7 @@ import {
   type FilterChip,
 } from '@/features/dashboards/types/product-detail'
 import {
+  DropdownMenuLabel,
   DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuRadioGroup,
@@ -39,7 +52,7 @@ import { toggleIn } from '@/shared/domain/format'
  * `extra` son los menús propios de cada pantalla y `chips` sus filtros activos (para «Limpiar»).
  */
 export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; chips?: FilterChip[] }) {
-  const { week, period, sellers, setWeek, setCustom, setSellers, update } = useDashboardFilters()
+  const { week, period, sellers, setWeek, setMonth, setCustom, setSellers, update } = useDashboardFilters()
   const [customOpen, setCustomOpen] = useState(false)
   const me = useRequiredSession().seller
   const team = isSupervisor(me)
@@ -51,8 +64,17 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
   const anyActive = period.custom || chosen.length > 0 || chips.length > 0
   // Una sola actualización de la URL: varias seguidas se pisarían entre sí.
   const clearAll = () => {
-    update({ vendedor: null, desde: null, hasta: null, ...Object.fromEntries(chips.map((c) => [c.key, null])) })
+    update({
+      vendedor: null,
+      desde: null,
+      hasta: null,
+      mes: null,
+      ...Object.fromEntries(chips.map((c) => [c.key, null])),
+    })
   }
+  const monthly = period.kind === 'month'
+  // El mes que muestra el selector: el del período o, si no es un mes, el actual.
+  const shown = monthly ? monthOf(period.from) : monthOf(today())
   const toggle = (username: string) => setSellers(toggleIn(sellers, username))
 
   return (
@@ -64,12 +86,12 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
       <div className="no-scrollbar relative flex items-center gap-2 overflow-x-auto dsk:flex-wrap dsk:overflow-visible">
         <SlidersHorizontal className="size-4 flex-none text-muted-foreground" aria-hidden />
         <FilterMenu
-          icon={period.custom ? <CalendarRange /> : <Calendar />}
-          label={rangeLabel(period.from, period.to)}
+          icon={monthly ? <CalendarDays /> : period.custom ? <CalendarRange /> : <Calendar />}
+          label={monthly ? monthLabel(shown) : rangeLabel(period.from, period.to)}
           title={WEEK_FILTER_LABEL}
           active={period.custom}
         >
-          <DropdownMenuRadioGroup value={period.custom ? '' : week} onValueChange={setWeek}>
+          <DropdownMenuRadioGroup value={period.kind === 'week' ? week : ''} onValueChange={setWeek}>
             {weekOptions().map((w) => (
               <DropdownMenuRadioItem key={w} value={w}>
                 {weekLabel(w)}
@@ -77,10 +99,39 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
             ))}
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-xs text-muted-foreground">{MONTH_FILTER_LABEL}</DropdownMenuLabel>
+          <div className="flex items-center gap-1 px-1 pb-1">
+            <MonthStep
+              label={PREV_MONTH_LABEL}
+              disabled={!monthAllowed(shiftMonth(shown, -1))}
+              onClick={() => setMonth(shiftMonth(shown, -1))}
+            >
+              <ChevronLeft />
+            </MonthStep>
+            <button
+              type="button"
+              aria-pressed={monthly}
+              onClick={() => setMonth(shown)}
+              className={cn(
+                'h-touch flex-1 rounded-sm px-2 text-sm hover:bg-muted dsk:h-control',
+                monthly && 'font-semibold text-primary',
+              )}
+            >
+              {monthLabel(shown)}
+            </button>
+            <MonthStep
+              label={NEXT_MONTH_LABEL}
+              disabled={!monthAllowed(shiftMonth(shown, 1))}
+              onClick={() => setMonth(shiftMonth(shown, 1))}
+            >
+              <ChevronRight />
+            </MonthStep>
+          </div>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             // Se abre después de que el menú termine de cerrarse (si no, el foco queda atrapado).
             onSelect={() => setTimeout(() => setCustomOpen(true), 0)}
-            className={cn(period.custom && 'font-semibold text-primary')}
+            className={cn(period.kind === 'custom' && 'font-semibold text-primary')}
           >
             <CalendarRange /> {CUSTOM_PERIOD_LABEL}
           </DropdownMenuItem>
@@ -137,6 +188,32 @@ export function DashboardFilterBar({ extra, chips = [] }: { extra?: ReactNode; c
         }}
       />
     </div>
+  )
+}
+
+/** Flecha para pasar al mes anterior o siguiente (el menú queda abierto). */
+function MonthStep({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string
+  disabled: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="grid size-touch flex-none place-items-center rounded-sm hover:bg-muted disabled:opacity-40 dsk:size-control [&_svg]:size-4"
+    >
+      {children}
+    </button>
   )
 }
 

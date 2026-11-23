@@ -22,7 +22,14 @@ import { DetailFilterMenus, ProductDetail } from '@/features/dashboards/ui/compo
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
 import { onlyProducts } from '@/features/dashboards/domain/sheets'
 import type { Units } from '@/shared/domain/products'
-import { NO_ZONE_LABEL } from '@/features/dashboards/types/product-detail'
+import {
+  MONTH_SUMMARY_TITLE,
+  NO_ZONE_LABEL,
+  PERIOD_SUMMARY_TITLE,
+  WEEK_SUMMARY_TITLE,
+} from '@/features/dashboards/types/product-detail'
+
+const SUMMARY_TITLE = { week: WEEK_SUMMARY_TITLE, month: MONTH_SUMMARY_TITLE, custom: PERIOD_SUMMARY_TITLE }
 
 /** Vendedor que no existe: para que un filtro sin coincidencias no muestre a todos. */
 const NO_SELLER = '·'
@@ -35,7 +42,7 @@ export function DashboardSummaryPage() {
   const navigate = useNavigate()
   const dayPath = useDayPath()
   const detail = useDetailSelection(period.dates, catalog)
-  const subtitle = period.custom ? 'Resumen del período' : 'Resumen semanal'
+  const subtitle = SUMMARY_TITLE[period.kind]
   const source = data.data ?? { projections: [], sales: [] }
 
   // Los filtros de la barra (vendedor, zona, tamaño y días) cambian también los totales y el

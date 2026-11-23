@@ -81,6 +81,12 @@ export function rangeLabel(from: IsoDate, to: IsoDate, long = false): string {
     : `${a.getDate()}${de}${names[a.getMonth()]} - ${tail}`
 }
 
+/** "noviembre 2026" (o "nov 2026") de un mes AAAA-MM. */
+export function monthLabel(ym: string, long = true): string {
+  const [y, m] = ym.split('-').map(Number)
+  return `${(long ? MONTHS_LONG : MONTHS)[m - 1]} ${y}`
+}
+
 export const weekLabel = (ws: IsoDate, long = false): string => rangeLabel(ws, addDays(ws, 6), long)
 
 export function relativeDay(s: IsoDate, ref: IsoDate = today()): string | null {

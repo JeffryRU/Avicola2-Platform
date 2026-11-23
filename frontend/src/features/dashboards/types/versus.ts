@@ -57,10 +57,10 @@ export const inUnitFoot = (text: string, unit: Unit) => `${text} en ${unit === '
 /** Gráfico. */
 export const chartTitle = (m: Measure) =>
   m === 'unidades'
-    ? 'Evolución semanal (unid.)'
+    ? 'Evolución en el período (unid.)'
     : m === 'ambos'
-      ? 'Evolución semanal (unid. y kg)'
-      : 'Evolución semanal (kg)'
+      ? 'Evolución en el período (unid. y kg)'
+      : 'Evolución en el período (kg)'
 export const chartAria = (unit: Unit) =>
   unit === 'kg' ? 'Kilogramos proyectados y pedidos por día' : 'Unidades proyectadas y pedidas por día'
 /** Con «Kg y unidades» el gráfico va en kg: se avisa dónde están las unidades. */
@@ -78,13 +78,13 @@ export const ALL_PRODUCTS_LABEL = 'Total de productos'
 export const productsCount = (n: number) => `${String(n)} productos`
 
 /** Tabla por producto. */
-export const PRODUCTS_TITLE = 'Desviación por producto (semana)'
+export const PRODUCTS_TITLE = 'Desviación por producto'
 export const PRODUCT_LABEL = 'Producto'
 export const PROJECTION_LABEL = 'Proyección'
 export const DIFF_LABEL = 'Dif.'
 export const TOTAL_LABEL = 'Total'
 export const NO_REAL_TITLE = 'Sin pedidos registrados'
-export const NO_REAL_BODY = 'Esta semana aún no tiene pedidos del ERP.'
+export const NO_REAL_BODY = 'Este período aún no tiene pedidos del ERP.'
 
 /** Botones del gráfico: ampliar y ancho completo. */
 export const EXPAND_LABEL = 'Ampliar'
@@ -97,3 +97,20 @@ export const LINES_FILTER_LABEL = 'Líneas del gráfico'
 export const ALL_LINES_LABEL = 'Todas las líneas'
 export const PARTS_LINE_LABEL = 'Franjas por tamaño'
 export const linesCount = (n: number) => (n === 1 ? '1 línea' : `${String(n)} líneas`)
+
+/** Tabla «Desviación por vendedor». */
+export const SELLERS_TITLE = 'Desviación por vendedor'
+export const SELLERS_HINT =
+  'Todos los vendedores del período. Cada uno cuenta solo los días en que tuvo pedido, por eso el total puede diferir del de arriba. Toca un nombre para filtrar solo por él.'
+export const SELLER_LABEL = 'Vendedor'
+export const SELLER_READING_LABEL = 'Lectura'
+export const SELLER_PCT_TITLE = 'Se ordena por la mayor desviación, sin importar el signo.'
+export const SELLERS_EMPTY_TITLE = 'Sin pedidos por vendedor'
+export const SELLERS_EMPTY_BODY = 'Cuando haya pedidos del ERP en este período, verás aquí a cada vendedor.'
+export const sortByLabel = (name: string) => `Ordenar por ${name}`
+export const SELLER_READING: Record<'under' | 'over' | 'even' | 'none', string> = {
+  under: 'Proyectó de menos',
+  over: 'Proyectó de más',
+  even: 'Sin desviación',
+  none: 'Sin proyección',
+}
