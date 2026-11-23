@@ -30,6 +30,7 @@ import { BRAND_IDS, DEFAULT_BRAND, type BrandId } from '@/shared/types/brands'
 import { ErrorBoundary } from '@/shared/ui/components/error-boundary'
 import { Splash } from '@/shared/ui/components/feedback'
 import { Toaster } from '@/shared/ui/components/shadcn/sonner'
+import { UpdateWatcher } from '@/app/update-watcher'
 
 /** La app con sesión se descarga aparte: el login no la necesita para pintarse. */
 const loadAuthenticatedApp = () => import('@/app/AuthenticatedApp')
@@ -175,6 +176,7 @@ Componentes:${componentStack}`
                     closeButton
                     visibleToasts={4}
                   />
+                  <UpdateWatcher />
                 </AccessibilityProvider>
               </LookProvider>
             </AppearanceProvider>
