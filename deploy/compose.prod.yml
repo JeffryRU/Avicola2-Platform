@@ -6,8 +6,11 @@
 #   - VPS sin panel o VM de GCP: sumar Caddy para el HTTPS:
 #       docker compose -f deploy/compose.prod.yml -f deploy/compose.caddy.yml --env-file .env up -d
 #
-# La base es Supabase Cloud. Los datos del servidor van en volúmenes con nombre (no rutas del
-# host), así los respaldos de volúmenes de Dokploy/Coolify los incluyen.
+# Base (ADR 0023): Postgres en este mismo servidor (`db`) es la principal y Supabase Cloud
+# recibe una copia cada COPY_EVERY_MINUTES (`db-copy`). Mientras DATABASE_URL apunte a Supabase,
+# todo sigue como antes (ADR 0002) y `db` queda sin usar: el cambio es explícito, en el .env.
+# Los datos del servidor van en volúmenes con nombre (no rutas del host), así los respaldos de
+# volúmenes de Dokploy/Coolify los incluyen.
 
 # Nombre del proyecto de Compose: se mantiene `avicola2` tras el cambio a AviPlanner porque
 # prefija los volúmenes (cambiarlo deja los datos en volúmenes huérfanos). ADR 0015.
@@ -27,7 +30,9 @@ services:
     restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV:-production}
-      DATABASE_URL: ${DATABASE_URL:?Falta DATABASE_URL (Supabase, pooler en modo sesión)}
+      # Base local: postgresql+psycopg://aviplanner:<LOCAL_DB_PASSWORD>@db:5432/aviplanner
+      # Supabase: el pooler en modo sesión (como antes del ADR 0023).
+      DATABASE_URL: ${DATABASE_URL:?Falta DATABASE_URL (base local `db` o Supabase)}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-3}
       DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-10}
@@ -157,6 +162,66 @@ services:
 
   # Respaldo diario de los esquemas `app` y `n8n` de Supabase (pg_dump), con retención.
   # Queda en el volumen `backups`: cópialo fuera del servidor (docs/deploy.md).
+  # Postgres local (ADR 0023): la base principal cuando DATABASE_URL y N8N_DB_HOST apuntan a
+  # `db`. Sin puerto publicado: solo la ven los servicios de este compose.
+  db:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aviplanner
+      POSTGRES_USER: aviplanner
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-cambia-esta-clave}
+      TZ: ${TZ:-America/Lima}
+    # 100 conexiones: backend (DB_POOL_SIZE + DB_MAX_OVERFLOW por worker) + n8n + copias, con
+    # holgura para 50+ personas a la vez (en Supabase gratuito eran 15 en total).
+    command: >-
+      postgres -c max_connections=100 -c shared_buffers=128MB -c effective_cache_size=384MB
+      -c work_mem=4MB -c maintenance_work_mem=64MB -c wal_compression=on
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aviplanner -d aviplanner"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: ${DB_MEM_LIMIT:-512m}
+    logging: *logging
+
+  # Copia de la base local en Supabase cada COPY_EVERY_MINUTES (ADR 0023): si este servidor se
+  # pierde, los datos siguen allí (se pierden a lo sumo esos minutos). Cada copia entra en una sola
+  # transacción: Supabase nunca queda a medias. Sin SUPABASE_COPY_URL, apagada.
+  db-copy:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SUPABASE_COPY_URL: ${SUPABASE_COPY_URL:-}
+      COPY_EVERY_MINUTES: ${COPY_EVERY_MINUTES:-15}
+      TZ: ${TZ:-America/Lima}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        plain() { echo "$$1" | sed 's#^postgresql+[a-z0-9]*://#postgresql://#'; }
+        src=$$(plain "$$DATABASE_URL"); dst=$$(plain "$$SUPABASE_COPY_URL")
+        if [ -z "$$dst" ] || [ "$$src" = "$$dst" ]; then
+          echo "Copia a Supabase apagada (sin SUPABASE_COPY_URL o la base ya es Supabase)."
+          exec sleep infinity
+        fi
+        while true; do
+          if pg_dump "$$src" --schema=app --schema=n8n --no-owner --no-privileges --format=custom --file=/tmp/copia.dump             && pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction --dbname="$$dst" /tmp/copia.dump; then
+            echo "Copia en Supabase al día: $$(date '+%F %T')"
+          else
+            echo "ERROR: no se pudo copiar la base a Supabase (se reintenta en $$COPY_EVERY_MINUTES min)" >&2
+          fi
+          rm -f /tmp/copia.dump
+          sleep $$((COPY_EVERY_MINUTES * 60))
+        done
+    depends_on:
+      db: {condition: service_healthy}
+    mem_limit: 256m
+    logging: *logging
+
   db-backup:
     image: postgres:17.11-alpine
     restart: unless-stopped
@@ -188,6 +253,7 @@ services:
     logging: *logging
 
 volumes:
+  pgdata:
   lakehouse:
   logs:
   n8n_data:

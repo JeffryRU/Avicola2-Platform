@@ -144,12 +144,27 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
 
 ## Respaldos y restauración
 
-- **Base (Supabase):** `db-backup` deja un `aviplanner-AAAAMMDD-HHMM.dump` (los anteriores al cambio de nombre se llaman `avicola2-…`) por día en el volumen `backups` y borra los de más de `BACKUP_KEEP_DAYS` días. Para restaurar (con un cliente de PostgreSQL 17):
+- **Base (la local con el ADR 0023, o Supabase):** `db-backup` deja un `aviplanner-AAAAMMDD-HHMM.dump` (los anteriores al cambio de nombre se llaman `avicola2-…`) por día en el volumen `backups` y borra los de más de `BACKUP_KEEP_DAYS` días. Para restaurar (con un cliente de PostgreSQL 17):
   ```bash
   pg_restore --no-owner --clean --if-exists -d "postgresql://...:5432/postgres?sslmode=require" aviplanner-20261103-0300.dump
   ```
 - **Lakehouse:** el volumen `lakehouse`. Se puede rehacer desde los archivos de bronze y la ingesta, pero conviene respaldarlo con los demás.
 - **Fuera del servidor:** un respaldo que solo vive en el mismo disco no protege si el servidor se pierde. Copia los volúmenes `backups` y `lakehouse` a S3 o GCS con el respaldo de volúmenes del panel o con `rclone`.
+
+## Base local en el VPS (ADR 0023)
+
+La base principal pasa a ser el Postgres del propio servidor (`db`) y Supabase queda como copia (`db-copy`, cada `COPY_EVERY_MINUTES`). Hasta que cambies el `.env`, todo sigue en Supabase.
+
+1. **Prepara el `.env`** (sin cambiar todavía `DATABASE_URL`): `LOCAL_DB_PASSWORD` (`openssl rand -hex 24`) y `SUPABASE_COPY_URL` (el pooler de Supabase, sin `+psycopg`). Despliega: `db` arranca vacía y `db-copy` sigue apagada.
+2. **Detén lo que escribe:** `backend` y `n8n` (desde el panel o `docker compose stop backend n8n`).
+3. **Copia Supabase → local** (desde el contenedor `db`):
+   ```bash
+   docker compose exec db sh -c 'pg_dump "postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"      --schema=app --schema=n8n --no-owner --no-privileges --format=custom --file=/tmp/inicial.dump      && pg_restore --no-owner --no-privileges -U aviplanner -d aviplanner /tmp/inicial.dump'
+   ```
+4. **Apunta la app y n8n a `db`:** `DATABASE_URL=postgresql+psycopg://aviplanner:<LOCAL_DB_PASSWORD>@db:5432/aviplanner`, `N8N_DB_HOST=db`, `N8N_DB_USER=aviplanner`, `N8N_DB_PASSWORD=<LOCAL_DB_PASSWORD>`, `N8N_DB_DATABASE=aviplanner` y `N8N_DB_SSL_ENABLED=false`. Opcional: `DB_POOL_SIZE=20`.
+5. **Despliega.** Revisa que entrar, registrar y el asistente funcionen. En los logs de `db-copy` debe aparecer «Copia en Supabase al día» cada 15 min.
+
+**Si el servidor se pierde:** en el servidor nuevo, apunta `DATABASE_URL` y `N8N_DB_*` otra vez a Supabase (como en el ADR 0002) y despliega. Luego repite estos pasos para volver a la base local.
 
 ## Logs
 
