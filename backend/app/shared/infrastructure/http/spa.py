@@ -10,8 +10,9 @@ from fastapi.responses import FileResponse, Response
 
 # Rutas que nunca deben caer en index.html.
 API_PREFIXES = ("api/", "ingest/", "mcp", "health", "docs", "redoc", "openapi.json")
-# El service worker y el manifest no se cachean: así la PWA detecta las versiones nuevas.
-NO_CACHE = {"sw.js", "registerSW.js", "manifest.webmanifest", "index.html"}
+# El service worker, el manifest y la versión no se cachean: así la PWA detecta las versiones
+# nuevas (la app consulta version.json y se recarga sola).
+NO_CACHE = {"sw.js", "registerSW.js", "manifest.webmanifest", "index.html", "version.json"}
 # Vite pone un hash en el nombre de todo lo de assets/: si cambia el contenido, cambia el nombre.
 IMMUTABLE_DIR = "assets"
 IMMUTABLE = "public, max-age=31536000, immutable"
@@ -58,6 +59,11 @@ def mount_spa(app: FastAPI, dist: Path) -> None:
             raise HTTPException(404)
         file = (root / path).resolve()
         if not (file.is_file() and file.is_relative_to(root)):
+            # Un archivo de assets/ que no existe es de una versión anterior: 404 (y no
+            # index.html, que el navegador intentaría ejecutar como JS). La app lo detecta y se
+            # recarga con la versión nueva.
+            if path.startswith(f"{IMMUTABLE_DIR}/"):
+                raise HTTPException(404)
             file = root / "index.html"
         headers: dict[str, str] = {}
         if file.name in NO_CACHE:

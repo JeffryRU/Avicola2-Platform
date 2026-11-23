@@ -107,3 +107,46 @@ const ORDER: Record<UnlockStatus, number> = { requested: 0, approved: 1, rejecte
 /** Pendientes primero, luego las habilitadas y al final el historial; dentro, lo más reciente arriba. */
 export const sortUnlocks = (list: Unlock[]) =>
   [...list].sort((a, b) => ORDER[a.status] - ORDER[b.status] || b.id - a.id)
+
+/** Filtro de la lista de solicitudes (Habilitaciones). `status` null = todas. */
+export interface UnlockFilter {
+  status: UnlockStatus | null
+  /** Usuario del vendedor; null = todos. */
+  seller: string | null
+  /** Día que se pidió abrir (ambos incluidos); null = sin límite. */
+  from: IsoDate | null
+  to: IsoDate | null
+  /** Busca en el nombre del vendedor y en el motivo (sin distinguir mayúsculas ni tildes). */
+  text: string
+}
+
+export const NO_UNLOCK_FILTER: UnlockFilter = { status: null, seller: null, from: null, to: null, text: '' }
+
+const plain = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+
+/** Solicitudes que pasan el filtro (`name` da el nombre visible de cada vendedor). */
+export function filterUnlocks(list: Unlock[], f: UnlockFilter, name: (seller: string) => string): Unlock[] {
+  const q = plain(f.text)
+  return list.filter(
+    (u) =>
+      (!f.status || u.status === f.status) &&
+      (!f.seller || u.seller === f.seller) &&
+      (!f.from || u.date >= f.from) &&
+      (!f.to || u.date <= f.to) &&
+      (!q || plain(`${name(u.seller)} ${u.seller} ${u.reason}`).includes(q)),
+  )
+}
+
+/** Cuántas hay de cada estado (con los demás filtros aplicados), para los contadores. */
+export function countByStatus(list: Unlock[]): Record<UnlockStatus, number> {
+  const out: Record<UnlockStatus, number> = { requested: 0, approved: 0, rejected: 0, closed: 0 }
+  for (const u of list) out[u.status] += 1
+  return out
+}
+
+/** Solicitudes agrupadas por el día que piden abrir (el más reciente primero). */
+export function groupByDay(list: Unlock[]): { date: IsoDate; items: Unlock[] }[] {
+  const groups = new Map<IsoDate, Unlock[]>()
+  for (const u of sortUnlocks(list)) groups.set(u.date, [...(groups.get(u.date) ?? []), u])
+  return [...groups.entries()].sort(([a], [b]) => b.localeCompare(a)).map(([date, items]) => ({ date, items }))
+}

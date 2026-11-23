@@ -7,9 +7,11 @@ La app móvil no usa cookies: pide el token con `POST /api/auth/token` y lo env�
 `Authorization: Bearer <token>` (ADR 0009). El navegador nunca recibe el token en el cuerpo.
 """
 
+import json
 from dataclasses import asdict
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
 from fastapi import (
     APIRouter,
@@ -24,6 +26,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -508,6 +511,14 @@ def set_active(
     return _admin_out(use_cases.set_account_active(actor, username, body.active), actor)
 
 
+@admin.put("/accounts/{username}")
+def edit_account(
+    use_cases: UseCases, actor: ActiveAccount, username: str, body: s.EditAccountIn
+) -> s.AdminAccountOut:
+    """Corrige nombre y zona. El usuario no cambia (es la llave de sus datos)."""
+    return _admin_out(use_cases.edit_account(actor, username, body.name, body.zone), actor)
+
+
 @admin.put("/accounts/{username}/role", dependencies=[requires(Permission.CHANGE_ROLES)])
 def change_role(
     use_cases: UseCases, actor: ActiveAccount, username: str, body: s.ChangeRoleIn
@@ -533,9 +544,20 @@ def _notification_out(n) -> s.NotificationOut:
 
 @router.get("/notifications")
 def list_notifications(
-    use_cases: UseCases, account: ActiveAccount, limit: Annotated[int, Query(ge=1, le=100)] = 50
+    use_cases: UseCases,
+    account: ActiveAccount,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
 ) -> s.NotificationsOut:
-    page = use_cases.list_notifications(account, limit)
+    """Las últimas notificaciones; con `date_from`/`date_to`, solo las de esos días (en la hora
+    del negocio, ambos incluidos)."""
+    if date_from and date_to and date_from > date_to:
+        raise DomainError("La fecha inicial no puede ser posterior a la final.")
+    tz = ZoneInfo(get_settings().tz)
+    since = datetime.combine(date_from, time.min, tz) if date_from else None
+    until = datetime.combine(date_to + timedelta(days=1), time.min, tz) if date_to else None
+    page = use_cases.list_notifications(account, limit, since, until)
     return s.NotificationsOut(items=[_notification_out(n) for n in page.items], unread=page.unread)
 
 
@@ -623,6 +645,21 @@ def ask_assistant(
     pregunta (el agente consulta con un pase de esta persona)."""
     answer = use_cases.ask_assistant(account, body.message, body.conversation)
     return s.AssistantReplyOut(reply=answer.reply, suggestions=list(answer.suggestions))
+
+
+@router.post("/assistant/messages/stream")
+def ask_assistant_stream(
+    use_cases: UseCases, account: ActiveAccount, body: s.AssistantMessageIn
+) -> StreamingResponse:
+    """La misma pregunta, con la respuesta en partes (una línea JSON por evento: `delta` con el
+    texto que se agrega, y al final `done` con la respuesta y sus sugerencias, o `error`)."""
+    events = use_cases.ask_assistant.stream(account, body.message, body.conversation)
+    return StreamingResponse(
+        (json.dumps(e, ensure_ascii=False) + "\n" for e in events),
+        media_type="application/x-ndjson",
+        # Sin búfer en los proxys: cada parte sale apenas llega.
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/editing")

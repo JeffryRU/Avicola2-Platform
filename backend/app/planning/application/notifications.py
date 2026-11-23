@@ -3,7 +3,7 @@
 import logging
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from app.planning.application.ports import (
     Clock,
@@ -101,10 +101,20 @@ class ListNotifications:
     def __init__(self, notifications: NotificationRepository):
         self.notifications = notifications
 
-    def __call__(self, account: SellerAccount, limit: int = 50) -> NotificationPage:
+    def __call__(
+        self,
+        account: SellerAccount,
+        limit: int = 50,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> NotificationPage:
+        """Las últimas `limit`; con un rango, solo las de esos días.
+
+        El conteo de no leídas es siempre de todas (no solo del rango).
+        """
         username = account.seller.username
         return NotificationPage(
-            self.notifications.list_for(username, min(max(limit, 1), MAX_LIST)),
+            self.notifications.list_for(username, min(max(limit, 1), MAX_LIST), since, until),
             self.notifications.unread_count(username),
         )
 

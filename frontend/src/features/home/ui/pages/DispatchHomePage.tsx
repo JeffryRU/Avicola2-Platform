@@ -64,7 +64,7 @@ export function DispatchHomePage() {
       <PageHeader title="Despacho de hoy" subtitle={`${dDowLong(now)} ${dFull(now)}`} back={null} />
       <PageBody className="grid gap-4">
         <KpiStrip>
-          <Kpi
+          <Kpi tone="primary"
             label={`${STOCK_TITLE} · hoy`}
             value={stockToday ? unitsCount(stockToday.total_units) : loading ? '…' : '—'}
             foot={
@@ -74,7 +74,7 @@ export function DispatchHomePage() {
               </>
             }
           />
-          <Kpi
+          <Kpi tone="kg"
             label={`${PRODUCTION_TITLE} · hoy`}
             value={prodToday ? unitsCount(prodToday.produced) : loading ? '…' : '—'}
             foot={
@@ -93,7 +93,7 @@ export function DispatchHomePage() {
                 : undefined
             }
           />
-          <Kpi
+          <Kpi tone="warn"
             label="Días con algo pendiente"
             value={loading ? '…' : `${String(pendingDays)} de ${String(DAYS)}`}
             foot="Stock o producción sin registrar"

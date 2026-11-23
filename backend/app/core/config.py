@@ -148,10 +148,8 @@ class Settings(BaseSettings):
     # Zonas que el reporte de pedidos en tienda nombra distinto que los vendedores
     # (STORE_ZONE_ALIASES, JSON): la región por la zona de venta.
     store_zone_aliases: dict[str, str] = Field(default_factory=lambda: {"LA LIBERTAD": "Trujillo"})
-    # Ubicaciones del stock de despacho, además de «General» (el stock que se sube de forma
-    # general; en la app, «Todas las ubicaciones») y de las zonas de los vendedores activos, que se
-    # suman solas (una zona nueva, p. ej. Huaraz, aparece sin configurar nada). STOCK_LOCATIONS
-    # (JSON) es para lugares que no son la zona de ningún vendedor.
+    # Ubicaciones del stock de despacho además de «General» (STOCK_LOCATIONS, JSON). Todo se
+    # almacena en un solo lugar (INS-10): vacío, solo hay «General» y la app no muestra el filtro.
     stock_locations: list[str] = Field(default_factory=list)
     # Para la saca solo cuenta el stock de lotes de hasta estos días (lo más antiguo se troza).
     saca_stock_lot_days: int = Field(3, ge=0, le=30)

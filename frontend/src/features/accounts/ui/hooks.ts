@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
 import { queryKeys } from '@/shared/application/query-keys'
-import type { NewAccount } from '@/features/accounts/domain/accounts'
+import type { AccountEdit, NewAccount } from '@/features/accounts/domain/accounts'
 import type { Role } from '@/shared/domain/session'
 
 /** Cuentas que la sesión puede ver en Usuarios. */
@@ -19,6 +19,13 @@ export function useRefreshAccounts() {
 export function useCreateAccount() {
   const { accounts } = useContainer()
   return useMutation({ mutationFn: (account: NewAccount) => accounts.create(account) })
+}
+
+export function useEditAccount() {
+  const { accounts } = useContainer()
+  return useMutation({
+    mutationFn: (next: { username: string; data: AccountEdit }) => accounts.edit(next.username, next.data),
+  })
 }
 
 export function useChangeRole() {

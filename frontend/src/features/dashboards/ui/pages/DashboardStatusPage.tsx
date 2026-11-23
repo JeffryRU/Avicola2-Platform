@@ -1,8 +1,6 @@
 import { SyncStatus } from '@/shared/ui/components/sync-status'
-import { granularityOf, sumDays } from '@/features/dashboards/domain/buckets'
-import { bucketLabels } from '@/features/dashboards/types/buckets'
 import { useNavigate } from 'react-router'
-import { dDM, dDow, dFull, dShort, rangeLabel } from '@/shared/domain/dates'
+import { dDM, dDow, dFull, dShort, fromIso, rangeLabel } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
 import { periodAgg } from '@/features/projections'
 import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
@@ -10,16 +8,17 @@ import { useTooltip } from '@/shared/ui/hooks/use-tooltip'
 import { DataTable } from '@/shared/ui/components/data-table'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
 import { useCatalog } from '@/features/catalog'
-import { BarChart } from '@/shared/ui/components/charts'
+import { ProjectionBars } from '@/features/dashboards/ui/components/projection-bars'
 import { StatusBadge, StatusDot } from '@/shared/ui/components/feedback'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
 import { kgAmount, STATUS_LABEL, unitsCount } from '@/shared/types/labels'
-import { useDayPath, usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
+import { useDayPath, usePeriodData, useDashboardFilters, useWideChart } from '@/features/dashboards/ui/hooks'
 import { col } from '@/shared/ui/lib/table-columns'
 
 export function DashboardStatusPage() {
   const { period, sellers } = useDashboardFilters()
+  const wide = useWideChart('estado')
   const { catalog } = useCatalog()
   const data = usePeriodData(period)
   const navigate = useNavigate()
@@ -31,6 +30,8 @@ export function DashboardStatusPage() {
 
   const days = periodAgg(period.dates, sellers, source.projections, source.sales, catalog)
   type Day = (typeof days)[number]
+  // Un mes se dibuja como calendario: el día 1 cae en su día de la semana.
+  const leading = period.kind === 'month' ? (fromIso(period.from).getDay() + 6) % 7 : 0
   const units = days.reduce((s, d) => s + d.u, 0)
   const kg = days.reduce((s, d) => s + d.kg, 0)
 
@@ -45,6 +46,9 @@ export function DashboardStatusPage() {
           aria-label="Estado por día"
           className="mb-4 grid grid-cols-7 gap-px overflow-hidden rounded-md border border-border bg-rule hc:rounded-none hc:border-x-0 hc:border-t-heavy hc:border-b-heavy hc:bg-foreground"
         >
+          {Array.from({ length: leading }, (_, i) => (
+            <span key={`blank-${String(i)}`} aria-hidden className="bg-surface" />
+          ))}
           {days.map((d) => (
             <button
               key={d.date}
@@ -80,29 +84,14 @@ export function DashboardStatusPage() {
           ))}
         </section>
         {node}
-        <div className="grid grid-cols-1 items-start gap-4 @6xl/main:grid-cols-2">
-          <Section title="Total proyectado por día (unidades)">
-            <div className="px-4 pt-3 pb-4 dsk:px-5">
-              <BarChart
-                label="Unidades proyectadas por día"
-                width={560}
-                height={330}
-                onSelect={(d) => void navigate(dayPath(d))}
-                bars={sumDays(days).map((d) => ({
-                  key: d.key,
-                  value: d.u,
-                  ...bucketLabels(d, granularityOf(days.length)),
-                  tip: (
-                    <>
-                      <b>{bucketLabels(d, granularityOf(days.length)).title}</b>
-                      <br />
-                      {nf0(d.u)} unidades, {kgAmount(d.kg)}
-                    </>
-                  ),
-                }))}
-              />
-            </div>
-          </Section>
+        <div className={cn('grid grid-cols-1 items-start gap-4', !wide[0] && '@4xl/main:grid-cols-2')}>
+          <ProjectionBars
+            title="Total proyectado por día"
+            days={days}
+            period={subtitle}
+            onSelect={(d) => void navigate(dayPath(d))}
+            wide={wide}
+          />
           <Section title="Detalle por día (unidades y kg)">
             <DataTable
               rows={days}

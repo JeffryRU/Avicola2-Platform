@@ -1,3 +1,4 @@
+import { rangeLabel } from '@/shared/domain/dates'
 import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { bucketsOf, granularityOf } from '@/features/dashboards/domain/buckets'
 import { GRANULARITY_NOTE, bucketLabels } from '@/features/dashboards/types/buckets'
@@ -6,8 +7,8 @@ import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
 import { DataTable, type CellTone, type Column, type RowTone } from '@/shared/ui/components/data-table'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
 import { kgPerUnitLabel, useCatalog } from '@/features/catalog'
-import { usePeriodData, useDashboardFilters } from '@/features/dashboards/ui/hooks'
-import { CountUp, LineChart } from '@/shared/ui/components/charts'
+import { usePeriodData, useDashboardFilters, useWideChart } from '@/features/dashboards/ui/hooks'
+import { CountUp, LineChart, type LineSeriesId } from '@/shared/ui/components/charts'
 import { EARLIER_DASH } from '@/shared/ui/lib/chart-dash'
 import { useHistory } from '@/features/history'
 import { onlyProducts, onlyProductsChanged, projectionParts, sheetRounds } from '@/features/dashboards/domain/sheets'
@@ -22,37 +23,86 @@ import {
 } from '@/shared/ui/components/shadcn/dropdown-menu'
 import { bySubcategory } from '@/shared/domain/products'
 import { toggleIn } from '@/shared/domain/format'
-import { Package, Scale } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChartLine,
+  Columns2,
+  Maximize2,
+  Package,
+  RectangleHorizontal,
+  Scale,
+} from 'lucide-react'
+import { useTeamSellers } from '@/features/sellers'
+import { useRequiredSession } from '@/features/auth'
+import { isSupervisor } from '@/shared/domain/session'
 import { useState, type ReactNode } from 'react'
 import { EmptyState } from '@/shared/ui/components/feedback'
+import { ChartColorsButton, type ChartSeries } from '@/shared/ui/components/chart-colors'
+import type { ChartKey } from '@/shared/domain/look'
+import { Button } from '@/shared/ui/components/shadcn/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from '@/shared/ui/components/shadcn/dialog'
+import { cn } from '@/shared/ui/lib/utils'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { col, signTone } from '@/shared/ui/lib/table-columns'
 import {
   DEFAULT_MEASURE,
+  DEFAULT_SELLER_SORT,
   MEASURES,
   MEASURE_PARAM,
   bucketVersus,
   chartUnit,
   deviationPct,
+  deviationReading,
   modelByDay,
   parseMeasure,
   productDeviation,
+  sellerDeviation,
+  sellerTotals,
+  sortSellerDeviation,
   unitsOf,
   versusDays,
   versusTotals,
   type Amount,
   type ProductDeviation,
+  type SellerDeviation,
+  type SellerSort,
+  type SellerSortKey,
   type Unit,
   type VersusPoint,
 } from '@/features/dashboards/domain/versus'
 import {
   ACCURACY_FOOT,
   ACCURACY_KPI,
+  ALL_LINES_LABEL,
+  SELLERS_EMPTY_BODY,
+  SELLERS_EMPTY_TITLE,
+  SELLERS_HINT,
+  SELLERS_TITLE,
+  SELLER_LABEL,
+  SELLER_PCT_TITLE,
+  SELLER_READING,
+  SELLER_READING_LABEL,
+  sortByLabel,
   ALL_PRODUCTS_LABEL,
+  LINES_FILTER_LABEL,
+  PARTS_LINE_LABEL,
+  linesCount,
   BOTH_CHART_NOTE,
   CHART_EMPTY_BODY,
   CHART_EMPTY_TITLE,
   CHART_PRODUCTS_LABEL,
+  EXPAND_LABEL,
+  EXPAND_TITLE,
+  WIDE_OFF_LABEL,
+  WIDE_ON_LABEL,
   DEVIATION_KPI,
   DIFF_LABEL,
   DIFF_PCT_LABEL,
@@ -83,7 +133,7 @@ import {
   chartAria,
   chartTitle,
   daysWithRealFoot,
-  inUnitsFoot,
+  inUnitFoot,
   measureSuffix,
   partsLegend,
   pctText,
@@ -100,6 +150,8 @@ const tone = (v: number) => (v < 0 ? 'text-bad' : 'text-ok')
 interface SeriesRow {
   key: string
   label: ReactNode
+  /** Serie que dibuja en el gráfico (para resaltarla al pasar el mouse); la fila de diferencia, ninguna. */
+  line?: LineSeriesId
   tone?: RowTone
   value: (p: VersusPoint) => Amount | null
   /** Texto de una medida en la celda (por defecto, la cifra). */
@@ -108,14 +160,21 @@ interface SeriesRow {
 }
 
 /** Celda con una cifra por medida: la primera arriba y las demás, más tenues, debajo. */
-function Stacked({ lines }: { lines: string[] }) {
+function Stacked({ lines, tags }: { lines: string[]; tags?: string[] }) {
   const [first, ...rest] = lines
+  // Con dos medidas, cada cifra lleva la suya al lado («unid.», «kg»): se sabe cuál es cuál.
+  const tag = (i: number) =>
+    tags && <span className="ml-1 inline-block w-8 text-left text-xs font-normal text-muted-foreground">{tags[i]}</span>
   return (
     <>
-      {first}
+      <span className="whitespace-nowrap">
+        {first}
+        {tag(0)}
+      </span>
       {rest.map((line, i) => (
-        <small key={i} className="block text-xs text-muted-foreground">
+        <small key={i} className="block text-xs whitespace-nowrap text-muted-foreground">
           {line}
+          {tag(i + 1)}
         </small>
       ))}
     </>
@@ -145,9 +204,15 @@ function SeriesKey({ dashed, round, model }: { dashed?: boolean; round?: number;
         strokeWidth={2.5}
         strokeLinecap="round"
         stroke={color}
-        strokeDasharray={
-          model ? '10 4' : prev ? EARLIER_DASH[(round - 1) % EARLIER_DASH.length] : dashed ? '5 3' : undefined
-        }
+        style={{
+          strokeDasharray: model
+            ? 'var(--dash-chart-model)'
+            : prev
+              ? EARLIER_DASH[(round - 1) % EARLIER_DASH.length]
+              : dashed
+                ? 'var(--dash-chart-2)'
+                : 'var(--dash-chart-1)',
+        }}
       />
       {/* El mismo marcador del gráfico: círculo (proyección; hueco si es anterior) o cuadrado (pedido). */}
       {model ? (
@@ -168,6 +233,16 @@ function SeriesKey({ dashed, round, model }: { dashed?: boolean; round?: number;
   )
 }
 
+/** Muestra de una franja apilada (un tamaño o producto de la proyección vigente). */
+function PartKey({ index }: { index: number }) {
+  const color = PART_COLOR[index % PART_COLOR.length]
+  return (
+    <svg aria-hidden width="12" height="12" viewBox="0 0 12 12" className="flex-none">
+      <rect width="12" height="12" rx="2" fill={color} fillOpacity={0.45} stroke={color} />
+    </svg>
+  )
+}
+
 /** Cifra de un KPI con su medida al lado. */
 function KpiAmount({ value, unit }: { value: number; unit: Unit }) {
   return (
@@ -178,11 +253,77 @@ function KpiAmount({ value, unit }: { value: number; unit: Unit }) {
   )
 }
 
+/** Columna de kg (un decimal) o de unidades (enteras). */
+const numberCol =
+  <T,>(unit: Unit) =>
+  (...args: Parameters<typeof col.kg<T>>) =>
+    unit === 'kg' ? col.kg<T>(...args) : col.units<T>(...args)
+
+/** Una columna por medida: con una sola, el encabezado lleva la medida; con dos, van agrupadas. */
+function perUnitColumns<T>(
+  units: Unit[],
+  key: string,
+  name: string,
+  build: (unit: Unit, header: ReactNode, group: string | null) => Column<T>,
+): Column<T>[] {
+  const both = units.length > 1
+  return units
+    .map((u) =>
+      both
+        ? build(u, UNIT_COLUMN[u], name)
+        : build(
+            u,
+            <>
+              {name}
+              <br />({UNIT_SHORT[u]})
+            </>,
+            null,
+          ),
+    )
+    .map((c) => ({ ...c, key: `${key}-${c.key}` }))
+}
+
+/** Encabezado de columna que ordena la tabla de vendedores al tocarlo. */
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  title,
+}: {
+  label: ReactNode
+  sortKey: SellerSortKey
+  sort: SellerSort
+  onSort: (key: SellerSortKey) => void
+  title?: string
+}) {
+  const active = sort.key === sortKey
+  const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={sortByLabel(typeof label === 'string' ? label : sortKey)}
+      onClick={() => onSort(sortKey)}
+      className={cn('inline-flex items-center gap-1 font-[inherit]', active && 'text-foreground')}
+    >
+      <span>{label}</span>
+      <Icon aria-hidden className={cn('size-3.5 flex-none', !active && 'opacity-50')} />
+    </button>
+  )
+}
+
 export function DashboardVersusPage() {
-  const { period, sellers, measure, setMeasure } = useDashboardFilters()
+  const { period, sellers, measure, setMeasure, setSellers } = useDashboardFilters()
+  const team = isSupervisor(useRequiredSession().seller)
+  const teamSellers = useTeamSellers()
+  const [sellerSort, setSellerSort] = useState<SellerSort>(DEFAULT_SELLER_SORT)
+  const [wide, setWide] = useWideChart()
   const units = unitsOf(measure)
   const main = units[0]
   const both = units.length > 1
+  /** La medida extra (con «Unidades y kg»: los kg). */
+  const other: Unit = main === 'units' ? 'kg' : 'units'
   const plotted = chartUnit(measure)
   const suffix = measureSuffix(units)
   const { catalog } = useCatalog()
@@ -192,6 +333,10 @@ export function DashboardVersusPage() {
   const days = periodAgg(period.dates, sellers, source.projections, source.sales, catalog)
   // Productos del gráfico (vacía = el total de todos). Solo cambia la evolución semanal.
   const [picked, setPicked] = useState<string[]>([])
+  // Líneas que se ven (filtro «Líneas») y la resaltada al pasar por su fila de la tabla.
+  const [hiddenLines, setHiddenLines] = useState<LineSeriesId[]>([])
+  const [focus, setFocus] = useState<LineSeriesId | null>(null)
+  const showLine = (id: LineSeriesId) => !hiddenLines.includes(id)
   const chartProducts = catalog.forProjection().products
   const pickedNames = chartProducts.filter((p) => picked.includes(p.id)).map((p) => p.name)
   const chartDays = picked.length
@@ -237,16 +382,18 @@ export function DashboardVersusPage() {
   type Point = (typeof points)[number]
 
   // Tabla bajo el gráfico: una fila por serie (rondas, modelo, pedido real) y una columna por día.
-  const series = (key: string, label: ReactNode, value: (p: VersusPoint) => Amount | null, rowTone?: RowTone) => ({
-    key,
-    label,
-    value,
-    tone: rowTone,
-  })
+  const series = (
+    key: string,
+    line: LineSeriesId,
+    label: ReactNode,
+    value: (p: VersusPoint) => Amount | null,
+    rowTone?: RowTone,
+  ) => ({ key, line, label, value, tone: rowTone })
   const seriesRows: SeriesRow[] = [
     ...earlierRounds.map((r) =>
       series(
         `round-${String(r)}`,
+        `e${r - 1}` as LineSeriesId,
         <>
           <SeriesKey round={r} />
           {roundLabel(r, rounds)} {suffix}
@@ -257,6 +404,7 @@ export function DashboardVersusPage() {
     ),
     series(
       'projected',
+      'a',
       <>
         <SeriesKey />
         {roundLabel(rounds, rounds)} {suffix}
@@ -267,6 +415,7 @@ export function DashboardVersusPage() {
       ? [
           series(
             'model',
+            'c',
             <>
               <SeriesKey model />
               {MODEL_LABEL} {suffix}
@@ -277,6 +426,7 @@ export function DashboardVersusPage() {
       : []),
     series(
       'real',
+      'b',
       <>
         <SeriesKey dashed />
         {REAL_LABEL} {suffix}
@@ -298,37 +448,22 @@ export function DashboardVersusPage() {
   const seriesCell = (r: SeriesRow, p: Point) => {
     const v = r.value(p)
     if (v == null) return '—'
-    return <Stacked lines={units.map((u) => (r.text ? r.text(p, u) : seriesNumber(v[u])))} />
+    return (
+      <Stacked
+        lines={units.map((u) => (r.text ? r.text(p, u) : seriesNumber(v[u])))}
+        tags={both ? units.map((u) => UNIT_SHORT[u]) : undefined}
+      />
+    )
   }
 
   // Tabla por producto: todos los que se proyectan, en el orden del catálogo.
   const productRows = productDeviation(days, catalog)
   const hasData = (r: ProductDeviation) => r.projected.units > 0 || r.real.units > 0
-  /** Columna de kg (un decimal) o de unidades (enteras). */
-  const numberCol =
-    (unit: Unit) =>
-    (...args: Parameters<typeof col.kg<ProductDeviation>>) =>
-      unit === 'kg' ? col.kg(...args) : col.units(...args)
-  /** Una columna por medida: con una sola, el encabezado lleva la medida; con dos, van agrupadas. */
   const perUnit = (
     key: string,
     name: string,
     build: (unit: Unit, header: ReactNode, group: string | null) => Column<ProductDeviation>,
-  ) =>
-    units
-      .map((u) =>
-        both
-          ? build(u, UNIT_COLUMN[u], name)
-          : build(
-              u,
-              <>
-                {name}
-                <br />({UNIT_SHORT[u]})
-              </>,
-              null,
-            ),
-      )
-      .map((c) => ({ ...c, key: `${key}-${c.key}` }))
+  ) => perUnitColumns(units, key, name, build)
   const productColumns: Column<ProductDeviation>[] = [
     {
       key: 'name',
@@ -342,13 +477,16 @@ export function DashboardVersusPage() {
       ),
     },
     ...perUnit('projected', PROJECTION_LABEL, (u, header, group) =>
-      numberCol(u)(u, header, (r) => r.projected[u], { group, total: productNumber(vs.projected[u], u) }),
+      numberCol<ProductDeviation>(u)(u, header, (r) => r.projected[u], {
+        group,
+        total: productNumber(vs.projected[u], u),
+      }),
     ),
     ...perUnit('real', REAL_LABEL, (u, header, group) =>
-      numberCol(u)(u, header, (r) => r.real[u], { group, total: productNumber(vs.real[u], u) }),
+      numberCol<ProductDeviation>(u)(u, header, (r) => r.real[u], { group, total: productNumber(vs.real[u], u) }),
     ),
     ...perUnit('diff', DIFF_LABEL, (u, header, group) =>
-      numberCol(u)(u, header, (r) => r.diff[u], {
+      numberCol<ProductDeviation>(u)(u, header, (r) => r.diff[u], {
         group,
         faint: (r) => !hasData(r),
         tone: (r) => hasData(r) && signTone(r.diff[u]),
@@ -365,6 +503,326 @@ export function DashboardVersusPage() {
       }),
     ),
   ]
+
+  // Tabla por vendedor (solo supervisión): todos los del período, con los productos del gráfico.
+  const sellerData = {
+    projections: onlyProducts(source.projections, picked),
+    sales: onlyProducts(source.sales, picked),
+  }
+  const sellerNames = new Map(teamSellers.map((s) => [s.username, s.name]))
+  const nameOf = (username: string) => sellerNames.get(username) ?? username
+  const usernames = [
+    ...new Set([
+      ...teamSellers.map((s) => s.username),
+      ...sellerData.projections.map((p) => p.seller),
+      ...sellerData.sales.map((x) => x.seller),
+    ]),
+  ]
+  const sellerRows = team
+    ? sellerDeviation(
+        usernames.map((seller) => ({
+          seller,
+          days: periodAgg(period.dates, [seller], sellerData.projections, sellerData.sales, catalog),
+        })),
+        catalog,
+      )
+    : []
+  const sellerSorted = sortSellerDeviation(sellerRows, sellerSort, main, nameOf)
+  const sellerTotal = sellerTotals(sellerRows)
+  const onSort = (key: SellerSortKey) =>
+    setSellerSort((cur) =>
+      cur.key === key
+        ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: key === 'seller' ? 'asc' : 'desc' },
+    )
+  const sortHeader = (label: ReactNode, key: SellerSortKey, title?: string) => (
+    <SortHeader label={label} sortKey={key} sort={sellerSort} onSort={onSort} title={title} />
+  )
+  const sellerPerUnit = (
+    key: string,
+    name: string,
+    sortKey: SellerSortKey,
+    build: (unit: Unit, header: ReactNode, group: string | null) => Column<SellerDeviation>,
+  ) =>
+    perUnitColumns<SellerDeviation>(units, key, name, (u, header, group) =>
+      build(u, both ? sortHeader(UNIT_COLUMN[u], sortKey) : sortHeader(header, sortKey), group),
+    )
+  const sellerColumns: Column<SellerDeviation>[] = [
+    {
+      key: 'seller',
+      sticky: true,
+      header: sortHeader(SELLER_LABEL, 'seller'),
+      cell: (r) => (
+        <button
+          type="button"
+          onClick={() => setSellers([r.seller])}
+          className={cn(
+            'text-left font-medium underline-offset-4 hover:underline',
+            sellers.length === 1 && sellers[0] === r.seller && 'text-primary',
+          )}
+        >
+          {nameOf(r.seller)}
+        </button>
+      ),
+    },
+    ...sellerPerUnit('projected', PROJECTION_LABEL, 'projected', (u, header, group) =>
+      numberCol<SellerDeviation>(u)(u, header, (r) => r.projected[u], {
+        group,
+        total: productNumber(sellerTotal.projected[u], u),
+      }),
+    ),
+    ...sellerPerUnit('real', REAL_LABEL, 'real', (u, header, group) =>
+      numberCol<SellerDeviation>(u)(u, header, (r) => r.real[u], {
+        group,
+        total: productNumber(sellerTotal.real[u], u),
+      }),
+    ),
+    ...sellerPerUnit('diff', DIFF_LABEL, 'diff', (u, header, group) =>
+      numberCol<SellerDeviation>(u)(u, header, (r) => r.diff[u], {
+        group,
+        tone: (r) => r.projected[u] > 0 && signTone(r.diff[u]),
+        total: productNumber(sellerTotal.diff[u], u),
+        totalTone: signTone(sellerTotal.diff[u]),
+      }),
+    ),
+    ...sellerPerUnit('pct', DIFF_PCT_LABEL, 'pct', (u, header, group) =>
+      col.change<SellerDeviation>(u, header, (r) => r.pct[u], {
+        group,
+        className: 'font-medium',
+        total: sellerTotal.pct[u] == null ? '—' : pctText(sellerTotal.pct[u]),
+        totalTone: signTone(sellerTotal.pct[u] ?? 0),
+      }),
+    ),
+    {
+      key: 'reading',
+      header: SELLER_READING_LABEL,
+      title: SELLER_PCT_TITLE,
+      desktopOnly: true,
+      cell: (r) => (
+        <span className="text-sm text-muted-foreground">{SELLER_READING[deviationReading(r.pct[main])]}</span>
+      ),
+      total: null,
+    },
+  ]
+
+  const legend = (
+    <>
+      {/* Solo las líneas que se ven; al pasar el mouse por una, se resalta en el gráfico. */}
+      <div className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-ink-2">
+        {[
+          ...earlierRounds.map((r) => ({
+            id: `e${r - 1}` as LineSeriesId,
+            key: <SeriesKey round={r} />,
+            name: roundLabel(r, rounds),
+          })),
+          { id: 'a' as const, key: <SeriesKey />, name: roundLabel(rounds, rounds) },
+          ...(hasModel ? [{ id: 'c' as const, key: <SeriesKey model />, name: MODEL_LEGEND }] : []),
+          { id: 'b' as const, key: <SeriesKey dashed />, name: REAL_ERP_LABEL },
+        ]
+          .filter((item) => showLine(item.id))
+          .map((item) => (
+            <span
+              key={item.id}
+              className="flex cursor-default items-center gap-1.5"
+              onMouseEnter={() => setFocus(item.id)}
+              onMouseLeave={() => setFocus(null)}
+            >
+              {item.key}
+              {item.name}
+            </span>
+          ))}
+      </div>
+      {both && <p className="mb-2 text-right text-xs text-muted-foreground">{BOTH_CHART_NOTE}</p>}
+      {GRANULARITY_NOTE[granularity] && (
+        <p className="mb-2 text-right text-xs text-muted-foreground">{GRANULARITY_NOTE[granularity]}</p>
+      )}
+      {parts.names.length > 1 && points.length > 0 && showLine('parts') && (
+        <div className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span>{partsLegend(picked.length > 0 && picked.length <= 4)}</span>
+          {parts.names.map((name, k) => (
+            <span key={name} className="flex items-center gap-1.5">
+              <svg aria-hidden width="12" height="12" viewBox="0 0 12 12" className="flex-none">
+                <rect
+                  width="12"
+                  height="12"
+                  rx="2"
+                  fill={PART_COLOR[k % PART_COLOR.length]}
+                  fillOpacity={0.45}
+                  stroke={PART_COLOR[k % PART_COLOR.length]}
+                />
+              </svg>
+              {name}
+            </span>
+          ))}
+        </div>
+      )}
+    </>
+  )
+
+  const chart = (
+    <LineChart
+      unitLabel={UNIT_SHORT[plotted]}
+      show={showLine}
+      focus={focus}
+      label={chartAria(plotted)}
+      empty={
+        <>
+          <b className="block font-semibold text-foreground">{CHART_EMPTY_TITLE}</b>
+          <span className="text-sm text-muted-foreground">{CHART_EMPTY_BODY}</span>
+        </>
+      }
+      points={allPoints.map((p) => ({
+        key: p.date,
+        label: p.label,
+        sublabel: p.sublabel,
+        a: p.confirmed ? p.projected[plotted] : null,
+        b: p.real?.[plotted] ?? null,
+        c: p.model?.[plotted] ?? null,
+        earlier: p.confirmed ? p.earlier.map((e) => e[plotted]) : undefined,
+        parts: p.confirmed && parts.names.length > 1 ? p.parts.map((x) => x[plotted]) : undefined,
+        tip: (
+          <>
+            <b>{p.title}</b>
+            {p.confirmed &&
+              p.earlier.map((e, i) => (
+                <span key={i}>
+                  <br />
+                  {roundLabel(i + 1, rounds)}: {amountsText(e, units)}
+                </span>
+              ))}
+            <br />
+            {p.confirmed ? `${roundLabel(rounds, rounds)}: ${amountsText(p.projected, units)}` : NO_PROJECTION_TIP}
+            {p.confirmed &&
+              parts.names.length > 1 &&
+              parts.names.map((name, k) => (
+                <span key={name}>
+                  <br />
+                  <span className="opacity-80">
+                    · {name}: {amountsText(p.parts[k], units)}
+                  </span>
+                </span>
+              ))}
+            {p.model != null && (
+              <>
+                <br />
+                {MODEL_LABEL}: {amountsText(p.model, units)}
+              </>
+            )}
+            <br />
+            {p.real == null ? (
+              NO_REAL_TIP
+            ) : (
+              <>
+                {REAL_LABEL}: {amountsText(p.real, units)}
+                {p.confirmed && p.projected[main] > 0 && (
+                  <>
+                    <br />
+                    {DIFF_TIP}:{' '}
+                    {units
+                      .map((u) => {
+                        const pct = deviationPct(p.projected[u], p.real?.[u] ?? 0)
+                        const text = pct == null ? '—' : pctText(pct)
+                        return both ? `${text} ${UNIT_SHORT[u]}` : text
+                      })
+                      .join(' · ')}
+                  </>
+                )}
+              </>
+            )}
+          </>
+        ),
+      }))}
+    />
+  )
+
+  const seriesTable = points.length > 0 && (
+    <div className="relative -mx-4 mt-3 -mb-4 overflow-x-auto dsk:-mx-5">
+      <DataTable
+        density="compact"
+        rows={seriesRows.filter((r) => !r.line || showLine(r.line))}
+        onRowHover={(r) => setFocus(r?.line && showLine(r.line) ? r.line : null)}
+        rowKey={(r) => r.key}
+        rowTone={(r) => r.tone}
+        columns={[
+          {
+            key: 'series',
+            sticky: true,
+            header: <span className="sr-only">{SERIES_COLUMN_LABEL}</span>,
+            cell: (r) => <span className="flex items-center gap-2">{r.label}</span>,
+          },
+          ...points.map((p) => ({
+            key: p.date,
+            header: (
+              <>
+                {p.label}
+                <br />
+                <span className="num">{p.sublabel}</span>
+              </>
+            ),
+            numeric: true,
+            faint: (r: SeriesRow) => r.value(p) == null,
+            tone: (r: SeriesRow) => r.cellTone?.(p),
+            cell: (r: SeriesRow) => seriesCell(r, p),
+          })),
+        ]}
+      />
+    </div>
+  )
+
+  const colorSeries: ChartSeries[] = [
+    ...earlierRounds.map((r) => ({
+      key: `chart-prev-${String(Math.min(r, 3))}` as ChartKey,
+      name: roundLabel(r, rounds),
+      sample: <SeriesKey round={r} />,
+    })),
+    { key: 'chart-1', name: roundLabel(rounds, rounds), sample: <SeriesKey /> },
+    ...(hasModel ? [{ key: 'chart-model' as const, name: MODEL_LEGEND, sample: <SeriesKey model /> }] : []),
+    { key: 'chart-2', name: REAL_ERP_LABEL, sample: <SeriesKey dashed /> },
+    ...(parts.names.length > 1
+      ? parts.names.slice(0, PART_COLOR.length).map((name, k) => ({
+          key: `chart-part-${String(k + 1)}` as ChartKey,
+          name,
+          sample: <PartKey index={k} />,
+          fill: true,
+        }))
+      : []),
+  ]
+
+  // Filtro «Líneas»: cada serie que hay en el gráfico, en el orden de la leyenda.
+  const lineOptions: { id: LineSeriesId; name: string }[] = [
+    ...earlierRounds.map((r) => ({ id: `e${r - 1}` as LineSeriesId, name: roundLabel(r, rounds) })),
+    { id: 'a', name: roundLabel(rounds, rounds) },
+    ...(hasModel ? [{ id: 'c' as const, name: MODEL_LEGEND }] : []),
+    { id: 'b', name: REAL_ERP_LABEL },
+    ...(parts.names.length > 1 ? [{ id: 'parts' as const, name: PARTS_LINE_LABEL }] : []),
+  ]
+  const shownCount = lineOptions.filter((o) => showLine(o.id)).length
+  const linesFilter = (
+    <FilterMenu
+      icon={<ChartLine />}
+      title={LINES_FILTER_LABEL}
+      label={shownCount === lineOptions.length ? ALL_LINES_LABEL : linesCount(shownCount)}
+      active={shownCount < lineOptions.length}
+    >
+      <CheckItem checked={shownCount === lineOptions.length} onToggle={() => setHiddenLines([])}>
+        {ALL_LINES_LABEL}
+      </CheckItem>
+      <DropdownMenuSeparator />
+      {lineOptions.map((o) => (
+        <CheckItem
+          key={o.id}
+          checked={showLine(o.id)}
+          onToggle={() => {
+            const next = toggleIn(hiddenLines, o.id)
+            // Siempre queda al menos una línea.
+            if (next.length < lineOptions.length) setHiddenLines(next)
+          }}
+        >
+          {o.name}
+        </CheckItem>
+      ))}
+    </FilterMenu>
+  )
 
   // La medida: con «Limpiar» vuelve a kg.
   const measureChips =
@@ -399,19 +857,21 @@ export function DashboardVersusPage() {
         <SyncStatus queries={[data, history, model]} />
         <KpiStrip className="mb-4">
           <Kpi
+            tone="primary"
             label={PROJECTED_KPI}
             value={<KpiAmount value={vs.projected[main]} unit={main} />}
             foot={
               <>
-                {both && <span>{amountText(vs.projected.units, 'units')}</span>}
+                {both && <span>{amountText(vs.projected[other], other)}</span>}
                 <span>{daysWithRealFoot(vs.daysWithReal)}</span>
               </>
             }
           />
           <Kpi
+            tone="kg"
             label={REAL_ERP_LABEL}
             value={<KpiAmount value={vs.real[main]} unit={main} />}
-            foot={both ? amountText(vs.real.units, 'units') : undefined}
+            foot={both ? amountText(vs.real[other], other) : undefined}
           />
           <Kpi
             label={DEVIATION_KPI}
@@ -430,7 +890,7 @@ export function DashboardVersusPage() {
               ) : (
                 <>
                   <span>{amountsText(vs.diff, units)}</span>
-                  {both && <span>{inUnitsFoot(pctText(vs.deviationPct.units))}</span>}
+                  {both && <span>{inUnitFoot(pctText(vs.deviationPct[other]), other)}</span>}
                 </>
               )
             }
@@ -446,206 +906,100 @@ export function DashboardVersusPage() {
             }
             foot={
               <>
-                {both && !noReal && <span>{inUnitsFoot(percentText(vs.accuracyPct.units))}</span>}
+                {both && !noReal && <span>{inUnitFoot(percentText(vs.accuracyPct[other]), other)}</span>}
                 <span>{ACCURACY_FOOT}</span>
               </>
             }
           />
         </KpiStrip>
-        <div className="grid grid-cols-1 items-start gap-4 @7xl/main:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <div
+          className={cn(
+            'grid grid-cols-1 items-start gap-4',
+            !wide && '@7xl/main:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]',
+          )}
+        >
           <Section
             className="flex flex-col overflow-hidden"
             title={chartTitle(measure)}
             aside={
-              <FilterMenu
-                icon={<Package />}
-                title={CHART_PRODUCTS_LABEL}
-                label={
-                  !picked.length
-                    ? ALL_PRODUCTS_LABEL
-                    : picked.length > 2
-                      ? productsCount(picked.length)
-                      : pickedNames.join(', ')
-                }
-                active={picked.length > 0}
-              >
-                <CheckItem checked={!picked.length} onToggle={() => setPicked([])}>
-                  {ALL_PRODUCTS_LABEL}
-                </CheckItem>
-                {bySubcategory(chartProducts).map((g) => (
-                  <div key={g.name ?? ''}>
-                    <DropdownMenuSeparator />
-                    {g.name && (
-                      <DropdownMenuLabel className="text-xs text-muted-foreground">{g.name}</DropdownMenuLabel>
-                    )}
-                    {g.products.map((p) => (
-                      <CheckItem
-                        key={p.id}
-                        checked={picked.includes(p.id)}
-                        onToggle={() => setPicked(toggleIn(picked, p.id))}
-                      >
-                        {p.name}
-                      </CheckItem>
-                    ))}
-                  </div>
-                ))}
-              </FilterMenu>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <FilterMenu
+                  icon={<Package />}
+                  title={CHART_PRODUCTS_LABEL}
+                  label={
+                    !picked.length
+                      ? ALL_PRODUCTS_LABEL
+                      : picked.length > 2
+                        ? productsCount(picked.length)
+                        : pickedNames.join(', ')
+                  }
+                  active={picked.length > 0}
+                >
+                  <CheckItem checked={!picked.length} onToggle={() => setPicked([])}>
+                    {ALL_PRODUCTS_LABEL}
+                  </CheckItem>
+                  {bySubcategory(chartProducts).map((g) => (
+                    <div key={g.name ?? ''}>
+                      <DropdownMenuSeparator />
+                      {g.name && (
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">{g.name}</DropdownMenuLabel>
+                      )}
+                      {g.products.map((p) => (
+                        <CheckItem
+                          key={p.id}
+                          checked={picked.includes(p.id)}
+                          onToggle={() => setPicked(toggleIn(picked, p.id))}
+                        >
+                          {p.name}
+                        </CheckItem>
+                      ))}
+                    </div>
+                  ))}
+                </FilterMenu>
+                {linesFilter}
+                <ChartColorsButton series={colorSeries} iconOnly />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="hidden @7xl/main:inline-flex"
+                  aria-pressed={wide}
+                  title={wide ? WIDE_OFF_LABEL : WIDE_ON_LABEL}
+                  onClick={() => setWide(!wide)}
+                >
+                  {wide ? (
+                    <Columns2 aria-hidden className="size-4" />
+                  ) : (
+                    <RectangleHorizontal aria-hidden className="size-4" />
+                  )}
+                  <span className="sr-only">{wide ? WIDE_OFF_LABEL : WIDE_ON_LABEL}</span>
+                </Button>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" title={EXPAND_TITLE}>
+                      <Maximize2 aria-hidden className="size-4" />
+                      <span className="sr-only">{EXPAND_LABEL}</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="flex h-[92dvh] w-[96vw] max-w-none flex-col gap-3 sm:max-w-none">
+                    <div className="pr-12">
+                      <DialogTitle className="text-xl font-bold">{chartTitle(measure)}</DialogTitle>
+                      <DialogDescription className="text-sm text-muted-foreground">
+                        {rangeLabel(period.from, period.to, true)}
+                      </DialogDescription>
+                    </div>
+                    {legend}
+                    <div className="relative min-h-0 flex-1">{chart}</div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             }
           >
             <div className="flex flex-1 flex-col px-4 pt-3 pb-4 dsk:px-5">
-              <div className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-ink-2">
-                {earlierRounds.map((r) => (
-                  <span key={r} className="flex items-center gap-1.5">
-                    <SeriesKey round={r} />
-                    {roundLabel(r, rounds)}
-                  </span>
-                ))}
-                <span className="flex items-center gap-1.5">
-                  <SeriesKey />
-                  {roundLabel(rounds, rounds)}
-                </span>
-                {hasModel && (
-                  <span className="flex items-center gap-1.5">
-                    <SeriesKey model />
-                    {MODEL_LEGEND}
-                  </span>
-                )}
-                <span className="flex items-center gap-1.5">
-                  <SeriesKey dashed />
-                  {REAL_ERP_LABEL}
-                </span>
-              </div>
-              {both && <p className="mb-2 text-right text-xs text-muted-foreground">{BOTH_CHART_NOTE}</p>}
-              {GRANULARITY_NOTE[granularity] && (
-                <p className="mb-2 text-right text-xs text-muted-foreground">{GRANULARITY_NOTE[granularity]}</p>
-              )}
-              {parts.names.length > 1 && points.length > 0 && (
-                <div className="mb-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span>{partsLegend(picked.length > 0 && picked.length <= 4)}</span>
-                  {parts.names.map((name, k) => (
-                    <span key={name} className="flex items-center gap-1.5">
-                      <svg aria-hidden width="12" height="12" viewBox="0 0 12 12" className="flex-none">
-                        <rect
-                          width="12"
-                          height="12"
-                          rx="2"
-                          fill={PART_COLOR[k % PART_COLOR.length]}
-                          fillOpacity={0.45}
-                          stroke={PART_COLOR[k % PART_COLOR.length]}
-                        />
-                      </svg>
-                      {name}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {legend}
               {/* Ocupa el alto que deja la tarjeta (con un mínimo): sin huecos blancos. */}
-              <div className="relative min-h-64 flex-1 dsk:min-h-80">
-                <LineChart
-                  label={chartAria(plotted)}
-                  empty={
-                    <>
-                      <b className="block font-semibold text-foreground">{CHART_EMPTY_TITLE}</b>
-                      <span className="text-sm text-muted-foreground">{CHART_EMPTY_BODY}</span>
-                    </>
-                  }
-                  points={allPoints.map((p) => ({
-                    key: p.date,
-                    label: p.label,
-                    sublabel: p.sublabel,
-                    a: p.confirmed ? p.projected[plotted] : null,
-                    b: p.real?.[plotted] ?? null,
-                    c: p.model?.[plotted] ?? null,
-                    earlier: p.confirmed ? p.earlier.map((e) => e[plotted]) : undefined,
-                    parts: p.confirmed && parts.names.length > 1 ? p.parts.map((x) => x[plotted]) : undefined,
-                    tip: (
-                      <>
-                        <b>{p.title}</b>
-                        {p.confirmed &&
-                          p.earlier.map((e, i) => (
-                            <span key={i}>
-                              <br />
-                              {roundLabel(i + 1, rounds)}: {amountsText(e, units)}
-                            </span>
-                          ))}
-                        <br />
-                        {p.confirmed
-                          ? `${roundLabel(rounds, rounds)}: ${amountsText(p.projected, units)}`
-                          : NO_PROJECTION_TIP}
-                        {p.confirmed &&
-                          parts.names.length > 1 &&
-                          parts.names.map((name, k) => (
-                            <span key={name}>
-                              <br />
-                              <span className="opacity-80">
-                                · {name}: {amountsText(p.parts[k], units)}
-                              </span>
-                            </span>
-                          ))}
-                        {p.model != null && (
-                          <>
-                            <br />
-                            {MODEL_LABEL}: {amountsText(p.model, units)}
-                          </>
-                        )}
-                        <br />
-                        {p.real == null ? (
-                          NO_REAL_TIP
-                        ) : (
-                          <>
-                            {REAL_LABEL}: {amountsText(p.real, units)}
-                            {p.confirmed && p.projected[main] > 0 && (
-                              <>
-                                <br />
-                                {DIFF_TIP}:{' '}
-                                {units
-                                  .map((u) => {
-                                    const pct = deviationPct(p.projected[u], p.real?.[u] ?? 0)
-                                    const text = pct == null ? '—' : pctText(pct)
-                                    return both ? `${text} ${UNIT_SHORT[u]}` : text
-                                  })
-                                  .join(' · ')}
-                              </>
-                            )}
-                          </>
-                        )}
-                      </>
-                    ),
-                  }))}
-                />
-              </div>
-              {points.length > 0 && (
-                <div className="relative -mx-4 mt-3 -mb-4 overflow-x-auto dsk:-mx-5">
-                  <DataTable
-                    density="compact"
-                    rows={seriesRows}
-                    rowKey={(r) => r.key}
-                    rowTone={(r) => r.tone}
-                    columns={[
-                      {
-                        key: 'series',
-                        sticky: true,
-                        header: <span className="sr-only">{SERIES_COLUMN_LABEL}</span>,
-                        cell: (r) => <span className="flex items-center gap-2">{r.label}</span>,
-                      },
-                      ...points.map((p) => ({
-                        key: p.date,
-                        header: (
-                          <>
-                            {p.label}
-                            <br />
-                            <span className="num">{p.sublabel}</span>
-                          </>
-                        ),
-                        numeric: true,
-                        faint: (r: SeriesRow) => r.value(p) == null,
-                        tone: (r: SeriesRow) => r.cellTone?.(p),
-                        cell: (r: SeriesRow) => seriesCell(r, p),
-                      })),
-                    ]}
-                  />
-                </div>
-              )}
+              <div className="relative min-h-64 flex-1 dsk:min-h-80">{chart}</div>
+              {seriesTable}
             </div>
           </Section>
           <Section title={PRODUCTS_TITLE}>
@@ -664,6 +1018,24 @@ export function DashboardVersusPage() {
             </div>
           </Section>
         </div>
+        {team && (
+          <Section title={SELLERS_TITLE} className="mt-4">
+            <p className="px-4 pt-3 text-xs text-muted-foreground dsk:px-5">{SELLERS_HINT}</p>
+            <div className="relative overflow-x-auto">
+              {sellerSorted.length ? (
+                <DataTable
+                  density="compact"
+                  rows={sellerSorted}
+                  rowKey={(r) => r.seller}
+                  totalLabel={TOTAL_LABEL}
+                  columns={sellerColumns}
+                />
+              ) : (
+                <EmptyState title={SELLERS_EMPTY_TITLE}>{SELLERS_EMPTY_BODY}</EmptyState>
+              )}
+            </div>
+          </Section>
+        )}
       </PageBody>
     </div>
   )

@@ -103,7 +103,7 @@ export function DayDetailPage() {
           </h2>
         </div>
         <KpiStrip className="mb-4 dsk:grid-cols-3">
-          <Kpi
+          <Kpi tone="primary"
             label="Total proyectado"
             value={
               <>

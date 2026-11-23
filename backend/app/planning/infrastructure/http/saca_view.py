@@ -46,6 +46,8 @@ def saca_out(plan: SacaPlan) -> s.SacaOut:
                 ordered=g.ordered,
                 projected=g.projected,
                 plus=g.plus,
+                b_rate=g.b_rate,
+                suggested_plus=g.suggested_plus,
                 balance=g.balance,
                 farm_order=g.farm_order,
                 demand=g.balance,

@@ -99,6 +99,30 @@ def test_training_measures_every_model_on_unseen_days(trained) -> None:
     ]
 
 
+def test_each_model_explains_itself(trained) -> None:
+    """Modelo de demanda → cada modelo: hiperparámetros, error por parte, por tamaño y por día."""
+    sizes = trained["sizes"]
+    # Un nombre por cada columna de variables del boosting.
+    cube = np.zeros((2, 3, 60))
+    days = [START + timedelta(days=i) for i in range(60)]
+    assert sizes and len(trained["features"]) == training.core.features(cube, days, 50).shape[1]
+    evaluated = len(trained["series"])
+    for m in trained["models"]:
+        assert m["params"], m["key"]
+        assert set(m["split_metrics"]) == {"validacion", "prueba"}
+        assert m["mae"] >= 0 and m["rmse"] >= m["mae"]  # RMSE nunca es menor que MAE
+        assert len(m["por_tamano"]) == len(sizes)
+        assert len(m["matriz"]) == len(sizes) and all(len(row) == 7 for row in m["matriz"])
+        # Sin pedidos de un tamaño, su error no existe (no un número enorme).
+        assert all(v is None or 0 <= v < 1000 for v in m["por_tamano"])
+        assert len(m["team"]) == evaluated
+    by_key = {m["key"]: m for m in trained["models"]}
+    # Los hiperparámetros son los mismos con los que se entrena.
+    assert by_key["tsb"]["params"]["alpha"] == training.core.CROSTON_ALPHA
+    assert by_key["boosting"]["params"]["learning_rate"] == training.core.GBM["learning_rate"]
+    assert by_key["destilado"]["params"]["mezcla_real_maestro"] == training.DISTILL_MIX
+
+
 def test_summary_is_for_supervision_and_suggestion_uses_the_model(trained) -> None:
     client = TestClient(app)
     _login(client, "supervisor")

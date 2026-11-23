@@ -27,7 +27,26 @@ export const modelSummarySchema = z.object({
   }),
   sellers: z.array(z.string()),
   series_teacher: z.number(),
-  models: z.array(z.object({ key: z.string(), name: z.string(), metrics: metricsSchema })),
+  models: z.array(
+    z.object({
+      key: z.string(),
+      name: z.string(),
+      metrics: metricsSchema,
+      // Detalle de cada modelo (corridas desde nov. 2026; las anteriores no lo traen).
+      params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+      split_metrics: z.object({ validacion: metricsSchema, prueba: metricsSchema }).optional(),
+      mae: z.number().optional(),
+      rmse: z.number().optional(),
+      /** WAPE de cada tamaño (en el orden de `sizes`); null = ese tamaño no tuvo pedidos. */
+      por_tamano: z.array(z.number().nullable()).optional(),
+      /** WAPE por tamaño (filas) y día de la semana (columnas, lunes primero); null = sin días. */
+      matriz: z.array(z.array(z.number().nullable())).optional(),
+      /** Predicción del equipo en cada día evaluado (mismo orden que `series`). */
+      team: z.array(z.number()).optional(),
+    }),
+  ),
+  sizes: z.array(z.string()).optional(),
+  features: z.array(z.string()).optional(),
   chosen: z.object({ sugerencia: z.string(), saca: z.string(), semana: z.string() }),
   series: z.array(
     z.object({

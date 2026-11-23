@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   accountState,
   adminAccountSchema,
+  editAccountSchema,
   newAccountSchema,
   otherRoles,
   type AdminAccount,
@@ -36,6 +37,11 @@ describe('cuentas', () => {
     const v = newAccountSchema.parse({ username: ' EAuleste ', name: 'Estuardo Auleste', zone: '', role: 'seller' })
     expect(v).toEqual({ username: 'eauleste', name: 'Estuardo Auleste', zone: null, role: 'seller' })
     expect(newAccountSchema.safeParse({ username: 'a', name: 'x', zone: '', role: 'seller' }).success).toBe(false)
+  })
+
+  it('normaliza el formulario de editar usuario y no deja el nombre vacío', () => {
+    expect(editAccountSchema.parse({ name: '  Rosa Navarro ', zone: ' ' })).toEqual({ name: 'Rosa Navarro', zone: null })
+    expect(editAccountSchema.safeParse({ name: ' ', zone: '' }).success).toBe(false)
   })
 
   it('solo ofrece cambiar a un rol distinto del actual, y nada si el backend no lo permite', () => {

@@ -1,16 +1,15 @@
 import { SyncStatus } from '@/shared/ui/components/sync-status'
-import { granularityOf, sumDays } from '@/features/dashboards/domain/buckets'
-import { bucketLabels } from '@/features/dashboards/types/buckets'
+import { granularityOf } from '@/features/dashboards/domain/buckets'
+import { ProjectionBars } from '@/features/dashboards/ui/components/projection-bars'
 import { useNavigate } from 'react-router'
 import { rangeLabel } from '@/shared/domain/dates'
-import { nf0 } from '@/shared/domain/format'
 import { periodAgg } from '@/features/projections'
 import { previousDates } from '@/features/dashboards/domain/period'
 import { DashboardTabs, Delta } from '@/features/dashboards/ui/components/dashboard'
 import { useCatalog } from '@/features/catalog'
-import { BarChart, CountUp } from '@/shared/ui/components/charts'
-import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
-import { STATUS_LABEL, kgAmount, UNITS_SHORT } from '@/shared/types/labels'
+import { CountUp } from '@/shared/ui/components/charts'
+import { Kpi, KpiStrip, PageBody, PageHeader } from '@/shared/ui/components/layout'
+import { UNITS_SHORT } from '@/shared/types/labels'
 import {
   useDayPath,
   useDetailSelection,
@@ -23,7 +22,14 @@ import { DetailFilterMenus, ProductDetail } from '@/features/dashboards/ui/compo
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
 import { onlyProducts } from '@/features/dashboards/domain/sheets'
 import type { Units } from '@/shared/domain/products'
-import { NO_ZONE_LABEL } from '@/features/dashboards/types/product-detail'
+import {
+  MONTH_SUMMARY_TITLE,
+  NO_ZONE_LABEL,
+  PERIOD_SUMMARY_TITLE,
+  WEEK_SUMMARY_TITLE,
+} from '@/features/dashboards/types/product-detail'
+
+const SUMMARY_TITLE = { week: WEEK_SUMMARY_TITLE, month: MONTH_SUMMARY_TITLE, custom: PERIOD_SUMMARY_TITLE }
 
 /** Vendedor que no existe: para que un filtro sin coincidencias no muestre a todos. */
 const NO_SELLER = '·'
@@ -36,7 +42,7 @@ export function DashboardSummaryPage() {
   const navigate = useNavigate()
   const dayPath = useDayPath()
   const detail = useDetailSelection(period.dates, catalog)
-  const subtitle = period.custom ? 'Resumen del período' : 'Resumen semanal'
+  const subtitle = SUMMARY_TITLE[period.kind]
   const source = data.data ?? { projections: [], sales: [] }
 
   // Los filtros de la barra (vendedor, zona, tamaño y días) cambian también los totales y el
@@ -75,6 +81,7 @@ export function DashboardSummaryPage() {
         <SyncStatus queries={[data]} />
         <KpiStrip className="mb-4">
           <Kpi
+            tone="primary"
             label="Total proyectado"
             value={
               <>
@@ -85,6 +92,7 @@ export function DashboardSummaryPage() {
             foot={<Delta current={units} previous={same.reduce((s, d) => s + d.u, 0)} />}
           />
           <Kpi
+            tone="kg"
             label="Total en kilos (aprox.)"
             value={
               <>
@@ -95,6 +103,7 @@ export function DashboardSummaryPage() {
             foot={<Delta current={kg} previous={same.reduce((s, d) => s + d.kg, 0)} />}
           />
           <Kpi
+            tone={confirmed === days.length && days.length > 0 ? 'ok' : 'warn'}
             label="Días confirmados"
             value={
               <>
@@ -105,34 +114,16 @@ export function DashboardSummaryPage() {
           />
           <Kpi label="Productos" value={catalog.products.length} foot="en la proyección" />
         </KpiStrip>
-        <Section title="Proyección por día (unidades)" aside="Elige una barra para ver el día" className="mb-4">
-          <div className="px-4 pt-3 pb-4 dsk:px-5">
-            <BarChart
-              label="Unidades proyectadas por día"
-              // Por día, la barra lleva al detalle del día; por semana o mes, no.
-              onSelect={granularityOf(days.length) === 'day' ? (d) => void navigate(dayPath(d)) : undefined}
-              bars={sumDays(days).map((d) => {
-                const g = granularityOf(days.length)
-                const labels = bucketLabels(d, g)
-                return {
-                  key: d.key,
-                  value: d.u,
-                  label: labels.label,
-                  sublabel: labels.sublabel,
-                  tip: (
-                    <>
-                      <b>{labels.title}</b>
-                      <br />
-                      {nf0(d.u)} unidades, {kgAmount(d.kg)}
-                      <br />
-                      {STATUS_LABEL[d.confirmed ? 'confirmed' : 'pending']}
-                    </>
-                  ),
-                }
-              })}
-            />
-          </div>
-        </Section>
+        <div className="mb-4">
+          <ProjectionBars
+            title="Proyección por día"
+            hint="Elige una barra para ver el día"
+            days={days}
+            period={rangeLabel(period.from, period.to, true)}
+            // Por día, la barra lleva al detalle del día; por semana o mes, no.
+            onSelect={granularityOf(days.length) === 'day' ? (d) => void navigate(dayPath(d)) : undefined}
+          />
+        </div>
         <ProductDetail
           dates={period.dates}
           custom={period.custom}

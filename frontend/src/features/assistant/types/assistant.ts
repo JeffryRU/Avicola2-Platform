@@ -1,6 +1,7 @@
 /** Textos del asistente (ADR 0008: las pantallas los toman de aquí). */
 export const ASSISTANT_LABEL = 'Asistente'
 export const ASSISTANT_OPEN = 'Abrir el asistente'
+export const ASSISTANT_CLOSE = 'Cerrar el asistente'
 export const ASSISTANT_TITLE = 'Asistente de AviPlanner'
 export const ASSISTANT_DESCRIPTION = 'Pregunta por tus datos y las reglas del registro. Solo ve lo que tú puedes ver.'
 export const ASSISTANT_PLACEHOLDER = 'Escribe tu pregunta…'

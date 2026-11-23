@@ -41,7 +41,7 @@ export function sumBy(buckets: Bucket[], value: (d: IsoDate) => number | null): 
 }
 
 /** Días con unidades y kg (como los de `periodAgg`), sumados por grupo para las barras. */
-interface DayTotals {
+export interface DayTotals {
   date: IsoDate
   u: number
   kg: number

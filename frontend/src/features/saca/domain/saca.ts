@@ -24,11 +24,15 @@ export type SacaLine = z.infer<typeof sacaLineSchema>
 export const sacaGroupSchema = z.object({
   name: z.string(),
   stock: z.number().int(),
-  // Stock de calidad B: ya está sumado en `stock`.
+  // Stock de calidad B del tipo: en la brasa no está en `stock` ni cuenta para la saca.
   stock_b: z.number().int().default(0),
   ordered: z.number().int(),
   projected: z.number().int(),
   plus: z.number().int().default(0),
+  // Parte de lo que llega del tipo que sale en calidad B y el plus que la cubriría (INS-14);
+  // null sin historia de producción suficiente o si el tipo cuenta la B como A.
+  b_rate: z.number().nullable().default(null),
+  suggested_plus: z.number().int().nullable().default(null),
   // stock − pedidos + proyección (puede ser negativo).
   balance: z.number().int(),
   farm_order: z.number().int(),
@@ -53,7 +57,7 @@ export const sacaSchema = z.object({
   plus: z.number().int().default(0),
   // Pedido final a granja: suma por tipo de max(0, balance + plus).
   farm_order: z.number().int(),
-  // Stock de calidad B (se suma a su tipo) y stock en lotes antiguos (no se descuenta).
+  // Stock de calidad B (en la brasa no cuenta para la saca) y stock en lotes antiguos (no se descuenta).
   stock_b: z.number().int().default(0),
   stock_old: z.number().int().default(0),
   stock_lot_days: z.number().int().nullish(),
@@ -147,6 +151,8 @@ export function emptySaca(
       ordered: 0,
       projected: 0,
       plus: 0,
+      b_rate: null,
+      suggested_plus: null,
       balance: 0,
       farm_order: 0,
     })),

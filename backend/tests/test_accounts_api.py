@@ -207,6 +207,33 @@ def test_deactivated_account_cannot_log_in(client):
     assert client.patch("/api/admin/accounts/supervisor", json={"active": False}).status_code == 422
 
 
+def test_supervisor_edits_name_and_zone_but_not_the_username(client):
+    _login(client, "supervisor")
+    r = client.put(
+        "/api/admin/accounts/rnavarro", json={"name": "  Rosa   Navarro ", "zone": " Norte "}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["username"] == "rnavarro"
+    assert (r.json()["name"], r.json()["zone"]) == ("Rosa Navarro", "Norte")
+    listed = {a["username"]: a for a in client.get("/api/admin/accounts").json()}
+    assert listed["rnavarro"]["name"] == "Rosa Navarro"
+    # Zona vacía = sin zona; igual que en el alta.
+    r = client.put("/api/admin/accounts/rnavarro", json={"name": "Rosa Navarro", "zone": " "})
+    assert r.json()["zone"] is None
+
+
+def test_edit_account_validates_and_checks_permissions(client):
+    _login(client, "supervisor")
+    assert client.put("/api/admin/accounts/rnavarro", json={"name": "   "}).status_code == 422
+    assert client.put("/api/admin/accounts/rnavarro", json={"name": "x" * 101}).status_code == 422
+    assert client.put("/api/admin/accounts/nadie", json={"name": "Nadie"}).status_code == 404
+    # Su propia cuenta se edita desde el perfil.
+    assert client.put("/api/admin/accounts/supervisor", json={"name": "Yo"}).status_code == 422
+    seller = TestClient(app)
+    _login(seller)
+    assert seller.put("/api/admin/accounts/hdias", json={"name": "Otro"}).status_code == 403
+
+
 def test_temporary_passwords_are_random_and_mixed():
     passwords = {RandomTemporaryPasswords().generate() for _ in range(50)}
     assert len(passwords) == 50

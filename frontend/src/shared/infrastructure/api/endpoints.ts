@@ -29,7 +29,7 @@ export const endpoints = {
   accounts: {
     /** GET → cuentas (supervisor). POST {username, name, role, zone} → credenciales temporales. */
     list: '/admin/accounts',
-    /** PATCH {active} → cuenta actualizada (activar o desactivar). */
+    /** PATCH {active} → activar o desactivar. PUT {name, zone} → corregir los datos. */
     account: (username: string) => `/admin/accounts/${seg(username)}`,
     /** POST {} → credenciales temporales nuevas. */
     resetPassword: (username: string) => `/admin/accounts/${seg(username)}/reset-password`,
@@ -142,6 +142,8 @@ export const endpoints = {
     info: '/assistant',
     /** POST {message, conversation} → {reply, suggestions}: la respuesta y cómo seguir. */
     messages: '/assistant/messages',
+    /** POST {message, conversation} → NDJSON: `delta` (texto que llega), y `done` o `error`. */
+    stream: '/assistant/messages/stream',
   },
 
   status: {

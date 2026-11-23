@@ -90,6 +90,11 @@ class CreateAccountIn(BaseModel):
     role: str = Field(SELLER, max_length=20)
 
 
+class EditAccountIn(BaseModel):
+    name: str = Field(min_length=1, max_length=MAX_NAME)
+    zone: str | None = Field(None, max_length=50)
+
+
 class NewCredentialsOut(BaseModel):
     """La contraseña temporal se muestra una sola vez; no se puede volver a consultar."""
 
@@ -372,6 +377,12 @@ class SacaGroupOut(BaseModel):
     ordered: int = Field(description="Pedidos de mañana.")
     projected: int = Field(description="Proyección de pasado mañana.")
     plus: int = Field(description="Aves extra fijas del tipo.")
+    b_rate: float | None = Field(
+        None, description="Parte de lo que llega del tipo que sale en calidad B (historia)."
+    )
+    suggested_plus: int | None = Field(
+        None, description="Plus que cubre la calidad B esperada; null sin historia o si no aplica."
+    )
     balance: int = Field(description="stock − pedidos + proyección, antes del plus.")
     farm_order: int = Field(description="balance + plus, nunca menos de 0.")
     # Compatibilidad con clientes anteriores (app móvil): ya no hay factor ni «falta».

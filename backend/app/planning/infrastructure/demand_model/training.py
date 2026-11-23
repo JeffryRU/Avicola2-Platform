@@ -58,6 +58,33 @@ MODELS = {
     "robusta": "Combinación robusta (promedio de 6)",
 }
 ROBUST = ("actual", "suavizado", "tsb", "sba", "boosting", "cliente")
+DISTILL_MIX = 0.5  # el alumno destilado aprende 50 % de lo real y 50 % de lo que dice el maestro
+OOF_BLOCKS = 4  # el apilado usa la predicción del maestro fuera de muestra (4 bloques)
+
+
+def params() -> dict[str, dict[str, object]]:
+    """Hiperparámetros de cada modelo (los mismos con los que se entrena), para la app."""
+    gbm = {k: v for k, v in core.GBM.items() if k not in ("categorical_features", "random_state")}
+    lag = {"horizonte_dias": core.HORIZON}
+    return {
+        "actual": {**lag, "semanas": core.MEDIAN_WEEKS, "agregado": "mediana"},
+        "suavizado": {**lag, "semanas": core.EWMA_WEEKS, "vida_media_semanas": core.EWMA_HALF_LIFE},
+        "tsb": {
+            **lag, "semanas": core.CROSTON_WEEKS, "alpha": core.CROSTON_ALPHA,
+            "beta": core.CROSTON_BETA,
+        },
+        "sba": {**lag, "semanas": core.CROSTON_WEEKS, "alpha": core.CROSTON_ALPHA},
+        "boosting": {**lag, **gbm, "series": "vendedores principales"},
+        "cliente": {
+            **lag, "semanas": core.CUSTOMER_WEEKS, "frecuencia_minima": core.CUSTOMER_MIN_FREQ,
+        },
+        "maestro": {**lag, **gbm, "series": "todas (incluye vendedores eventuales)"},
+        "destilado": {**lag, **gbm, "mezcla_real_maestro": DISTILL_MIX},
+        "apilado": {**lag, **gbm, "bloques_fuera_de_muestra": OOF_BLOCKS},
+        "robusta": {"modelos": len(ROBUST), "agregado": "promedio", "combina": ", ".join(ROBUST)},
+    }  # fmt: skip
+
+
 # Qué modelo se usa en cada lugar de la app (elegidos con validación + prueba).
 # Cada uso toma el modelo con menor error en su nivel (se recalcula en cada entrenamiento: con más
 # historia el mejor puede cambiar).
@@ -179,10 +206,12 @@ def _train(session: Session, products: list[Product]) -> dict | None:
     def boosting_models(train_part):
         student = core.fit(stack(XC, train_part), cat(yc, train_part))
         teacher = core.fit(stack(XA, train_part), cat(ya, train_part))
-        soft = 0.5 * cat(yc, train_part) + 0.5 * teacher.predict(stack(XC, train_part)).clip(min=0)
+        soft = (1 - DISTILL_MIX) * cat(yc, train_part) + DISTILL_MIX * teacher.predict(
+            stack(XC, train_part)
+        ).clip(min=0)
         distilled = core.fit(stack(XC, train_part), soft)
         oof = {}
-        for block in np.array_split(np.array(train_part), 4):
+        for block in np.array_split(np.array(train_part), OOF_BLOCKS):
             tm = core.fit(
                 stack(XA, [d for d in train_part if d not in set(block)]),
                 cat(ya, [d for d in train_part if d not in set(block)]),
@@ -255,7 +284,17 @@ def _train(session: Session, products: list[Product]) -> dict | None:
         },
         "sellers": sellers,
         "series_teacher": int(YA.shape[0]),
-        "models": [{"key": k, "name": n, "metrics": metrics[k]} for k, n in MODELS.items()],
+        "models": [
+            {"key": k, "name": n, "metrics": metrics[k], **detail(k)}
+            for detail in [
+                _detail(
+                    preds, Y[:, B], (val_d, test_d), sizes, [days[d].weekday() for d in evaluated]
+                )
+            ]
+            for k, n in MODELS.items()
+        ],
+        "sizes": [items[r.start].subcategory or items[r.start].category for r in sizes],
+        "features": core.FEATURES,
         "chosen": chosen,
         # Total del equipo por día: lo real, la mediana anterior y el modelo de cada uso.
         "series": [
@@ -275,6 +314,33 @@ def _train(session: Session, products: list[Product]) -> dict | None:
         S, summary["data_from"], summary["data_to"],
     )  # fmt: skip
     return summary
+
+
+def _detail(preds, Y, parts, sizes, weekdays):
+    """Detalle de cada modelo (Modelo de demanda → cada modelo): error en validación y en prueba,
+    por tamaño y por día de la semana, MAE/RMSE, hiperparámetros y su predicción del equipo.
+    `Y`: lo real (solo brasa); `parts`: los días de validación y de prueba."""
+    val_d, test_d = parts
+    evaluated = val_d + test_d
+    n = Y.shape[1]
+    hyper = params()
+
+    def cube(k, ds):
+        return np.stack([preds[k][d][:, :n] for d in ds], axis=2)
+
+    def detail(k: str) -> dict:
+        split = {
+            name: core.wape(cube(k, part), Y[:, :, part], sizes)
+            for name, part in (("validacion", val_d), ("prueba", test_d))
+        }
+        return {
+            "params": hyper.get(k, {}),
+            "split_metrics": split,
+            **core.breakdown(cube(k, evaluated), Y[:, :, evaluated], sizes, weekdays),
+            "team": [float(preds[k][d][:, :n].sum()) for d in evaluated],
+        }
+
+    return detail
 
 
 def _save(session, summary, preds, stored, evaluated, days, sellers, brasa) -> None:

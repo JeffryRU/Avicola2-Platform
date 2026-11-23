@@ -4,14 +4,18 @@ import { periodAgg, type Projection } from '@/features/projections'
 import {
   bucketVersus,
   chartUnit,
+  deviationReading,
   modelByDay,
   parseMeasure,
   productDeviation,
+  sellerDeviation,
+  sellerTotals,
+  sortSellerDeviation,
   unitsOf,
   versusDays,
   versusTotals,
 } from '@/features/dashboards/domain/versus'
-import { projectionParts, sheetRounds } from '@/features/dashboards/domain/sheets'
+import { onlyProducts, projectionParts, sheetRounds } from '@/features/dashboards/domain/sheets'
 import { amountsText, chartTitle, measureSuffix } from '@/features/dashboards/types/versus'
 
 const catalog = new Catalog([
@@ -43,25 +47,26 @@ const sales = [{ seller: 'ana', date: D1, units: { B1: 8, B2: 6 } }]
 const days = periodAgg([D1, D2], [], projections, sales, catalog)
 
 describe('medida de «Proyección vs pedido real»', () => {
-  it('lee la medida de la URL; cualquier otra cosa es kg', () => {
-    expect(parseMeasure('unidades')).toBe('unidades')
+  it('lee la medida de la URL; cualquier otra cosa es unidades', () => {
+    expect(parseMeasure('kg')).toBe('kg')
     expect(parseMeasure('ambos')).toBe('ambos')
-    expect(parseMeasure('litros')).toBe('kg')
-    expect(parseMeasure(null)).toBe('kg')
+    expect(parseMeasure('litros')).toBe('unidades')
+    expect(parseMeasure(null)).toBe('unidades')
   })
 
-  it('elige las columnas y la medida del gráfico (con ambas, el gráfico va en kg)', () => {
+  it('elige las columnas y la medida del gráfico (con ambas, unidades primero y en el gráfico)', () => {
     expect(unitsOf('kg')).toEqual(['kg'])
     expect(unitsOf('unidades')).toEqual(['units'])
-    expect(unitsOf('ambos')).toEqual(['kg', 'units'])
-    expect(chartUnit('ambos')).toBe('kg')
+    expect(unitsOf('ambos')).toEqual(['units', 'kg'])
+    expect(chartUnit('ambos')).toBe('units')
+    expect(chartUnit('kg')).toBe('kg')
     expect(chartUnit('unidades')).toBe('units')
   })
 
   it('el título y los rótulos siguen a la medida', () => {
-    expect(chartTitle('kg')).toBe('Evolución semanal (kg)')
-    expect(chartTitle('unidades')).toBe('Evolución semanal (unid.)')
-    expect(measureSuffix(unitsOf('ambos'))).toBe('(kg / unid.)')
+    expect(chartTitle('kg')).toBe('Evolución en el período (kg)')
+    expect(chartTitle('unidades')).toBe('Evolución en el período (unid.)')
+    expect(measureSuffix(unitsOf('ambos'))).toBe('(unid. / kg)')
     expect(amountsText({ kg: 12.5, units: 10 }, ['kg', 'units'])).toBe('12.5 kg · 10 unid.')
   })
 })
@@ -76,6 +81,12 @@ describe('totales en kg y unidades', () => {
     expect(vs.deviationPct.kg).toBe(0)
     expect(vs.deviationPct.units).toBeCloseTo((-1 / 15) * 100)
     expect(vs.accuracyPct.units).toBeCloseTo(100 - (1 / 15) * 100)
+  })
+
+  it('un pedido vacío del ERP (sin productos) es «sin dato», no «pidió 0» (no da −100 %)', () => {
+    const [day] = periodAgg([D1], [], projections, [{ seller: 'ana', date: D1, units: {} }], catalog)
+    expect(day.real).toBeNull()
+    expect(versusTotals([day], catalog).daysWithReal).toBe(0)
   })
 
   it('sin pedidos, todo en cero', () => {
@@ -138,5 +149,81 @@ describe('puntos del gráfico', () => {
       { seller: 'luis', date: D1, units: { B1: 5 } },
     ]
     expect(modelByDay(rows, ['luis'], catalog).get(D1)).toEqual({ kg: 5, units: 5 })
+  })
+})
+
+describe('desviación por vendedor', () => {
+  const projs = [
+    projection('ana', D1, { B1: 10 }),
+    projection('ana', D2, { B1: 4 }),
+    projection('luis', D1, { B1: 10 }),
+    projection('rosa', D1, { B1: 5 }),
+  ]
+  const real = [
+    { seller: 'ana', date: D1, units: { B1: 12 } }, // pidió más: proyectó de menos
+    { seller: 'luis', date: D1, units: { B1: 8 } }, // pidió menos: proyectó de más
+    // rosa no tiene pedido; ana no tiene pedido el D2 (no cuenta)
+  ]
+  const bySeller = ['ana', 'luis', 'rosa', 'sin-datos'].map((seller) => ({
+    seller,
+    days: periodAgg([D1, D2], [seller], projs, real, catalog),
+  }))
+  const rows = sellerDeviation(bySeller, catalog)
+
+  it('compara a cada vendedor solo en sus días con pedido y omite a quien no tiene ninguno', () => {
+    expect(rows.map((r) => r.seller)).toEqual(['ana', 'luis'])
+    expect(rows[0]).toMatchObject({
+      daysWithReal: 1,
+      projected: { units: 10, kg: 10 },
+      real: { units: 12 },
+      diff: { units: 2 },
+    })
+    expect(rows[0].pct.units).toBeCloseTo(20)
+    expect(rows[1].pct.units).toBeCloseTo(-20)
+  })
+
+  it('respeta el filtro de productos (las unidades de otros productos no cuentan)', () => {
+    const only = periodAgg([D1], ['ana'], onlyProducts(projs, ['B2']), onlyProducts(real, ['B2']), catalog)
+    expect(sellerDeviation([{ seller: 'ana', days: only }], catalog)).toEqual([])
+  })
+
+  it('el total es la suma de las filas', () => {
+    const t = sellerTotals(rows)
+    expect(t.projected.units).toBe(20)
+    expect(t.real.units).toBe(20)
+    expect(t.diff.units).toBe(0)
+    expect(t.pct.units).toBe(0)
+    expect(t.daysWithReal).toBe(2)
+  })
+
+  it('ordena por columna, por desviación absoluta y deja sin proyección al final', () => {
+    const none = { ...rows[0], seller: 'zeta', pct: { kg: null, units: null } }
+    const all = [none, rows[0], { ...rows[1], pct: { kg: -35, units: -35 } }]
+    expect(sortSellerDeviation(all, { key: 'pct', dir: 'desc' }, 'units').map((r) => r.seller)).toEqual([
+      'luis',
+      'ana',
+      'zeta',
+    ])
+    expect(sortSellerDeviation(all, { key: 'pct', dir: 'asc' }, 'units').map((r) => r.seller)).toEqual([
+      'ana',
+      'luis',
+      'zeta',
+    ])
+    expect(sortSellerDeviation(all, { key: 'seller', dir: 'asc' }, 'units').map((r) => r.seller)).toEqual([
+      'ana',
+      'luis',
+      'zeta',
+    ])
+    expect(sortSellerDeviation(rows, { key: 'diff', dir: 'asc' }, 'units').map((r) => r.seller)).toEqual([
+      'luis',
+      'ana',
+    ])
+  })
+
+  it('lee la desviación: de menos, de más, sin desviación o sin proyección', () => {
+    expect(deviationReading(20)).toBe('under')
+    expect(deviationReading(-0.5)).toBe('over')
+    expect(deviationReading(0.04)).toBe('even')
+    expect(deviationReading(null)).toBe('none')
   })
 })

@@ -1,7 +1,18 @@
+import { useCallback, useState } from 'react'
+import { z } from 'zod'
+import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { addDays, dShort, type IsoDate } from '@/shared/domain/dates'
 import { useSearchParams } from 'react-router'
-import { checkPeriod, customPeriod, weekPeriod, type Period } from '@/features/dashboards/domain/period'
+import {
+  MONTH_PARAM,
+  checkPeriod,
+  customPeriod,
+  monthPeriod,
+  parseMonth,
+  weekPeriod,
+  type Period,
+} from '@/features/dashboards/domain/period'
 import { weekOptions } from '@/features/dashboards/domain/weeks'
 import { DEFAULT_MEASURE, MEASURE_PARAM, parseMeasure, type Measure } from '@/features/dashboards/domain/versus'
 import { isoDateSchema } from '@/shared/domain/schemas'
@@ -30,7 +41,7 @@ export function useStoreEntries(dates: IsoDate[], sellers: readonly string[], zo
 
 /**
  * Filtros de los dashboards guardados en la URL para poder compartirla:
- * ?semana= o ?desde=&hasta= (rango personalizado), &vendedor=a,b (vacío = todos)&dia=&zona=&tamano=
+ * ?semana=, ?mes=AAAA-MM o ?desde=&hasta= (rango personalizado; gana sobre el mes, y este sobre la semana), &vendedor=a,b (vacío = todos)&dia=&zona=&tamano=
  * y &medida=kg|unidades|ambos (Proyección vs pedido real; kg si falta).
  */
 export function useDashboardFilters() {
@@ -42,7 +53,9 @@ export function useDashboardFilters() {
   const from = params.get('desde') ?? ''
   const to = params.get('hasta') ?? ''
   const valid = isoDateSchema.safeParse(from).success && isoDateSchema.safeParse(to).success
-  const period = valid && !checkPeriod(from, to) ? customPeriod(from, to) : weekPeriod(week)
+  const month = parseMonth(params.get(MONTH_PARAM))
+  const period =
+    valid && !checkPeriod(from, to) ? customPeriod(from, to) : month ? monthPeriod(month) : weekPeriod(week)
   const measure = parseMeasure(params.get(MEASURE_PARAM))
   /** Cambia varios filtros a la vez (null o '' los quita). Se puede llamar varias veces seguidas. */
   const update = (patch: Record<string, string | null>) => {
@@ -65,8 +78,9 @@ export function useDashboardFilters() {
     measure,
     param: (key: string) => params.get(key),
     update,
-    setWeek: (w: string) => update({ semana: w, desde: null, hasta: null }),
-    setCustom: (a: string, b: string) => update({ desde: a, hasta: b }),
+    setWeek: (w: string) => update({ semana: w, [MONTH_PARAM]: null, desde: null, hasta: null }),
+    setMonth: (m: string) => update({ [MONTH_PARAM]: m, semana: null, desde: null, hasta: null }),
+    setCustom: (a: string, b: string) => update({ desde: a, hasta: b, [MONTH_PARAM]: null }),
     setSellers: (list: string[]) => update({ vendedor: list.join(',') || null }),
     setMeasure: (m: Measure) => update({ [MEASURE_PARAM]: m === DEFAULT_MEASURE ? null : m }),
   }
@@ -151,4 +165,24 @@ export function usePeriodData(period: Period) {
   const from = old || prevFrom < w.from ? prevFrom : w.from
   const to = old ? period.to : period.to > w.to ? period.to : w.to
   return useRangeData(from, to)
+}
+
+const wideSchema = z.boolean()
+
+/**
+ * Gráfico a todo el ancho (la tabla de al lado pasa abajo): se recuerda en este equipo, por
+ * pantalla (`screen`).
+ */
+export function useWideChart(screen = 'versus'): [boolean, (wide: boolean) => void] {
+  const { preferences } = useContainer()
+  const key = `nv_${screen}_wide_chart`
+  const [wide, setWide] = useState(() => preferences.get(key, wideSchema) ?? false)
+  const set = useCallback(
+    (w: boolean) => {
+      setWide(w)
+      preferences.set(key, w)
+    },
+    [preferences, key],
+  )
+  return [wide, set]
 }

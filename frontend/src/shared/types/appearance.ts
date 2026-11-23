@@ -41,3 +41,128 @@ export const A11Y_OPTIONS = {
 export const A11Y_RESET_LABEL = 'Restablecer todo'
 export const A11Y_READER_ON = 'Lector activado. Toca cualquier texto o botón para escucharlo.'
 export const A11Y_READER_UNAVAILABLE = 'Este navegador no puede leer en voz alta.'
+
+/** Panel de apariencia (botón de la paleta): temas, figuras de fondo y tema propio. */
+export const LOOK_TEXT = {
+  panel: 'Apariencia',
+  panelHint: 'Se guarda en tu cuenta: lo verás igual en cualquier equipo.',
+  themes: 'Temas prediseñados',
+  noThemes: 'Aún no tienes temas propios. Con «Personalizar» armas uno con tus colores y figuras.',
+  primary: 'Color principal',
+  primaryHint: (theme: string) =>
+    `Combina con el tema «${theme}». Se usa en botones, enlaces, cabeceras de tablas y avisos.`,
+  otherColor: 'Otro color',
+  yourColor: 'Tu color',
+  myThemes: 'Mis temas',
+  customize: 'Personalizar',
+  editTheme: 'Editar tema',
+  deleteTheme: 'Borrar tema',
+  duplicateTheme: 'Crear uno a partir de este',
+  copyName: (name: string) => `${name} (copia)`.slice(0, 30),
+  newFromTitle: (name: string) => `Nuevo tema a partir de «${name}»`,
+  deleted: (name: string) => `Tema «${name}» borrado`,
+  undo: 'Deshacer',
+  font: 'Tipo de letra',
+  fontHint: 'Vale con cualquier tema. «La del tema» usa la del tema elegido.',
+  fontSample: 'Pollo a la brasa 1 234',
+  patterns: 'Figuras de fondo',
+  page: 'En la pantalla',
+  menu: 'En el menú',
+  size: 'Tamaño',
+  smaller: 'Más pequeñas',
+  bigger: 'Más grandes',
+  editorTitle: 'Tema propio',
+  name: 'Nombre',
+  defaultName: 'Mi tema',
+  menuColor: 'Color del menú',
+  topbarColor: 'Color de la franja de arriba',
+  shape: 'Forma',
+  shapeSoft: 'Redondeada (MVP)',
+  shapeCrisp: 'Recta, con bordes finos',
+  activeColor: 'Color de lo seleccionado',
+  backgroundColor: 'Color del fondo',
+  pagePattern: 'Figuras de la pantalla',
+  menuPattern: 'Figuras del menú',
+  figureColor: 'Color de las figuras',
+  save: 'Guardar tema',
+  cancel: 'Cancelar',
+  saved: 'Tema guardado',
+  limit: 'Puedes guardar hasta 8 temas: borra uno para guardar otro.',
+  hcNote: 'En alto contraste los colores y las figuras no se aplican.',
+  preview: 'Vista previa',
+  icons: 'Íconos de la figura',
+  iconsHint: 'Elige hasta 4: se reparten por el fondo.',
+  iconsPick: 'Arma la figura con tus íconos',
+} as const
+
+/** Nombre en pantalla de cada figura de fondo. */
+export const PATTERN_NAMES = {
+  none: 'Sin figuras',
+  dashes: 'Rayitas',
+  lines: 'Rayas',
+  dots: 'Puntos',
+  grid: 'Cuadrícula',
+  waves: 'Ondas',
+  plus: 'Cruces',
+  grains: 'Granos',
+  eggs: 'Huevos',
+  icons: 'Íconos',
+} as const
+
+/** Descripción breve de los temas predefinidos. */
+export const PRESET_HINTS = {
+  clasico: 'Blanco y azul, redondeado (MVP 1 y 2)',
+  marca: 'Menú del color principal',
+  blanco: 'Claro y minimalista',
+  campo: 'Verde y amarillo',
+  grafito: 'Gris oscuro y menta',
+  ciruela: 'Morado y durazno',
+  cielo: 'Azul claro y amarillo',
+} as const
+
+/** Selector de color (ventana centrada). */
+export const COLOR_PICKER_TEXT = {
+  hint: 'Mueve el punto o escribe el código del color.',
+  code: 'Código del color',
+  suggested: 'Sugeridos',
+  cancel: 'Cancelar',
+  use: 'Usar color',
+  choose: 'Elegir color',
+} as const
+
+/** Colores de las series de un gráfico (botón «Colores»). */
+export const CHART_COLORS_TEXT = {
+  button: 'Colores',
+  title: 'Colores del gráfico',
+  hint: 'Cambia el color y el trazo de cada línea. Se guarda en tu cuenta y vale para todos los gráficos.',
+  hintFill: 'Cambia el color de las barras. Se guarda en tu cuenta y vale para todos los gráficos.',
+  change: 'Cambiar color',
+  reset: 'Volver a los colores de siempre',
+  hcNote: 'En alto contraste se usan los colores del sistema.',
+  lineStyle: 'Trazo',
+} as const
+
+/** Nombre de cada trazo de línea. */
+export const LINE_STYLE_NAMES = {
+  solid: 'Continua',
+  dashed: 'Guiones',
+  dotted: 'Puntos',
+  dashdot: 'Raya y punto',
+  long: 'Raya larga',
+} as const
+
+/** Nombre de cada serie de los gráficos (Perfil → Apariencia: colores de los gráficos). */
+export const CHART_SERIES_NAMES = {
+  'chart-1': 'Proyección vigente',
+  'chart-2': 'Pedido real (ERP)',
+  'chart-model': 'Modelo (sugerencia)',
+  'chart-prev-1': 'Proyección 1 (anterior)',
+  'chart-prev-2': 'Proyección 2 (anterior)',
+  'chart-prev-3': 'Proyección 3 (anterior)',
+  'chart-part-1': 'Franja 1 (p. ej. Brasa chica)',
+  'chart-part-2': 'Franja 2 (p. ej. Brasa mediana)',
+  'chart-part-3': 'Franja 3 (p. ej. Brasa grande)',
+  'chart-part-4': 'Franja 4 (p. ej. Pollo entero)',
+} as const
+export const CHART_STYLES_TITLE = 'Colores de los gráficos'
+export const CHART_STYLES_HINT = 'Color y trazo de cada línea. También desde el botón «Colores» de cada gráfico.'

@@ -9,6 +9,7 @@ import { useAccounts, useRefreshAccounts } from '@/features/accounts/ui/hooks'
 import { AccountRow } from '@/features/accounts/ui/components/account-row'
 import { ChangeRoleDialog } from '@/features/accounts/ui/components/change-role-dialog'
 import { CredentialsDialog } from '@/features/accounts/ui/components/credentials-dialog'
+import { EditAccountDialog } from '@/features/accounts/ui/components/edit-account-dialog'
 import { NewAccountDialog } from '@/features/accounts/ui/components/new-account-dialog'
 
 /** Supervisores: alta de cuentas, recuperación de contraseña, desactivación, edición y roles.
@@ -19,6 +20,7 @@ export function AccountsPage() {
   const [creating, setCreating] = useState(false)
   const [credentials, setCredentials] = useState<NewCredentials | null>(null)
   const [granting, setGranting] = useState<AdminAccount | null>(null)
+  const [editingAccount, setEditingAccount] = useState<AdminAccount | null>(null)
   const [changingRole, setChangingRole] = useState<AdminAccount | null>(null)
   const editing = useEditingWindow().data
   const unlocks = useUnlocks().data ?? []
@@ -35,7 +37,7 @@ export function AccountsPage() {
     <div>
       <PageHeader
         title="Usuarios"
-        subtitle="Crea cuentas, restablece contraseñas, desactiva accesos y habilita la edición de proyecciones."
+        subtitle="Crea cuentas, corrige sus datos, restablece contraseñas, desactiva accesos y habilita la edición de proyecciones."
         actions={newButton}
         mobileActions={
           <Button type="button" size="icon" aria-label="Nuevo usuario" onClick={() => setCreating(true)}>
@@ -66,6 +68,7 @@ export function AccountsPage() {
                     granted={grantedFor(a)}
                     onGrant={() => setGranting(a)}
                     onChangeRole={() => setChangingRole(a)}
+                    onEdit={() => setEditingAccount(a)}
                   />
                 ))}
               </ul>
@@ -74,6 +77,7 @@ export function AccountsPage() {
         </div>
       </PageBody>
       <GrantEditingDialog seller={granting} window={editing} onClose={() => setGranting(null)} />
+      <EditAccountDialog account={editingAccount} onClose={() => setEditingAccount(null)} />
       <ChangeRoleDialog account={changingRole} onClose={() => setChangingRole(null)} />
       <NewAccountDialog
         open={creating}

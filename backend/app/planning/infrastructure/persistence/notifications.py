@@ -60,11 +60,22 @@ class SqlNotificationRepository:
             id=new_id,
         )
 
-    def list_for(self, username: str, limit: int) -> list[Notification]:
+    def list_for(
+        self,
+        username: str,
+        limit: int,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> list[Notification]:
+        t = notifications.c
+        when = [
+            *([t.created_at >= _utc(since)] if since else []),
+            *([t.created_at < _utc(until)] if until else []),
+        ]
         rows = self.session.execute(
             select(notifications)
             .join(sellers, sellers.c.id == notifications.c.seller_id)
-            .where(sellers.c.username == username)
+            .where(sellers.c.username == username, *when)
             .order_by(notifications.c.created_at.desc(), notifications.c.id.desc())
             .limit(limit)
         ).mappings()

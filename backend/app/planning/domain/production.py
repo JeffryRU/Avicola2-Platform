@@ -91,6 +91,17 @@ class ArrivalRates:
     date_from: date
     date_to: date
 
+    def b_rate_by_group(self, group_of: dict[str, str]) -> dict[str, float]:
+        """De todo lo que llega de cada tipo, qué parte sale en calidad B (ponderado por lo que
+        llega de cada producto). Los tipos sin llegadas no figuran."""
+        arrived: dict[str, float] = {}
+        second: dict[str, float] = {}
+        for product, group in group_of.items():
+            share = self.share.get(product, 0.0)
+            arrived[group] = arrived.get(group, 0.0) + share
+            second[group] = second.get(group, 0.0) + share * self.b_rate.get(product, 0.0)
+        return {g: round(second[g] / n, 4) for g, n in arrived.items() if n > 0}
+
     def expect(self, product_id: str, requested: float) -> tuple[int, int]:
         """Aves esperadas de un producto y cuántas en calidad A, si se pide `requested` del tipo."""
         birds = requested * self.share.get(product_id, 0.0)

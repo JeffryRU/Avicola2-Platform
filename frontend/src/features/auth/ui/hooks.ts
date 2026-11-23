@@ -7,6 +7,7 @@ import type { Credentials } from '@/features/auth/domain/credentials'
 import { preferencesKey, type UiPreferences } from '@/shared/domain/preferences'
 import { useAccessibility } from '@/shared/ui/hooks/use-accessibility'
 import { useAppearance } from '@/shared/ui/hooks/use-appearance'
+import { useLook } from '@/shared/ui/hooks/use-look'
 
 export function useSession(): Session | null {
   const { auth } = useContainer()
@@ -86,7 +87,8 @@ export function usePreferencesSync() {
   const user = useSession()?.seller.username
   const { preference: appearance, setPreference: setAppearance } = useAppearance()
   const { preference: a11y, setPreference: setA11y } = useAccessibility()
-  const current = useMemo<UiPreferences>(() => ({ appearance, a11y }), [appearance, a11y])
+  const { preference: look, setPreference: setLook } = useLook()
+  const current = useMemo<UiPreferences>(() => ({ appearance, a11y, look }), [appearance, a11y, look])
   const latest = useRef(current)
   // Lo último que se sabe guardado en la cuenta (null: aún no se leyó la de esta sesión).
   const synced = useRef<{ user: string; key: string } | null>(null)
@@ -107,6 +109,8 @@ export function usePreferencesSync() {
           synced.current = { user, key: preferencesKey(remote) }
           setAppearance(remote.appearance)
           setA11y(remote.a11y)
+          // Si la cuenta aún no tiene estilo, se queda el del equipo y el próximo guardado lo sube.
+          if (remote.look) setLook(remote.look)
           return
         }
         synced.current = { user, key: preferencesKey(latest.current) }
@@ -119,7 +123,7 @@ export function usePreferencesSync() {
     return () => {
       cancelled = true
     }
-  }, [user, auth, setAppearance, setA11y])
+  }, [user, auth, setAppearance, setA11y, setLook])
 
   useEffect(() => {
     const known = synced.current

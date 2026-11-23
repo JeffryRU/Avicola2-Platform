@@ -6,7 +6,7 @@ aplicando los casos de uso de siempre.
 """
 
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 
 from app.planning.application.ports import AssistantGateway, AssistantRequest, TokenService
 from app.planning.domain.assistant import (
@@ -15,6 +15,7 @@ from app.planning.domain.assistant import (
     MAX_SUGGESTIONS,
     AssistantAnswer,
     GuardrailRule,
+    ReplyStream,
     StarterGroup,
     blocked_by,
     guard_reply,
@@ -81,6 +82,54 @@ class AskAssistant:
         return self.gateway is not None
 
     def __call__(self, account: SellerAccount, message: str, conversation: str) -> AssistantAnswer:
+        request = self._request(account, message, conversation)
+        if isinstance(request, AssistantAnswer):
+            return request
+        try:
+            text = self.gateway.ask(request)  # type: ignore[union-attr] (validado en _request)
+        except Exception:
+            logger.exception("El asistente no respondió")
+            raise AssistantUnavailableError(UNAVAILABLE) from None
+        return self._finish(account, text)
+
+    def stream(self, account: SellerAccount, message: str, conversation: str) -> Iterator[dict]:
+        """La misma pregunta, con la respuesta en partes mientras el agente la escribe.
+
+        Valida antes de empezar (los errores salen como siempre); después emite `delta` (texto
+        que se agrega), y al final `done` con la respuesta completa y sus sugerencias (reemplaza
+        lo mostrado) o `error`. Sin streaming en el agente, llega todo en una sola parte.
+        """
+        request = self._request(account, message, conversation)
+
+        def events() -> Iterator[dict]:
+            if isinstance(request, AssistantAnswer):
+                yield _done(request)
+                return
+            guard, parts = ReplyStream(), []
+            ask_stream = getattr(self.gateway, "ask_stream", None)
+            try:
+                # Sin `ask_stream` (otro adaptador), la respuesta llega en una sola parte.
+                chunks = ask_stream(request) if ask_stream else iter([self.gateway.ask(request)])  # type: ignore[union-attr]
+                for chunk in chunks:
+                    parts.append(chunk)
+                    if delta := guard.feed(chunk):
+                        yield {"type": "delta", "text": delta}
+                answer = self._finish(account, "".join(parts))
+            except AssistantUnavailableError:
+                yield {"type": "error", "message": UNAVAILABLE}
+                return
+            except Exception:
+                logger.exception("El asistente no respondió")
+                yield {"type": "error", "message": UNAVAILABLE}
+                return
+            yield _done(answer)
+
+        return events()
+
+    def _request(
+        self, account: SellerAccount, message: str, conversation: str
+    ) -> AssistantRequest | AssistantAnswer:
+        """Valida la pregunta y arma lo que va al agente (o la respuesta del guardrail)."""
         message = message.strip()
         if not message:
             raise DomainError("Escribe una pregunta.")
@@ -98,7 +147,7 @@ class AskAssistant:
             # Ni la pregunta ni la respuesta pasan por el agente. Solo se registra la categoría.
             logger.info("Asistente: pregunta de %s detenida (%s)", seller.username, rule.category)
             return AssistantAnswer(rule.reply, self.starters(account)[:MAX_SUGGESTIONS])
-        request = AssistantRequest(
+        return AssistantRequest(
             message=message,
             # La memoria del agente es por persona: nadie puede seguir la conversación de otro.
             conversation=f"{seller.username}:{conversation}",
@@ -109,11 +158,10 @@ class AskAssistant:
             permissions=tuple(sorted(p.value for p in permissions_of(seller.role))),
             scope=self.starters.scope(account),
         )
-        try:
-            text = self.gateway.ask(request)
-        except Exception:
-            logger.exception("El asistente no respondió")
-            raise AssistantUnavailableError(UNAVAILABLE) from None
+
+    def _finish(self, account: SellerAccount, text: str) -> AssistantAnswer:
+        """La respuesta final: guardrail, sin bloque de sugerencias y con preguntas a su alcance."""
+        seller = account.seller
         safe, intervened = guard_reply(text)
         if intervened:
             logger.warning(
@@ -126,3 +174,7 @@ class AskAssistant:
         # se ofrecen las de inicio.
         follow = self.starters.within_scope(account, answer.suggestions)
         return AssistantAnswer(answer.reply, follow or self.starters(account)[:MAX_SUGGESTIONS])
+
+
+def _done(answer: AssistantAnswer) -> dict:
+    return {"type": "done", "reply": answer.reply, "suggestions": list(answer.suggestions)}

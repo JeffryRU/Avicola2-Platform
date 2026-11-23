@@ -326,6 +326,23 @@ class SetAccountActive(_ManageAccount):
         return updated
 
 
+class EditAccount(_ManageAccount):
+    """Corrige el nombre y la zona de una cuenta ajena (los datos del alta).
+
+    El usuario no se cambia: es la llave de las proyecciones, el stock, los avisos y las
+    sesiones. Para cambiar el rol, el rol tiene su propia acción.
+    """
+
+    def __call__(
+        self, actor: SellerAccount, username: str, name: str, zone: str | None
+    ) -> SellerAccount:
+        target = self._target(actor, username)
+        name, zone = clean_name(name), (zone or "").strip() or None
+        updated = self._apply(actor, target, profile=(name, zone))
+        logger.info("%s editó la cuenta %s", actor.seller.username, updated.seller.username)
+        return updated
+
+
 class ChangeRole(_ManageAccount):
     """Solo quien tiene CHANGE_ROLES (el supervisor general) y dentro de MANAGEABLE_ROLES.
 

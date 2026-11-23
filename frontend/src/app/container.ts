@@ -59,6 +59,8 @@ export interface Container {
   events: EventStream
   exporter: TableExporter
   preferences: KeyValueStore
+  /** Lo que dura solo mientras la pestaña está abierta (sessionStorage). */
+  session: KeyValueStore
   errors: ErrorReporter
   accounts: AccountsGateway
   editing: EditingGateway
@@ -115,6 +117,7 @@ export function createContainer(): Container {
     events: new SseEventStream(apiUrl(baseUrl, endpoints.events.stream)),
     exporter: new BrowserTableExporter(),
     preferences: local,
+    session: tab,
     errors,
     accounts: new HttpAccountsGateway(http),
     editing: new HttpEditingGateway(http),
@@ -126,6 +129,6 @@ export function createContainer(): Container {
     aris: new HttpArisGateway(http),
     production: new HttpProductionGateway(http),
     installer: new BrowserAppInstaller(window, import.meta.env.VITE_ANDROID_APK_URL),
-    assistant: new HttpAssistantGateway(http),
+    assistant: new HttpAssistantGateway(http, baseUrl),
   }
 }

@@ -192,3 +192,45 @@ def test_reset_password_revokes_open_streams(client):
         event_bus.publish = original  # type: ignore[method-assign]
     assert [e.type for e in received] == [SESSION_REVOKED]
     assert received[0].audience.usernames == {"rnavarro"}
+
+
+def test_list_by_day_or_range(client):
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update
+
+    from app.planning.infrastructure.persistence.tables import notifications
+
+    seller = _as("rnavarro")
+    _submit(seller, 0)
+    _submit(seller, 1)
+    supervisor = _as("supervisor")
+    ids = [n["id"] for n in supervisor.get("/api/notifications").json()["items"]]
+    # Una de hace 10 días (a mediodía en Lima = 17:00 UTC).
+    old = TODAY - timedelta(days=10)
+    with SessionLocal() as session:
+        session.execute(
+            update(notifications)
+            .where(notifications.c.id == ids[-1])
+            .values(created_at=datetime(old.year, old.month, old.day, 17, tzinfo=UTC))
+        )
+        session.commit()
+
+    def listed(**params):
+        r = supervisor.get("/api/notifications", params=params)
+        assert r.status_code == 200, r.text
+        return [n["id"] for n in r.json()["items"]]
+
+    assert listed(date_from=TODAY, date_to=TODAY) == [ids[0]]
+    assert listed(date_from=old, date_to=old) == [ids[-1]]
+    assert sorted(listed(date_from=old, date_to=TODAY)) == sorted(ids)
+    assert listed(date_from=TODAY - timedelta(days=5), date_to=TODAY - timedelta(days=1)) == []
+    # El conteo de no leídas es de todas, no solo del rango.
+    assert (
+        supervisor.get("/api/notifications", params={"date_from": old, "date_to": old}).json()[
+            "unread"
+        ]
+        == 2
+    )
+    r = supervisor.get("/api/notifications", params={"date_from": TODAY, "date_to": old})
+    assert r.status_code == 422

@@ -44,15 +44,16 @@ export function DayStrip({
             onClick={() => onChange(d)}
             className={cn(
               'relative flex min-w-16 flex-none snap-start flex-col items-center rounded-md border border-border bg-surface px-3 pt-2 pb-2 text-foreground transition-colors hover:border-border-strong',
+              isMarked && !active && 'border-ok/40 bg-ok-soft',
               active &&
-                'border-primary bg-selected text-selected-foreground ring-1 ring-primary hover:border-primary hc:border-foreground hc:bg-nav-active hc:text-nav-active-foreground hc:ring-foreground',
+                'border-primary bg-primary text-primary-foreground hover:border-primary hc:border-foreground hc:bg-nav-active hc:text-nav-active-foreground hc:ring-1 hc:ring-foreground',
             )}
           >
             <span
               className={cn(
                 'text-2xs font-medium tracking-wide uppercase',
                 active
-                  ? 'text-selected-foreground hc:text-nav-active-foreground'
+                  ? 'text-primary-foreground hc:text-nav-active-foreground'
                   : note
                     ? 'text-primary'
                     : 'text-muted-foreground',
@@ -60,8 +61,14 @@ export function DayStrip({
             >
               {note ?? dDow(d)}
             </span>
-            <span className="num text-md font-medium hc:font-bold">{dDM(d)}</span>
-            <span aria-hidden className={cn('mt-1 size-1.5 rounded-full', isMarked ? 'bg-ok' : 'bg-transparent')} />
+            <span className="num text-md font-bold hc:font-bold">{dDM(d)}</span>
+            <span
+              aria-hidden
+              className={cn(
+                'mt-1 size-2 rounded-full',
+                isMarked ? (active ? 'bg-primary-foreground' : 'bg-ok-fill') : 'bg-transparent',
+              )}
+            />
           </button>
         )
       })}

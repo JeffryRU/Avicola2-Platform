@@ -64,6 +64,8 @@ export interface DataTableProps<T> {
   totalLabel?: ReactNode
   /** Abre el detalle de la fila (también con Enter o Espacio). */
   onRowClick?: (row: T) => void
+  /** El mouse (o el foco) entra en una fila (null: sale de la tabla), p. ej. para resaltarla en un gráfico. */
+  onRowHover?: (row: T | null) => void
   /** Fila con estilo propio: total, atenuada o que pide atención. */
   rowTone?: (row: T) => RowTone | null | undefined | false
   rowClassName?: (row: T) => Maybe
@@ -100,6 +102,7 @@ export function DataTable<T>({
   groupHeader,
   totalLabel,
   onRowClick,
+  onRowHover,
   rowTone,
   rowClassName,
   density = 'normal',
@@ -193,6 +196,8 @@ export function DataTable<T>({
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   onKeyDown={onRowClick ? open(row) : undefined}
                   tabIndex={onRowClick ? 0 : undefined}
+                  onMouseEnter={onRowHover ? () => onRowHover(row) : undefined}
+                  onMouseLeave={onRowHover ? () => onRowHover(null) : undefined}
                   className={cn(
                     ts.row({ hover: hover && tone !== 'total', striped, clickable: !!onRowClick, tone }),
                     rowClassName?.(row),
@@ -209,6 +214,7 @@ export function DataTable<T>({
                       className={cn(
                         ts.td({ density, align: alignOf(c), numeric: !!c.numeric, tone: toneOf(c, row) }),
                         c.sticky && ts.sticky,
+                        c.sticky && !c.numeric && ts.stickyText,
                         // Con grupos, en el celular la primera columna visible es esta: su margen.
                         grouped && i === 0 && 'pl-4 first:pl-4 dsk:pl-3 dsk:first:pl-3',
                         c.desktopOnly && ts.desktopOnly,

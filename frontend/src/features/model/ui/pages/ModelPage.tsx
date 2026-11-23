@@ -6,6 +6,8 @@ import {
   BASELINE_KEY,
   BIAS_LABEL,
   CHART_TITLE,
+  DETAIL_NOTE,
+  DETAIL_TITLE,
   EMPTY_BODY,
   EMPTY_TITLE,
   LEVEL_LABEL,
@@ -23,6 +25,7 @@ import {
   trainedNote,
 } from '@/features/model/types/model'
 import { LineChart } from '@/shared/ui/components/charts'
+import { ModelDetails } from '@/features/model/ui/components/model-detail'
 import { EmptyState } from '@/shared/ui/components/feedback'
 import { Kpi, KpiStrip, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { SyncStatus } from '@/shared/ui/components/sync-status'
@@ -162,6 +165,12 @@ export function ModelPage() {
               },
             ]}
           />
+        </Section>
+
+        <Section title={DETAIL_TITLE} aside={DETAIL_NOTE} className="mb-4">
+          <div className="p-3 dsk:p-4">
+            <ModelDetails s={s} />
+          </div>
         </Section>
 
         <Section title={CHART_TITLE} className="mb-4">

@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { History } from 'lucide-react'
+import { GitBranch } from 'lucide-react'
 import { z } from 'zod'
 import { useContainer } from '@/app/di'
 import { PanelContext, useCurrentVersion, useOpenVersions } from '@/features/versions/ui/hooks'
@@ -73,7 +73,7 @@ export function VersionsButton({ className }: { className?: string }) {
         className,
       )}
     >
-      <History aria-hidden className="size-[1.15rem]" />
+      <GitBranch aria-hidden className="size-[1.15rem]" />
     </button>
   )
 }

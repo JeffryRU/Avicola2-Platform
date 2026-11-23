@@ -1,8 +1,9 @@
 import type { RealtimeEvent } from '@/features/notifications/domain/events'
-import type { NotificationPage } from '@/features/notifications/domain/notifications'
+import type { NotificationPage, NotificationRange } from '@/features/notifications/domain/notifications'
 
 export interface NotificationsGateway {
-  list(): Promise<NotificationPage>
+  /** Las últimas; con `range`, solo las de esos días. */
+  list(range?: NotificationRange | null): Promise<NotificationPage>
   /** Sin `ids` marca todas como leídas. */
   markRead(ids?: number[]): Promise<void>
 }

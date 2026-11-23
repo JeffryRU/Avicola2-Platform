@@ -21,6 +21,7 @@ def dist(tmp_path):
     (tmp_path / "assets" / "index-abc123.js").write_bytes(BIG_JS)
     (tmp_path / "assets" / "tiny-abc.css").write_text("a{}")
     (tmp_path / "assets" / "plex-abc.woff2").write_bytes(b"wOF2" + bytes(4000))
+    (tmp_path / "version.json").write_text('{"build": "abc-1"}')
     (tmp_path / "secret.txt").write_text("no")
     return tmp_path
 
@@ -58,9 +59,16 @@ def test_without_gzip_the_file_goes_as_is(client):
 
 
 def test_index_and_service_worker_are_never_cached(client):
-    for path in ("/", "/sw.js", "/registrar", "/dashboards/dia/2026-11-16"):
+    for path in ("/", "/sw.js", "/version.json", "/registrar", "/dashboards/dia/2026-11-16"):
         r, _ = _get(client, path)
         assert r.headers["cache-control"] == "no-cache", path
+
+
+def test_a_missing_asset_of_an_old_version_is_404_not_index(client):
+    """Una pestaña con la versión anterior pide un archivo que ya no existe: 404, para que la
+    app lo note y se recargue (index.html como JS rompía la carga)."""
+    r, _ = _get(client, "/assets/index-viejo999.js")
+    assert r.status_code == 404
 
 
 def test_react_routes_fall_back_to_index(client):
