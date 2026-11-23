@@ -320,3 +320,92 @@ def test_scope_goes_to_the_agent_and_follow_ups_stay_in_scope(agent) -> None:
     assert "¿Cuánto stock hay hoy?" in _ask("despacho").json()["suggestions"]
     seller = _ask("rnavarro").json()["suggestions"]
     assert not any("saca" in q for q in seller)
+
+
+# --- Respuesta en partes (streaming) --------------------------------------------------------
+
+
+def _stream(username: str, message: str = "hola") -> list[dict]:
+    from app.planning import bootstrap
+
+    # Cada prueba empieza con el límite de preguntas por minuto en cero.
+    bootstrap._assistant_limiter.cache_clear()
+    body = {"message": message, "conversation": CONVERSATION}
+    r = login(username).post("/api/assistant/messages/stream", json=body)
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("application/x-ndjson")
+    return [json.loads(line) for line in r.text.splitlines() if line.strip()]
+
+
+def test_stream_without_streaming_agent_sends_everything_at_the_end(agent) -> None:
+    events = _stream("rnavarro")
+    assert events[-1] == {"type": "done", "reply": "Hola.", "suggestions": ["¿Algo más?"]}
+    assert all(e["type"] in ("delta", "done") for e in events)
+
+
+def test_stream_shows_text_as_it_arrives_but_never_secrets_or_suggestions(agent) -> None:
+    secret = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJybmF2YXJybyJ9.abcdefghijklmnop"
+    words = ("La saca de hoy es de 1200 aves. " * 12).split(" ")
+    chunks = [w + " " for w in words] + [
+        f"Token {secret} ",
+        "fin. ",
+        "<sugerencias>¿Y mañana?",
+        "</sugerencias>",
+    ]
+    agent.ask_stream = lambda _request: iter(chunks)
+    events = _stream("rnavarro")
+    deltas = "".join(e["text"] for e in events if e["type"] == "delta")
+    assert deltas.startswith("La saca de hoy")  # se vio antes del final
+    assert "eyJ" not in deltas and "<sugerencias" not in deltas
+    done = events[-1]
+    assert done["type"] == "done" and "[oculto]" in done["reply"]
+    assert done["suggestions"] == ["¿Y mañana?"]
+
+
+def test_stream_stops_showing_if_the_instructions_leak(agent) -> None:
+    from app.planning.domain.assistant import INSTRUCTIONS_CANARY, LEAKED_REPLY
+
+    agent.ask_stream = lambda _request: iter(
+        ["Mis reglas: ", INSTRUCTIONS_CANARY, " " + "x " * 200]
+    )
+    events = _stream("rnavarro")
+    assert not any(INSTRUCTIONS_CANARY in e.get("text", "") for e in events)
+    assert events[-1]["reply"] == LEAKED_REPLY
+
+
+def test_stream_failure_is_an_error_event(agent) -> None:
+    def broken(_request):
+        yield "Hola "
+        raise RuntimeError("n8n se cayó")
+
+    agent.ask_stream = broken
+    assert _stream("rnavarro")[-1]["type"] == "error"
+
+
+def test_n8n_gateway_reads_the_streamed_lines(monkeypatch) -> None:
+    from app.planning.infrastructure import assistant as adapter
+
+    lines = [
+        {"type": "begin", "metadata": {}},
+        {"type": "item", "content": "Ho"},
+        {"type": "item", "content": "la"},
+        {"type": "end", "metadata": {}},
+    ]
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def __iter__(self):
+            return iter((json.dumps(x) + "\n").encode() for x in lines)
+
+    monkeypatch.setattr(adapter.urllib.request, "urlopen", lambda *_a, **_k: Response())
+    request = AssistantRequest("hola", "u:c", "t", "u", "U", "seller", ())
+    gateway = adapter.N8nAssistant("http://n8n/x", "s", 30)
+    assert list(gateway.ask_stream(request)) == ["Ho", "la"]
+    # Un workflow aún sin streaming (un solo JSON) también funciona.
+    lines[:] = [{"output": "Hola entero"}]
+    assert list(gateway.ask_stream(request)) == ["Hola entero"]

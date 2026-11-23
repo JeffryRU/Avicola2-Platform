@@ -6,6 +6,7 @@ Se le manda la pregunta por su webhook, con el secreto en `X-Assistant-Token`, y
 
 import json
 import urllib.request
+from collections.abc import Iterator
 from pathlib import Path
 
 import yaml
@@ -22,6 +23,36 @@ class N8nAssistant:
         self.url, self.token, self.timeout = url, token, timeout_seconds
 
     def ask(self, request: AssistantRequest) -> str:
+        with urllib.request.urlopen(self._http(request), timeout=self.timeout) as response:  # noqa: S310
+            return _reply_of(json.loads(response.read().decode() or "{}"))
+
+    def ask_stream(self, request: AssistantRequest) -> Iterator[str]:
+        """La respuesta en partes: el webhook de n8n en modo «Streaming» manda una línea JSON por
+        evento (`begin`, `item` con el texto, `end`, `error`). Si el workflow aún responde de una
+        vez (un solo JSON), se entrega todo junto."""
+        with urllib.request.urlopen(self._http(request), timeout=self.timeout) as response:  # noqa: S310
+            rest: list[str] = []
+            for raw in response:
+                line = raw.decode().strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    rest.append(line)
+                    continue
+                kind = event.get("type") if isinstance(event, dict) else None
+                if kind == "item" and isinstance(event.get("content"), str):
+                    yield event["content"]
+                elif kind == "error":
+                    raise ValueError("El agente falló a mitad de la respuesta.")
+                elif kind not in ("begin", "end"):
+                    rest.append(line)
+            if rest:
+                # Sin streaming: el cuerpo es la respuesta entera (JSON de «Respond to Webhook»).
+                yield _reply_of(json.loads("".join(rest)))
+
+    def _http(self, request: AssistantRequest) -> urllib.request.Request:
         body = json.dumps(
             {
                 "message": request.message,
@@ -37,20 +68,22 @@ class N8nAssistant:
             },
             ensure_ascii=False,
         ).encode()
-        http = urllib.request.Request(  # noqa: S310 (URL de la configuración, no del usuario)
+        return urllib.request.Request(  # noqa: S310 (URL de la configuración, no del usuario)
             self.url,
             data=body,
             method="POST",
             headers={"Content-Type": "application/json", "X-Assistant-Token": self.token},
         )
-        with urllib.request.urlopen(http, timeout=self.timeout) as response:  # noqa: S310
-            data = json.loads(response.read().decode() or "{}")
-        if isinstance(data, list) and data:
-            data = data[0]
-        text = data.get("reply") or data.get("output") if isinstance(data, dict) else None
-        if not isinstance(text, str):
-            raise ValueError("El agente respondió sin texto.")
-        return text
+
+
+def _reply_of(data: object) -> str:
+    """El texto de la respuesta del agente (`reply` u `output`, también dentro de una lista)."""
+    if isinstance(data, list) and data:
+        data = data[0]
+    text = data.get("reply") or data.get("output") if isinstance(data, dict) else None
+    if not isinstance(text, str):
+        raise ValueError("El agente respondió sin texto.")
+    return text
 
 
 def _read(config_dir: Path) -> dict:

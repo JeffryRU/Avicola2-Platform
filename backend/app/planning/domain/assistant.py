@@ -163,3 +163,43 @@ def guard_reply(text: str) -> tuple[str, bool]:
     for pattern in _SECRETS:
         clean = pattern.sub(REDACTED, clean)
     return clean, clean != text
+
+
+SUGGESTIONS_TAG = "<sugerencias"
+# Lo último que llegó no se muestra todavía: así un secreto o el canario a medio escribir no
+# alcanzan a verse antes de que el guardrail los reconozca (un JWT o una clave caben aquí).
+STREAM_HOLDBACK = 120
+
+
+class ReplyStream:
+    """La respuesta del agente a medida que llega, con los mismos guardrails que la final.
+
+    `feed` devuelve solo el texto nuevo que ya es seguro mostrar: sin el bloque de sugerencias,
+    sin secretos y guardando los últimos `holdback` caracteres. Si aparece el canario (el agente
+    filtró sus instrucciones), deja de mostrar nada: la respuesta final lo reemplaza.
+    """
+
+    def __init__(self, holdback: int = STREAM_HOLDBACK) -> None:
+        self.holdback = holdback
+        self.raw = ""
+        self.sent = ""
+        self.leaked = False
+
+    def feed(self, chunk: str) -> str:
+        self.raw += chunk
+        if self.leaked or INSTRUCTIONS_CANARY.lower() in self.raw.lower():
+            self.leaked = True
+            return ""
+        cut = self.raw.lower().find(SUGGESTIONS_TAG)
+        safe, _ = guard_reply(self.raw if cut < 0 else self.raw[:cut])
+        upto = len(safe) - self.holdback
+        # Se corta en un espacio: no se muestran palabras a medias.
+        space = safe.rfind(" ", len(self.sent), max(upto, 0))
+        if space < 0:
+            return ""
+        shown = safe[: space + 1]
+        if not shown.startswith(self.sent):
+            # Lo ya mostrado cambió (un secreto que empezaba antes): se espera a la final.
+            return ""
+        delta, self.sent = shown[len(self.sent) :], shown
+        return delta

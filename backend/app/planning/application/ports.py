@@ -241,7 +241,16 @@ class NotificationRepository(Protocol):
         """Guarda y devuelve con id; None si ya existía una con el mismo `dedupe_key`."""
         ...
 
-    def list_for(self, username: str, limit: int) -> list[Notification]: ...
+    def list_for(
+        self,
+        username: str,
+        limit: int,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> list[Notification]:
+        """Las más recientes primero; con `since`/`until`, solo las creadas en [since, until)."""
+        ...
+
     def unread_count(self, username: str) -> int: ...
 
     def mark_read(self, username: str, ids: list[int] | None, now: datetime) -> int:
