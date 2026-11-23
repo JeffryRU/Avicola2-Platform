@@ -17,6 +17,29 @@
 @import '@fontsource/plus-jakarta-sans/latin-600.css';
 @import '@fontsource/plus-jakarta-sans/latin-700.css';
 @import '@fontsource/plus-jakarta-sans/latin-800.css';
+/* Letras que puede elegir cada persona (FONTS en shared/domain/look.ts): el navegador baja cada
+ * archivo solo si esa letra se usa. */
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+@import '@fontsource/inter/latin-700.css';
+@import '@fontsource/nunito/latin-400.css';
+@import '@fontsource/nunito/latin-600.css';
+@import '@fontsource/nunito/latin-700.css';
+@import '@fontsource/nunito/latin-800.css';
+@import '@fontsource/montserrat/latin-400.css';
+@import '@fontsource/montserrat/latin-500.css';
+@import '@fontsource/montserrat/latin-600.css';
+@import '@fontsource/montserrat/latin-700.css';
+@import '@fontsource/lexend/latin-400.css';
+@import '@fontsource/lexend/latin-500.css';
+@import '@fontsource/lexend/latin-600.css';
+@import '@fontsource/lexend/latin-700.css';
+@import '@fontsource/source-sans-3/latin-400.css';
+@import '@fontsource/source-sans-3/latin-600.css';
+@import '@fontsource/source-sans-3/latin-700.css';
+@import '@fontsource/atkinson-hyperlegible/latin-400.css';
+@import '@fontsource/atkinson-hyperlegible/latin-700.css';
 
 /*
  * Sistema visual de AviPlanner (docs/diseno/sistema.md, ADR 0018).
@@ -1288,6 +1311,13 @@ html[data-text-size='xlarge'] {
   --font-ui: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   --font-head: var(--font-ui);
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 6px 18px rgb(16 24 40 / 0.06);
+}
+/* Letra elegida por la persona (--look-font, en línea sobre <html>): manda sobre la del tema; en
+ * alto contraste y con «letra más legible» de accesibilidad mandan esas. */
+[style*='--look-font']:not([data-contrast='high']) {
+  --font-ui: var(--look-font);
+  --font-head: var(--look-font);
+  --font-figures: var(--look-font);
 }
 [data-shape='soft'][data-theme='dark']:not([data-contrast='high']) {
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 22px rgb(0 0 0 / 0.35);

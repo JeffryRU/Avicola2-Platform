@@ -33,6 +33,7 @@ const custom: LookPreference = {
   menu: { show: true, size: 0.5 },
   primaries: { ciruela: '#1e3a8a' },
   open: { presets: false, mine: true },
+  font: 'nunito',
 }
 
 describe('estilo en la cuenta', () => {
@@ -73,6 +74,12 @@ describe('estilo en la cuenta', () => {
     expect(look.theme).toBe('clasico') // el tema por defecto (MVP 1 y 2)
     expect(look.page.size).toBe(2)
     expect(look.primaries).toEqual({})
+    expect(sanitizeLook({ font: 'comic' }).font).toBe('theme')
+  })
+
+  it('la letra elegida se aplica con cualquier tema; «la del tema» no pone nada', () => {
+    expect(lookVars({ ...DEFAULT_LOOK, font: 'nunito' }, 'light')['--look-font']).toMatch(/^'Nunito'/)
+    expect(lookVars(DEFAULT_LOOK, 'light')['--look-font']).toBeUndefined()
   })
 })
 

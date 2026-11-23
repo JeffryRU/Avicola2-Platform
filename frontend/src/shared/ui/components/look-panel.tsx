@@ -1,7 +1,10 @@
 import { useId, useState, type CSSProperties, type ReactNode } from 'react'
-import { Check, ChevronDown, Palette, Pencil, Plus, Shapes, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Copy, Palette, Pencil, Plus, Shapes, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
+  DEFAULT_LOOK,
+  FONT_IDS,
+  FONTS,
   MAX_ICONS,
   MAX_SAVED_LOOKS,
   PATTERN_IDS,
@@ -15,6 +18,7 @@ import {
   patternUrl,
   readableOn,
   type ColorRef,
+  type FontId,
   type Look,
   type PatternId,
   type PatternSetting,
@@ -135,6 +139,71 @@ function ThemeCard({
         {hint && <small className="-mt-1 px-0.5 text-xs leading-snug text-muted-foreground">{hint}</small>}
       </button>
       {actions && <div className="absolute top-2.5 right-2.5 flex gap-1">{actions}</div>}
+    </div>
+  )
+}
+
+/** Botón chico sobre la tarjeta de un tema (editar, duplicar, borrar). */
+function CardAction({
+  label,
+  title,
+  onClick,
+  danger,
+  children,
+}: {
+  label: string
+  title: string
+  onClick: () => void
+  danger?: boolean
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={title}
+      onClick={onClick}
+      className={cn(
+        'grid size-7 place-items-center rounded-md bg-surface/90 shadow-sm hover:bg-surface',
+        danger ? 'text-bad' : 'text-foreground',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** Tipo de letra: cada opción se muestra con su propia letra. */
+function FontPicker() {
+  const { preference, setPreference } = useLook()
+  const pick = (font: FontId) => setPreference({ ...preference, font })
+  return (
+    <div role="radiogroup" aria-label={T.font} className="grid gap-1.5 sm:grid-cols-2">
+      {FONT_IDS.map((id) => {
+        const active = preference.font === id
+        const family = FONTS[id].family || undefined
+        return (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => pick(id)}
+            className={cn(
+              'relative grid min-h-touch gap-0.5 rounded-md border border-border bg-surface py-1.5 pr-7 pl-2.5 text-left transition-colors hover:bg-muted',
+              active && 'border-primary bg-selected text-selected-foreground hover:bg-selected',
+            )}
+          >
+            <span className="text-sm leading-tight font-semibold" style={{ fontFamily: family }}>
+              {FONTS[id].name}
+            </span>
+            <small className="text-xs leading-tight text-muted-foreground" style={{ fontFamily: family }}>
+              {T.fontSample}
+            </small>
+            {active && <Check aria-hidden className="absolute top-1/2 right-2 size-4 -translate-y-1/2" />}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -560,7 +629,7 @@ function LookPanel() {
   const { preference, setPreference } = useLook()
   const high = useAppearance().resolved.contrast === 'high'
   /** null: lista de temas; si no, el tema que se está editando (id vacío: uno nuevo). */
-  const [editing, setEditing] = useState<{ id: string; draft: Look & { name: string } } | null>(null)
+  const [editing, setEditing] = useState<{ id: string; from?: string; draft: Look & { name: string } } | null>(null)
 
   const select = (theme: string) => setPreference({ ...preference, theme })
   const toggle = (key: 'presets' | 'mine') =>
@@ -581,20 +650,32 @@ function LookPanel() {
     setEditing(null)
     toast.success(T.saved)
   }
-  const remove = (id: string) => {
-    const primaries = without(preference.primaries, id)
+  /** Borra un tema propio (los predefinidos no se borran); se puede deshacer desde el aviso. */
+  const remove = (theme: SavedLook) => {
+    const before = preference
     setPreference({
       ...preference,
-      saved: preference.saved.filter((s) => s.id !== id),
-      primaries,
-      theme: preference.theme === id ? 'marca' : preference.theme,
+      saved: preference.saved.filter((s) => s.id !== theme.id),
+      primaries: without(preference.primaries, theme.id),
+      theme: preference.theme === theme.id ? DEFAULT_LOOK.theme : preference.theme,
     })
+    toast.success(T.deleted(theme.name), { action: { label: T.undo, onClick: () => setPreference(before) } })
+  }
+  /** Abre el editor con una copia de un tema (predefinido o propio) para guardarla como uno nuevo. */
+  const duplicate = (look: Look, name: string, primary: string) => {
+    if (preference.saved.length >= MAX_SAVED_LOOKS) {
+      toast.error(T.limit)
+      return
+    }
+    setEditing({ id: '', from: name, draft: toDraft({ ...look, primary }, T.copyName(name)) })
   }
 
   if (editing)
     return (
       <div className="grid gap-3 px-4 pb-6">
-        <h3 className="text-md font-bold">{editing.id ? T.editTheme : T.editorTitle}</h3>
+        <h3 className="text-md font-bold">
+          {editing.id ? T.editTheme : editing.from ? T.newFromTitle(editing.from) : T.editorTitle}
+        </h3>
         <LookEditor initial={editing.draft} onSave={save} onCancel={() => setEditing(null)} />
       </div>
     )
@@ -616,6 +697,17 @@ function LookPanel() {
               hint={PRESET_HINTS[id]}
               active={preference.theme === id}
               onSelect={() => select(id)}
+              actions={
+                <CardAction
+                  label={`${T.duplicateTheme}: ${PRESETS[id].name}`}
+                  title={T.duplicateTheme}
+                  onClick={() =>
+                    duplicate(PRESETS[id], PRESETS[id].name, preference.primaries[id] ?? PRESETS[id].primary)
+                  }
+                >
+                  <Copy aria-hidden className="size-3.5" />
+                </CardAction>
+              }
             />
           ))}
         </div>
@@ -655,9 +747,8 @@ function LookPanel() {
                 onSelect={() => select(s.id)}
                 actions={
                   <>
-                    <button
-                      type="button"
-                      aria-label={`${T.editTheme}: ${s.name}`}
+                    <CardAction
+                      label={`${T.editTheme}: ${s.name}`}
                       title={T.editTheme}
                       onClick={() =>
                         setEditing({
@@ -665,19 +756,24 @@ function LookPanel() {
                           draft: toDraft({ ...s, primary: preference.primaries[s.id] ?? s.primary }, s.name),
                         })
                       }
-                      className="grid size-7 place-items-center rounded-md bg-surface/90 text-foreground shadow-sm hover:bg-surface"
                     >
                       <Pencil aria-hidden className="size-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`${T.deleteTheme}: ${s.name}`}
+                    </CardAction>
+                    <CardAction
+                      label={`${T.duplicateTheme}: ${s.name}`}
+                      title={T.duplicateTheme}
+                      onClick={() => duplicate(s, s.name, preference.primaries[s.id] ?? s.primary)}
+                    >
+                      <Copy aria-hidden className="size-3.5" />
+                    </CardAction>
+                    <CardAction
+                      label={`${T.deleteTheme}: ${s.name}`}
                       title={T.deleteTheme}
-                      onClick={() => remove(s.id)}
-                      className="grid size-7 place-items-center rounded-md bg-surface/90 text-bad shadow-sm hover:bg-surface"
+                      onClick={() => remove(s)}
+                      danger
                     >
                       <Trash2 aria-hidden className="size-3.5" />
-                    </button>
+                    </CardAction>
                   </>
                 }
               />
@@ -690,6 +786,12 @@ function LookPanel() {
         <h3 className="text-sm font-bold">{T.primary}</h3>
         <p className="-mt-1 text-xs text-muted-foreground">{T.primaryHint(themeName)}</p>
         <PrimaryPicker />
+      </section>
+
+      <section className="grid gap-2">
+        <h3 className="text-sm font-bold">{T.font}</h3>
+        <p className="-mt-1 text-xs text-muted-foreground">{T.fontHint}</p>
+        <FontPicker />
       </section>
 
       <section className="grid gap-2">

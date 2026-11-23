@@ -54,6 +54,27 @@ export interface Look {
 export const SHAPES = ['soft', 'crisp'] as const
 export type Shape = (typeof SHAPES)[number]
 
+/**
+ * Tipos de letra que puede elegir cada persona (aparte del tema). `theme`: la del tema (Plus
+ * Jakarta Sans con la forma «soft», IBM Plex Sans con «crisp»). Los archivos los carga globals.css.
+ */
+const FALLBACK = "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif"
+export const FONTS = {
+  theme: { name: 'La del tema', family: '' },
+  jakarta: { name: 'Plus Jakarta Sans (MVP 1 y 2)', family: `'Plus Jakarta Sans', ${FALLBACK}` },
+  plex: { name: 'IBM Plex Sans', family: `'IBM Plex Sans', ${FALLBACK}` },
+  public: { name: 'Public Sans', family: `'Public Sans', ${FALLBACK}` },
+  inter: { name: 'Inter', family: `'Inter', ${FALLBACK}` },
+  nunito: { name: 'Nunito (redondeada)', family: `'Nunito', ${FALLBACK}` },
+  montserrat: { name: 'Montserrat', family: `'Montserrat', ${FALLBACK}` },
+  lexend: { name: 'Lexend (lectura fácil)', family: `'Lexend', ${FALLBACK}` },
+  source: { name: 'Source Sans 3', family: `'Source Sans 3', ${FALLBACK}` },
+  atkinson: { name: 'Atkinson Hyperlegible', family: `'Atkinson Hyperlegible', ${FALLBACK}` },
+} as const
+export type FontId = keyof typeof FONTS
+export const FONT_IDS = Object.keys(FONTS) as FontId[]
+const isFontId = (v: unknown): v is FontId => typeof v === 'string' && v in FONTS
+
 export interface SavedLook extends Look {
   id: string
   name: string
@@ -79,6 +100,8 @@ export interface LookPreference {
   chart: Partial<Record<ChartKey, string>>
   /** Trazo propio de cada línea de los gráficos. */
   chartDash: Partial<Record<LineKey, LineStyle>>
+  /** Tipo de letra elegido (vale con cualquier tema). */
+  font: FontId
 }
 
 /** Líneas cuyo trazo se puede cambiar (las franjas no tienen trazo). */
@@ -251,6 +274,7 @@ export const DEFAULT_LOOK: LookPreference = {
   open: { presets: true, mine: true },
   chart: {},
   chartDash: {},
+  font: 'theme',
 }
 
 /** Claves en el almacén del equipo. `nv_look_vars` lo lee public/appearance-boot.js (sin parpadeo). */
@@ -585,6 +609,8 @@ export function lookVars(pref: LookPreference, theme: 'light' | 'dark'): Record<
   }
   // Forma (la lee el proveedor para poner data-shape en <html>).
   v['--look-shape'] = look.shape
+  // Letra elegida (globals.css la aplica salvo en alto contraste).
+  if (pref.font !== 'theme') v['--look-font'] = FONTS[pref.font].family
 
   // Color principal (globals.css arma sus variantes; en alto contraste no se aplica)
   const primary = primaryOf(pref)
@@ -681,6 +707,7 @@ export function sanitizeLook(raw: unknown): LookPreference {
     chartDash: Object.fromEntries(
       Object.entries(isObject(o.chartDash) ? o.chartDash : {}).filter(([k, v]) => isLineKey(k) && isLineStyle(v)),
     ),
+    font: isFontId(o.font) ? o.font : DEFAULT_LOOK.font,
   }
 }
 
@@ -703,6 +730,7 @@ export function lookToStored(p: LookPreference): Record<string, Group> {
     mz: String(p.menu.size),
     op: p.open.presets,
     om: p.open.mine,
+    f: p.font,
   }
   for (const [id, color] of Object.entries(p.primaries)) look[`p_${id}`] = color
   for (const [key, color] of Object.entries(p.chart)) look[`k_${key}`] = color
@@ -774,5 +802,6 @@ export function lookFromStored(raw: Record<string, unknown>): LookPreference | n
         .map(([k, v]) => [k.slice(2), v]),
     ),
     open: { presets: look.op, mine: look.om },
+    font: look.f,
   })
 }
