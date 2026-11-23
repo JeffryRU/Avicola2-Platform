@@ -45,7 +45,7 @@ export const PLUS_SAVED = 'Plus guardado.'
 export const PLUS_INVALID = 'Escribe un número entero entre 0 y 100 000 en cada tipo (por ejemplo 4000).'
 export { CANCEL_LABEL as CANCEL, SAVE_LABEL as SAVE_PLUS } from '@/shared/types/labels'
 export const NEED_LABEL = 'aves sin contar el plus'
-export const groupStockBNote = (n: number) => `incl. ${n.toLocaleString('es-PE')} en B`
+export const groupStockBNote = (n: number) => `+${n.toLocaleString('es-PE')} en B, no cuentan`
 
 /** Panel "Con qué datos se calculó". */
 export const SOURCES_TITLE = 'Con qué datos se calculó'
@@ -61,7 +61,7 @@ export const ARRIVAL_HINT =
 export const arrivalNote = (days: number, from: string, to: string) =>
   `Con ${String(days)} días de producción, del ${from} al ${to}.`
 export const stockBNote = (n: number) =>
-  `Además, ${n.toLocaleString('es-PE')} de calidad B, que se suman al stock de su tipo.`
+  `Además, ${n.toLocaleString('es-PE')} de calidad B: están en el stock, pero en la brasa no se cuentan para la saca.`
 export const stockOldNote = (n: number, days: number) =>
   `No se cuentan ${n.toLocaleString('es-PE')} unid. de lotes de más de ${String(days)} días (se trozan).`
 export const NO_STOCK = 'Sin registro de stock entre anteayer y hoy: se toma como 0.'

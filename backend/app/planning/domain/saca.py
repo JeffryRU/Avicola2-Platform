@@ -4,9 +4,10 @@ Se calcula el día D (hoy) y, por tipo de pedido a granja, en este orden (regla 
 
     saca = stock − pedidos de mañana (D+1) + proyección de pasado mañana (D+2) + plus
 
-- **Stock:** lo que quedó en despacho, lo último registrado hasta D (si es reciente). Incluye la
-  calidad B, que se cuenta por tipo.
-- **Pedidos:** los confirmados para entregar mañana.
+- **Stock:** lo que quedó en despacho, lo último registrado hasta D (si es reciente). En la
+  brasa **no cuenta la calidad B**: se registra en el stock pero no reemplaza a un pollo de
+  calidad A en lo que se pide a granja (INS-12). En los demás tipos sí se suma.
+- **Pedidos:** los confirmados para entregar mañana (brasa y pollo de mercado).
 - **Proyección:** la del equipo de vendedores para pasado mañana (cuando llega lo que se pide).
 - **Plus:** aves extra fijas por tipo, que configura un supervisor.
 - Nunca menos de 0: un pedido a granja negativo no existe.
@@ -18,7 +19,7 @@ tipo. Las líneas por producto muestran el mismo cálculo sin el plus, como deta
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from app.planning.domain.models import Product
+from app.planning.domain.models import BRASA_CATEGORY, Product
 from app.planning.domain.production import ArrivalEstimate
 
 # El stock de hace más días ya no representa lo que hay en despacho: no se descuenta.
@@ -59,7 +60,7 @@ class SacaGroup:
     ordered: int
     stock: int
     plus: int = 0
-    # De ese stock, cuánto es calidad B (se cuenta por tipo, no por producto).
+    # Calidad B registrada del tipo (se muestra; en la brasa no entra en `stock` ni en la saca).
     stock_b: int = 0
 
     @property
@@ -100,7 +101,7 @@ class SacaPlan:
     yield_factor: float
     # Plus por tipo (aves); los tipos que no figuran no llevan plus.
     group_plus: tuple[tuple[str, int], ...] = ()
-    # Stock de calidad B por tipo: se suma al stock del tipo, no de un producto.
+    # Stock de calidad B por tipo: en la brasa solo se informa; en los demás tipos se suma.
     stock_b_by_group: tuple[tuple[str, int], ...] = ()
     # Unidades en lotes demasiado antiguos, que no se cuentan (se trozan).
     stock_old: int = 0
@@ -154,12 +155,14 @@ class SacaPlan:
         result = []
         for name in names:
             lines = [line for line in self.lines if product_group(line.product) == name]
+            # La calidad B de la brasa no se pide en lugar de una A: no se suma (INS-12).
+            counts_b = not all(line.product.category == BRASA_CATEGORY for line in lines)
             result.append(
                 SacaGroup(
                     name,
                     sum(line.projected for line in lines),
                     sum(line.ordered for line in lines),
-                    sum(line.stock for line in lines) + quality_b.get(name, 0),
+                    sum(line.stock for line in lines) + (quality_b.get(name, 0) if counts_b else 0),
                     plus.get(name, 0),
                     quality_b.get(name, 0),
                 )

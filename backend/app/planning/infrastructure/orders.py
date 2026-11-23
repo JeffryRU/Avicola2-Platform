@@ -5,6 +5,7 @@ despacho): no es una conexión en vivo, así que solo hay pedidos para los días
 archivo cargado. `NoConfirmedOrders` es la fuente vacía (pruebas, o si no se quiere usar).
 """
 
+from collections import Counter
 from datetime import date
 
 from sqlalchemy import select
@@ -29,10 +30,18 @@ class NoConfirmedOrders:
 
 
 class LoadedOrders:
-    """Pedidos de pollo entero para brasa con entrega ese día, llevados a productos del catálogo."""
+    """Pedidos con entrega ese día, llevados a productos del catálogo: el pollo entero para brasa
+    (por su peso) y los otros productos que se proyectan, reconocidos por su material de ARIS
+    (`extra_materials`: producto → inicio del material, p. ej. el pollo de mercado)."""
 
-    def __init__(self, session: Session, products: ProductRepository) -> None:
+    def __init__(
+        self,
+        session: Session,
+        products: ProductRepository,
+        extra_materials: dict[str, str] | None = None,
+    ) -> None:
         self.session, self.products = session, products
+        self.extra_materials = extra_materials or {}
         # Se actualiza en cada consulta: ¿hay pedidos cargados para ese día?
         self.available = False
 
@@ -45,13 +54,32 @@ class LoadedOrders:
             t.ordered_units,
             t.dispatched_kg,
             t.dispatched_units,
-        ).where(
-            t.delivery_date == day,
-            t.material.startswith(ORDER_MATERIAL_PREFIX, autoescape=True),
+        ).where(t.delivery_date == day)
+        active = self.products.list_active()
+        brasa = [p for p in active if p.category == ORDER_CATEGORY]
+        extras = [
+            (p, self.extra_materials[p.id].upper()) for p in active if p.id in self.extra_materials
+        ]
+        lines, units = [], Counter()
+        for row in self.session.execute(query):
+            line = OrderLine(*row)
+            material = line.material.upper()
+            extra = next((p for p, prefix in extras if material.startswith(prefix)), None)
+            if extra is not None:
+                lines.append(line)
+                n = (
+                    line.ordered_units
+                    if line.ordered_units > 0
+                    else line.ordered_kg / extra.kg_per_unit
+                )
+                units[extra.id] += n
+            elif material.startswith(ORDER_MATERIAL_PREFIX):
+                lines.append(line)
+        units.update(
+            daily_units(
+                [x for x in lines if x.material.upper().startswith(ORDER_MATERIAL_PREFIX)], brasa
+            ).get(day, {})
         )
-        lines = [OrderLine(*row) for row in self.session.execute(query)]
-        products = [p for p in self.products.list_active() if p.category == ORDER_CATEGORY]
-        units = daily_units(lines, products).get(day, {})
         self.available = bool(lines)
         return {product: round(n) for product, n in units.items() if round(n) > 0}
 

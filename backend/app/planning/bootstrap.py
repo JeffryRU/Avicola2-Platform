@@ -288,7 +288,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             products,
             projections,
             stock,
-            LoadedOrders(session, products),
+            LoadedOrders(session, products, settings.demand_extra_materials),
             sellers,
             settings.yield_factor,
             production,

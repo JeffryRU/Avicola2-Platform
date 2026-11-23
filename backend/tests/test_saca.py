@@ -257,7 +257,7 @@ def test_supervisors_change_the_plus_of_each_type(client) -> None:
     )
 
 
-def test_saca_counts_only_recent_lots_and_quality_b_by_type(client) -> None:
+def test_saca_counts_only_recent_lots_and_leaves_brasa_quality_b_out(client) -> None:
     _login(client, "rnavarro")
     # Solo la brasa se proyecta; el pollo de mercado entra a la saca solo por su stock.
     body = {"category": "BRASA", "days": [{"date": str(AFTER_TOMORROW), "units": {"P0001": 300}}]}
@@ -282,12 +282,46 @@ def test_saca_counts_only_recent_lots_and_quality_b_by_type(client) -> None:
     assert by_id["P0001"]["stock"] == 80 and plan["stock_old"] == 500
     assert plan["stock_lot_days"] == 3 and plan["stock_b"] == 40
     groups = {g["name"]: g for g in plan["groups"]}
-    # La calidad B se suma al stock del tipo: 80 + 40 − 0 + 300 = 420.
+    # La calidad B de la brasa se ve en el stock pero no entra en la saca (INS-12): 80 − 0 + 300.
     chica = groups["Brasa chica"]
-    assert (chica["stock"], chica["stock_b"], chica["farm_order"]) == (120, 40, 420)
+    assert (chica["stock"], chica["stock_b"], chica["farm_order"]) == (80, 40, 380)
     # El pollo de mercado es un tipo más, sin proyección: 10 − 0 + 0.
     assert groups["Pollo de mercado"]["farm_order"] == 10
-    assert plan["farm_order"] == 430
+    assert plan["farm_order"] == 390
+
+
+def test_market_chicken_subtracts_tomorrows_orders_and_adds_the_projection(client) -> None:
+    """El pollo de mercado (pollo entero sin menudencia) sigue la misma regla que la brasa."""
+    from sqlalchemy import insert
+
+    from app.planning.infrastructure.persistence.tables import dispatch_orders
+
+    _login(client, "rnavarro")
+    body = {
+        "category": "Pollo de mercado",
+        "days": [{"date": str(AFTER_TOMORROW), "units": {"P0012": 70}}],
+    }
+    assert client.post("/api/projections", json=body).status_code == 201
+    row = {
+        "order_number": 2, "customer": "Cliente", "material_code": "Y",
+        "material": "POLLO ENTERO CARNE SIN MENUDENCIA (-)", "ordered_kg": 0, "dispatched_kg": 0,
+        "ordered_units": 25, "dispatched_units": 0, "zone": None, "registered_on": TODAY,
+        "delivery_date": TOMORROW, "seller": None,
+    }  # fmt: skip
+    with SessionLocal() as session:
+        session.execute(insert(dispatch_orders), [row])
+        session.commit()
+    _login(client, "despacho")
+    lines = [{"product_id": "P0012", "units": 40}]
+    assert client.put(f"/api/stock/{TODAY}", json={"lines": lines}).status_code == 200
+
+    _login(client, "supervisor")
+    _set_plus(client, NO_PLUS)
+    plan = _saca(client)
+    line = {x["product_id"]: x for x in plan["lines"]}["P0012"]
+    # 40 de stock − 25 pedidos de mañana + 70 proyectados para pasado mañana = 85.
+    assert (line["stock"], line["ordered"], line["projected"], line["demand"]) == (40, 25, 70, 85)
+    assert plan["orders_available"] is True
 
 
 def test_discards_are_registered_in_stock_but_never_enter_the_farm_order(client) -> None:
