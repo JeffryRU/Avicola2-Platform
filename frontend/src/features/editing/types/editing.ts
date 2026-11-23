@@ -1,5 +1,5 @@
 /** Textos de la hora de corte y las habilitaciones de edición (única fuente). */
-import { dateOf, dShort, type IsoDate, timeOf } from '@/shared/domain/dates'
+import { clockTime as clockTimeOf, dateOf, dShort, type IsoDate, timeOf } from '@/shared/domain/dates'
 import type { UnlockAction, UnlockStatus } from '@/features/editing/domain/editing'
 
 export const UNLOCKS_TITLE = 'Habilitaciones'
@@ -88,3 +88,34 @@ export const MY_REQUESTS_LIST_TITLE = 'Mis solicitudes'
 export const MY_REQUESTS_EMPTY = 'No pediste ninguna apertura en los últimos 30 días.'
 export const decidedByLabel = (status: UnlockStatus, by: string) =>
   status === 'approved' ? `la habilitó ${by}` : status === 'rejected' ? `la rechazó ${by}` : `la cerró ${by}`
+
+/** Habilitaciones (supervisor): resumen del corte, modal y filtros de las solicitudes. */
+export const CONFIGURE_CUTOFF_LABEL = 'Configurar horario'
+export const CUTOFF_DIALOG_HINT = 'Hasta qué hora se puede registrar o corregir cada día.'
+export const cutoffSummary = (time: string, daysBefore: number, enabled: boolean) =>
+  enabled ? `Corte ${time} · ${daysBeforeLabel(daysBefore).toLowerCase()}` : 'Sin hora de corte'
+export const LOCK_ON_CHIP = 'Bloqueo activo'
+export const LOCK_OFF_CHIP = 'Bloqueo apagado'
+export const ALL_STATUSES_LABEL = 'Todas'
+export const UNLOCK_STATUS_TAB: Record<UnlockStatus, string> = {
+  requested: 'Por decidir',
+  approved: 'Habilitadas',
+  rejected: 'Rechazadas',
+  closed: 'Cerradas',
+}
+export const statusTab = (label: string, n: number) => `${label} · ${String(n)}`
+export const ALL_SELLERS_LABEL = 'Todos los vendedores'
+export const SELLER_FILTER_LABEL = 'Vendedor'
+export const FROM_LABEL = 'Desde'
+export const TO_LABEL = 'Hasta'
+export const DAY_FILTER_HINT = 'Día que piden abrir'
+export const SEARCH_LABEL = 'Buscar'
+export const SEARCH_PLACEHOLDER = 'Vendedor o motivo'
+export const CLEAR_FILTERS_LABEL = 'Limpiar filtros'
+export const NO_MATCH_TITLE = 'Ninguna solicitud con estos filtros'
+export const NO_MATCH_BODY = 'Prueba con otro estado, otro vendedor u otras fechas.'
+export const pendingAside = (n: number) => (n === 1 ? '1 por decidir' : `${String(n)} por decidir`)
+export const dayGroupLabel = (n: number) => (n === 1 ? '1 solicitud' : `${String(n)} solicitudes`)
+export const requestedAtLabel = (iso: string) => `Pedida el ${dShort(dateOf(iso))} a las ${clockTimeOf(iso)}`
+export const decidedLabel = (status: UnlockStatus, by: string, iso: string | null) =>
+  `${decidedByLabel(status, by).replace(/^./, (c) => c.toUpperCase())}${iso ? ` el ${dShort(dateOf(iso))}` : ''}`

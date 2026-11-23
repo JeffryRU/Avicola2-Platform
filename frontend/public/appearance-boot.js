@@ -57,6 +57,16 @@
   root.setAttribute('data-focus', on('strongFocus') ? 'strong' : 'normal')
   root.setAttribute('data-images', on('hideImages') ? 'hidden' : 'shown')
   root.setAttribute('data-reader', on('readAloud') ? 'on' : 'off')
+  // Estilo elegido (src/shared/domain/look.ts: lookVars, ya calculado y guardado por la app).
+  try {
+    var look = JSON.parse(w.localStorage.getItem('nv_look_vars'))
+    if (look && typeof look === 'object' && root.style)
+      for (var k in look)
+        if (k.indexOf('--look-') === 0 && typeof look[k] === 'string') root.style.setProperty(k, look[k])
+    root.setAttribute('data-primary', look && typeof look['--look-primary'] === 'string' ? 'custom' : 'brand')
+    // Sin estilo guardado, el tema por defecto (clásico) es redondeado.
+    root.setAttribute('data-shape', look && look['--look-shape'] === 'crisp' ? 'crisp' : 'soft')
+  } catch (e) {}
   var meta = d.querySelector('meta[name="theme-color"]')
   if (meta) meta.setAttribute('content', color)
 })(document, window)

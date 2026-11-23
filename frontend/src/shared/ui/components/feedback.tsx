@@ -37,7 +37,12 @@ export function Splash({ visible }: { visible: boolean }) {
         <div className="relative grid size-32 place-items-center">
           <span aria-hidden className="splash-ripple absolute inset-4 rounded-full border-2 border-primary" />
           <span aria-hidden className="splash-ripple late absolute inset-4 rounded-full border-2 border-primary" />
-          <svg aria-hidden data-decor className="splash-orbit absolute inset-0 size-full text-primary" viewBox="0 0 100 100">
+          <svg
+            aria-hidden
+            data-decor
+            className="splash-orbit absolute inset-0 size-full text-primary"
+            viewBox="0 0 100 100"
+          >
             <circle
               cx="50"
               cy="50"
@@ -103,10 +108,10 @@ export function Note({
   className?: string
 }) {
   const tones = {
-    info: 'border-border bg-surface text-ink-2 [&>svg]:text-primary',
+    info: 'border-info-border bg-info-soft text-ink-2 [&>svg]:text-primary',
     warn: 'border-warn-border bg-warn-soft text-warn-foreground [&>svg]:text-warn',
     bad: 'border-bad-border bg-bad-soft text-foreground [&>svg]:text-bad',
-    ok: 'border-border bg-ok-soft text-foreground [&>svg]:text-ok',
+    ok: 'border-ok/30 bg-ok-soft text-foreground [&>svg]:text-ok',
   }
   return (
     <div
@@ -161,8 +166,8 @@ export function StatusDot({ tone, className }: { tone: 'ok' | 'warn' | 'draft' |
       aria-hidden
       className={cn(
         'inline-block size-2 flex-none rounded-full',
-        tone === 'ok' && 'bg-ok',
-        tone === 'warn' && 'border-[1.5px] border-warn',
+        tone === 'ok' && 'bg-ok-fill',
+        tone === 'warn' && 'bg-warn-fill ring-1 ring-warn/40',
         tone === 'draft' && 'bg-draft',
         tone === 'bad' && 'bg-bad',
         className,
@@ -179,19 +184,23 @@ const STATUS_TONE: Record<StatusKind, 'ok' | 'warn' | 'draft'> = {
   local: 'draft',
 }
 
-/** Estado con punto y texto (Confirmada, Pendiente, Sincronizada...). Sin pastillas de color. */
+/**
+ * Estado en bloque lleno (Confirmada en verde, Pendiente en amarillo, borrador en gris). El color
+ * repite lo que dice el texto: nunca va solo. En alto contraste vuelve a punto y texto.
+ */
 export function StatusBadge({ kind }: { kind: StatusKind }) {
   const tone = STATUS_TONE[kind]
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 text-sm whitespace-nowrap',
-        tone === 'ok' && 'text-foreground',
-        tone === 'warn' && 'font-medium text-warn hc:font-bold',
-        tone === 'draft' && 'text-muted-foreground',
+        'inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 text-sm font-semibold whitespace-nowrap',
+        tone === 'ok' && 'bg-ok-fill text-ok-fill-foreground',
+        tone === 'warn' && 'bg-warn-fill text-warn-fill-foreground',
+        tone === 'draft' && 'bg-muted font-medium text-muted-foreground',
+        'hc:bg-transparent hc:px-0 hc:text-foreground',
       )}
     >
-      <StatusDot tone={tone} />
+      <StatusDot tone={tone} className="hidden hc:inline-block" />
       {STATUS_LABEL[kind]}
     </span>
   )

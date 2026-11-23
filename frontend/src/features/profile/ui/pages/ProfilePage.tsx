@@ -9,9 +9,17 @@ import { useLogout, useRequiredSession } from '@/features/auth'
 import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { Segmented } from '@/shared/ui/components/segmented'
 import { Switch } from '@/shared/ui/components/shadcn/switch'
-import { AccentSwatches } from '@/shared/ui/components/accent-picker'
+import { PrimaryPicker } from '@/shared/ui/components/look-panel'
+import { AllChartStyles } from '@/shared/ui/components/chart-colors'
 import { AccessibilityOptions } from '@/shared/ui/components/accessibility-options'
-import { A11Y_LABEL, ACCENT_LABEL, HIGH_CONTRAST_HINT, HIGH_CONTRAST_LABEL } from '@/shared/types/appearance'
+import {
+  A11Y_LABEL,
+  ACCENT_LABEL,
+  CHART_STYLES_HINT,
+  CHART_STYLES_TITLE,
+  HIGH_CONTRAST_HINT,
+  HIGH_CONTRAST_LABEL,
+} from '@/shared/types/appearance'
 import { useAppearance } from '@/shared/ui/hooks/use-appearance'
 import { cn } from '@/shared/ui/lib/utils'
 import { VersionChip } from '@/features/versions'
@@ -105,7 +113,7 @@ export function ProfilePage() {
   )
 }
 
-/** Apariencia y accesibilidad: tema, color, alto contraste y las opciones de lectura. Se guardan en este equipo. */
+/** Apariencia y accesibilidad: tema, color, alto contraste, colores de los gráficos y las opciones de lectura. */
 export function AppearancePage() {
   const { preference, resolved, system, setPreference } = useAppearance()
   const contrastId = useId()
@@ -132,8 +140,11 @@ export function AppearancePage() {
               full
             />
           </Field>
-          <Field title={ACCENT_LABEL} hint="Botones, enlaces y selección. También desde el botón de paleta del menú.">
-            <AccentSwatches />
+          <Field
+            title={ACCENT_LABEL}
+            hint="Botones, enlaces y selección, según el tema elegido. El tema y sus figuras, en el botón de paleta del menú."
+          >
+            <PrimaryPicker />
           </Field>
           <div className="flex items-start gap-4 px-4 py-4 dsk:px-5">
             <label htmlFor={contrastId} className="min-w-0 flex-1 cursor-pointer">
@@ -150,6 +161,11 @@ export function AppearancePage() {
               onCheckedChange={(on) => setPreference({ ...preference, contrast: contrastFromSwitch(on, system) })}
               className="mt-1"
             />
+          </div>
+        </Section>
+        <Section title={CHART_STYLES_TITLE} aside={CHART_STYLES_HINT}>
+          <div className="p-4 dsk:p-5">
+            <AllChartStyles />
           </div>
         </Section>
         <Section title={A11Y_LABEL}>

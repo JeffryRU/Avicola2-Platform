@@ -44,12 +44,12 @@ export const tableStyles = {
   }),
 
   th: cva(
-    `border-b border-rule-strong px-3 text-xs font-medium whitespace-nowrap text-muted-foreground ${EDGE} hc:border-b-heavy hc:text-sm hc:font-bold hc:text-foreground`,
+    `border-b border-rule-strong bg-table-head px-3 text-xs font-semibold whitespace-nowrap text-table-head-foreground ${EDGE} hc:border-b-heavy hc:text-sm hc:font-bold hc:text-foreground`,
     {
       variants: {
         density: { compact: 'py-2', normal: 'py-2.5', relaxed: 'py-3' },
         align,
-        stickyHeader: { true: 'sticky top-0 z-20 bg-surface', false: '' },
+        stickyHeader: { true: 'sticky top-0 z-20', false: '' },
       },
       defaultVariants: { density: 'normal', align: 'left', stickyHeader: false },
     },
@@ -96,7 +96,7 @@ export const tableStyles = {
       },
       tone: {
         total:
-          'bg-muted font-semibold [&>td]:border-t [&>td]:border-b-0 [&>td]:border-rule-strong [&>td]:py-3 hc:[&>td]:border-t-heavy hc:[&>td]:border-t-foreground',
+          'bg-table-head font-bold text-table-head-foreground [&>td]:border-t [&>td]:border-b-0 [&>td]:border-rule-strong [&>td]:py-3 hc:[&>td]:border-t-heavy hc:[&>td]:border-t-foreground',
         muted: 'text-muted-foreground',
         attention: 'hc:bg-warn-soft',
       } satisfies Record<RowTone, string>,
@@ -110,7 +110,7 @@ export const tableStyles = {
    */
   edit: {
     table: 'w-full border-separate border-spacing-0',
-    th: 'border-b border-rule-strong bg-surface px-2 py-2 text-xs font-medium whitespace-nowrap text-muted-foreground hc:border-b-heavy hc:border-foreground hc:text-sm hc:font-bold hc:text-foreground',
+    th: 'border-b border-rule-strong bg-table-head px-2 py-2 text-xs font-semibold whitespace-nowrap text-table-head-foreground hc:border-b-heavy hc:border-foreground hc:text-sm hc:font-bold hc:text-foreground',
     /** Columna fija a la izquierda (el producto) en todos los tamaños. */
     stickyCol: 'sticky left-0 z-[1] bg-surface',
     /** Fila de subtotal de un grupo (p. ej. «Brasa chica»). */
@@ -136,7 +136,12 @@ export const tableStyles = {
   /** Columna fija a la izquierda al deslizar en el celular (en escritorio, normal). */
   // Con hover, la celda fija se pinta igual que su fila (si no, quedaría blanca al pasar el mouse).
   sticky: 'sticky left-0 z-10 bg-surface group-hover/row:bg-muted dsk:static dsk:bg-transparent',
-  stickyTotal: 'sticky left-0 z-10 bg-muted dsk:static',
+  /**
+   * Texto de la columna fija (producto, vendedor): un nombre largo («Pollo entero carne sin
+   * menudencia») pasa a dos líneas en vez de ensanchar toda la columna y empujar las cifras.
+   */
+  stickyText: 'min-w-28 max-w-52 whitespace-normal',
+  stickyTotal: 'sticky left-0 z-10 bg-table-head dsk:static',
   desktopOnly: 'hidden dsk:table-cell',
 }
 

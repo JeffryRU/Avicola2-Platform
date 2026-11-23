@@ -126,6 +126,6 @@ export function createContainer(): Container {
     aris: new HttpArisGateway(http),
     production: new HttpProductionGateway(http),
     installer: new BrowserAppInstaller(window, import.meta.env.VITE_ANDROID_APK_URL),
-    assistant: new HttpAssistantGateway(http),
+    assistant: new HttpAssistantGateway(http, baseUrl),
   }
 }

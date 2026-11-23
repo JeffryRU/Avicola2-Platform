@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { diffDays, dShort, toIso } from '@/shared/domain/dates'
+import { addDays, diffDays, dShort, toIso, type IsoDate } from '@/shared/domain/dates'
 
 /** Notificación guardada en el servidor (GET /api/notifications). */
 export const notificationSchema = z.object({
@@ -39,4 +39,50 @@ export function whenLabel(createdAt: string, now: Date = new Date()): string {
   if (days === 0) return `Hoy ${time}`
   if (days === 1) return `Ayer ${time}`
   return dShort(toIso(at))
+}
+
+/** Días de las notificaciones que se ven (ambos incluidos); null = las últimas, sin filtro. */
+export interface NotificationRange {
+  from: IsoDate
+  to: IsoDate
+}
+
+/** Atajos del filtro por día. `custom`: el rango que se elija. */
+export const RANGE_PRESETS = ['all', 'today', 'yesterday', 'week', 'custom'] as const
+export type RangePreset = (typeof RANGE_PRESETS)[number]
+
+export function presetRange(preset: Exclude<RangePreset, 'custom'>, today: IsoDate): NotificationRange | null {
+  if (preset === 'today') return { from: today, to: today }
+  if (preset === 'yesterday') return { from: addDays(today, -1), to: addDays(today, -1) }
+  if (preset === 'week') return { from: addDays(today, -6), to: today }
+  return null
+}
+
+/** Qué atajo corresponde a un rango (o `custom` si no es ninguno). */
+export function presetOf(range: NotificationRange | null, today: IsoDate): RangePreset {
+  if (!range) return 'all'
+  const match = (['today', 'yesterday', 'week'] as const).find((p) => {
+    const r = presetRange(p, today)
+    return r?.from === range.from && r.to === range.to
+  })
+  return match ?? 'custom'
+}
+
+/** Día (en la hora del equipo) en que llegó una notificación. */
+export const dayOf = (n: AppNotification): IsoDate => toIso(new Date(n.created_at))
+
+/** Si una notificación cae en el rango (también filtra lo ya cargado, sin esperar al servidor). */
+export const inRange = (n: AppNotification, range: NotificationRange | null) =>
+  !range || (dayOf(n) >= range.from && dayOf(n) <= range.to)
+
+/** Notificaciones agrupadas por día, en el orden en que vienen (las más nuevas primero). */
+export function byDay(items: AppNotification[]): { day: IsoDate; items: AppNotification[] }[] {
+  const out: { day: IsoDate; items: AppNotification[] }[] = []
+  for (const n of items) {
+    const day = dayOf(n)
+    const last = out.at(-1)
+    if (last?.day === day) last.items.push(n)
+    else out.push({ day, items: [n] })
+  }
+  return out
 }

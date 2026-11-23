@@ -107,14 +107,19 @@ function runBoot(storage: Record<string, string | null>, media: { dark: boolean;
 describe('public/appearance-boot.js (antes del primer pintado)', () => {
   const stored = fc.oneof(
     fc.constant(null),
-    fc.constantFrom('light', 'dark', 'system', 'normal', 'high', 'noraves', 'rocio', 'brand', 'green', 'teal').map((v) => JSON.stringify(v)),
+    fc
+      .constantFrom('light', 'dark', 'system', 'normal', 'high', 'noraves', 'rocio', 'brand', 'green', 'teal')
+      .map((v) => JSON.stringify(v)),
     fc.string(), // dato corrupto: no debe romper nada
   )
 
   it('aplica lo mismo que resolveAppearance y themeColor (propiedad)', () => {
     fc.assert(
       fc.property(stored, stored, stored, stored, fc.boolean(), fc.boolean(), (t, c, b, a, dark, more) => {
-        const { attrs, color } = runBoot({ [THEME_KEY]: t, [CONTRAST_KEY]: c, nv_brand: b, [ACCENT_KEY]: a }, { dark, more })
+        const { attrs, color } = runBoot(
+          { [THEME_KEY]: t, [CONTRAST_KEY]: c, nv_brand: b, [ACCENT_KEY]: a },
+          { dark, more },
+        )
         const parse = (raw: string | null) => {
           try {
             return raw === null ? null : (JSON.parse(raw) as unknown)

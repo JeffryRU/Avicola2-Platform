@@ -13,6 +13,8 @@ import { TopControls } from '@/app/top-controls'
 import { BrandProvider } from '@/shared/ui/components/brand'
 import { AppearanceProvider } from '@/shared/ui/components/appearance'
 import { AccessibilityProvider } from '@/shared/ui/components/accessibility'
+import { LookProvider } from '@/shared/ui/components/look'
+import { LOOK_KEY, LOOK_VARS_KEY, sanitizeLook, type LookPreference } from '@/shared/domain/look'
 import { A11Y_KEY, sanitizeA11y, type A11yPreference } from '@/shared/domain/accessibility'
 import {
   CONTRAST_KEY,
@@ -112,6 +114,8 @@ const contrastSchema = z.enum(CONTRAST_PREFERENCES)
 const accentSchema = z.enum(ACCENT_IDS)
 /** Opciones de accesibilidad: lo que no se entienda vuelve a su valor normal. */
 const a11ySchema = z.unknown().transform(sanitizeA11y)
+/** Estilo de la app (tema, figuras): lo que no se entienda vuelve a «Marca». */
+const lookSchema = z.unknown().transform(sanitizeLook)
 
 export function App({ container }: { container: Container }) {
   // Uno por app (useState lo crea una vez): sus valores por defecto están en query-client.ts.
@@ -132,6 +136,14 @@ export function App({ container }: { container: Container }) {
   }))
   const persistA11y = useCallback((p: A11yPreference) => container.preferences.set(A11Y_KEY, p), [container])
   const [a11y] = useState(() => sanitizeA11y(container.preferences.get(A11Y_KEY, a11ySchema)))
+  const persistLook = useCallback(
+    (p: LookPreference, vars: Record<string, string>) => {
+      container.preferences.set(LOOK_KEY, p)
+      container.preferences.set(LOOK_VARS_KEY, vars)
+    },
+    [container],
+  )
+  const [look] = useState(() => sanitizeLook(container.preferences.get(LOOK_KEY, lookSchema)))
   const reportCrash = useCallback(
     (error: unknown, componentStack: string) => {
       const crash = error instanceof Error ? error : new Error(String(error))
@@ -150,19 +162,21 @@ Componentes:${componentStack}`
             persist={persistBrand}
           >
             <AppearanceProvider initial={appearance} persist={persistAppearance}>
-              <AccessibilityProvider initial={a11y} persist={persistA11y}>
-                <BrowserRouter>
-                  <Routed />
-                </BrowserRouter>
-                {/* Avisos arriba a la derecha; en el celular, arriba (respetando la muesca). */}
-                <Toaster
-                  position="top-right"
-                  offset={{ top: 20, right: 20 }}
-                  mobileOffset={{ top: 'calc(10px + env(safe-area-inset-top))', left: 12, right: 12 }}
-                  closeButton
-                  visibleToasts={4}
-                />
-              </AccessibilityProvider>
+              <LookProvider initial={look} persist={persistLook}>
+                <AccessibilityProvider initial={a11y} persist={persistA11y}>
+                  <BrowserRouter>
+                    <Routed />
+                  </BrowserRouter>
+                  {/* Avisos arriba a la derecha; en el celular, arriba (respetando la muesca). */}
+                  <Toaster
+                    position="top-right"
+                    offset={{ top: 20, right: 20 }}
+                    mobileOffset={{ top: 'calc(10px + env(safe-area-inset-top))', left: 12, right: 12 }}
+                    closeButton
+                    visibleToasts={4}
+                  />
+                </AccessibilityProvider>
+              </LookProvider>
             </AppearanceProvider>
           </BrandProvider>
         </QueryClientProvider>

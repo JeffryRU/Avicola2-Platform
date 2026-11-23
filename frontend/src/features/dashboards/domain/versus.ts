@@ -11,15 +11,16 @@ type DayAgg = ReturnType<typeof periodAgg>[number]
  * (KPIs, gráfico, tablas) sale de aquí con la medida elegida; la pantalla solo lo pinta.
  */
 
-export const MEASURES = ['kg', 'unidades', 'ambos'] as const
+export const MEASURES = ['unidades', 'kg', 'ambos'] as const
 export type Measure = (typeof MEASURES)[number]
-export const DEFAULT_MEASURE: Measure = 'kg'
+/** Por defecto, unidades (lo que proyecta el vendedor); los kg son un extra. */
+export const DEFAULT_MEASURE: Measure = 'unidades'
 /** Parámetro de la URL con la medida (?medida=kg|unidades|ambos). */
 export const MEASURE_PARAM = 'medida'
 
 const measureSchema = z.enum(MEASURES)
 
-/** La medida de la URL; cualquier otro valor (o ninguno) es kg. */
+/** La medida de la URL; cualquier otro valor (o ninguno) es unidades. */
 export const parseMeasure = (raw: string | null | undefined): Measure => {
   const parsed = measureSchema.safeParse(raw)
   return parsed.success ? parsed.data : DEFAULT_MEASURE
@@ -35,13 +36,14 @@ export interface Amount {
 export type Unit = keyof Amount
 
 /** Qué medidas se muestran, en orden (kg primero). */
-export const unitsOf = (m: Measure): Unit[] => (m === 'kg' ? ['kg'] : m === 'unidades' ? ['units'] : ['kg', 'units'])
+/** Medidas en pantalla, la principal primero: con «ambos», unidades y luego kg. */
+export const unitsOf = (m: Measure): Unit[] => (m === 'kg' ? ['kg'] : m === 'unidades' ? ['units'] : ['units', 'kg'])
 
 /**
- * La medida del gráfico: con «ambos» se grafica en kg (es la que suma productos de distinto peso
- * sin engañar) y las unidades van en el detalle de cada punto y en la tabla de abajo.
+ * La medida del gráfico: la principal. Con «ambos» se grafica en unidades y los kg van en el
+ * detalle de cada punto y en la tabla de abajo.
  */
-export const chartUnit = (m: Measure): Unit => (m === 'unidades' ? 'units' : 'kg')
+export const chartUnit = (m: Measure): Unit => (m === 'kg' ? 'kg' : 'units')
 
 const zero = (): Amount => ({ kg: 0, units: 0 })
 const add = (a: Amount, b: Amount): Amount => ({ kg: a.kg + b.kg, units: a.units + b.units })

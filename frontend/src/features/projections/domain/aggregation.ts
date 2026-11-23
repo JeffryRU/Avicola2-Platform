@@ -69,7 +69,9 @@ export function dayAgg(
   const mine = (x: { seller: string; date: string }) => x.date === date && (pick.size === 0 || pick.has(x.seller))
   const days = projections.filter((p) => mine(p) && p.status === CONFIRMED)
   const units = days.reduce<Units>((acc, p) => addUnits(acc, p.units), {})
-  const realDays = sales.filter(mine)
+  // Un pedido sin ningún producto (fila vacía del ERP) no es «pidió 0»: es que aún no hay dato.
+  // Contarlo como 0 daría −100 % de diferencia y bajaría la exactitud.
+  const realDays = sales.filter((s) => mine(s) && Object.keys(s.units).length > 0)
   const real = realDays.length ? realDays.reduce<Units>((acc, s) => addUnits(acc, s.units), {}) : null
   return { date, confirmed: days.length > 0, units, u: sumUnits(units), kg: catalog.kg(units), real }
 }

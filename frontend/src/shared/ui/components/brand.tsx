@@ -76,7 +76,7 @@ const ISO_PATHS = (() => {
   })
 })()
 
-export function IsoMark({ size, onDark, animated }: { size: number; onDark?: boolean; animated?: boolean }) {
+export function IsoMark({ size, onDark, animated }: { size: number; onDark?: boolean | 'chrome'; animated?: boolean }) {
   return (
     <svg className={cn(animated && 'iso-anim')} width={size} height={size} viewBox="4 6 92 92" aria-hidden="true">
       <g className="spin">
@@ -84,8 +84,10 @@ export function IsoMark({ size, onDark, animated }: { size: number; onDark?: boo
           <path
             key={d}
             d={d}
-            fill={onDark ? 'var(--head-foreground)' : 'var(--brand-accent)'}
-            stroke={onDark ? 'var(--head)' : 'var(--surface)'}
+            fill={
+              onDark === 'chrome' ? 'var(--chrome-logo)' : onDark ? 'var(--head-foreground)' : 'var(--brand-accent)'
+            }
+            stroke={onDark === 'chrome' ? 'var(--chrome)' : onDark ? 'var(--head)' : 'var(--surface)'}
             strokeWidth={4.5}
             strokeLinejoin="round"
           />
@@ -103,7 +105,7 @@ export function BrandMark({
   shadow,
 }: {
   size: number
-  onDark?: boolean
+  onDark?: boolean | 'chrome'
   animated?: boolean
   shadow?: boolean
 }) {
@@ -115,20 +117,31 @@ export function BrandMark({
   )
 }
 
-/** Marca del producto: la mascota (o el isotipo de Rocío), «AviPlanner» y la marca del cliente debajo. */
-export function Logo({ onDark, compact }: { onDark?: boolean; compact?: boolean }) {
+/**
+ * Marca del producto: la mascota (o el isotipo de Rocío), «AviPlanner» y la marca del cliente debajo.
+ * `onDark="chrome"`: sobre el marco de la app, con el color de texto del tema elegido.
+ */
+export function Logo({ onDark, compact }: { onDark?: boolean | 'chrome'; compact?: boolean }) {
   const { brand } = useBrand()
   return (
     <div className="flex items-center gap-2.5">
       <BrandMark size={compact ? 30 : 34} onDark={onDark} />
       <span className="flex min-w-0 flex-col leading-tight">
         <span
-          className={cn('text-md font-semibold hc:font-extrabold', onDark ? 'text-head-foreground' : 'text-foreground')}
+          className={cn(
+            'text-md font-semibold hc:font-extrabold',
+            onDark === 'chrome' ? 'text-chrome-logo' : onDark ? 'text-head-foreground' : 'text-foreground',
+          )}
         >
           AviPlanner
         </span>
         {!compact && (
-          <span className={cn('text-xs', onDark ? 'text-head-muted' : 'text-muted-foreground')}>
+          <span
+            className={cn(
+              'text-xs',
+              onDark === 'chrome' ? 'text-chrome-muted' : onDark ? 'text-head-muted' : 'text-muted-foreground',
+            )}
+          >
             {BRANDS[brand].name}
           </span>
         )}

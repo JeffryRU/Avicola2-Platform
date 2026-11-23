@@ -43,25 +43,26 @@ const sales = [{ seller: 'ana', date: D1, units: { B1: 8, B2: 6 } }]
 const days = periodAgg([D1, D2], [], projections, sales, catalog)
 
 describe('medida de «Proyección vs pedido real»', () => {
-  it('lee la medida de la URL; cualquier otra cosa es kg', () => {
-    expect(parseMeasure('unidades')).toBe('unidades')
+  it('lee la medida de la URL; cualquier otra cosa es unidades', () => {
+    expect(parseMeasure('kg')).toBe('kg')
     expect(parseMeasure('ambos')).toBe('ambos')
-    expect(parseMeasure('litros')).toBe('kg')
-    expect(parseMeasure(null)).toBe('kg')
+    expect(parseMeasure('litros')).toBe('unidades')
+    expect(parseMeasure(null)).toBe('unidades')
   })
 
-  it('elige las columnas y la medida del gráfico (con ambas, el gráfico va en kg)', () => {
+  it('elige las columnas y la medida del gráfico (con ambas, unidades primero y en el gráfico)', () => {
     expect(unitsOf('kg')).toEqual(['kg'])
     expect(unitsOf('unidades')).toEqual(['units'])
-    expect(unitsOf('ambos')).toEqual(['kg', 'units'])
-    expect(chartUnit('ambos')).toBe('kg')
+    expect(unitsOf('ambos')).toEqual(['units', 'kg'])
+    expect(chartUnit('ambos')).toBe('units')
+    expect(chartUnit('kg')).toBe('kg')
     expect(chartUnit('unidades')).toBe('units')
   })
 
   it('el título y los rótulos siguen a la medida', () => {
     expect(chartTitle('kg')).toBe('Evolución semanal (kg)')
     expect(chartTitle('unidades')).toBe('Evolución semanal (unid.)')
-    expect(measureSuffix(unitsOf('ambos'))).toBe('(kg / unid.)')
+    expect(measureSuffix(unitsOf('ambos'))).toBe('(unid. / kg)')
     expect(amountsText({ kg: 12.5, units: 10 }, ['kg', 'units'])).toBe('12.5 kg · 10 unid.')
   })
 })
@@ -76,6 +77,12 @@ describe('totales en kg y unidades', () => {
     expect(vs.deviationPct.kg).toBe(0)
     expect(vs.deviationPct.units).toBeCloseTo((-1 / 15) * 100)
     expect(vs.accuracyPct.units).toBeCloseTo(100 - (1 / 15) * 100)
+  })
+
+  it('un pedido vacío del ERP (sin productos) es «sin dato», no «pidió 0» (no da −100 %)', () => {
+    const [day] = periodAgg([D1], [], projections, [{ seller: 'ana', date: D1, units: {} }], catalog)
+    expect(day.real).toBeNull()
+    expect(versusTotals([day], catalog).daysWithReal).toBe(0)
   })
 
   it('sin pedidos, todo en cero', () => {

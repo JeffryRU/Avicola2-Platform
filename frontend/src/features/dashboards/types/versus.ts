@@ -9,9 +9,9 @@ export const VERSUS_SUBTITLE = 'Comparativo de proyección y pedido real por pro
 /** Filtro de medida. */
 export const MEASURE_FILTER_LABEL = 'Medida'
 export const MEASURE_LABEL: Record<Measure, string> = {
-  kg: 'Kg',
   unidades: 'Unidades',
-  ambos: 'Kg y unidades',
+  kg: 'Kg',
+  ambos: 'Unidades y kg',
 }
 
 /** Abreviatura de cada medida («kg», «unid.»). */
@@ -51,20 +51,20 @@ export const ACCURACY_KPI = 'Exactitud'
 export const daysWithRealFoot = (n: number) => `${String(n)} días con pedido registrado`
 export const NO_REAL_FOOT = 'sin pedidos del ERP'
 export const ACCURACY_FOOT = 'según días con pedido'
-/** Pie de un KPI con «Kg y unidades»: la cifra en unidades. */
-export const inUnitsFoot = (text: string) => `${text} en unidades`
+/** Pie de un KPI con «Unidades y kg»: la cifra en la otra medida. */
+export const inUnitFoot = (text: string, unit: Unit) => `${text} en ${unit === 'kg' ? 'kg' : 'unidades'}`
 
 /** Gráfico. */
 export const chartTitle = (m: Measure) =>
   m === 'unidades'
     ? 'Evolución semanal (unid.)'
     : m === 'ambos'
-      ? 'Evolución semanal (kg y unid.)'
+      ? 'Evolución semanal (unid. y kg)'
       : 'Evolución semanal (kg)'
 export const chartAria = (unit: Unit) =>
   unit === 'kg' ? 'Kilogramos proyectados y pedidos por día' : 'Unidades proyectadas y pedidas por día'
 /** Con «Kg y unidades» el gráfico va en kg: se avisa dónde están las unidades. */
-export const BOTH_CHART_NOTE = 'El gráfico va en kg; las unidades, en el detalle de cada punto y en la tabla.'
+export const BOTH_CHART_NOTE = 'El gráfico va en unidades; los kg, en el detalle de cada punto y en la tabla.'
 export const CHART_EMPTY_TITLE = 'Sin proyecciones en este período'
 export const CHART_EMPTY_BODY = 'Cuando se registren, verás aquí la proyección y el pedido real de cada día.'
 export const NO_PROJECTION_TIP = 'Sin proyección'
@@ -85,3 +85,15 @@ export const DIFF_LABEL = 'Dif.'
 export const TOTAL_LABEL = 'Total'
 export const NO_REAL_TITLE = 'Sin pedidos registrados'
 export const NO_REAL_BODY = 'Esta semana aún no tiene pedidos del ERP.'
+
+/** Botones del gráfico: ampliar y ancho completo. */
+export const EXPAND_LABEL = 'Ampliar'
+export const EXPAND_TITLE = 'Ver el gráfico en grande'
+export const WIDE_ON_LABEL = 'Ancho completo'
+export const WIDE_OFF_LABEL = 'Junto a la tabla'
+
+/** Filtro «Líneas» del gráfico: qué series se ven. */
+export const LINES_FILTER_LABEL = 'Líneas del gráfico'
+export const ALL_LINES_LABEL = 'Todas las líneas'
+export const PARTS_LINE_LABEL = 'Franjas por tamaño'
+export const linesCount = (n: number) => (n === 1 ? '1 línea' : `${String(n)} líneas`)

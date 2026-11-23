@@ -4,17 +4,24 @@ import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
 import { queryKeys } from '@/shared/application/query-keys'
 import { useSession } from '@/features/auth'
-import type { NotificationPage } from '@/features/notifications/domain/notifications'
+import { inRange, type NotificationPage, type NotificationRange } from '@/features/notifications/domain/notifications'
 
 const EMPTY: NotificationPage = { items: [], unread: 0 }
 
-/** Notificaciones del usuario. Se actualizan solas con el canal en tiempo real. */
-export function useNotifications() {
+/**
+ * Notificaciones del usuario (con `range`, solo las de esos días). Se actualizan solas con el
+ * canal en tiempo real. Lo que llega se filtra también aquí: así el rango se respeta aunque el
+ * servidor aún no sepa filtrar.
+ */
+export function useNotifications(range: NotificationRange | null = null) {
   const { notifications } = useContainer()
   const session = useSession()
   const query = useQuery({
-    queryKey: queryKeys.notifications.all,
-    queryFn: () => notifications.list(),
+    queryKey: range ? [...queryKeys.notifications.all, range.from, range.to] : queryKeys.notifications.all,
+    queryFn: () => notifications.list(range),
+    // Al cambiar de días se ve lo anterior (ya filtrado) mientras llega lo nuevo: sin parpadeo.
+    placeholderData: (previous) => previous,
+    select: (page) => (range ? { ...page, items: page.items.filter((n) => inRange(n, range)) } : page),
     enabled: !!session && !session.must_change_password,
     staleTime: 60_000,
   })

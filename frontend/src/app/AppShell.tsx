@@ -15,8 +15,6 @@ import {
   Inbox,
   ListChecks,
   LockOpen,
-  LogOut,
-  Settings,
   TrendingUp,
   Users,
   Warehouse,
@@ -26,16 +24,15 @@ import {
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { InstallBanner } from '@/app/install'
 import { TopControls } from '@/app/top-controls'
-import { AssistantButton } from '@/features/assistant'
+import { FloatingActions } from '@/app/floating-actions'
+import { UserBar } from '@/app/user-bar'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
-import { can, hasTeamView, roleLabel, type Session } from '@/shared/domain/session'
-import { initials } from '@/shared/domain/format'
-import { useLogout, useRequiredSession } from '@/features/auth'
+import { can, hasTeamView, type Session } from '@/shared/domain/session'
+import { useRequiredSession } from '@/features/auth'
 import { useUnreadCount } from '@/features/notifications'
 import { useUnlocks, MY_REQUESTS_TITLE, UNLOCKS_TITLE } from '@/features/editing'
 import { Logo } from '@/shared/ui/components/brand'
 import { cn } from '@/shared/ui/lib/utils'
-import { LOGOUT_LABEL, PROFILE_LABEL } from '@/shared/types/labels'
 import { STOCK_TITLE } from '@/features/stock'
 import { FORECAST_NAV_LABEL, PRODUCTION_TITLE } from '@/features/production'
 import { SACA_TITLE } from '@/features/saca'
@@ -157,10 +154,10 @@ function navGroups(session: Session, counts: { unread: number; unlocks: number }
 
 const sideItemCls = (active: boolean) =>
   cn(
-    'flex min-h-8 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-base text-ink-2 transition-colors hover:bg-muted hover:text-foreground',
+    'flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-1 text-left text-base font-medium text-chrome-muted transition-colors hover:bg-chrome-hover hover:text-chrome-foreground',
     'hc:min-h-9 hc:text-md hc:font-semibold hc:text-foreground',
     active &&
-      'bg-nav-active font-semibold text-nav-active-foreground hover:bg-nav-active hover:text-nav-active-foreground hc:font-extrabold',
+      'bg-chrome-active font-semibold text-chrome-active-foreground hover:bg-chrome-active hover:text-chrome-active-foreground hc:font-extrabold',
   )
 
 function SideItem({ to, label, end, count, icon }: NavItem) {
@@ -169,11 +166,16 @@ function SideItem({ to, label, end, count, icon }: NavItem) {
   // "Registrar" sigue activo en la pantalla de éxito y "Mis proyecciones" en el detalle.
   return (
     <NavLink to={to} end={end} className={({ isActive }) => sideItemCls(isActive || (!end && pathname.startsWith(to)))}>
-      {Icon && <Icon aria-hidden className="size-4 flex-none opacity-80" />}
+      {Icon && <Icon aria-hidden className="size-4 flex-none" />}
       <span className="min-w-0 flex-1">{label}</span>
       {!!count && (
         <span
-          className={cn('num text-sm font-medium hc:font-bold', to === paths.notifications ? 'text-bad' : 'text-warn')}
+          className={cn(
+            'num grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-semibold hc:font-bold',
+            to === paths.notifications
+              ? 'bg-bad-fill text-bad-fill-foreground'
+              : 'bg-warn-fill text-warn-fill-foreground',
+          )}
           aria-label={to === paths.notifications ? `${count} sin leer` : `${count} pendientes`}
         >
           {count}
@@ -184,9 +186,7 @@ function SideItem({ to, label, end, count, icon }: NavItem) {
 }
 
 function Sidebar() {
-  const logout = useLogout()
   const session = useRequiredSession()
-  const { seller } = session
   const unread = useUnreadCount()
   const editing = can(session, 'manage_editing')
   const unlocks = (useUnlocks(editing).data ?? []).filter((u) => u.status === 'requested').length
@@ -194,61 +194,25 @@ function Sidebar() {
   return (
     // El fondo y el borde van en el contenedor que se estira a todo el alto de la página;
     // lo de adentro se queda fijo al hacer scroll (antes el fondo se cortaba).
-    <aside className="hidden w-60 flex-none border-r border-border bg-side dsk:block hc:border-r-2 hc:border-foreground">
+    <aside className="bg-chrome-pattern hidden w-60 flex-none border-r border-chrome-edge bg-chrome text-chrome-foreground dsk:block hc:border-r-2 hc:border-foreground">
       <div className="sticky top-0 flex max-h-dvh min-h-dvh flex-col overflow-y-auto px-3 pt-5 pb-4 hc:top-14 hc:max-h-[calc(100dvh-3.5rem)] hc:min-h-[calc(100dvh-3.5rem)]">
-        <div className="px-2.5 pb-4 hc:hidden">
-          <Logo />
+        <div className="px-2.5 pb-5 hc:hidden">
+          <Logo onDark="chrome" />
         </div>
         <nav aria-label="Principal" className="grid gap-0.5">
           {groups.map((g, i) => (
             <div key={g.title ?? i} className={cn('grid gap-px', i > 0 && 'mt-3.5')}>
-              {g.title && <div className="eyebrow mb-1 px-2.5 hc:text-xs hc:text-foreground">{g.title}</div>}
+              {g.title && (
+                <div className="mb-1 px-2.5 text-xs font-semibold text-chrome-muted/75 hc:text-xs hc:text-foreground">
+                  {g.title}
+                </div>
+              )}
               {g.items.map((item) => (
                 <SideItem key={item.to} {...item} />
               ))}
             </div>
           ))}
         </nav>
-        {/* Pie: herramientas (versiones, color, accesibilidad, tema) y la cuenta con Perfil y salir. */}
-        <div className="mt-auto grid grid-cols-[minmax(0,1fr)] gap-px pt-5">
-          <TopControls side="top" className="mb-1 grid grid-cols-4 gap-0 [&>*]:w-full" />
-          <div className="flex items-center gap-1 border-t border-border pt-2.5 pb-1 pl-1 hc:border-t-heavy hc:border-foreground">
-            <span
-              aria-hidden
-              className="mr-0.5 grid size-7 flex-none place-items-center rounded-full bg-selected text-xs font-semibold text-selected-foreground hc:bg-brand-accent hc:text-foreground"
-            >
-              {initials(seller.name)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <b className="block truncate text-sm font-medium" title={seller.name}>
-                {seller.name}
-              </b>
-              <small className="block truncate text-xs text-muted-foreground">{roleLabel(seller)}</small>
-            </div>
-            <NavLink
-              to={paths.profile}
-              aria-label={PROFILE_LABEL}
-              title={PROFILE_LABEL}
-              className={({ isActive }) =>
-                cn(
-                  'grid size-8 flex-none place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground',
-                  isActive && 'bg-nav-active text-nav-active-foreground hover:bg-nav-active',
-                )
-              }
-            >
-              <Settings className="size-4" />
-            </NavLink>
-            <button
-              type="button"
-              aria-label={LOGOUT_LABEL}
-              title={LOGOUT_LABEL}
-              onClick={() => logout.mutate()}
-              className="grid size-8 flex-none place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <LogOut className="size-4" />
-            </button>
-          </div>
-        </div>
       </div>
     </aside>
   )
@@ -262,25 +226,24 @@ function TopBar() {
   const { seller } = useRequiredSession()
   const unread = useUnreadCount()
   return (
-    <header className="flex h-14 items-center gap-3 border-b border-border bg-side pr-1 pl-4 dsk:hidden hc:border-0 hc:bg-head hc:dsk:sticky hc:dsk:top-0 hc:dsk:z-30 hc:dsk:flex hc:dsk:px-7">
+    <header className="bg-chrome-pattern flex h-14 items-center gap-3 bg-chrome pr-1 pl-4 text-chrome-foreground dsk:hidden hc:border-0 hc:bg-head hc:dsk:sticky hc:dsk:top-0 hc:dsk:z-30 hc:dsk:flex hc:dsk:px-7">
       <Link to={paths.home} aria-label="Inicio" className="flex min-w-0 flex-1 items-center">
-        <span className="hc:hidden">
-          <Logo compact />
-        </span>
-        <span className="hidden hc:block">
-          <Logo onDark compact />
-        </span>
+        <Logo onDark="chrome" compact />
       </Link>
       <span className="hidden text-sm text-head-muted hc:dsk:inline">{seller.name}</span>
-      <TopControls className="dsk:hidden hc:text-head-foreground [&_button]:hc:text-head-foreground [&_button]:hc:hover:bg-transparent" />
+      <TopControls
+        versions={false}
+        a11y={false}
+        className="dsk:hidden hc:text-head-foreground [&_button]:text-chrome-foreground [&_button]:hover:bg-chrome-hover [&_button]:hc:text-head-foreground [&_button]:hc:hover:bg-transparent"
+      />
       <Link
         to={paths.notifications}
         aria-label={unread > 0 ? `Notificaciones: ${unread} sin leer` : 'Notificaciones'}
-        className="relative grid size-touch place-items-center rounded-md text-foreground hover:bg-muted dsk:hidden hc:text-head-foreground hc:hover:bg-transparent"
+        className="relative grid size-touch place-items-center rounded-md text-chrome-foreground hover:bg-chrome-hover dsk:hidden hc:text-head-foreground hc:hover:bg-transparent"
       >
         <Bell className="size-5" aria-hidden />
         {unread > 0 && (
-          <i className="absolute top-2.5 right-2.5 size-2 rounded-full bg-bad ring-2 ring-side hc:ring-head" />
+          <i className="absolute top-2.5 right-2.5 size-2.5 rounded-full bg-brand-accent ring-2 ring-chrome hc:bg-bad hc:ring-head" />
         )}
       </Link>
     </header>
@@ -326,7 +289,7 @@ function BottomNav() {
     <nav
       aria-label="Navegación"
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
-      className="fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-side pb-[env(safe-area-inset-bottom)] dsk:hidden hc:border-t-heavy hc:border-foreground hc:bg-surface"
+      className="bg-chrome-pattern fixed inset-x-0 bottom-0 z-30 grid bg-chrome pb-[env(safe-area-inset-bottom)] dsk:hidden hc:border-t-heavy hc:border-foreground hc:bg-surface"
     >
       {items.map(({ to, label, end }) => (
         <NavLink
@@ -337,16 +300,16 @@ function BottomNav() {
             // «Dashboards» sigue activo en Vs. venta, Estado y el detalle del día.
             const isActive = exact || (to === paths.dashSummary && pathname.startsWith(paths.dashboards))
             return cn(
-              'relative flex h-14 items-center justify-center gap-1 px-0.5 text-center text-xs leading-tight text-ink-2 transition-colors',
+              'relative flex h-14 items-center justify-center gap-1 px-0.5 text-center text-xs leading-tight text-chrome-muted transition-colors',
               'hc:h-15 hc:text-xs hc:font-semibold hc:text-foreground',
               isActive &&
-                'font-semibold text-selected-foreground before:absolute before:inset-x-2 before:top-0 before:h-0.5 before:bg-primary hc:bg-nav-active hc:font-extrabold hc:text-nav-active-foreground hc:before:hidden',
+                'font-semibold text-chrome-foreground before:absolute before:inset-x-3 before:top-0 before:h-1 before:rounded-b-sm before:bg-chrome-active hc:bg-nav-active hc:font-extrabold hc:text-nav-active-foreground hc:before:hidden',
             )
           }}
         >
           {label}
           {to === paths.notifications && unread > 0 && (
-            <i aria-label={`${unread} sin leer`} className="size-1.5 flex-none rounded-full bg-bad" />
+            <i aria-label={`${unread} sin leer`} className="size-2 flex-none rounded-full bg-brand-accent hc:bg-bad" />
           )}
         </NavLink>
       ))}
@@ -368,9 +331,11 @@ export function AppShell() {
       <div className="flex min-h-dvh">
         <Sidebar />
         <main className="@container/main min-w-0 flex-1">
+          {/* Escritorio: arriba a la derecha, apariencia, modo oscuro y la cuenta. */}
+          {!flow && <UserBar />}
           <div
             key={pathname}
-            className={cn('mx-auto max-w-7xl animate-enter dsk:px-9 dsk:pt-7 dsk:pb-12', flow ? 'pb-6' : 'pb-24')}
+            className={cn('mx-auto max-w-7xl animate-enter dsk:px-9 dsk:pt-7 dsk:pb-24', flow ? 'pb-6' : 'pb-24')}
           >
             {/* Aviso de datos de ARIS: solo a quien los sube y solo si faltan días. */}
             {!flow && <ArisNotice />}
@@ -379,7 +344,7 @@ export function AppShell() {
         </main>
       </div>
       {!flow && <BottomNav />}
-      {!flow && <AssistantButton />}
+      {!flow && <FloatingActions />}
       {/* Aviso de instalación solo en la pantalla de entrada de cada rol. */}
       {(pathname === paths.home || pathname === paths.dashSummary) && <InstallBanner />}
     </div>

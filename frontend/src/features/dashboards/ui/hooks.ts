@@ -1,3 +1,6 @@
+import { useCallback, useState } from 'react'
+import { z } from 'zod'
+import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { addDays, dShort, type IsoDate } from '@/shared/domain/dates'
 import { useSearchParams } from 'react-router'
@@ -151,4 +154,24 @@ export function usePeriodData(period: Period) {
   const from = old || prevFrom < w.from ? prevFrom : w.from
   const to = old ? period.to : period.to > w.to ? period.to : w.to
   return useRangeData(from, to)
+}
+
+const wideSchema = z.boolean()
+
+/**
+ * Gráfico a todo el ancho (la tabla de al lado pasa abajo): se recuerda en este equipo, por
+ * pantalla (`screen`).
+ */
+export function useWideChart(screen = 'versus'): [boolean, (wide: boolean) => void] {
+  const { preferences } = useContainer()
+  const key = `nv_${screen}_wide_chart`
+  const [wide, setWide] = useState(() => preferences.get(key, wideSchema) ?? false)
+  const set = useCallback(
+    (w: boolean) => {
+      setWide(w)
+      preferences.set(key, w)
+    },
+    [preferences, key],
+  )
+  return [wide, set]
 }

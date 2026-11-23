@@ -1,3 +1,4 @@
+import { useRequiredSession } from '@/features/auth'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
 import { queryKeys, REFERENCE_DATA_STALE_MS } from '@/shared/application/query-keys'
@@ -16,7 +17,21 @@ export function useAssistantInfo(username: string) {
 export function useAskAssistant() {
   const { assistant } = useContainer()
   return useMutation({
-    mutationFn: ({ message, conversation }: { message: string; conversation: string }) =>
-      assistant.ask(message, conversation),
+    // La respuesta llega en partes: `onDelta` va mostrando el texto mientras se escribe.
+    mutationFn: ({
+      message,
+      conversation,
+      onDelta,
+    }: {
+      message: string
+      conversation: string
+      onDelta: (text: string) => void
+    }) => assistant.askStream(message, conversation, onDelta),
   })
+}
+
+/** Si el backend tiene asistente (si no, no se ofrece el botón). */
+export function useAssistantEnabled() {
+  const { seller } = useRequiredSession()
+  return useAssistantInfo(seller.username).data?.enabled === true
 }

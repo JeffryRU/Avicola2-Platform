@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Calendar, CalendarRange, ChevronDown, SlidersHorizontal, Users } from 'lucide-react'
+import { Calendar, CalendarRange, SlidersHorizontal, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
 import { rangeLabel, weekLabel } from '@/shared/domain/dates'
@@ -24,17 +24,14 @@ import {
   type FilterChip,
 } from '@/features/dashboards/types/product-detail'
 import {
-  DropdownMenu,
   DropdownMenuCheckboxItem,
-  DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from '@/shared/ui/components/shadcn/dropdown-menu'
 import { cn } from '@/shared/ui/lib/utils'
+import { FilterMenu } from '@/shared/ui/components/filter-menu'
 import { toggleIn } from '@/shared/domain/format'
 
 /**
@@ -176,40 +173,5 @@ function ExportPeriod() {
   return <ExportMenu onExport={run} disabled={!catalog || !data || !team.length} className="flex-none" />
 }
 
-/** Un filtro de la barra: botón con el valor actual que abre su menú. `active` = distinto del valor por defecto. */
-export function FilterMenu({
-  icon,
-  label,
-  title,
-  active = false,
-  children,
-}: {
-  icon?: ReactNode
-  label: string
-  title: string
-  active?: boolean
-  children: ReactNode
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={`${title}: ${label}`}
-        className={cn(
-          'flex h-touch flex-none items-center gap-1.5 rounded-md border-control border-border-strong bg-surface px-3 text-sm whitespace-nowrap text-foreground transition-colors hover:bg-muted dsk:h-control [&_svg]:size-4',
-          active &&
-            'border-primary bg-selected font-medium text-selected-foreground hover:bg-selected hc:border-foreground',
-        )}
-      >
-        {icon && (
-          <span className={cn('grid', active ? 'text-selected-foreground' : 'text-muted-foreground')}>{icon}</span>
-        )}
-        {label}
-        <ChevronDown className="text-muted-foreground" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-[min(70dvh,26rem)] min-w-56 overflow-y-auto">
-        <DropdownMenuLabel>{title}</DropdownMenuLabel>
-        {children}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
+// Vive en shared (también lo usan otras pantallas, p. ej. Productos).
+export { FilterMenu }

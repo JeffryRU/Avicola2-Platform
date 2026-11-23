@@ -142,6 +142,8 @@ export const endpoints = {
     info: '/assistant',
     /** POST {message, conversation} → {reply, suggestions}: la respuesta y cómo seguir. */
     messages: '/assistant/messages',
+    /** POST {message, conversation} → NDJSON: `delta` (texto que llega), y `done` o `error`. */
+    stream: '/assistant/messages/stream',
   },
 
   status: {

@@ -39,7 +39,9 @@ export function PageHeader({
         </Link>
       )}
       <div className="min-w-0 flex-1 dsk:flex-[1_1_auto]">
-        <h1 className="text-xl font-semibold dsk:text-2xl hc:font-extrabold">{title}</h1>
+        <h1 className="title-display text-xl text-head dsk:text-3xl dark:text-foreground hc:font-extrabold hc:text-foreground">
+          {title}
+        </h1>
         {subtitle && <p className="text-sm text-muted-foreground dsk:mt-1 dsk:text-base">{subtitle}</p>}
       </div>
       {mobileActions && <div className="flex-none dsk:hidden">{mobileActions}</div>}
@@ -72,7 +74,10 @@ export function Section({
     <section className={cn('panel min-w-0', className)}>
       {title && (
         <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 border-b border-rule px-4 py-2.5 dsk:px-5">
-          <h2 className="min-w-0 flex-1 text-md font-semibold hc:text-lg hc:font-extrabold">{title}</h2>
+          {/* Con poco ancho, lo de la derecha (filtros, botones) baja a otra línea: el título no se aprieta. */}
+          <h2 className="min-w-48 flex-1 text-md font-bold text-head dark:text-foreground hc:text-lg hc:font-extrabold hc:text-foreground">
+            {title}
+          </h2>
           {aside && <div className="text-sm text-muted-foreground">{aside}</div>}
         </div>
       )}
@@ -87,7 +92,7 @@ export function KpiStrip({ children, className }: { children: ReactNode; classNa
     <section
       aria-label="Resumen"
       className={cn(
-        'grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-rule dsk:grid-cols-4 hc:rounded-none hc:border-x-0 hc:border-t-heavy hc:border-b-heavy hc:bg-foreground',
+        'kpi-strip grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-rule dsk:grid-cols-4 hc:rounded-none hc:border-x-0 hc:border-t-heavy hc:border-b-heavy hc:bg-foreground',
         className,
       )}
     >
@@ -96,25 +101,44 @@ export function KpiStrip({ children, className }: { children: ReactNode; classNa
   )
 }
 
+/** Qué mide la cifra: pinta la regla de arriba y el valor (sin iconos ni fondos de colores). */
+export type KpiTone = 'primary' | 'ok' | 'warn' | 'bad' | 'kg' | 'neutral'
+
+const KPI_TONE: Record<KpiTone, string> = {
+  primary: 'before:bg-primary [&_b]:text-primary',
+  ok: 'before:bg-ok-fill [&_b]:text-ok',
+  warn: 'before:bg-warn-fill [&_b]:text-warn',
+  bad: 'before:bg-bad-fill [&_b]:text-bad',
+  kg: 'before:bg-chart-2 [&_b]:text-chart-2',
+  neutral: 'before:bg-head dark:before:bg-border-strong',
+}
+
 /** Una cifra de la franja: etiqueta, valor y una nota opcional. `extra` va a la derecha (p. ej. un anillo). */
 export function Kpi({
   label,
   value,
   foot,
   extra,
+  tone = 'neutral',
 }: {
   label: string
   value: ReactNode
   foot?: ReactNode
   extra?: ReactNode
+  tone?: KpiTone
 }) {
   return (
-    <div className="flex min-w-0 items-start gap-3 bg-surface px-4 py-3.5 dsk:px-5 dsk:py-4">
+    <div
+      className={cn(
+        'relative flex min-w-0 items-start gap-3 bg-surface px-4 pt-4 pb-3.5 before:absolute before:inset-x-0 before:top-0 before:h-1 dsk:px-5 dsk:pt-5 dsk:pb-4 hc:before:hidden hc:[&_b]:text-foreground',
+        KPI_TONE[tone],
+      )}
+    >
       <div className="min-w-0 flex-1">
-        <span className="block text-xs text-muted-foreground hc:text-sm hc:font-semibold hc:text-foreground">
+        <span className="block text-sm font-medium text-ink-2 hc:text-sm hc:font-semibold hc:text-foreground">
           {label}
         </span>
-        <b className="num mt-1 block text-xl leading-tight font-medium whitespace-nowrap dsk:text-2xl hc:font-extrabold">
+        <b className="num title-display mt-1 block text-2xl leading-tight whitespace-nowrap dsk:text-3xl hc:font-extrabold">
           {value}
         </b>
         {foot && (

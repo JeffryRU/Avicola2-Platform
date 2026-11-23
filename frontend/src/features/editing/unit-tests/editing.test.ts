@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   activeUnlocks,
+  countByStatus,
+  filterUnlocks,
+  groupByDay,
+  NO_UNLOCK_FILTER,
   closedDays,
   cutoffFormSchema,
   defaultGrantDays,
@@ -94,5 +98,42 @@ describe('habilitar edición desde Usuarios', () => {
   it('marca los días que ya cerraron o, si ninguno, el primero', () => {
     expect(defaultGrantDays(WINDOW, new Date('2026-11-05T08:00:00-05:00'))).toEqual(['2026-11-04', '2026-11-05'])
     expect(defaultGrantDays(WINDOW, new Date('2026-11-03T08:00:00-05:00'))).toEqual(['2026-11-04'])
+  })
+})
+
+describe('filtro de solicitudes (Habilitaciones)', () => {
+  const u = (id: number, seller: string, date: string, status: Unlock['status'], reason = 'motivo'): Unlock => ({
+    id,
+    seller,
+    date,
+    reason,
+    status,
+    requested_at: '2026-11-12T11:14:00-05:00',
+    decided_by: null,
+    decided_at: null,
+  })
+  const list = [
+    u(1, 'hdias', '2026-11-13', 'closed'),
+    u(2, 'hdias', '2026-11-14', 'requested', 'El cliente aumentó'),
+    u(3, 'rnavarro', '2026-11-13', 'approved'),
+  ]
+  const name = (s: string) => ({ hdias: 'Hebert Días', rnavarro: 'Roberto Navarro' })[s] ?? s
+
+  it('filtra por estado, vendedor, días y texto (sin tildes ni mayúsculas)', () => {
+    expect(filterUnlocks(list, { ...NO_UNLOCK_FILTER, status: 'requested' }, name).map((x) => x.id)).toEqual([2])
+    expect(filterUnlocks(list, { ...NO_UNLOCK_FILTER, seller: 'hdias' }, name).map((x) => x.id)).toEqual([1, 2])
+    expect(
+      filterUnlocks(list, { ...NO_UNLOCK_FILTER, from: '2026-11-14', to: '2026-11-14' }, name).map((x) => x.id),
+    ).toEqual([2])
+    expect(filterUnlocks(list, { ...NO_UNLOCK_FILTER, text: 'hebert dias' }, name)).toHaveLength(2)
+    expect(filterUnlocks(list, { ...NO_UNLOCK_FILTER, text: 'AUMENTO' }, name).map((x) => x.id)).toEqual([2])
+  })
+
+  it('cuenta por estado y agrupa por día (el más reciente primero)', () => {
+    expect(countByStatus(list)).toEqual({ requested: 1, approved: 1, rejected: 0, closed: 1 })
+    expect(groupByDay(list).map((g) => [g.date, g.items.map((x) => x.id)])).toEqual([
+      ['2026-11-14', [2]],
+      ['2026-11-13', [3, 1]],
+    ])
   })
 })

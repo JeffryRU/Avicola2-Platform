@@ -21,7 +21,7 @@ import { useCatalog } from '@/features/catalog'
 import { useMyDays } from '@/features/projections'
 import { useUnreadCount } from '@/features/notifications'
 import { CountUp } from '@/shared/ui/components/charts'
-import { Note, StatusDot } from '@/shared/ui/components/feedback'
+import { Note } from '@/shared/ui/components/feedback'
 import { Section } from '@/shared/ui/components/layout'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
@@ -67,13 +67,14 @@ export function HomePage() {
 
   return (
     <div className="px-4 pt-5 dsk:p-0">
-      <header className="mb-4 dsk:mb-6">
-        <p className="text-sm text-muted-foreground">
-          {seller.name} · {roleLabel(seller)}
-        </p>
-        <h1 className="text-2xl font-semibold hc:text-3xl hc:font-extrabold">
-          {dDowLong(now)} {dFull(now)}
+      {/* En celular el saludo sigue el azul de la barra superior; en escritorio va sobre el fondo. */}
+      <header className="bg-chrome-pattern -mx-4 -mt-5 mb-4 bg-chrome px-4 pt-4 pb-6 text-chrome-foreground dsk:mx-0 dsk:mt-0 dsk:mb-6 dsk:bg-transparent dsk:bg-none dsk:p-0 dsk:text-foreground hc:bg-transparent hc:text-foreground">
+        <h1 className="title-display text-3xl dsk:text-4xl dsk:text-head dark:dsk:text-foreground hc:font-extrabold hc:text-foreground">
+          Hola, {seller.name.split(' ')[0]}
         </h1>
+        <p className="mt-1 text-md text-chrome-muted dsk:text-muted-foreground hc:text-muted-foreground">
+          {dDowLong(now)} {dFull(now)} · {roleLabel(seller)}
+        </p>
       </header>
 
       <SyncStatus queries={[editingWindow]} />
@@ -87,13 +88,13 @@ export function HomePage() {
             {next && !days.has(next.date) && (
               <section
                 aria-label="Pendiente"
-                className="grid gap-3 rounded-md border border-warn-border bg-warn-soft p-4 hc:p-5"
+                className="grid gap-3 rounded-md bg-warn-fill p-4 text-warn-fill-foreground hc:border hc:border-warn-border hc:bg-warn-soft hc:p-5"
               >
                 <div>
-                  <b className="block font-semibold hc:text-lg hc:font-extrabold">
+                  <b className="block text-lg font-bold hc:text-lg hc:font-extrabold">
                     Falta tu proyección {dayPhrase(next.date, now)}
                   </b>
-                  <span className="text-sm text-warn-foreground hc:text-md">
+                  <span className="text-sm hc:text-md hc:text-warn-foreground">
                     {closesLabel(next.closes_at, true, now)}. Confírmala para que entre a la planificación.
                   </span>
                 </div>
@@ -127,7 +128,7 @@ export function HomePage() {
                 </span>
               }
             >
-              <ol className="grid grid-cols-7 px-1 py-2 text-center">
+              <ol className="grid grid-cols-7 gap-1 px-2 py-3 text-center">
                 {week.map((d) => {
                   const ok = days.has(d)
                   const due = !ok && d === next?.date
@@ -139,22 +140,17 @@ export function HomePage() {
                         aria-label={`${dShort(d)}: ${state}`}
                         className={cn(
                           // Esquinas redondeadas y un borde tenue para el día de hoy.
-                          'flex min-h-touch flex-col items-center gap-1 rounded-xl py-2 text-sm transition-colors hover:bg-muted',
-                          due && 'font-semibold text-warn hc:bg-warn-soft hc:text-foreground',
-                          d === now && 'ring-1 ring-border ring-inset hc:ring-border-strong',
+                          'flex min-h-touch flex-col items-center gap-0.5 rounded-md bg-muted py-2 text-sm transition-colors hover:bg-rule hc:bg-transparent',
+                          ok && 'bg-ok-fill text-ok-fill-foreground hover:bg-ok-fill hc:text-foreground',
+                          due && 'bg-warn-fill font-semibold text-warn-fill-foreground hover:bg-warn-fill hc:bg-warn-soft hc:text-foreground',
+                          d === now && 'ring-2 ring-primary ring-offset-1 ring-offset-surface hc:ring-1 hc:ring-border-strong',
                         )}
                       >
-                        <span className={cn('text-xs', !due && 'text-muted-foreground')}>{dDow(d)}</span>
-                        <span className="num">{dDM(d).slice(0, 2)}</span>
+                        <span className={cn('text-xs', !due && !ok && 'text-muted-foreground')}>{dDow(d)}</span>
+                        <span className="num text-md font-bold">{dDM(d).slice(0, 2)}</span>
                         {/* Punto en A; en alto contraste, texto (el estado no depende del color). */}
-                        <span className="hc:hidden">
-                          {ok ? (
-                            <StatusDot tone="ok" />
-                          ) : due ? (
-                            <StatusDot tone="warn" />
-                          ) : (
-                            <span aria-hidden className="block size-2 rounded-full bg-control-line" />
-                          )}
+                        <span aria-hidden className="text-xs font-semibold hc:hidden">
+                          {ok ? '✓' : due ? 'falta' : ' '}
                         </span>
                         <span aria-hidden className="hidden text-xs font-bold hc:block">
                           {ok ? '✓' : due ? 'falta' : '—'}
@@ -177,14 +173,14 @@ export function HomePage() {
               <dl className="grid">
                 <div className="flex items-baseline justify-between gap-3 border-b border-rule px-4 py-3 dsk:px-5">
                   <dt className="text-ink-2">Proyectado</dt>
-                  <dd className="num font-medium hc:text-lg hc:font-extrabold">
-                    <CountUp value={weekUnits} /> {UNITS_SHORT}
+                  <dd className="num title-display text-xl text-primary hc:text-lg hc:font-extrabold hc:text-foreground">
+                    <CountUp value={weekUnits} /> <span className="text-md font-normal">{UNITS_SHORT}</span>
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3 px-4 py-3 dsk:px-5">
                   <dt className="text-ink-2">Kilos aprox.</dt>
-                  <dd className="num font-medium hc:text-lg hc:font-extrabold">
-                    <CountUp value={weekKg} decimals={1} /> kg
+                  <dd className="num title-display text-xl text-chart-2 hc:text-lg hc:font-extrabold hc:text-foreground">
+                    <CountUp value={weekKg} decimals={1} /> <span className="text-md font-normal">kg</span>
                   </dd>
                 </div>
               </dl>

@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { cutoffFormSchema, type Cutoff } from '@/features/editing/domain/editing'
 import {
+  CANCEL_LABEL,
   CUTOFF_TIME_LABEL,
   DAYS_BEFORE_LABEL,
   LOCK_LABEL,
@@ -20,7 +21,21 @@ import { Switch } from '@/shared/ui/components/shadcn/switch'
 import { cn } from '@/shared/ui/lib/utils'
 
 /** Supervisor: bloqueo por horario (encendido o apagado), hora de corte y con cuánta anticipación. */
-export function CutoffForm({ policy, idPrefix = 'cutoff' }: { policy: Cutoff; idPrefix?: string }) {
+export function CutoffForm({
+  policy,
+  idPrefix = 'cutoff',
+  onSaved,
+  onCancel,
+  className,
+}: {
+  policy: Cutoff
+  idPrefix?: string
+  /** Tras guardar (p. ej., cerrar el modal). */
+  onSaved?: () => void
+  /** Con él aparece «Cancelar» junto a «Guardar». */
+  onCancel?: () => void
+  className?: string
+}) {
   const update = useUpdateCutoff()
   const [enabled, setEnabled] = useState(policy.enabled)
   const [time, setTime] = useState(policy.cutoff_time)
@@ -39,15 +54,17 @@ export function CutoffForm({ policy, idPrefix = 'cutoff' }: { policy: Cutoff; id
     update.mutate(
       { time: parsed.data.cutoff_time, daysBefore: parsed.data.days_before, enabled: parsed.data.enabled },
       {
-        onSuccess: () =>
-          toast.success(parsed.data.enabled ? 'Horario de corte guardado.' : 'Bloqueo por horario apagado.'),
+        onSuccess: () => {
+          toast.success(parsed.data.enabled ? 'Horario de corte guardado.' : 'Bloqueo por horario apagado.')
+          onSaved?.()
+        },
         onError: (err) => setError(err.message),
       },
     )
   }
 
   return (
-    <form onSubmit={submit} noValidate className="grid gap-4 px-4 pt-3 pb-4 dsk:px-5 dsk:pb-5">
+    <form onSubmit={submit} noValidate className={cn('grid gap-4 px-4 pt-3 pb-4 dsk:px-5 dsk:pb-5', className)}>
       <label
         htmlFor={`${idPrefix}-enabled`}
         className="flex min-h-touch cursor-pointer items-center gap-3 border-b border-rule pb-3"
@@ -93,7 +110,12 @@ export function CutoffForm({ policy, idPrefix = 'cutoff' }: { policy: Cutoff; id
           {error}
         </p>
       )}
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        {onCancel && (
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            {CANCEL_LABEL}
+          </Button>
+        )}
         <Button type="submit" disabled={!changed || update.isPending}>
           {update.isPending ? <Loader2 className="animate-spin" /> : <Save />} {SAVE_LABEL}
         </Button>

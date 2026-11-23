@@ -75,6 +75,7 @@ export function TeamDayView({
           <>
             <KpiStrip className="mb-4">
               <Kpi
+                tone={day.confirmed === day.rows.length && day.rows.length > 0 ? 'ok' : 'warn'}
                 label="Vendedores que confirmaron"
                 value={
                   <>
@@ -84,6 +85,7 @@ export function TeamDayView({
                 }
               />
               <Kpi
+                tone="primary"
                 label="Total proyectado"
                 value={
                   <>
@@ -93,6 +95,7 @@ export function TeamDayView({
                 }
               />
               <Kpi
+                tone="kg"
                 label="Total en kilos (aprox.)"
                 value={
                   <>

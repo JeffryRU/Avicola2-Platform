@@ -37,3 +37,11 @@ export function currentSuggestions(messages: ChatMessage[], starters: string[], 
   if (!last) return starters
   return last.from === 'assistant' ? latest : starters.slice(0, 3)
 }
+
+/** Una línea de la respuesta en partes (POST /assistant/messages/stream, NDJSON). */
+export const streamEventSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('delta'), text: z.string() }),
+  z.object({ type: z.literal('done'), reply: z.string(), suggestions: z.array(z.string()) }),
+  z.object({ type: z.literal('error'), message: z.string() }),
+])
+export type StreamEvent = z.infer<typeof streamEventSchema>
