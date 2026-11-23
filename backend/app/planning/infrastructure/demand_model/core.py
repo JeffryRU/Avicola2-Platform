@@ -1,4 +1,4 @@
-# ruff: noqa: N803, N806, PLR2004 — notación de matrices (Y, X, C) y umbrales del modelo
+# ruff: noqa: N803, N806 — notación de matrices (Y, X, C)
 """Modelos de demanda (numpy + scikit-learn): los mismos de notebooks/modelo_demanda.ipynb.
 
 Trabajan sobre un cubo (vendedor, producto, día) de unidades despachadas y predicen el día `d`
@@ -40,6 +40,16 @@ def sizes_of(groups: list[str]) -> tuple[range, ...]:
     return tuple(out)
 
 
+# Hiperparámetros de los modelos simples (también se muestran en «Modelo de demanda»).
+MEDIAN_WEEKS = 4  # mediana de los últimos 4 días iguales de la semana
+EWMA_WEEKS = 12  # suavizado: 12 semanas…
+EWMA_HALF_LIFE = 3  # …con vida media de 3 semanas
+CROSTON_WEEKS = 12
+CROSTON_ALPHA = 0.15  # suavizado del tamaño del pedido
+CROSTON_BETA = 0.15  # suavizado de la probabilidad de pedir (TSB)
+CUSTOMER_WEEKS = 4
+CUSTOMER_MIN_FREQ = 0.5  # el cliente cuenta si pidió al menos la mitad de esos días
+
 GBM = {
     "loss": "poisson", "learning_rate": 0.05, "max_leaf_nodes": 31, "min_samples_leaf": 80,
     "l2_regularization": 1.0, "max_iter": 150, "categorical_features": [0, 1], "random_state": 7,
@@ -53,11 +63,11 @@ def weekday_lags(Y: np.ndarray, day: int, k: int) -> np.ndarray:
 
 
 def median4(Y, day):
-    lags = weekday_lags(Y, day, 4)
+    lags = weekday_lags(Y, day, MEDIAN_WEEKS)
     return np.median(lags, axis=2) if lags.shape[2] else np.zeros(Y.shape[:2])
 
 
-def ewma(Y, day, hl=3, k=12):
+def ewma(Y, day, hl=EWMA_HALF_LIFE, k=EWMA_WEEKS):
     L = weekday_lags(Y, day, k)
     if not L.shape[2]:
         return np.zeros(Y.shape[:2])
@@ -65,9 +75,9 @@ def ewma(Y, day, hl=3, k=12):
     return (L * w).sum(axis=2) / w.sum()
 
 
-def croston(Y, day, kind: str, alpha=0.15, beta=0.15):
+def croston(Y, day, kind: str, alpha=CROSTON_ALPHA, beta=CROSTON_BETA):
     """SBA o TSB sobre los mismos días de la semana (12 semanas)."""
-    L = weekday_lags(Y, day, 12)[:, :, ::-1]
+    L = weekday_lags(Y, day, CROSTON_WEEKS)[:, :, ::-1]
     S, P = Y.shape[:2]
     out = np.zeros((S, P))
     for s in range(S):
@@ -94,7 +104,7 @@ def croston(Y, day, kind: str, alpha=0.15, beta=0.15):
     return out
 
 
-def by_customer(C: np.ndarray, owner: np.ndarray, n_sellers: int, weeks=4):
+def by_customer(C: np.ndarray, owner: np.ndarray, n_sellers: int, weeks=CUSTOMER_WEEKS):
     """Cada cliente que suele pedir ese día de la semana, con su cantidad típica; por vendedor."""
 
     def predict(_Y, day):
@@ -105,12 +115,23 @@ def by_customer(C: np.ndarray, owner: np.ndarray, n_sellers: int, weeks=4):
         ordered = lags.sum(axis=1) > 0
         freq = ordered.mean(axis=1)
         typical = np.zeros(lags.shape[:2])
-        for c in np.nonzero(freq >= 0.5)[0]:
+        for c in np.nonzero(freq >= CUSTOMER_MIN_FREQ)[0]:
             typical[c] = np.median(lags[c][:, ordered[c]], axis=1)
         np.add.at(out, owner, typical)
         return out
 
     return predict
+
+
+# Nombre de cada variable de `features` (en el mismo orden), para mostrarlas en la app.
+FEATURES = [
+    "vendedor", "producto",
+    *(f"mismo día hace {k} sem." for k in range(1, 7)),
+    "promedio 4 sem.", "mediana 4 sem.", "promedio 7 días", "promedio 28 días",
+    "total del vendedor (4 sem.)", "peso del producto en el vendedor", "total × peso",
+    "día de la semana", "día del mes", "mes",
+    "feriado", "víspera de feriado", "día después de feriado",
+]  # fmt: skip
 
 
 def features(Y: np.ndarray, days: list[date], day: int) -> np.ndarray:
@@ -161,4 +182,35 @@ def wape(P: np.ndarray, A: np.ndarray, sizes: tuple[range, ...]) -> dict[str, fl
         "equipo_dia": e(team_p, team_a),
         "equipo_semana": e(week(team_p), week(team_a)) if k else 0.0,
         "sesgo": float(100 * (P.sum() - A.sum()) / max(A.sum(), 1e-9)),
+    }
+
+
+def breakdown(
+    P: np.ndarray, A: np.ndarray, sizes: tuple[range, ...], weekdays: list[int]
+) -> dict[str, object]:
+    """Detalle del error de un modelo en los días evaluados (P y A: vendedor, producto, día).
+
+    - `mae` y `rmse`: unidades por vendedor y día (cuánto se equivoca en promedio con cada uno).
+    - `por_tamano`: WAPE de cada tamaño por día.
+    - `matriz`: WAPE de cada tamaño (filas) en cada día de la semana (columnas, lunes = 0).
+    Sin pedidos reales (o sin ese día de la semana) el error no existe: None, no un número enorme.
+    """
+    pv, av = P.sum(1), A.sum(1)  # vendedor × día
+    err = pv - av
+    by_size_p = np.stack([P.sum(0)[list(r)].sum(0) for r in sizes])  # tamaño × día
+    by_size_a = np.stack([A.sum(0)[list(r)].sum(0) for r in sizes])
+
+    def e(p: np.ndarray, a: np.ndarray) -> float | None:
+        return float(100 * np.abs(p - a).sum() / a.sum()) if a.sum() > 0 else None
+
+    wd = np.array(weekdays)
+    matrix = [
+        [e(by_size_p[s, wd == w], by_size_a[s, wd == w]) for w in range(7)]
+        for s in range(len(sizes))
+    ]
+    return {
+        "mae": float(np.abs(err).mean()),
+        "rmse": float(np.sqrt((err**2).mean())),
+        "por_tamano": [e(by_size_p[s], by_size_a[s]) for s in range(len(sizes))],
+        "matriz": matrix,
     }
