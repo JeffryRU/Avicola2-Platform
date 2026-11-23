@@ -108,6 +108,8 @@ class AccountChange:
     # Lo que cambia (None = no se toca).
     role: str | None = None
     active: bool | None = None
+    # Corregir datos: nombre y zona se cambian juntos (la zona puede quedar vacía).
+    profile: tuple[str, str | None] | None = None
     # Restablecer: nueva contraseña temporal (obligada a cambiarse) y desbloqueo.
     password_hash: str | None = None
     # Sube la versión de sesión: los tokens anteriores de la cuenta dejan de valer.

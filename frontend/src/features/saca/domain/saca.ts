@@ -29,6 +29,10 @@ export const sacaGroupSchema = z.object({
   ordered: z.number().int(),
   projected: z.number().int(),
   plus: z.number().int().default(0),
+  // Parte de lo que llega del tipo que sale en calidad B y el plus que la cubriría (INS-14);
+  // null sin historia de producción suficiente o si el tipo cuenta la B como A.
+  b_rate: z.number().nullable().default(null),
+  suggested_plus: z.number().int().nullable().default(null),
   // stock − pedidos + proyección (puede ser negativo).
   balance: z.number().int(),
   farm_order: z.number().int(),
@@ -147,6 +151,8 @@ export function emptySaca(
       ordered: 0,
       projected: 0,
       plus: 0,
+      b_rate: null,
+      suggested_plus: null,
       balance: 0,
       farm_order: 0,
     })),

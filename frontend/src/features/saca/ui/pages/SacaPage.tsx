@@ -11,7 +11,15 @@ import { useRequiredSession } from '@/features/auth'
 import { bySubcategory, type Product } from '@/shared/domain/products'
 import { useCatalog } from '@/features/catalog'
 import { useSacaPlan, useSetSacaPlus } from '@/features/saca/ui/hooks'
-import { emptySaca, missingSellers, parsePlus, sacaDays, type Saca, type SacaLine } from '@/features/saca/domain/saca'
+import {
+  emptySaca,
+  missingSellers,
+  parsePlus,
+  sacaDays,
+  type Saca,
+  type SacaGroup,
+  type SacaLine,
+} from '@/features/saca/domain/saca'
 import {
   ARRIVAL_HINT,
   arrivalNote,
@@ -29,6 +37,8 @@ import {
   FIX_STOCK,
   FORMULA,
   groupStockBNote,
+  SUGGESTED_PLUS_SHORT,
+  suggestedPlusTitle,
   HERO_LABEL,
   HISTORY_LINK,
   savedNote,
@@ -206,6 +216,34 @@ function FarmOrder({ plan }: { plan: Saca }) {
       onError: (e) => setError(e.message),
     })
   }
+  // Plus sugerido por la calidad B junto al plus: al editar, tocarlo lo usa (INS-14).
+  const suggestion = (g: SacaGroup) => {
+    // Sin faltante no hay nada que sugerir (como en las proyecciones, el 0 no se muestra).
+    if (!g.suggested_plus || g.b_rate === null) return null
+    const n = g.suggested_plus
+    const title = suggestedPlusTitle(g.b_rate, n, !!draft)
+    const text = `${SUGGESTED_PLUS_SHORT} +${nf0(n)}`
+    if (!draft)
+      return (
+        <small className="num block text-2xs text-primary/80" title={title}>
+          {text}
+        </small>
+      )
+    return (
+      <button
+        type="button"
+        title={title}
+        aria-label={`Usar el plus sugerido de ${g.name}: ${nf0(n)}`}
+        onClick={() => setDraft({ ...draft, [g.name]: String(n) })}
+        className={cn(
+          'num block w-full rounded px-1 text-right text-xs font-medium whitespace-nowrap text-primary/80 transition-colors hover:bg-primary/10 hover:text-primary hc:text-primary hc:underline',
+          draft[g.name] === String(n) && 'text-faint',
+        )}
+      >
+        {text}
+      </button>
+    )
+  }
   const plusCell = (name: string, value: number) =>
     draft ? (
       <input
@@ -216,7 +254,7 @@ function FarmOrder({ plan }: { plan: Saca }) {
         className="num h-touch w-full min-w-0 rounded-sm border-control border-input bg-surface px-2 text-right text-base text-foreground outline-none focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring dsk:h-8"
       />
     ) : (
-      <span className="num text-right">+{nf0(value)}</span>
+      <span className="num block text-right">+{nf0(value)}</span>
     )
 
   return (
@@ -256,7 +294,10 @@ function FarmOrder({ plan }: { plan: Saca }) {
               {g.ordered ? `−${nf0(g.ordered)}` : 0}
             </span>
             <span className="num text-right">+{nf0(g.projected)}</span>
-            {plusCell(g.name, g.plus)}
+            <span className="text-right">
+              {plusCell(g.name, g.plus)}
+              {suggestion(g)}
+            </span>
             <b className="num text-right text-lg font-semibold hc:font-extrabold">{nf0(g.farm_order)}</b>
           </div>
           <div className="sm:hidden">
@@ -269,7 +310,14 @@ function FarmOrder({ plan }: { plan: Saca }) {
                 {nf0(g.stock)} − {nf0(g.ordered)} + {nf0(g.projected)} {draft ? '+' : `+ ${nf0(g.plus)}`}
                 {g.stock_b > 0 && ` · ${groupStockBNote(g.stock_b)}`}
               </span>
-              {draft && <span className="w-24">{plusCell(g.name, g.plus)}</span>}
+              {draft ? (
+                <span className="w-24">
+                  {plusCell(g.name, g.plus)}
+                  {suggestion(g)}
+                </span>
+              ) : (
+                suggestion(g)
+              )}
             </div>
           </div>
         </div>

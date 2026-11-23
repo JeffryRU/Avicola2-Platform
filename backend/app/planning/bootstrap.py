@@ -129,6 +129,7 @@ class PlanningUseCases:
     create_account: acc.CreateAccount
     reset_password: acc.ResetPassword
     set_account_active: acc.SetAccountActive
+    edit_account: acc.EditAccount
     change_role: acc.ChangeRole
     get_catalog: uc.GetCatalog
     list_sellers: uc.ListSellers
@@ -223,6 +224,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         create_account=acc.CreateAccount(sellers, hasher, passwords),
         reset_password=acc.ResetPassword(sellers, hasher, passwords, event_bus),
         set_account_active=acc.SetAccountActive(sellers, event_bus),
+        edit_account=acc.EditAccount(sellers, event_bus),
         change_role=acc.ChangeRole(sellers, event_bus, notifications),
         get_catalog=uc.GetCatalog(products),
         list_sellers=uc.ListSellers(sellers),
@@ -279,10 +281,10 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         update_cutoff=ed.UpdateCutoff(editing, event_bus, clock),
         grant_editing=ed.GrantEditing(editing, unlocks, sellers, notifier, event_bus, clock),
         revoke_editing=ed.RevokeEditing(unlocks, sellers, notifier, event_bus, clock),
-        register_stock=st.RegisterStock(products, stock, clock, settings.stock_locations, sellers),
+        register_stock=st.RegisterStock(products, stock, clock, settings.stock_locations),
         list_stock=st.ListStock(stock),
         stock_options=st.GetStockOptions(
-            products, settings.stock_locations, settings.saca_stock_lot_days, sellers
+            products, settings.stock_locations, settings.saca_stock_lot_days
         ),
         calculate_saca=sc.CalculateSaca(
             products,

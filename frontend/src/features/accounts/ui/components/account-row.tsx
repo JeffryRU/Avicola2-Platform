@@ -1,4 +1,4 @@
-import { KeyRound, Lock, LockOpen, Power, UserCog } from 'lucide-react'
+import { KeyRound, Lock, LockOpen, Pencil, Power, UserCog } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   accountState,
@@ -93,6 +93,7 @@ export function AccountRow({
   granted,
   onGrant,
   onChangeRole,
+  onEdit,
 }: {
   account: AdminAccount
   onCredentials: (c: NewCredentials) => void
@@ -100,6 +101,7 @@ export function AccountRow({
   granted?: Unlock[]
   onGrant: () => void
   onChangeRole: () => void
+  onEdit: () => void
 }) {
   const refresh = useRefreshAccounts()
   const reset = useResetPassword(account.username)
@@ -151,6 +153,9 @@ export function AccountRow({
       ) : (
         <div className="flex flex-wrap gap-1.5 dsk:justify-end">
           {granted && <EditingControl account={account} granted={granted} onGrant={onGrant} />}
+          <Button type="button" variant="outline" size="sm" onClick={onEdit}>
+            <Pencil /> Editar
+          </Button>
           {otherRoles(account).length > 0 && (
             <Button type="button" variant="outline" size="sm" onClick={onChangeRole}>
               <UserCog /> Rol

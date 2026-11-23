@@ -4,7 +4,6 @@ from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import update
 
 from app.core.config import get_settings
 from app.main import app
@@ -20,7 +19,6 @@ from app.planning.domain.permissions import (
 )
 from app.planning.infrastructure import cli
 from app.planning.infrastructure.clock import ZoneClock
-from app.planning.infrastructure.persistence.tables import sellers
 from app.shared.infrastructure.database.metadata import metadata
 from app.shared.infrastructure.database.session import SessionLocal, engine
 
@@ -179,36 +177,25 @@ def test_only_the_general_supervisor_creates_dispatch_chiefs(client) -> None:
 
 
 def test_stock_is_general_by_default(client) -> None:
-    """«General» va primero (en la app, «Todas las ubicaciones»), luego las zonas de los
-    vendedores; una ubicación que no es ninguna de esas no."""
+    """Todo se almacena en un solo lugar (INS-10): sin STOCK_LOCATIONS solo está «General» (la
+    app no muestra el filtro) y las zonas de los vendedores no son ubicaciones."""
     _login(client, "despacho")
-    locations = client.get("/api/stock/options").json()["locations"]
-    assert locations[0] == "General" and {"Trujillo", "Piura", "Chiclayo"} <= set(locations)
+    assert client.get("/api/stock/options").json()["locations"] == ["General"]
     lines = [{"product_id": "P0001", "units": 5}]
-    r = client.put(f"/api/stock/{TODAY}", json={"location": "Lima", "lines": lines})
-    assert r.status_code == 422
-
-
-def test_a_new_seller_zone_is_a_stock_location(client) -> None:
-    """Un vendedor de una zona nueva (Huaraz) la suma a las ubicaciones, sin configurar nada."""
-    with SessionLocal() as session:
-        session.execute(
-            update(sellers).where(sellers.c.username == "rnavarro").values(zone="Huaraz")
-        )
-        session.commit()
-    _login(client, "despacho")
-    assert "Huaraz" in client.get("/api/stock/options").json()["locations"]
-    lines = [{"product_id": "P0001", "units": 5}]
-    r = client.put(f"/api/stock/{TODAY}", json={"location": "Huaraz", "lines": lines})
+    for place in ("Trujillo", "Lima"):
+        r = client.put(f"/api/stock/{TODAY}", json={"location": place, "lines": lines})
+        assert r.status_code == 422
+    r = client.put(f"/api/stock/{TODAY}", json={"lines": lines})
     assert r.status_code == 200, r.text
+    assert {line["location"] for line in r.json()["lines"]} == {"General"}
 
 
 def test_stock_by_lot_and_location(client, monkeypatch) -> None:
     # Con varias ubicaciones configuradas se registra por ubicación.
-    monkeypatch.setattr(get_settings(), "stock_locations", ["Almacén Norte"])
+    monkeypatch.setattr(get_settings(), "stock_locations", ["Trujillo", "Piura"])
     _login(client, "despacho")
     options = client.get("/api/stock/options").json()
-    assert options["locations"][:2] == ["General", "Almacén Norte"] and options["lot_days"] == 3
+    assert options["locations"] == ["General", "Trujillo", "Piura"] and options["lot_days"] == 3
     names = {i["id"]: (i["name"], i["quality"]) for i in options["items"]}
     assert names["P0101"] == ("Brasa chica B", "B")
     assert names["P0011"] == ("Pollo entero con menudencia", "A")

@@ -29,7 +29,7 @@ export const endpoints = {
   accounts: {
     /** GET → cuentas (supervisor). POST {username, name, role, zone} → credenciales temporales. */
     list: '/admin/accounts',
-    /** PATCH {active} → cuenta actualizada (activar o desactivar). */
+    /** PATCH {active} → activar o desactivar. PUT {name, zone} → corregir los datos. */
     account: (username: string) => `/admin/accounts/${seg(username)}`,
     /** POST {} → credenciales temporales nuevas. */
     resetPassword: (username: string) => `/admin/accounts/${seg(username)}/reset-password`,

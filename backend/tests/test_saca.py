@@ -8,7 +8,14 @@ from fastapi.testclient import TestClient
 from app.core.config import get_settings
 from app.main import app
 from app.planning.domain.models import Product
-from app.planning.domain.saca import build_plan, orders_day, projection_day, stock_window
+from app.planning.domain.production import ArrivalRates
+from app.planning.domain.saca import (
+    build_plan,
+    orders_day,
+    projection_day,
+    stock_window,
+    suggested_plus,
+)
 from app.planning.infrastructure import cli
 from app.planning.infrastructure.clock import ZoneClock
 from app.shared.infrastructure.database.metadata import metadata
@@ -56,6 +63,36 @@ def test_saca_is_stock_minus_orders_plus_projection_plus_plus() -> None:
     assert grande.farm_order == 1540
     assert plan.farm_order == 5740 and plan.plus == 5500
     assert plan.request_by_group() == {"Brasa chica": 4200.0, "Brasa grande": 1540.0}
+
+
+def test_suggested_plus_covers_the_expected_quality_b() -> None:
+    """INS-14: si el 20 % de lo que llega sale en B, para 200 aves A hay que pedir 250 (+50)."""
+    plan = build_plan(
+        DAY,
+        [CHICA_1, CHICA_2, GRANDE],
+        projected={"P1": 100, "P2": 50},
+        ordered={"P1": 30},
+        stock={"P2": 80},
+        **CONTEXT,
+        b_rate_by_group=(("Brasa chica", 0.2),),
+    )
+    chica, grande = plan.groups
+    assert (chica.balance, chica.b_rate, chica.suggested_plus) == (200, 0.2, 50)
+    # Sin historia de calidad B del tipo no se sugiere nada.
+    assert grande.suggested_plus is None
+    assert suggested_plus(-40, 0.1) == 0 and suggested_plus(10, None) is None
+
+
+def test_b_rate_of_a_type_weights_each_size_by_what_arrives() -> None:
+    rates = ArrivalRates(
+        share={"P1": 0.75, "P2": 0.25, "P8": 1.0},
+        b_rate={"P1": 0.1, "P2": 0.3, "P8": 0.0},
+        days=14,
+        date_from=DAY,
+        date_to=DAY,
+    )
+    groups = {"P1": "Brasa chica", "P2": "Brasa chica", "P8": "Brasa grande"}
+    assert rates.b_rate_by_group(groups) == {"Brasa chica": 0.15, "Brasa grande": 0.0}
 
 
 def test_more_stock_gives_a_bigger_saca() -> None:

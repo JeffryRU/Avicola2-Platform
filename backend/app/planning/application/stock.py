@@ -7,7 +7,6 @@ from datetime import date
 from app.planning.application.ports import (
     Clock,
     ProductRepository,
-    SellerRepository,
     StockRepository,
 )
 from app.planning.domain.dates import check_range
@@ -54,15 +53,13 @@ class RegisterStock:
         stock: StockRepository,
         clock: Clock,
         locations: list[str] | None = None,
-        sellers: SellerRepository | None = None,
     ):
         self.products, self.stock, self.clock = products, stock, clock
-        self.configured, self.sellers = locations or [], sellers
+        self.configured = locations or []
 
     @property
     def locations(self) -> list[str]:
-        zones = [s.zone for s in self.sellers.list_active()] if self.sellers else []
-        return stock_locations(self.configured, zones)
+        return stock_locations(self.configured)
 
     def __call__(
         self, actor: Seller, day: date, entries: list[StockEntry], location: str | None = None
@@ -121,15 +118,12 @@ class GetStockOptions:
         products: ProductRepository,
         locations: list[str],
         lot_days: int,
-        sellers: SellerRepository | None = None,
     ):
         self.products, self.configured, self.lot_days = products, locations, lot_days
-        self.sellers = sellers
 
     def __call__(self, viewer: Seller) -> StockOptions:
         require(viewer.role, Permission.VIEW_STOCK)
         items = sorted(
             self.products.list_stock_items(), key=lambda p: (p.category, p.sort_order, p.id)
         )
-        zones = [s.zone for s in self.sellers.list_active()] if self.sellers else []
-        return StockOptions(items, stock_locations(self.configured, zones), self.lot_days)
+        return StockOptions(items, stock_locations(self.configured), self.lot_days)

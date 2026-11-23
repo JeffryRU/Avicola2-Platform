@@ -70,14 +70,11 @@ def check_lot_date(lot: date, day: date) -> None:
         raise DomainError(f"Un lote no puede tener más de {MAX_LOT_AGE_DAYS} días.")
 
 
-def stock_locations(configured: list[str], zones: list[str | None]) -> list[str]:
-    """Ubicaciones del stock: «General» (el stock que se sube de forma general), las configuradas
-    y las zonas de los vendedores activos. Una zona nueva (p. ej. Huaraz) aparece sola."""
+def stock_locations(configured: list[str]) -> list[str]:
+    """Ubicaciones del stock: «General» y las configuradas (STOCK_LOCATIONS). Todo se almacena en
+    un solo lugar, así que las zonas de los vendedores no separan el stock (INS-10): sin nada
+    configurado solo está «General» y la app no muestra el filtro de ubicación."""
     seen: dict[str, str] = {}
-    for place in [
-        DEFAULT_LOCATION,
-        *configured,
-        *sorted(z.strip() for z in zones if z and z.strip()),
-    ]:
+    for place in [DEFAULT_LOCATION, *configured]:
         seen.setdefault(place.casefold(), place)
     return list(seen.values())

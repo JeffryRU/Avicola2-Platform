@@ -182,6 +182,8 @@ class SqlSellerRepository:
             values["role"] = change.role
         if change.active is not None:
             values["is_active"] = change.active
+        if change.profile is not None:
+            values.update(name=change.profile[0], zone=change.profile[1])
         if change.password_hash is not None:
             values.update(
                 password_hash=change.password_hash,

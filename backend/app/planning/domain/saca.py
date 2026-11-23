@@ -9,13 +9,17 @@ Se calcula el día D (hoy) y, por tipo de pedido a granja, en este orden (regla 
   calidad A en lo que se pide a granja (INS-12). En los demás tipos sí se suma.
 - **Pedidos:** los confirmados para entregar mañana (brasa y pollo de mercado).
 - **Proyección:** la del equipo de vendedores para pasado mañana (cuando llega lo que se pide).
-- **Plus:** aves extra fijas por tipo, que configura un supervisor.
+- **Plus:** aves extra fijas por tipo, que configura un supervisor. Junto al plus se sugiere uno
+  según la calidad B (INS-14): si de lo que llega de un tipo una parte `r` sale en B (no sirve en
+  lugar de una A), para cubrir lo que falta con calidad A hay que pedir `faltante × r / (1 − r)`
+  aves más. Solo es una sugerencia: el supervisor decide.
 - Nunca menos de 0: un pedido a granja negativo no existe.
 
 A granja no se pide por producto sino por tipo (Brasa chica, mediana, grande): el plus va por
 tipo. Las líneas por producto muestran el mismo cálculo sin el plus, como detalle.
 """
 
+import math
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
@@ -62,6 +66,9 @@ class SacaGroup:
     plus: int = 0
     # Calidad B registrada del tipo (se muestra; en la brasa no entra en `stock` ni en la saca).
     stock_b: int = 0
+    # Qué parte de lo que llega del tipo sale en calidad B (historia de producción); None: sin
+    # historia suficiente o el tipo cuenta la B como A (no hace falta plus por ella).
+    b_rate: float | None = None
 
     @property
     def balance(self) -> int:
@@ -72,6 +79,11 @@ class SacaGroup:
     def farm_order(self) -> int:
         """stock − pedidos + proyección + plus; nunca menos de 0."""
         return max(0, self.balance + self.plus)
+
+    @property
+    def suggested_plus(self) -> int | None:
+        """Plus que cubre la calidad B esperada (INS-14); None si no hay tasa de B."""
+        return suggested_plus(self.balance, self.b_rate)
 
 
 @dataclass(frozen=True)
@@ -103,6 +115,8 @@ class SacaPlan:
     group_plus: tuple[tuple[str, int], ...] = ()
     # Stock de calidad B por tipo: en la brasa solo se informa; en los demás tipos se suma.
     stock_b_by_group: tuple[tuple[str, int], ...] = ()
+    # Parte de lo que llega de cada tipo que sale en calidad B (para el plus sugerido).
+    b_rate_by_group: tuple[tuple[str, float], ...] = ()
     # Unidades en lotes demasiado antiguos, que no se cuentan (se trozan).
     stock_old: int = 0
     # Antigüedad máxima de los lotes que sí cuentan (días).
@@ -151,6 +165,7 @@ class SacaPlan:
         """Por tipo, en el orden del catálogo: sus sumas, su plus y el pedido final a granja."""
         plus = dict(self.group_plus)
         quality_b = dict(self.stock_b_by_group)
+        b_rates = dict(self.b_rate_by_group)
         names = list(dict.fromkeys(product_group(line.product) for line in self.lines))
         result = []
         for name in names:
@@ -165,6 +180,7 @@ class SacaPlan:
                     sum(line.stock for line in lines) + (quality_b.get(name, 0) if counts_b else 0),
                     plus.get(name, 0),
                     quality_b.get(name, 0),
+                    None if counts_b else b_rates.get(name),
                 )
             )
         return tuple(result)
@@ -190,6 +206,14 @@ class SacaPlan:
     def live_kg(self) -> float:
         """Kg vivos estimados: kg de producto entre el rendimiento (kg de producto por kg vivo)."""
         return round(self.request_kg / self.yield_factor, 2)
+
+
+def suggested_plus(balance: int, b_rate: float | None) -> int | None:
+    """Aves extra para que, si una parte `b_rate` llega en calidad B, lo que falta (`balance`)
+    llegue en calidad A. Sin faltante no hace falta plus (0)."""
+    if b_rate is None or not 0 <= b_rate < 1:
+        return None
+    return min(MAX_PLUS, math.ceil(max(0, balance) * b_rate / (1 - b_rate) - 1e-9))
 
 
 def product_group(product: Product) -> str:

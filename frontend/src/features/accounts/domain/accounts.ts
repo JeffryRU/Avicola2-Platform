@@ -44,6 +44,10 @@ export const newAccountSchema = z.object({
 })
 export type NewAccount = z.infer<typeof newAccountSchema>
 
+/** Formulario "Editar usuario": el usuario (login) no cambia; el rol tiene su propio diálogo. */
+export const editAccountSchema = newAccountSchema.pick({ name: true, zone: true })
+export type AccountEdit = z.infer<typeof editAccountSchema>
+
 export function accountState(account: AdminAccount, now: Date): AccountState {
   if (!account.is_active) return 'inactive'
   if (account.locked_until && new Date(account.locked_until) > now) return 'locked'

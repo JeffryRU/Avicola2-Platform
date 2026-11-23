@@ -183,5 +183,8 @@ class CalculateSaca:
         fitted = self.model.fit(history, groups, target=arrives)
         if fitted is None:
             return plan
+        # Con la tasa de calidad B de cada tipo se sugiere el plus (INS-14); cambia el pedido
+        # final solo cuando el supervisor lo guarda, así que la llegada se estima con el actual.
+        plan = replace(plan, b_rate_by_group=tuple(fitted.rates.b_rate_by_group(groups).items()))
         arrival = estimate_from(fitted.rates, groups, plan.request_by_group())
         return replace(plan, arrival=replace(arrival, model=fitted.model))

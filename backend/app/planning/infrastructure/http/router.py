@@ -511,6 +511,14 @@ def set_active(
     return _admin_out(use_cases.set_account_active(actor, username, body.active), actor)
 
 
+@admin.put("/accounts/{username}")
+def edit_account(
+    use_cases: UseCases, actor: ActiveAccount, username: str, body: s.EditAccountIn
+) -> s.AdminAccountOut:
+    """Corrige nombre y zona. El usuario no cambia (es la llave de sus datos)."""
+    return _admin_out(use_cases.edit_account(actor, username, body.name, body.zone), actor)
+
+
 @admin.put("/accounts/{username}/role", dependencies=[requires(Permission.CHANGE_ROLES)])
 def change_role(
     use_cases: UseCases, actor: ActiveAccount, username: str, body: s.ChangeRoleIn

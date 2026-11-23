@@ -45,6 +45,13 @@ export const PLUS_SAVED = 'Plus guardado.'
 export const PLUS_INVALID = 'Escribe un número entero entre 0 y 100 000 en cada tipo (por ejemplo 4000).'
 export { CANCEL_LABEL as CANCEL, SAVE_LABEL as SAVE_PLUS } from '@/shared/types/labels'
 export const NEED_LABEL = 'aves sin contar el plus'
+/** Plus sugerido por la calidad B (INS-14), junto al plus como la sugerencia del modelo en las proyecciones. */
+export const SUGGESTED_PLUS_SHORT = 'sug.'
+export const suggestedPlusTitle = (rate: number, n: number, editing: boolean) =>
+  `Sugerido según la calidad B: de lo que llega de este tipo, el ${(rate * 100).toLocaleString('es-PE', { maximumFractionDigits: 1 })} % sale en B. ` +
+  `Con +${n.toLocaleString('es-PE')} se cubre con calidad A lo que falta.${
+    editing ? ' Tócalo para usarlo.' : ' Para usarlo, cambia el plus.'
+  }`
 export const groupStockBNote = (n: number) => `+${n.toLocaleString('es-PE')} en B, no cuentan`
 
 /** Panel "Con qué datos se calculó". */
