@@ -77,6 +77,8 @@ export const queryKeys = {
   assistant: {
     /** GET /assistant (por usuario: las preguntas dependen del rol). */
     info: (username: string) => ['assistant', username] as const,
+    /** GET /assistant/conversations (historial de la persona). */
+    conversations: (username: string) => ['assistant', username, 'conversations'] as const,
   },
 
   saca: {
