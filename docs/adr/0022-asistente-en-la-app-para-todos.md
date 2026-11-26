@@ -46,8 +46,8 @@ Y por debajo de todo, lo que no depende del modelo: el agente solo lee y solo ve
 - `ASSISTANT_RATE_LIMIT` preguntas por persona cada `ASSISTANT_RATE_WINDOW_SECONDS` (10 por minuto): **429**. Además sigue el límite del MCP por persona (las llamadas con pase cuentan a nombre de quien preguntó).
 - Si n8n no responde, tarda más de `ASSISTANT_TIMEOUT_SECONDS` o responde sin texto: **503** con un mensaje simple (el detalle queda en el log).
 - Sin `ASSISTANT_WEBHOOK_URL` no hay asistente: `GET /api/assistant` dice `enabled: false`, el botón no aparece y preguntar responde 409.
-- **Proveedor del LLM:** cualquier API compatible con OpenAI Chat Completions (`ASSISTANT_LLM_URL`, nodo OpenAI Chat Model 1.2 de n8n, sin Responses API). Por ahora **Devlum AI** (`https://ai.devlumlabs.com/api/v1`), con el saldo de la hackathon (hasta el 27/11/2026); después basta cambiar la URL y la clave de la credencial, o volver a Anthropic. El modelo tiene que soportar *tools* (en Devlum, `capabilities` de `GET /models`). Los datos de la consulta pasan por ese proveedor.
-- **Modelo:** `ASSISTANT_MODEL` en n8n, `claude-haiku-5-5` por defecto (lo usan todos; US$ 0,10 y 0,50 por millón de tokens en Devlum). Con ~20 personas × 10 preguntas × 26 días ≈ 5.200 preguntas al mes: ~US$ 8 con Haiku, ~US$ 160 con Sonnet (mismos supuestos de tokens que el ADR 0017).
+- **Proveedor del LLM:** la API de Anthropic, con el nodo Anthropic Chat Model de n8n y la credencial `Anthropic (AviPlanner)` (la misma del agente 03). Antes se usó Devlum AI (API compatible con OpenAI, saldo de la hackathon); se volvió a Anthropic cuando su dominio dejó de resolver (24/11/2026). Los datos de la consulta pasan por Anthropic.
+- **Modelo:** `ASSISTANT_MODEL` en n8n, `claude-haiku-5-5` por defecto (lo usan todos; US$ 0,10 y 0,50 por millón de tokens). Con ~20 personas × 10 preguntas × 26 días ≈ 5.200 preguntas al mes: ~US$ 8 con Haiku, ~US$ 160 con Sonnet (mismos supuestos de tokens que el ADR 0017).
 - **Auditoría:** cada herramienta queda en `app.mcp` con el usuario real (no `agente:n8n`).
 
 ## Por qué así

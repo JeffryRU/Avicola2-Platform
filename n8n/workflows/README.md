@@ -110,7 +110,7 @@ Sin la cabecera `Authorization`, o con un token inválido, responde 401.
 ## 07_asistente_app
 
 ```
-Pregunta desde la app (webhook, X-Assistant-Token) → Agente de la app ← Modelo (ASSISTANT_LLM_URL + ASSISTANT_MODEL)
+Pregunta desde la app (webhook, X-Assistant-Token) → Agente de la app ← Claude (ASSISTANT_MODEL)
                                                     ← Memoria (por usuario y conversación)
                                                     ← AviPlanner MCP ({{ $env.BACKEND_URL }}/mcp?ticket=<pase>)
                                   → Responder a la app {reply}
@@ -121,7 +121,7 @@ El chat dentro de la app (botón «Asistente»), para **todos los roles**: cada 
 ### Antes de importarlo
 
 1. `MCP_AGENT_TOKEN` en el backend y la credencial `AviPlanner MCP (agente)` (como en `03_agente_chatbot`).
-2. **LLM:** credencial `LLM del asistente (AviPlanner)`, tipo OpenAI: la clave de la API y, en *Base URL*, la de `ASSISTANT_LLM_URL` (por defecto Devlum AI, `https://ai.devlumlabs.com/api/v1`). Sirve cualquier API compatible con OpenAI Chat Completions cuyo modelo soporte *tools*.
+2. **LLM:** credencial `Anthropic (AviPlanner)`, tipo Anthropic, con la clave de la API de Anthropic (la misma que usa `03_agente_chatbot`).
 3. **Secreto del webhook:** genera uno (`openssl rand -hex 32`) y ponlo en `ASSISTANT_WEBHOOK_TOKEN` del backend, con `ASSISTANT_WEBHOOK_URL=http://n8n:5678/webhook/aviplanner-asistente`. Reinicia el backend.
 4. **Credencial** `AviPlanner asistente (backend)`, tipo Header Auth: nombre `X-Assistant-Token`, valor = `ASSISTANT_WEBHOOK_TOKEN`.
 5. **Modelo (opcional):** `ASSISTANT_MODEL` en n8n (`claude-haiku-5-5` por defecto).
