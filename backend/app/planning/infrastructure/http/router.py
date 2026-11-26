@@ -35,6 +35,7 @@ from app.planning.application.production import ProductionEntry
 from app.planning.application.stock import StockEntry
 from app.planning.application.use_cases import DayUnits
 from app.planning.bootstrap import PlanningUseCases, build_use_cases
+from app.planning.domain.channels import ExtractedRow, Extraction
 from app.planning.domain.editing import CutoffPolicy, EditUnlock
 from app.planning.domain.models import Projection, Seller, SellerAccount
 from app.planning.domain.permissions import (
@@ -644,7 +645,12 @@ def ask_assistant(
     """Una pregunta al asistente: la respuesta y preguntas para seguir. Solo ve lo de quien
     pregunta (el agente consulta con un pase de esta persona)."""
     answer = use_cases.ask_assistant(account, body.message, body.conversation)
-    return s.AssistantReplyOut(reply=answer.reply, suggestions=list(answer.suggestions))
+    return s.AssistantReplyOut(
+        reply=answer.reply,
+        suggestions=list(answer.suggestions),
+        message_id=answer.message_id,
+        blocks=list(answer.blocks),
+    )
 
 
 @router.post("/assistant/messages/stream")
@@ -660,6 +666,86 @@ def ask_assistant_stream(
         # Sin búfer en los proxys: cada parte sale apenas llega.
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# --- Historial, tablas y canales del asistente (ADR 0024) ---------------------------------
+
+
+@router.get("/assistant/conversations")
+def list_conversations(
+    use_cases: UseCases,
+    account: ActiveAccount,
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+    before: Annotated[datetime | None, Query()] = None,
+) -> list[s.ConversationSummaryOut]:
+    """Mis conversaciones con el asistente, de la más reciente a la más vieja."""
+    return [
+        s.ConversationSummaryOut(
+            id=str(c.id),
+            title=c.title,
+            channel=c.channel,
+            updated_at=c.updated_at,
+            preview=c.preview,
+        )
+        for c in use_cases.assistant_history.conversations_of(account, limit, before)
+    ]
+
+
+@router.get("/assistant/conversations/{conversation_id}")
+def get_conversation(
+    use_cases: UseCases, account: ActiveAccount, conversation_id: str
+) -> s.ConversationOut:
+    conversation, found = use_cases.assistant_history.get(account, conversation_id)
+    return s.ConversationOut(
+        id=str(conversation.id),
+        title=conversation.title,
+        channel=conversation.channel,
+        messages=[
+            s.StoredMessageOut(
+                id=str(m.id),
+                role=m.role,
+                text=m.text,
+                blocks=list(m.blocks),
+                suggestions=list(m.suggestions),
+                created_at=m.created_at,
+            )
+            for m in found
+        ],
+    )
+
+
+@router.delete("/assistant/conversations/{conversation_id}", status_code=204)
+def archive_conversation(use_cases: UseCases, account: ActiveAccount, conversation_id: str) -> None:
+    """Archiva la conversación: deja de aparecer en el historial."""
+    use_cases.assistant_history.archive(account, conversation_id)
+
+
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _xlsx_response(file) -> Response:
+    return Response(
+        content=file.content,
+        media_type=XLSX,
+        headers={"Content-Disposition": f'attachment; filename="{file.name}"'},
+    )
+
+
+@router.get("/assistant/messages/{message_id}/tables/{index}.xlsx", response_class=Response)
+def download_table(
+    use_cases: UseCases, account: ActiveAccount, message_id: str, index: int
+) -> Response:
+    """Una tabla de un mensaje guardado, en Excel (solo para el dueño de la conversación;
+    `index` es la posición entre las tablas del mensaje, desde 0)."""
+    file = use_cases.assistant_history.table_file(account.seller.username, message_id, index)
+    return _xlsx_response(file)
+
+
+@router.post("/assistant/channels/link-code")
+def link_code(use_cases: UseCases, account: ActiveAccount) -> s.LinkCodeOut:
+    """Código para vincular Telegram o WhatsApp: se envía al bot como `vincular ABC123`."""
+    created = use_cases.create_link_code(account)
+    return s.LinkCodeOut(code=created.code, expires_at=created.expires_at)
 
 
 @router.get("/editing")
@@ -962,3 +1048,65 @@ def aris_ingest(
     )
     content = _read_upload(file)
     return [asdict(r) for r in use_cases.import_aris(system, content, file.filename or "")]
+
+
+# --- Canales del asistente: Telegram y WhatsApp (ADR 0024) --------------------------------
+
+CHANNEL_FILES = f"{API_PREFIX}/internal/channel/files"
+
+
+def _channel_reply(reply) -> s.ChannelReplyOut:
+    return s.ChannelReplyOut(
+        text=reply.text,
+        files=[
+            s.ChannelFileOut(name=f.name, url=f"{CHANNEL_FILES}/{f.token}") for f in reply.files
+        ],
+        suggestions=list(reply.suggestions),
+    )
+
+
+@internal.post("/channel/message")
+def channel_message(use_cases: UseCases, body: s.ChannelMessageIn) -> s.ChannelReplyOut:
+    """Un mensaje de texto de Telegram o WhatsApp: vincula, confirma, o le pregunta al asistente
+    como la persona vinculada."""
+    return _channel_reply(use_cases.channel_assistant.message(body.channel, body.sender, body.text))
+
+
+@internal.post("/channel/photo")
+def channel_photo(use_cases: UseCases, body: s.ChannelPhotoIn) -> s.ChannelReplyOut:
+    """Lo que el modelo leyó de una foto: arma el borrador de proyección o de stock."""
+    extraction = Extraction(
+        body.extraction.kind,
+        body.extraction.date,
+        tuple(ExtractedRow(r.product, r.units, r.kg, r.lot_date) for r in body.extraction.rows),
+        body.extraction.notes,
+    )
+    return _channel_reply(use_cases.channel_assistant.photo(body.channel, body.sender, extraction))
+
+
+@internal.get("/channel/context")
+def channel_context(
+    use_cases: UseCases,
+    channel: Annotated[str, Query(max_length=10)],
+    sender: Annotated[str, Query(max_length=64)],
+) -> s.ChannelContextOut:
+    """Para el paso de visión: quién es, qué puede registrar y con qué catálogo y fechas."""
+    ctx = use_cases.channel_assistant.context(channel, sender)
+    return s.ChannelContextOut(
+        linked=ctx.linked,
+        name=ctx.name,
+        can_project=ctx.can_project,
+        can_stock=ctx.can_stock,
+        today=ctx.today,
+        dates=list(ctx.dates),
+        products=[
+            s.ChannelProductOut(id=p.id, name=p.name, category=p.category, unit="unidad")
+            for p in ctx.products
+        ],
+    )
+
+
+@internal.get("/channel/files/{token}", response_class=Response)
+def channel_file(use_cases: UseCases, token: str) -> Response:
+    """El Excel de una tabla para el canal (token firmado, vence en 15 minutos)."""
+    return _xlsx_response(use_cases.channel_assistant.file(token))

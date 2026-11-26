@@ -33,4 +33,9 @@ def test_expected_tables() -> None:
         "np_model_predictions",
         "np_dispatch_orders",
         "np_store_sales",
+        "np_assistant_conversations",
+        "np_assistant_messages",
+        "np_assistant_channel_links",
+        "np_assistant_link_codes",
+        "np_assistant_drafts",
     }

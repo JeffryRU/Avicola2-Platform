@@ -6,8 +6,11 @@ Los adaptadores de infrastructure/ los implementan; la aplicación nunca los imp
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Protocol
+from uuid import UUID
 
 from app.planning.domain.accounts import AccountChange, ChangeOutcome
+from app.planning.domain.channels import Draft
+from app.planning.domain.conversations import Conversation, ConversationSummary, StoredMessage
 from app.planning.domain.editing import EditUnlock
 from app.planning.domain.history import ProjectionChange
 from app.planning.domain.models import DailyUnits, Product, Projection, Seller, SellerAccount
@@ -213,6 +216,9 @@ class AssistantRequest:
     permissions: tuple[str, ...]
     # Lo que puede consultar, en palabras (el agente no ofrece nada fuera de esto).
     scope: str = ""
+    # Últimos mensajes de la conversación, del más viejo al más nuevo: `(rol, texto)`. La memoria
+    # del agente sale del historial guardado (ADR 0024), así sobrevive a un reinicio de n8n.
+    history: tuple[tuple[str, str], ...] = ()
 
 
 class AssistantGateway(Protocol):
@@ -339,3 +345,80 @@ class ArisData(Protocol):
     def load(self, content: bytes, filename: str) -> list[ArisLoad]:
         """Carga el export reemplazando solo las fechas que trae."""
         ...
+
+
+class ConversationRepository(Protocol):
+    """Conversaciones guardadas del asistente (ADR 0024)."""
+
+    def get(self, conversation_id: UUID) -> Conversation | None: ...
+    def create(self, conversation: Conversation) -> None: ...
+
+    def add_message(self, message: StoredMessage, title: str | None = None) -> None:
+        """Guarda el mensaje, sube `updated_at` de la conversación y, si viene, pone su título."""
+        ...
+
+    def messages(self, conversation_id: UUID) -> list[StoredMessage]:
+        """Del más viejo al más nuevo."""
+        ...
+
+    def message(self, message_id: UUID) -> tuple[Conversation, StoredMessage] | None: ...
+
+    def list_for(
+        self, username: str, limit: int, before: datetime | None
+    ) -> list[ConversationSummary]:
+        """Las no archivadas y con mensajes, de la más reciente a la más vieja."""
+        ...
+
+    def latest_for(self, username: str, channel: str) -> Conversation | None:
+        """La conversación no archivada más reciente de esa persona en ese canal."""
+        ...
+
+    def archive(self, conversation_id: UUID) -> None: ...
+
+    def purge_before(self, cutoff: datetime) -> int:
+        """Borra las conversaciones (y sus mensajes) sin actividad desde `cutoff`."""
+        ...
+
+
+class ChannelLinkRepository(Protocol):
+    """Vinculación de un chat de Telegram o WhatsApp con una cuenta, y sus códigos."""
+
+    def link(self, channel: str, sender: str, username: str, now: datetime) -> None:
+        """Vincula (si ese chat ya estaba vinculado, lo reemplaza)."""
+        ...
+
+    def username_for(self, channel: str, sender: str) -> str | None: ...
+    def delete_for(self, username: str) -> int: ...
+
+    def save_code(self, code: str, username: str, now: datetime, expires_at: datetime) -> None:
+        """Guarda el código (los anteriores de esa persona dejan de valer)."""
+        ...
+
+    def consume_code(self, code: str, now: datetime) -> str | None:
+        """La persona dueña del código si sigue vigente; el código queda usado."""
+        ...
+
+    def purge_codes(self, now: datetime) -> int: ...
+
+
+class DraftRepository(Protocol):
+    """Borradores de fotos por confirmar (uno pendiente por persona)."""
+
+    def replace(self, draft: Draft) -> None:
+        """Guarda el borrador y descarta el pendiente anterior de esa persona."""
+        ...
+
+    def pending(self, username: str) -> Draft | None: ...
+    def set_status(self, draft_id: UUID, status: str) -> None: ...
+    def purge_before(self, cutoff: datetime) -> int: ...
+
+
+class FileTokens(Protocol):
+    """Token firmado de un solo archivo (una tabla de un mensaje) para los canales."""
+
+    def issue(self, username: str, message_id: str, index: int) -> str: ...
+    def decode(self, token: str) -> tuple[str, str, int] | None: ...
+
+
+class TableExporter(Protocol):
+    def xlsx(self, title: str | None, columns: list[str], rows: list[list[str]]) -> bytes: ...

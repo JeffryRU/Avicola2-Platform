@@ -65,6 +65,7 @@ class N8nAssistant:
                     "permissions": list(request.permissions),
                     "scope": request.scope,
                 },
+                "history": [{"role": role, "text": text} for role, text in request.history],
             },
             ensure_ascii=False,
         ).encode()

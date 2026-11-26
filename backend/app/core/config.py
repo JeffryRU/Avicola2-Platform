@@ -130,6 +130,11 @@ class Settings(BaseSettings):
     # Preguntas por persona en cada ventana de ASSISTANT_RATE_WINDOW_SECONDS.
     assistant_rate_limit: int = Field(10, ge=1)
     assistant_rate_window_seconds: int = Field(60, ge=1)
+    # Días que se guardan las conversaciones del asistente (ADR 0024); una limpieza diaria borra
+    # las más viejas.
+    assistant_history_days: int = Field(90, ge=1)
+    # Horas sin mensajes tras las que el chat de Telegram o WhatsApp empieza otra conversación.
+    assistant_channel_idle_hours: int = Field(12, ge=1)
 
     # Carpeta con catalog.yaml, schemas.yaml, tables.yaml y planning_seed.yaml.
     config_dir: Path = BACKEND_DIR / "config"

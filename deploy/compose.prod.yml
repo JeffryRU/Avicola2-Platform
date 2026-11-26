@@ -53,6 +53,9 @@ services:
       ASSISTANT_WEBHOOK_URL: ${ASSISTANT_WEBHOOK_URL:-}
       ASSISTANT_WEBHOOK_TOKEN: ${ASSISTANT_WEBHOOK_TOKEN:-}
       ASSISTANT_RATE_LIMIT: ${ASSISTANT_RATE_LIMIT:-10}
+      # Historial del asistente y chats de Telegram/WhatsApp (ADR 0024).
+      ASSISTANT_HISTORY_DAYS: ${ASSISTANT_HISTORY_DAYS:-90}
+      ASSISTANT_CHANNEL_IDLE_HOURS: ${ASSISTANT_CHANNEL_IDLE_HOURS:-12}
       AUTH_TOKEN_TTL_HOURS: ${AUTH_TOKEN_TTL_HOURS:-12}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-}
       # Frontend servido aparte (Vercel reenviando /api aquí): su dominio, para no bloquearlo.
@@ -145,6 +148,8 @@ services:
       # Modelo del asistente de la app (07_asistente_app, ADR 0022); la clave va en la credencial
       # «Anthropic (AviPlanner)» de n8n, la misma del agente 03.
       ASSISTANT_MODEL: ${ASSISTANT_MODEL:-claude-haiku-5-5}
+      # Modelo con visión que lee las fotos en 05_telegram_aris y 06_whatsapp_aris (ADR 0024).
+      ASSISTANT_VISION_MODEL: ${ASSISTANT_VISION_MODEL:-claude-sonnet-5-5}
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:
       - n8n_data:/home/node/.n8n
