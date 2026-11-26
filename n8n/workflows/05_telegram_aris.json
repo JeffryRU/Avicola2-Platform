@@ -52,42 +52,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        240,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "d4a10005-0103-4c0e-9f00-000000000103",
-              "leftValue": "={{ ($json.message.document && $json.message.document.file_name) || '' }}",
-              "rightValue": "\\.(xlsx|xlsm|csv)$",
-              "operator": {
-                "type": "string",
-                "operation": "regex"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "d4a10005-0003-4c0e-9f00-000000000003",
-      "name": "¿Trae un Excel o CSV?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
         480,
-        -100
-      ]
+        -200
+      ],
+      "notes": "Solo para el Excel o CSV de ARIS. El texto y las fotos no pasan por esta lista: el asistente exige cuenta vinculada."
     },
     {
       "parameters": {
@@ -133,7 +101,7 @@
       "typeVersion": 4.2,
       "position": [
         720,
-        -200
+        -260
       ]
     },
     {
@@ -217,7 +185,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
-        "text": "Envíame el export de ARIS (DESPACHO y/o VENTAS) como documento: Excel (.xlsx) o CSV. Reemplazo solo las fechas que trae y el modelo se reentrena solo.",
+        "text": "Puedo ayudarte con tres cosas. 1) Escríbeme tu pregunta (proyecciones, saca, stock). 2) Mándame una foto de tu hoja o pizarra de proyección o de stock y te preparo el registro para que lo confirmes. 3) Si tu chat está autorizado, envía el export de ARIS (DESPACHO y/o VENTAS) como documento Excel (.xlsx) o CSV. Para empezar, vincula tu cuenta: en la app abre el asistente, toca «Usar en Telegram o WhatsApp» y escríbeme el código: vincular ABC123",
         "additionalFields": {
           "appendAttribution": false
         }
@@ -227,8 +195,8 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        720,
-        0
+        480,
+        560
       ],
       "webhookId": "d4a10005-0908-4c0e-9f00-000000000908"
     },
@@ -245,10 +213,631 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        480,
-        160
+        720,
+        -60
       ],
       "webhookId": "d4a10005-0909-4c0e-9f00-000000000909"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d4a10005-0201-4c0e-9f00-000000000201",
+                    "leftValue": "={{ ($json.message.document && $json.message.document.file_name) || '' }}",
+                    "rightValue": "\\.(xlsx|xlsm|csv)$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Excel o CSV"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d4a10005-0202-4c0e-9f00-000000000202",
+                    "leftValue": "={{ !!($json.message.text && String($json.message.text).trim()) }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Texto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d4a10005-0203-4c0e-9f00-000000000203",
+                    "leftValue": "={{ Array.isArray($json.message.photo) && $json.message.photo.length > 0 }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Foto"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Otro tipo"
+        }
+      },
+      "id": "d4a10005-0031-4c0e-9f00-000000000031",
+      "name": "Tipo de mensaje",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        240,
+        0
+      ],
+      "notes": "Excel o CSV: sigue a ARIS (solo chats autorizados). Texto: asistente. Foto: lectura de la foto. Otro: explica qué se puede enviar. ADR 0024."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
+        "operation": "sendChatAction",
+        "action": "typing"
+      },
+      "id": "d4a10005-0032-4c0e-9f00-000000000032",
+      "name": "Escribiendo (texto)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        480,
+        120
+      ],
+      "webhookId": "d4a10005-0931-4c0e-9f00-000000000931",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
+        "operation": "sendChatAction",
+        "action": "typing"
+      },
+      "id": "d4a10005-0033-4c0e-9f00-000000000033",
+      "name": "Escribiendo (foto)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        480,
+        380
+      ],
+      "webhookId": "d4a10005-0932-4c0e-9f00-000000000932",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/channel/message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: 'telegram', sender: String($('Mensaje de Telegram').item.json.message.chat.id), text: $('Mensaje de Telegram').item.json.message.text }) }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "d4a10005-0034-4c0e-9f00-000000000034",
+      "name": "Preguntar al asistente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        120
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Manda el texto al asistente del backend (ADR 0024): vincula la cuenta, confirma borradores y responde como la persona vinculada. Si falla, responde un texto amable."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/channel/context",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "telegram"
+            },
+            {
+              "name": "sender",
+              "value": "={{ String($('Mensaje de Telegram').item.json.message.chat.id) }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "d4a10005-0035-4c0e-9f00-000000000035",
+      "name": "Contexto de la persona",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        380
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Quién es, qué puede registrar y qué productos y fechas hay. Se le da a Claude para leer la foto."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10005-0204-4c0e-9f00-000000000204",
+              "leftValue": "={{ $json.statusCode === 200 && $json.body.linked === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10005-0036-4c0e-9f00-000000000036",
+      "name": "¿Está vinculada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        940,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  \"model\": $env.ASSISTANT_VISION_MODEL || 'claude-sonnet-5-5',\n  \"max_tokens\": 4000,\n  \"system\": \"Lees una foto de una hoja o pizarra de proyección de pollo, o de stock, de Avícola 2 (Perú) y devuelves solo los datos en el formato pedido. Reglas: 1) kind es «projection» si la foto es una proyección de ventas o pedidos por producto, «stock» si es un conteo de existencias, «unknown» si no es ninguna de las dos o no se entiende. 2) date es la fecha de la proyección (o del conteo) en AAAA-MM-DD; si la foto no trae fecha usa la del pie de foto; si tampoco, null. 3) rows: una fila por producto, con product tal como está escrito en la foto (usa solo productos de la lista que te doy; si lo escrito no corresponde a ninguno, copia el texto leído para que lo revise una persona). 4) units son unidades enteras y kg el peso; si la foto solo trae uno de los dos, el otro va null. lot_date (fecha del lote) solo si es stock y la foto la trae; si no, null. 5) No inventes ni calcules nada: si un número no se lee con claridad, déjalo null. 6) notes: una frase corta con lo que dudes o no pudiste leer (vacío si todo está claro). Responde en español.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"image\",\n          \"source\": {\n            \"type\": \"base64\",\n            \"media_type\": $json.mediaType,\n            \"data\": $json.imageBase64\n          }\n        },\n        {\n          \"type\": \"text\",\n          \"text\": $json.contextText\n        }\n      ]\n    }\n  ],\n  \"output_config\": {\n    \"format\": {\n      \"type\": \"json_schema\",\n      \"schema\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"kind\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"projection\",\n              \"stock\",\n              \"unknown\"\n            ]\n          },\n          \"date\": {\n            \"type\": [\n              \"string\",\n              \"null\"\n            ]\n          },\n          \"rows\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"product\": {\n                  \"type\": \"string\"\n                },\n                \"units\": {\n                  \"type\": [\n                    \"integer\",\n                    \"null\"\n                  ]\n                },\n                \"kg\": {\n                  \"type\": [\n                    \"number\",\n                    \"null\"\n                  ]\n                },\n                \"lot_date\": {\n                  \"type\": [\n                    \"string\",\n                    \"null\"\n                  ]\n                }\n              },\n              \"required\": [\n                \"product\",\n                \"units\",\n                \"kg\",\n                \"lot_date\"\n              ],\n              \"additionalProperties\": false\n            }\n          },\n          \"notes\": {\n            \"type\": \"string\"\n          }\n        },\n        \"required\": [\n          \"kind\",\n          \"date\",\n          \"rows\",\n          \"notes\"\n        ],\n        \"additionalProperties\": false\n      }\n    }\n  }\n}) }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "d4a10005-0037-4c0e-9f00-000000000037",
+      "name": "Leer la foto con Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        380
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "aviplannerAnthropic",
+          "name": "Anthropic (AviPlanner)"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Visión con salida estructurada (JSON Schema del ADR 0024). Modelo: ASSISTANT_VISION_MODEL (claude-sonnet-5-5 por defecto). Sin temperature. Clave en la credencial «Anthropic (AviPlanner)»."
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.item.json;\nlet extraction = null;\ntry {\n  const block = ((r.body && r.body.content) || []).find(b => b.type === 'text');\n  extraction = JSON.parse(block.text);\n} catch (e) {\n  extraction = null;\n}\nreturn { json: { ok: r.statusCode === 200 && !!extraction && typeof extraction === 'object', extraction } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "d4a10005-0038-4c0e-9f00-000000000038",
+      "name": "Leer la extracción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        380
+      ],
+      "notes": "Parsea content[0].text. Si no es JSON válido, ok = false y se responde que no se pudo leer."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10005-0205-4c0e-9f00-000000000205",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10005-0039-4c0e-9f00-000000000039",
+      "name": "¿Se leyó la foto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/channel/photo",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: 'telegram', sender: String($('Mensaje de Telegram').item.json.message.chat.id), extraction: $json.extraction }) }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "d4a10005-0040-4c0e-9f00-000000000040",
+      "name": "Enviar la foto al backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2260,
+        320
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "El backend valida productos, fechas y permisos, guarda un borrador y responde con la tabla a confirmar (sí / no)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10005-0206-4c0e-9f00-000000000206",
+              "leftValue": "={{ $json.statusCode === 200 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10005-0041-4c0e-9f00-000000000041",
+      "name": "¿Respondió bien?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Contexto de la persona').first().json.body || {};\nconst msg = $('Mensaje de Telegram').first().json.message || {};\nconst item = $input.first();\nconst bin = item.binary.data;\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];\nconst mt = String(bin.mimeType || '').toLowerCase();\nconst mediaType = allowed.includes(mt) ? mt : 'image/jpeg';\nconst dates = (ctx.dates || []).map(d => (typeof d === 'string' ? d : (d.date || JSON.stringify(d)))).join(', ');\nconst products = (ctx.products || []).map(p => '- ' + p.id + ': ' + p.name + (p.category ? ' (' + p.category + (p.unit ? ', ' + p.unit : '') + ')' : '')).join('\\n');\nconst caption = msg.caption || '';\nconst contextText = [\n  'Hoy: ' + (ctx.today || ''),\n  'Fechas válidas: ' + (dates || '(ninguna)'),\n  'Puede proyectar: ' + (ctx.can_project ? 'sí' : 'no'),\n  'Puede registrar stock: ' + (ctx.can_stock ? 'sí' : 'no'),\n  'Productos (id: nombre):',\n  products || '(sin lista)',\n  caption ? 'Pie de foto: ' + caption : 'La foto no trae pie de foto.',\n  'Lee la foto y devuelve los datos en el formato pedido.'\n].join('\\n');\nreturn [{ json: { imageBase64: buf.toString('base64'), mediaType, contextText } }];\n"
+      },
+      "id": "d4a10005-0042-4c0e-9f00-000000000042",
+      "name": "Preparar la foto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        380
+      ],
+      "notes": "Pasa la imagen a base64, elige el media_type real y arma el contexto (hoy, fechas, productos, permisos, pie de foto)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10005-0207-4c0e-9f00-000000000207",
+              "leftValue": "={{ Array.isArray($json.body.files) && $json.body.files.length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10005-0043-4c0e-9f00-000000000043",
+      "name": "¿Trae archivos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "body.files",
+        "options": {}
+      },
+      "id": "d4a10005-0044-4c0e-9f00-000000000044",
+      "name": "Un ítem por archivo",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        2920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BACKEND_URL }}{{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "d4a10005-0045-4c0e-9f00-000000000045",
+      "name": "Descargar el archivo generado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3140,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Excel generado por el backend; el enlace vence en 15 minutos."
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $('Mensaje de Telegram').item.json.message.photo[$('Mensaje de Telegram').item.json.message.photo.length - 1].file_id }}",
+        "download": true
+      },
+      "id": "d4a10005-0046-4c0e-9f00-000000000046",
+      "name": "Pedir la foto",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1160,
+        380
+      ],
+      "webhookId": "d4a10005-0933-4c0e-9f00-000000000933",
+      "notes": "getFile de la foto más grande (la última de message.photo) y la descarga como binario."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
+        "text": "={{ String($json.body.text || 'Listo.').slice(0, 3900).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/```[a-z]*\\n?([\\s\\S]*?)```/g, '<pre>$1</pre>').replace(/\\*([^*\\n]+)\\*/g, '<b>$1</b>') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "d4a10005-0047-4c0e-9f00-000000000047",
+      "name": "Responder al chat",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2700,
+        80
+      ],
+      "webhookId": "d4a10005-0934-4c0e-9f00-000000000934",
+      "notes": "HTML: el backend no escapa, así que se escapan < > & aquí y los bloques entre ``` (tablas) van en <pre> para que se vean alineados."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
+        "operation": "sendDocument",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "appendAttribution": false,
+          "fileName": "={{ $('Un ítem por archivo').item.json.name }}"
+        }
+      },
+      "id": "d4a10005-0048-4c0e-9f00-000000000048",
+      "name": "Enviar el documento",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3360,
+        300
+      ],
+      "webhookId": "d4a10005-0935-4c0e-9f00-000000000935"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
+        "text": "={{ $json.statusCode === 429 ? 'Me estás escribiendo muy seguido. Espera un minuto e inténtalo de nuevo.' : 'No pude responderte en este momento. Inténtalo de nuevo en un minuto.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d4a10005-0049-4c0e-9f00-000000000049",
+      "name": "Responder: no se pudo",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2700,
+        480
+      ],
+      "webhookId": "d4a10005-0936-4c0e-9f00-000000000936"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
+        "text": "={{ ($json.statusCode === 200 && $json.body && typeof $json.body.text === 'string' && $json.body.text) || 'Todavía no tienes tu cuenta vinculada. En la app abre el asistente, toca «Usar en Telegram o WhatsApp», pide tu código y envíamelo así: vincular ABC123' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d4a10005-0050-4c0e-9f00-000000000050",
+      "name": "Responder: falta vincular",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1160,
+        580
+      ],
+      "webhookId": "d4a10005-0937-4c0e-9f00-000000000937"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
+        "text": "No pude leer la foto. Prueba con otra más nítida, de frente y con buena luz, o escríbeme los datos.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d4a10005-0051-4c0e-9f00-000000000051",
+      "name": "Responder: no se leyó la foto",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2260,
+        580
+      ],
+      "webhookId": "d4a10005-0938-4c0e-9f00-000000000938"
     }
   ],
   "connections": {
@@ -256,7 +845,7 @@
       "main": [
         [
           {
-            "node": "¿Chat autorizado?",
+            "node": "Tipo de mensaje",
             "type": "main",
             "index": 0
           }
@@ -267,24 +856,6 @@
       "main": [
         [
           {
-            "node": "¿Trae un Excel o CSV?",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "No autorizado",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "¿Trae un Excel o CSV?": {
-      "main": [
-        [
-          {
             "node": "Cargar en el backend",
             "type": "main",
             "index": 0
@@ -292,7 +863,7 @@
         ],
         [
           {
-            "node": "Explicar qué enviar",
+            "node": "No autorizado",
             "type": "main",
             "index": 0
           }
@@ -332,11 +903,238 @@
         ],
         []
       ]
+    },
+    "Tipo de mensaje": {
+      "main": [
+        [
+          {
+            "node": "¿Chat autorizado?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Escribiendo (texto)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Escribiendo (foto)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar qué enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escribiendo (texto)": {
+      "main": [
+        [
+          {
+            "node": "Preguntar al asistente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escribiendo (foto)": {
+      "main": [
+        [
+          {
+            "node": "Contexto de la persona",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preguntar al asistente": {
+      "main": [
+        [
+          {
+            "node": "¿Respondió bien?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contexto de la persona": {
+      "main": [
+        [
+          {
+            "node": "¿Está vinculada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Está vinculada?": {
+      "main": [
+        [
+          {
+            "node": "Pedir la foto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: falta vincular",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedir la foto": {
+      "main": [
+        [
+          {
+            "node": "Preparar la foto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar la foto": {
+      "main": [
+        [
+          {
+            "node": "Leer la foto con Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer la foto con Claude": {
+      "main": [
+        [
+          {
+            "node": "Leer la extracción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer la extracción": {
+      "main": [
+        [
+          {
+            "node": "¿Se leyó la foto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Se leyó la foto?": {
+      "main": [
+        [
+          {
+            "node": "Enviar la foto al backend",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: no se leyó la foto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar la foto al backend": {
+      "main": [
+        [
+          {
+            "node": "¿Respondió bien?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Respondió bien?": {
+      "main": [
+        [
+          {
+            "node": "Responder al chat",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "¿Trae archivos?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: no se pudo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Trae archivos?": {
+      "main": [
+        [
+          {
+            "node": "Un ítem por archivo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Un ítem por archivo": {
+      "main": [
+        [
+          {
+            "node": "Descargar el archivo generado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar el archivo generado": {
+      "main": [
+        [
+          {
+            "node": "Enviar el documento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
-    "timezone": "America/Lima"
+    "timezone": "America/Lima",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false
   },
   "active": false,
   "pinData": {},

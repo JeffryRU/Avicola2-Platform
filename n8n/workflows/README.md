@@ -111,7 +111,7 @@ Sin la cabecera `Authorization`, o con un token inválido, responde 401.
 
 ```
 Pregunta desde la app (webhook, X-Assistant-Token) → Agente de la app ← Claude (ASSISTANT_MODEL)
-                                                    ← Memoria (por usuario y conversación)
+                                                    (memoria: los últimos mensajes guardados, en body.history)
                                                     ← AviPlanner MCP ({{ $env.BACKEND_URL }}/mcp?ticket=<pase>)
                                   → Responder a la app {reply}
 ```
@@ -191,25 +191,61 @@ Quien tenga el export de ARIS (DESPACHO y/o VENTAS, en Excel o CSV) lo deja en u
 ## 05_telegram_aris
 
 ```
-Telegram Trigger (mensaje, descarga el adjunto) → ¿chat autorizado? → ¿Excel o CSV? → POST /api/internal/aris → responder → ¿200? → aviso
-                                                     └→ «no autorizado» (le dice su id)  └→ explicar qué enviar
+Telegram Trigger → Tipo de mensaje ─┬ Excel o CSV → ¿chat autorizado? → POST /api/internal/aris → responder → ¿200? → aviso
+                                    │                   └→ «no autorizado» (le dice su id)
+                                    ├ Texto → «escribiendo…» → POST /api/internal/channel/message → ¿200? ─┬→ responder (HTML, tablas en <pre>)
+                                    │                                                                      │   └→ ¿trae archivos? → un ítem por archivo → descargar → sendDocument
+                                    │                                                                      └→ «no pude responderte» (429: espera un minuto)
+                                    ├ Foto → «escribiendo…» → GET /channel/context → ¿vinculada? ─┬→ getFile (la foto más grande) → base64
+                                    │                                                              │     → Claude (visión, JSON Schema) → ¿se leyó? → POST /channel/photo → (mismo ¿200? de arriba)
+                                    │                                                              └→ «vincula tu cuenta»
+                                    └ Otro → explicar qué enviar
 ```
+
+Un solo bot atiende ARIS y el asistente (Telegram solo admite un webhook por bot). Decisión en el [ADR 0024](../../docs/adr/0024-historial-tablas-y-canales-del-asistente.md).
 
 1. **Bot.** En Telegram, habla con **@BotFather** → `/newbot`. Copia el token.
 2. **Credencial.** En n8n, crea una credencial **Telegram API** con ese token y úsala en todos los nodos de Telegram del workflow.
-3. **Autorizados.** Activa el workflow y escríbele al bot: te contestará el id de tu chat. Ponlo en `ARIS_TELEGRAM_CHAT_IDS` (separados por comas; un grupo también sirve) y reinicia n8n.
-4. **Requisito:** n8n tiene que tener HTTPS público (`WEBHOOK_URL`), porque Telegram llama a su webhook. En develop y producción ya lo tiene.
+3. **Autorizados para ARIS.** Solo afecta al Excel o CSV. Activa el workflow y envía un Excel: el bot te contestará el id de tu chat. Ponlo en `ARIS_TELEGRAM_CHAT_IDS` (separados por comas; un grupo también sirve) y reinicia n8n.
+4. **Asistente: credencial y variables.** El paso de la foto llama a la API de Anthropic con la credencial **`Anthropic (AviPlanner)`** (tipo Anthropic, la misma de `03` y `07`): elígela en el nodo *Leer la foto con Claude*. Variable opcional de n8n: `ASSISTANT_VISION_MODEL` (`claude-sonnet-5-5` por defecto; la lectura de fotos necesita un modelo con visión). También se usan `BACKEND_URL` e `INGEST_API_TOKEN`, como en ARIS.
+5. **Requisito:** n8n tiene que tener HTTPS público (`WEBHOOK_URL`), porque Telegram llama a su webhook. En develop y producción ya lo tiene.
+
+### Vincular a una persona
+
+El asistente responde **como la persona vinculada**, con sus permisos. Sin vinculación, el bot solo explica cómo hacerlo. En la app: asistente → «Usar en Telegram o WhatsApp» → aparece un código de 6 caracteres que vale 10 minutos. La persona se lo escribe al bot: `vincular ABC123` (también `/vincular ABC123` o `/start ABC123`). No hace falta agregar su chat a `ARIS_TELEGRAM_CHAT_IDS`.
+
+### Probarlo
+
+1. Escribe `hola` al bot: debe explicar cómo vincularse. Vincula con un código y pregunta «¿cuánto proyecté para mañana?»: responde como esa persona; una tabla llega alineada y, además, como Excel adjunto.
+2. Manda una foto de una hoja de proyección (con o sin pie de foto): debe responder con la tabla de lo que va a registrar y «Responde sí para registrarlo o no para descartarlo». Una foto sin vincular responde cómo vincularse.
+3. Manda un Excel de ARIS desde un chat autorizado: se carga igual que antes. Un sticker o un audio: responde qué se puede enviar.
+4. Las ejecuciones **no se guardan** cuando salen bien (`saveDataSuccessExecution: none`, para no dejar fotos ni preguntas en n8n); las que fallan sí, para poder depurar.
 
 ## 06_whatsapp_aris
 
 ```
-WhatsApp Trigger (messages) → ¿número autorizado? → ¿documento? → enlace (Graph API) → descargar → POST /api/internal/aris → responder → ¿200? → aviso
-                                └→ «no autorizado»       └→ explicar qué enviar
+WhatsApp Trigger → ¿es un mensaje? → Tipo de mensaje ─┬ Excel o CSV → ¿número autorizado? → enlace (Graph API) → descargar → POST /api/internal/aris → responder → ¿200? → aviso
+                                                      │                   └→ «no autorizado»
+                                                      ├ Texto → POST /api/internal/channel/message → ¿200? ─┬→ responder
+                                                      │                                                     │   └→ ¿trae archivos? → un ítem por archivo → descargar → subir a /{phone-number-id}/media → enviar tipo document
+                                                      │                                                     └→ «no pude responderte»
+                                                      ├ Foto → GET /channel/context → ¿vinculada? ─┬→ enlace (Graph API) → descargar → base64
+                                                      │                                            │     → Claude (visión, JSON Schema) → ¿se leyó? → POST /channel/photo → (mismo ¿200?)
+                                                      │                                            └→ «vincula tu cuenta»
+                                                      └ Otro → explicar qué enviar
 ```
+
+Un solo número atiende ARIS y el asistente (la app de Meta admite un webhook por número). Decisión en el [ADR 0024](../../docs/adr/0024-historial-tablas-y-canales-del-asistente.md).
 
 1. **Cuenta de Meta.** En developers.facebook.com, crea una app de tipo *Business* y agrégale el producto **WhatsApp**. La prueba gratuita trae un número de prueba que acepta hasta 5 destinatarios verificados. Para usar el número de la empresa hay que verificarla en Meta.
 2. **Credenciales en n8n.**
-   - **WhatsApp API:** el token de acceso permanente (de un usuario del sistema) y el *Business Account ID*. Úsala en los nodos *Pedir el enlace del archivo*, *Descargar el archivo* y en los de respuesta.
+   - **WhatsApp API:** el token de acceso permanente (de un usuario del sistema) y el *Business Account ID*. Úsala en los nodos de la Graph API (*Pedir el enlace…*, *Descargar…*, *Subir a WhatsApp*, *Enviar el documento*) y en los de respuesta.
    - **WhatsApp OAuth API:** el *App ID* y el *App Secret*. Úsala en *Mensaje de WhatsApp*: n8n registra el webhook en Meta al activar el workflow.
-3. **Autorizados.** Pon en `ARIS_WHATSAPP_NUMBERS` los números que pueden enviar, con código de país y sin «+» (por ejemplo, `51987654321`). Reinicia n8n.
-4. **Para responder:** WhatsApp solo deja contestar en las 24 horas siguientes al mensaje de la persona. Aquí siempre es así, porque la respuesta va en el momento.
+   - **`Anthropic (AviPlanner)`** (tipo Anthropic, la misma de `03` y `07`): en el nodo *Leer la foto con Claude*.
+3. **Autorizados para ARIS.** Solo afecta al Excel o CSV: pon en `ARIS_WHATSAPP_NUMBERS` los números que pueden enviarlo, con código de país y sin «+» (por ejemplo, `51987654321`). Reinicia n8n.
+4. **Variable opcional:** `ASSISTANT_VISION_MODEL` (`claude-sonnet-5-5` por defecto) para leer las fotos. Usa también `BACKEND_URL` e `INGEST_API_TOKEN`.
+5. **Para responder:** WhatsApp solo deja contestar en las 24 horas siguientes al mensaje de la persona. Aquí siempre es así, porque la respuesta va en el momento.
+
+### Vincular a una persona y probarlo
+
+Igual que en Telegram: en la app, asistente → «Usar en Telegram o WhatsApp» → código de 6 caracteres (10 minutos) → la persona le escribe al número `vincular ABC123`. El `sender` es su número sin «+». Pruebas: texto («¿cuánto proyecté para mañana?»), foto de una hoja (devuelve la tabla y pide «sí» o «no»), Excel de ARIS desde un número autorizado, y un audio o sticker (explica qué se puede enviar). WhatsApp no tiene el aviso «escribiendo» para bots, así que la respuesta llega sin él. Las ejecuciones correctas no se guardan, igual que en `05`.
