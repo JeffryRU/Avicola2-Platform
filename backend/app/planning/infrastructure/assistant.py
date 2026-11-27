@@ -66,6 +66,8 @@ class N8nAssistant:
                     "scope": request.scope,
                 },
                 "history": [{"role": role, "text": text} for role, text in request.history],
+                # El flujo 07 lee la memoria como texto, una línea por mensaje.
+                "history_text": _history_text(request.history),
             },
             ensure_ascii=False,
         ).encode()
@@ -75,6 +77,12 @@ class N8nAssistant:
             method="POST",
             headers={"Content-Type": "application/json", "X-Assistant-Token": self.token},
         )
+
+
+def _history_text(history: tuple[tuple[str, str], ...]) -> str:
+    return "\n".join(
+        ("Persona: " if role == "user" else "Asistente: ") + text for role, text in history
+    )
 
 
 def _reply_of(data: object) -> str:
