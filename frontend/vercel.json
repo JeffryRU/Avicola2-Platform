@@ -10,7 +10,7 @@
       "missing": [
         {
           "type": "host",
-          "value": "avicola2-platform(-git-main|-git-mvp1)?(-jeffry25ru-gmailcoms-projects)?\\.vercel\\.app"
+          "value": "(avicola2-platform(-git-main|-git-mvp1)?(-jeffry25ru-gmailcoms-projects)?\\.vercel\\.app|avicola2\\.dnthub\\.com)"
         }
       ],
       "destination": "https://avicola-dev.13-140-234-184.sslip.io/api/:path*"
