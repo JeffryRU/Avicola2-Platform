@@ -208,7 +208,7 @@ Un solo bot atiende ARIS y el asistente (Telegram solo admite un webhook por bot
 2. **Credencial.** En n8n, crea una credencial **Telegram API** llamada `Telegram (AviPlanner)` con ese token (el workflow ya la usa en todos sus nodos de Telegram, con el id `aviplannerTelegram`).
 3. **Autorizados para ARIS.** Solo afecta al Excel o CSV. Activa el workflow y envía un Excel: el bot te contestará el id de tu chat. Ponlo en `ARIS_TELEGRAM_CHAT_IDS` (separados por comas; un grupo también sirve) y reinicia n8n.
 4. **Asistente: credencial y variables.** El paso de la foto llama a la API de Anthropic con la credencial **`Anthropic (AviPlanner)`** (tipo Anthropic, la misma de `03` y `07`): elígela en el nodo *Leer la foto con Claude*. Variable opcional de n8n: `ASSISTANT_VISION_MODEL` (`claude-sonnet-5-5` por defecto; la lectura de fotos necesita un modelo con visión). También se usan `BACKEND_URL` e `INGEST_API_TOKEN`, como en ARIS.
-5. **Requisito:** n8n tiene que tener HTTPS público (`WEBHOOK_URL`), porque Telegram llama a su webhook. En Coolify, con `N8N_PUBLIC_WEBHOOKS=true` (solo `/webhook/`; hoy, en producción).
+5. **Requisito:** n8n tiene que tener HTTPS público (`WEBHOOK_URL`), porque Telegram llama a su webhook. En Coolify se publica solo `/webhook/` (ver `docs/deploy.md`); hoy, en producción.
 
 ### Vincular a una persona
 
