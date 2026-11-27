@@ -23,8 +23,9 @@ class N8nAssistant:
         self.url, self.token, self.timeout = url, token, timeout_seconds
 
     def ask(self, request: AssistantRequest) -> str:
-        with urllib.request.urlopen(self._http(request), timeout=self.timeout) as response:  # noqa: S310
-            return _reply_of(json.loads(response.read().decode() or "{}"))
+        """La respuesta entera (Telegram, WhatsApp y la API sin streaming). El workflow puede
+        responder en partes o de una vez: se leen igual que en `ask_stream`."""
+        return "".join(self.ask_stream(request))
 
     def ask_stream(self, request: AssistantRequest) -> Iterator[str]:
         """La respuesta en partes: el webhook de n8n en modo «Streaming» manda una línea JSON por

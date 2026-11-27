@@ -223,8 +223,8 @@ def test_n8n_gateway_sends_the_secret_and_reads_the_reply(monkeypatch) -> None:
         def __exit__(self, *_):
             return False
 
-        def read(self) -> bytes:
-            return json.dumps({"output": "Hola"}).encode()
+        def __iter__(self):
+            return iter([json.dumps({"output": "Hola"}).encode()])
 
     def urlopen(request, timeout):
         seen.update(request.headers, timeout=timeout, body=json.loads(request.data))
@@ -417,6 +417,8 @@ def test_n8n_gateway_reads_the_streamed_lines(monkeypatch) -> None:
     request = AssistantRequest("hola", "u:c", "t", "u", "U", "seller", ())
     gateway = adapter.N8nAssistant("http://n8n/x", "s", 30)
     assert list(gateway.ask_stream(request)) == ["Ho", "la"]
+    # La respuesta entera (Telegram, WhatsApp) también sale de las partes.
+    assert gateway.ask(request) == "Hola"
     # Un workflow aún sin streaming (un solo JSON) también funciona.
     lines[:] = [{"output": "Hola entero"}]
     assert list(gateway.ask_stream(request)) == ["Hola entero"]
