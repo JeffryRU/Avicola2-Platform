@@ -1,34 +1,30 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, BarChart3, Calendar, Clock, Send, Tag } from 'lucide-react'
+import { AlertCircle, BarChart3, Calendar, Check, Clock, Send, Tag } from 'lucide-react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { dFull, dShort } from '@/shared/domain/dates'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { useRequiredSession } from '@/features/auth'
 import type { SubmitOutcome } from '@/features/projections/application/planning-service'
-import { sumUnits } from '@/features/catalog/domain/catalog'
+import { sumUnits, type Units } from '@/shared/domain/products'
 import type { Draft } from '@/features/projections/domain/draft'
-import type { Units } from '@/features/catalog/domain/schemas'
-import { useCatalog } from '@/features/catalog/ui/hooks'
-import { useQueue } from '@/features/projections/ui/hooks'
-import { SummaryRow } from '@/features/projections/ui/components/review-dialog'
+import { useCatalog } from '@/features/catalog'
+import { useFlushQueue, useQueue } from '@/features/projections/ui/hooks'
+import { SummaryRow } from '@/shared/ui/components/summary-row'
 import { CountUp } from '@/shared/ui/components/charts'
-import { Confetti, Note } from '@/shared/ui/components/feedback'
-import { PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
+import { Note } from '@/shared/ui/components/feedback'
+import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import { cn } from '@/shared/ui/lib/utils'
-import { daysCount } from '@/shared/types/labels'
-import { kgAmount, unitsCount } from '@/shared/types/labels'
+import { daysCount, kgAmount, unitsCount, RETRY_LABEL } from '@/shared/types/labels'
 
 export function SuccessPage() {
   const state = useLocation().state as { outcome: SubmitOutcome; draft: Draft } | null
   const { catalog } = useCatalog()
-  const { planning } = useContainer()
+  const flushQueue = useFlushQueue()
   const { seller } = useRequiredSession()
   const queue = useQueue()
   const navigate = useNavigate()
-  const client = useQueryClient()
   // Si la cola se vació (se reintentó con éxito), el envío ya está sincronizado.
   const pending =
     state?.outcome.sync === 'pending' && queue.some((q) => q.submission_id === state.outcome.submission.submission_id)
@@ -43,57 +39,51 @@ export function SuccessPage() {
   const kg = days.reduce((s, d) => s + catalog.kg(shown(d.units)), 0)
 
   async function retry() {
-    const r = await planning.flush(seller.username)
+    const r = await flushQueue.mutateAsync(seller.username)
     if (r.sent) {
-      await client.invalidateQueries({ queryKey: ['window'] })
       toast.success('Proyección sincronizada')
     } else toast('No se pudo sincronizar. Se intentará de nuevo.')
   }
 
   return (
     <div>
-      <PageHeader title="Confirmar proyección" />
+      <PageHeader title="Confirmar proyección" back={paths.home} />
       <PageBody>
-        <div className="mx-auto max-w-[560px] pt-6 text-center">
-          <div
-            className={cn(
-              'relative mx-auto mt-2 mb-[18px] grid size-[104px] animate-popin place-items-center rounded-full shadow-[0_0_0_10px_var(--ok-soft)]',
-              pending ? 'bg-warn shadow-[0_0_0_10px_var(--warn-soft)]' : 'bg-ok',
-            )}
-          >
-            <svg
-              width="52"
-              height="52"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#fff"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        <div className="mx-auto grid max-w-xl gap-4 dsk:mx-0">
+          <div role="status" className="flex items-start gap-3">
+            <span
+              aria-hidden
+              className={cn(
+                'mt-0.5 grid size-9 flex-none place-items-center rounded-full border-2',
+                pending ? 'border-warn text-warn' : 'border-ok text-ok',
+              )}
             >
-              <path className="tick-path" d="M5 12.5l4.5 4.5L19 7.5" />
-            </svg>
+              {pending ? <Clock className="size-4.5" /> : <Check className="size-5" strokeWidth={2.5} />}
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-xl font-semibold hc:text-2xl hc:font-extrabold">
+                {pending ? 'Proyección guardada' : '¡Proyección enviada!'}
+              </h2>
+              <p className="text-ink-2">
+                {pending
+                  ? 'Quedó guardada en este dispositivo y se enviará en cuanto haya conexión.'
+                  : 'Tu proyección fue registrada y enviada a planificación.'}
+              </p>
+            </div>
           </div>
-          <h1 className="text-[30px] font-extrabold">{pending ? 'Proyección guardada' : '¡Proyección enviada!'}</h1>
-          <p className="mt-2 mb-[22px] text-[17px] text-ink-2">
-            {pending
-              ? 'Quedó guardada en este dispositivo y se enviará en cuanto haya conexión.'
-              : 'Tu proyección fue registrada y enviada a planificación.'}
-          </p>
           {pending && outcome.sync === 'pending' && (
-            <Note tone="warn" icon={<AlertCircle />} className="mb-4 text-left">
+            <Note tone="warn" icon={<AlertCircle />}>
               <div className="min-w-0 flex-1">
-                <b>No se pudo enviar.</b>
-                <br />
+                <b className="block">No se pudo enviar.</b>
                 {outcome.error}
               </div>
-              <Button className="h-10 font-bold" onClick={retry}>
-                Reintentar
+              <Button variant="outline" onClick={retry}>
+                {RETRY_LABEL}
               </Button>
             </Note>
           )}
-          <Section className="text-left">
-            <div className="grid px-4 pt-3 pb-4 dsk:px-5 dsk:pb-5">
+          <Section title="Resumen">
+            <div className="grid px-4 pb-1 dsk:px-5">
               <SummaryRow icon={<Calendar />} label="Fecha de inicio">
                 {dFull(state.draft.start)}
               </SummaryRow>
@@ -104,55 +94,46 @@ export function SuccessPage() {
                 {catalog.detailedLabel(selection)}
               </SummaryRow>
               <SummaryRow icon={<BarChart3 />} label="Total proyectado">
-                <CountUp value={units} /> unidades<small>{kgAmount(kg, true)}</small>
+                <span className="num">
+                  <CountUp value={units} />
+                </span>{' '}
+                unidades<small className="num">{kgAmount(kg, true)}</small>
               </SummaryRow>
               <SummaryRow icon={<Send />} label="Destino">
                 {pending ? 'En este dispositivo (por sincronizar)' : 'Base de datos'}
               </SummaryRow>
             </div>
           </Section>
-          <h2 className="mt-5 mb-2.5 text-left text-[19px] font-extrabold">Total por día</h2>
-          <Section>
-            <div className="overflow-x-auto p-2.5">
-              <table className={tableCls.table}>
-                <thead>
-                  <tr>
-                    <th className={tableCls.th}>Fecha</th>
-                    <th className={tableCls.th}>Unidades</th>
-                    <th className={tableCls.th}>Kg (aprox.)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {days.map((d) => (
-                    <tr
-                      key={d.date}
-                      className={cn(tableCls.row, 'cursor-pointer')}
-                      onClick={() => navigate(paths.day(d.date))}
-                    >
-                      <td className={tableCls.td}>{dShort(d.date)}</td>
-                      <td className={tableCls.td}>{unitsCount(sumUnits(shown(d.units)))}</td>
-                      <td className={tableCls.td}>{kgAmount(catalog.kg(shown(d.units)))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <Section title="Total por día">
+            <DataTable
+              rows={days}
+              rowKey={(d) => d.date}
+              onRowClick={(d) => void navigate(paths.day(d.date))}
+              columns={[
+                {
+                  key: 'date',
+                  header: 'Fecha',
+                  cell: (d) => (
+                    <Link to={paths.day(d.date)} className="font-medium underline-offset-4 hover:underline">
+                      {dShort(d.date)}
+                    </Link>
+                  ),
+                },
+                { key: 'units', header: 'Unidades', numeric: true, cell: (d) => unitsCount(sumUnits(shown(d.units))) },
+                { key: 'kg', header: 'Kg (aprox.)', numeric: true, cell: (d) => kgAmount(catalog.kg(shown(d.units))) },
+              ]}
+            />
           </Section>
-          <div className="mt-5 grid gap-2.5">
-            <Button
-              asChild
-              variant="outline"
-              className="h-[54px] rounded-[14px] border-[1.5px] border-primary text-[16.5px] font-bold text-primary"
-            >
+          <div className="grid gap-2.5 dsk:flex dsk:justify-end">
+            <Button asChild variant="outline" className="h-12 text-md dsk:h-control dsk:text-base">
               <Link to={paths.mine}>Ver mis proyecciones</Link>
             </Button>
-            <Button asChild className="h-[54px] rounded-[14px] text-[16.5px] font-bold">
+            <Button asChild className="h-12 text-md dsk:h-control dsk:text-base">
               <Link to={paths.register}>Nueva proyección</Link>
             </Button>
           </div>
         </div>
       </PageBody>
-      {state.outcome.sync === 'ok' && <Confetti />}
     </div>
   )
 }

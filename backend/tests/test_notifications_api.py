@@ -19,6 +19,7 @@ from app.planning.domain.notifications import (
 from app.planning.infrastructure import cli
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.events import InMemoryEventBus, event_bus
+from app.planning.infrastructure.http import events as events_http
 from app.planning.infrastructure.http.events import _stream
 from app.shared.infrastructure.database.metadata import metadata
 from app.shared.infrastructure.database.session import SessionLocal, engine
@@ -89,7 +90,8 @@ def test_daily_reminder_only_for_pending_sellers_and_once(client):
     assert r.json() == {"created": 6}  # rnavarro ya envió y el supervisor no proyecta
     assert client.post("/api/internal/notifications/projection-reminders").json() == {"created": 0}
     reminder = _as("hdias").get("/api/notifications").json()["items"][0]
-    assert reminder["title"] == "Proyección pendiente" and reminder["link"] == "/registrar"
+    assert reminder["title"] == "Proyección pendiente"
+    assert reminder["link"].startswith("/registrar?dia=")
     assert _as("rnavarro").get("/api/notifications").json()["unread"] == 0
 
 
@@ -153,13 +155,28 @@ def test_stream_sends_events_and_stops_on_session_revoked():
         async with bus.subscribe("rnavarro", "seller") as sub:
             bus.publish(Event(NOTIFICATION_CREATED, Audience.users("rnavarro"), {"id": 7}))
             bus.publish(Event(SESSION_REVOKED, Audience.users("rnavarro"), {"reason": "x"}))
-            return [chunk async for chunk in _stream(_FakeRequest(10), sub)]
+            return [chunk async for chunk in _stream(_FakeRequest(10), sub, None)]
 
     chunks = asyncio.run(scenario())
     assert chunks[0].startswith("retry: 5000")
     assert chunks[1] == 'event: notification\ndata: {"id": 7}\n\n'
     assert chunks[2].startswith("event: session.revoked")
     assert len(chunks) == 3  # tras cerrar la sesión no sigue enviando
+
+
+def test_stream_closes_when_the_session_stops_being_valid(monkeypatch):
+    """Un cambio hecho en otro proceso (p. ej., `cli rol`) no pasa por este bus: el
+    heartbeat revalida la sesión y cierra el canal."""
+    monkeypatch.setattr(events_http, "HEARTBEAT_SECONDS", 0.01)
+    bus = InMemoryEventBus()
+
+    async def scenario():
+        async with bus.subscribe("rnavarro", "seller") as sub:
+            return [chunk async for chunk in _stream(_FakeRequest(10), sub, "token-viejo")]
+
+    chunks = asyncio.run(scenario())
+    assert chunks[-1].startswith("event: session.revoked")
+    assert len(chunks) == 2  # "conectado" y el cierre, sin pings
 
 
 def test_reset_password_revokes_open_streams(client):
@@ -175,3 +192,45 @@ def test_reset_password_revokes_open_streams(client):
         event_bus.publish = original  # type: ignore[method-assign]
     assert [e.type for e in received] == [SESSION_REVOKED]
     assert received[0].audience.usernames == {"rnavarro"}
+
+
+def test_list_by_day_or_range(client):
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update
+
+    from app.planning.infrastructure.persistence.tables import notifications
+
+    seller = _as("rnavarro")
+    _submit(seller, 0)
+    _submit(seller, 1)
+    supervisor = _as("supervisor")
+    ids = [n["id"] for n in supervisor.get("/api/notifications").json()["items"]]
+    # Una de hace 10 días (a mediodía en Lima = 17:00 UTC).
+    old = TODAY - timedelta(days=10)
+    with SessionLocal() as session:
+        session.execute(
+            update(notifications)
+            .where(notifications.c.id == ids[-1])
+            .values(created_at=datetime(old.year, old.month, old.day, 17, tzinfo=UTC))
+        )
+        session.commit()
+
+    def listed(**params):
+        r = supervisor.get("/api/notifications", params=params)
+        assert r.status_code == 200, r.text
+        return [n["id"] for n in r.json()["items"]]
+
+    assert listed(date_from=TODAY, date_to=TODAY) == [ids[0]]
+    assert listed(date_from=old, date_to=old) == [ids[-1]]
+    assert sorted(listed(date_from=old, date_to=TODAY)) == sorted(ids)
+    assert listed(date_from=TODAY - timedelta(days=5), date_to=TODAY - timedelta(days=1)) == []
+    # El conteo de no leídas es de todas, no solo del rango.
+    assert (
+        supervisor.get("/api/notifications", params={"date_from": old, "date_to": old}).json()[
+            "unread"
+        ]
+        == 2
+    )
+    r = supervisor.get("/api/notifications", params={"date_from": TODAY, "date_to": old})
+    assert r.status_code == 422

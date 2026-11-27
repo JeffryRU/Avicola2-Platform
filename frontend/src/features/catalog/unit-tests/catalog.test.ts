@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { bySubcategory, Catalog } from '@/features/catalog/domain/catalog'
+import { bySubcategory } from '@/shared/domain/products'
+import { Catalog } from '@/features/catalog/domain/catalog'
 
 const catalog = new Catalog([
   { id: 'B2', category: 'BRASA', name: 'Brasa 2', kg_per_unit: 1.5, sort_order: 1 },
@@ -30,7 +31,9 @@ describe('catálogo', () => {
     expect(c.label({ category: 'BRASA', subcategory: null })).toBe('Todas las brasas')
     expect(c.detailedLabel({ category: 'BRASA', subcategory: null })).toBe('Todas las brasas (chica, mediana y grande)')
     expect(c.detailedLabel({ category: 'BRASA', subcategory: 'Brasa chica' })).toBe('Brasa chica')
-    expect(catalog.choices.map((x) => x.label)).toEqual(['BRASA', 'OTRA'])
+    // Una categoría con un solo producto se llama como él (el pollo sin menudencia).
+    expect(catalog.choices.map((x) => x.label)).toEqual(['BRASA', 'Otro 1'])
+    expect(catalog.label({ category: 'OTRA', subcategory: null })).toBe('Otro 1')
   })
 
   it('agrupa por subcategoría respetando el orden', () => {
@@ -71,5 +74,16 @@ describe('catálogo', () => {
     const chica = { category: 'BRASA', subcategory: 'Brasa chica' }
     expect(c.pick({ P1: 3, P5: 1 }, chica)).toEqual({ P1: 3 })
     expect(c.others({ P1: 3, P5: 1 }, chica)).toEqual({ P5: 1 })
+  })
+
+  it('para proyectar deja solo lo que se proyecta (sin el dato, sí se proyecta)', () => {
+    const c = new Catalog([
+      { id: 'B1', category: 'BRASA', name: 'Brasa 1', kg_per_unit: 1.2, sort_order: 0, projected: true },
+      { id: 'B2', category: 'BRASA', name: 'Brasa 2', kg_per_unit: 1.5, sort_order: 1 },
+      { id: 'M1', category: 'Pollo de mercado', name: 'Entero', kg_per_unit: 2, sort_order: 2, projected: false },
+    ])
+    expect(c.forProjection().categories).toEqual(['BRASA'])
+    expect(c.forProjection().products.map((p) => p.id)).toEqual(['B1', 'B2'])
+    expect(c.categories).toEqual(['BRASA', 'Pollo de mercado'])
   })
 })

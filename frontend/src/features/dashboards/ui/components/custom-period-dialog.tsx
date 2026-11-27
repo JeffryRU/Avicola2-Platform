@@ -43,7 +43,7 @@ export function CustomPeriodDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] rounded-[20px] sm:max-w-[420px]">
+      <DialogContent className="sm:max-w-md">
         {/* Se vuelve a montar en cada apertura: arranca con el período actual. */}
         {open && <RangeForm period={period} onApply={onApply} onCancel={() => onOpenChange(false)} />}
       </DialogContent>
@@ -74,9 +74,9 @@ function RangeForm({
 
   return (
     <form onSubmit={submit} noValidate className="grid gap-4">
-      <DialogHeader className="text-left">
-        <DialogTitle className="flex items-center gap-2 text-[20px] font-extrabold">
-          <CalendarRange className="size-5" /> {CUSTOM_PERIOD_TITLE}
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <CalendarRange className="size-4.5 text-muted-foreground" aria-hidden /> {CUSTOM_PERIOD_TITLE}
         </DialogTitle>
         <DialogDescription>{periodHint(min, max)}</DialogDescription>
       </DialogHeader>
@@ -91,7 +91,6 @@ function RangeForm({
             value={from}
             onChange={(e) => setFrom(e.target.value)}
             aria-invalid={!!message}
-            className="h-11"
           />
         </div>
         <div className="grid gap-1.5">
@@ -104,22 +103,21 @@ function RangeForm({
             value={to}
             onChange={(e) => setTo(e.target.value)}
             aria-invalid={!!message}
-            className="h-11"
           />
         </div>
       </div>
       {message ? (
-        <p role="alert" className="text-[13px] font-semibold text-destructive">
+        <p role="alert" className="text-sm font-medium text-bad">
           {message}
         </p>
       ) : (
-        <p className="text-[13px] text-muted-foreground">{daysCount(diffDays(to, from) + 1)}</p>
+        <p className="num text-sm text-muted-foreground">{daysCount(diffDays(to, from) + 1)}</p>
       )}
       <DialogFooter className="flex-row gap-2 sm:justify-end">
-        <Button type="button" variant="ghost" className="h-11 flex-1 font-bold sm:flex-none sm:px-6" onClick={onCancel}>
+        <Button type="button" variant="outline" className="flex-1 sm:flex-none sm:px-5" onClick={onCancel}>
           {CANCEL_LABEL}
         </Button>
-        <Button type="submit" disabled={!!message} className="h-11 flex-1 font-bold sm:flex-none sm:px-6">
+        <Button type="submit" disabled={!!message} className="flex-1 sm:flex-none sm:px-5">
           {APPLY_LABEL}
         </Button>
       </DialogFooter>

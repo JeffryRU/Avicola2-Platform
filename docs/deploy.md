@@ -106,19 +106,19 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
 
 ## Después del primer despliegue (común)
 
-1. **Comprobar:** `https://APP_DOMAIN/health` responde `{"status":"ok","database":"ok"}`.
+1. **Comprobar:** `https://APP_DOMAIN/health` responde `{"status":"ok"}` (solo el proceso; es el que usa el healthcheck) y `https://APP_DOMAIN/health/ready` responde `{"status":"ok","database":"ok"}`.
 2. **Primer supervisor** (los usuarios de prueba no existen en producción):
    ```bash
-   docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli init
-   docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli supervisor <usuario> "<Nombre Apellido>"
+   docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli supervisor <usuario> "<Nombre Apellido>" --general
    ```
-   - `init` carga el catálogo de productos.
-   - `supervisor` muestra una contraseña temporal, que se cambia al entrar.
+   - El catálogo de productos no hace falta cargarlo: el backend corre `cli init` en cada arranque, después de las migraciones.
+   - `supervisor` muestra una contraseña inicial (se puede cambiar desde el perfil, no es obligatorio). Con `--general` crea un supervisor general, el único que gestiona a otros supervisores y cambia roles ([ADR 0010](adr/0010-roles-y-permisos.md)).
+   - Si ya había un supervisor de antes, se lo asciende con `cli rol <usuario> general_supervisor`.
    - Después, el supervisor crea a los vendedores desde la pantalla **Usuarios**, o se cargan de una vez los 7 de la tabla maestra (`config/planning_seed.yaml`):
      ```bash
      docker compose -f deploy/compose.prod.yml exec backend python -m app.planning.infrastructure.cli vendedores
      ```
-     Imprime una tabla con usuario, contraseña temporal, nombre y zona. Cada uno debe cambiar su contraseña al entrar.
+     Imprime una tabla con usuario, contraseña inicial, nombre y zona. Cada uno puede cambiarla desde su perfil.
      - `--simple`: contraseña `<usuario>2026` (p. ej. `cvillalobos2026`), fácil de dictar. Como contiene el usuario, la app no la acepta como contraseña definitiva.
      - `--reset`: también restablece a los que ya existen y cierra sus sesiones. Sin `--reset`, los existentes no se tocan.
 
@@ -144,12 +144,27 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
 
 ## Respaldos y restauración
 
-- **Base (Supabase):** `db-backup` deja un `avicola2-AAAAMMDD-HHMM.dump` por día en el volumen `backups` y borra los de más de `BACKUP_KEEP_DAYS` días. Para restaurar (con un cliente de PostgreSQL 17):
+- **Base (la local con el ADR 0023, o Supabase):** `db-backup` deja un `aviplanner-AAAAMMDD-HHMM.dump` (los anteriores al cambio de nombre se llaman `avicola2-…`) por día en el volumen `backups` y borra los de más de `BACKUP_KEEP_DAYS` días. Para restaurar (con un cliente de PostgreSQL 17):
   ```bash
-  pg_restore --no-owner --clean --if-exists -d "postgresql://...:5432/postgres?sslmode=require" avicola2-20261103-0300.dump
+  pg_restore --no-owner --clean --if-exists -d "postgresql://...:5432/postgres?sslmode=require" aviplanner-20261103-0300.dump
   ```
 - **Lakehouse:** el volumen `lakehouse`. Se puede rehacer desde los archivos de bronze y la ingesta, pero conviene respaldarlo con los demás.
 - **Fuera del servidor:** un respaldo que solo vive en el mismo disco no protege si el servidor se pierde. Copia los volúmenes `backups` y `lakehouse` a S3 o GCS con el respaldo de volúmenes del panel o con `rclone`.
+
+## Base local en el VPS (ADR 0023)
+
+La base principal pasa a ser el Postgres del propio servidor (`db`) y Supabase queda como copia (`db-copy`, cada `COPY_EVERY_MINUTES`). Hasta que cambies el `.env`, todo sigue en Supabase.
+
+1. **Prepara el `.env`** (sin cambiar todavía `DATABASE_URL`): `LOCAL_DB_PASSWORD` (`openssl rand -hex 24`) y `SUPABASE_COPY_URL` (el pooler de Supabase, sin `+psycopg`). Despliega: `db` arranca vacía y `db-copy` sigue apagada.
+2. **Detén lo que escribe:** `backend` y `n8n` (desde el panel o `docker compose stop backend n8n`).
+3. **Copia Supabase → local** (desde el contenedor `db`):
+   ```bash
+   docker compose exec db sh -c 'pg_dump "postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"      --schema=app --schema=n8n --no-owner --no-privileges --format=custom --file=/tmp/inicial.dump      && pg_restore --no-owner --no-privileges -U aviplanner -d aviplanner /tmp/inicial.dump'
+   ```
+4. **Apunta la app y n8n a `db`:** `DATABASE_URL=postgresql+psycopg://aviplanner:<LOCAL_DB_PASSWORD>@db:5432/aviplanner`, `N8N_DB_HOST=db`, `N8N_DB_USER=aviplanner`, `N8N_DB_PASSWORD=<LOCAL_DB_PASSWORD>`, `N8N_DB_DATABASE=aviplanner` y `N8N_DB_SSL_ENABLED=false`. Opcional: `DB_POOL_SIZE=20`.
+5. **Despliega.** Revisa que entrar, registrar y el asistente funcionen. En los logs de `db-copy` debe aparecer «Copia en Supabase al día» cada 15 min.
+
+**Si el servidor se pierde:** en el servidor nuevo, apunta `DATABASE_URL` y `N8N_DB_*` otra vez a Supabase (como en el ADR 0002) y despliega. Luego repite estos pasos para volver a la base local.
 
 ## Logs
 
@@ -163,4 +178,4 @@ Vercel corta cada conexión reenviada a los 120 s. El canal de notificaciones en
 - [ ] HTTPS activo en `APP_DOMAIN`. El login funciona y la cookie `nv_session` sale con `Secure`.
 - [ ] Editor de n8n sin exponer a internet, o con verificación en dos pasos si se publicó su dominio.
 - [ ] Respaldo de la base del día visible en el volumen `backups`, y copia fuera del servidor configurada.
-- [ ] Primer supervisor creado y contraseña temporal cambiada.
+- [ ] Primer supervisor creado (conviene que cambie la contraseña inicial desde su perfil).

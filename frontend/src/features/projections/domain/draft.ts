@@ -1,10 +1,12 @@
 import { z } from 'zod'
-import { dShort, rangeDates, today, type IsoDate } from '@/shared/domain/dates'
-import { sumUnits } from '@/features/catalog/domain/catalog'
+import { addDays, dShort, rangeDates, today, type IsoDate } from '@/shared/domain/dates'
+import { sumUnits, type Units } from '@/shared/domain/products'
 import { isoDateSchema } from '@/shared/domain/schemas'
+import type { Catalog } from '@/features/catalog'
+import type { MyDay } from '@/features/projections/domain/aggregation'
 
 export const MAX_DAYS = 7
-export const MAX_UNITS = 9999
+export const MAX_UNITS = 99_999
 
 /** Borrador de una nueva proyección (paso 1: fechas y categoría; paso 2: unidades). */
 export const draftSchema = z.object({
@@ -20,7 +22,8 @@ export const draftSchema = z.object({
 })
 export type Draft = z.infer<typeof draftSchema>
 
-export const newDraft = (start: IsoDate = today(), category = ''): Draft => ({
+/** Las proyecciones son de los días siguientes: por defecto empieza mañana. */
+export const newDraft = (start: IsoDate = addDays(today(), 1), category = ''): Draft => ({
   step: 0,
   start,
   days: 3,
@@ -51,4 +54,72 @@ export function submittableDraft(ref: IsoDate = today()) {
 /** Días sin unidades (para marcarlos en rojo). */
 export function emptyDays(d: Draft): IsoDate[] {
   return draftDates(d).filter((date) => sumUnits(d.units[date]) === 0)
+}
+
+/** Hoja vigente de un día del borrador (misma categoría). */
+export interface PreviousSheet {
+  date: IsoDate
+  sheet: number
+  units: Units
+}
+
+/**
+ * INS-06: cada registro abre una hoja nueva. Devuelve las hojas vigentes de los días del borrador
+ * (misma categoría): la que se envíe ahora será la siguiente y la reemplaza, no se suma.
+ */
+export function previousSheets(
+  draft: Draft,
+  days: ReadonlyMap<IsoDate, { category: string; units: Units; sheet?: number }>,
+): PreviousSheet[] {
+  return draftDates(draft).flatMap((date) => {
+    const day = days.get(date)
+    return day?.category === draft.category ? [{ date, sheet: day.sheet ?? 1, units: day.units }] : []
+  })
+}
+
+const pick = (units: Units, keep: (id: string) => boolean): Units =>
+  Object.fromEntries(Object.entries(units).filter(([id]) => keep(id)))
+
+/**
+ * Abre la hoja nueva de cada día: en blanco para los productos que se ven. Los que no se ven
+ * (otro tamaño de brasa) conservan lo de la hoja anterior, porque se envía el día completo.
+ */
+export function openNewSheets(draft: Draft, previous: PreviousSheet[], visible: ReadonlySet<string>): Draft {
+  const before = new Map(previous.map((p) => [p.date, p.units]))
+  const units = { ...draft.units }
+  for (const date of draftDates(draft)) {
+    units[date] ??= pick(before.get(date) ?? {}, (id) => !visible.has(id))
+  }
+  return { ...draft, units }
+}
+
+/** Copia a la hoja nueva lo de la anterior, solo en los días donde aún no se escribió nada visible. */
+export function copyPreviousSheets(draft: Draft, previous: PreviousSheet[], visible: ReadonlySet<string>): Draft {
+  const units = { ...draft.units }
+  for (const p of previous) {
+    const day = units[p.date] ?? {}
+    if (!Object.keys(day).some((id) => visible.has(id))) {
+      units[p.date] = { ...day, ...pick(p.units, (id) => visible.has(id)) }
+    }
+  }
+  return { ...draft, units }
+}
+
+/** Abre la hoja nueva de cada día (INS-06): en blanco, sin precargar lo ya registrado. */
+export function withNewSheets(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): Draft {
+  const visible = new Set(catalog.selected(draft).map((p) => p.id))
+  return openNewSheets(draft, previousSheets(draft, days), visible)
+}
+
+/** Ajusta un borrador guardado al catálogo actual (categoría o tamaño que ya no existen) y abre las hojas nuevas. */
+export function normalizeDraft(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): Draft {
+  let d = draft
+  if (!catalog.categories.includes(d.category)) {
+    // La del día ya registrado, si aún se proyecta (un día viejo puede ser de otra categoría).
+    const registered = days.get(d.start)?.category
+    const category = registered && catalog.categories.includes(registered) ? registered : catalog.categories[0]
+    d = { ...d, category, subcategory: null, units: {} }
+  }
+  if (d.subcategory && !catalog.subcategories(d.category).includes(d.subcategory)) d = { ...d, subcategory: null }
+  return d.step === 1 ? withNewSheets(d, catalog, days) : d
 }

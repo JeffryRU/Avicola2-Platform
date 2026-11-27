@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/components/shadcn/dialog'
+import { CANCEL_LABEL } from '@/shared/types/labels'
 
 interface Props {
   title: string
@@ -50,7 +51,7 @@ export function ConfirmDialog({ title, description, confirmLabel, destructive, o
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy}>
-              Cancelar
+              {CANCEL_LABEL}
             </Button>
             <Button type="button" variant={destructive ? 'destructive' : 'default'} onClick={confirm} disabled={busy}>
               {busy && <Loader2 className="animate-spin" />} {confirmLabel}

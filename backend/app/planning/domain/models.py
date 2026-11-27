@@ -4,10 +4,20 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from uuid import UUID
 
+# Roles y permisos: domain/permissions.py es la fuente única.
+from app.planning.domain.permissions import SELLER, Permission, can
+
 CONFIRMED = "confirmed"
-# Roles (varchar validado por la app, no ENUM). El supervisor administra cuentas y ve a todos.
-SELLER, SUPERVISOR = "seller", "supervisor"
-ROLES = (SELLER, SUPERVISOR)
+# Calidad de un producto (config/planning_seed.yaml). La A se proyecta y se pide a granja;
+# cualquier otra (la B) solo se cuenta en el stock, por tipo.
+QUALITY_A = "A"
+QUALITY_B = "B"
+# Descarte: producto que no se vende como pollo entero. Se registra en el stock de despacho,
+# pero no se proyecta ni entra al pedido a granja de la saca (ni como calidad B).
+QUALITY_DISCARD = "D"
+# Categoría de los pollos para brasa (clave de config/planning_seed.yaml): la de los pedidos
+# reales, la producción y los datos de ejemplo.
+BRASA_CATEGORY = "BRASA"
 
 
 @dataclass(frozen=True)
@@ -19,9 +29,21 @@ class Product:
     sort_order: int = 0
     # Agrupa productos dentro de la categoría (p. ej. Brasa chica/mediana/grande); solo informativo.
     subcategory: str | None = None
+    # «A»: producto normal. «B»: calidad B, que solo se cuenta en el stock (no se proyecta).
+    quality: str = QUALITY_A
 
     def kg(self, units: int) -> float:
         return round(units * self.kg_per_unit, 2)
+
+    @property
+    def is_projectable(self) -> bool:
+        """Se proyecta y se pide a granja: solo la calidad A. El resto solo va al stock."""
+        return self.quality == QUALITY_A
+
+
+def projectable(products: list[Product]) -> list[Product]:
+    """Los productos que se proyectan y se piden, en el mismo orden."""
+    return [p for p in products if p.is_projectable]
 
 
 @dataclass(frozen=True)
@@ -32,8 +54,12 @@ class Seller:
     role: str = SELLER
 
     @property
-    def is_supervisor(self) -> bool:
-        return self.role == SUPERVISOR
+    def is_seller(self) -> bool:
+        """Vendedor del equipo: registra proyecciones y aparece en los dashboards."""
+        return self.role == SELLER
+
+    def can(self, permission: Permission) -> bool:
+        return can(self.role, permission)
 
 
 @dataclass(frozen=True)
@@ -62,7 +88,7 @@ class ProjectionLine:
 
 @dataclass(frozen=True)
 class Projection:
-    """Proyección de un vendedor para un día y una categoría (única por esa terna)."""
+    """Proyección vigente de un vendedor para un día y una categoría (única por esa terna)."""
 
     id: UUID
     submission_id: UUID
@@ -72,6 +98,9 @@ class Projection:
     lines: tuple[ProjectionLine, ...]
     submitted_at: datetime
     status: str = CONFIRMED
+    # Hoja de registro: 1 la primera vez; cada registro que cambia las unidades abre una nueva.
+    # La última hoja es la que vale (reemplaza a la anterior; no se suman).
+    sheet: int = 1
 
     @property
     def total_units(self) -> int:

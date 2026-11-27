@@ -1,0 +1,129 @@
+# Archivos que acepta la app de planificación y cómo se validan.
+#
+# Si ARIS, las tiendas o producción cambian el nombre de una columna, se agrega aquí como alias:
+# no hace falta tocar el código. Los títulos se comparan sin tildes, mayúsculas, espacios ni
+# signos («COD. PEDIDO» = «cod pedido» = «CodPedido»).
+#
+# Por archivo:
+#   label:       nombre para los mensajes («Al archivo de … le falta …»)
+#   description: qué es y de dónde sale
+#   used_by:     qué partes de la app usan estos datos (catálogo de datos por módulo)
+#   upload:      aris → se acepta en la carga de la app, Drive, Telegram y WhatsApp
+#   sheet:       hoja del Excel (si no, cualquiera cuyos títulos coincidan)
+#   detect:      campos cuyas columnas identifican el archivo
+#   table:       tabla donde se guarda (backend/config/tables.yaml)
+#   date_field:  fecha por la que se reemplaza en las cargas incrementales
+#   unique:      campo que identifica la línea (el export la repite: se guarda una vez)
+#   keep_if:     solo las filas cuyo campo contiene todos esos textos
+#
+# Por columna (campo → columna del archivo):
+#   source:   título de la columna
+#   type:     string | int | float | date (fecha ISO 2026-11-19 o 19/11/2026)
+#   required: la columna debe estar (por defecto, sí); si falta, se rechaza el archivo
+#   nullable: celda vacía = sin dato; si no, en texto queda vacío, en número `default` y en
+#             fecha o entero sin `default` la fila se descarta (y se informa)
+#   default:  valor de una celda numérica vacía
+#   aliases:  otros títulos con los que puede venir la columna
+
+files:
+  despacho:
+    label: DESPACHO de ARIS
+    description: >-
+      Export de ARIS con una fila por línea de pedido: cliente, vendedor, zona, material y lo
+      pedido y despachado (kg y unidades). Es la venta real con la que aprende el modelo.
+    used_by:
+      - "Proyección: sugerencia del modelo junto a cada casilla"
+      - "Modelo de demanda: entrenamiento y evaluación"
+      - "Dashboards: proyección vs venta real"
+      - "Cálculo de saca: pedidos confirmados del día"
+    upload: aris
+    sheet: DESPACHO
+    detect: [order_number, delivery_date, dispatched_units, material]
+    table: dispatch_orders
+    date_field: delivery_date
+    columns:
+      order_number: {source: NumeroPedido, type: int}
+      customer: {source: PedidoCliente}
+      material_code: {source: PedidoDetalleMaterialCodigo, nullable: true}
+      material: {source: PedidoDetalleMaterial}
+      ordered_kg: {source: PedidoDetalleKilos, type: float, default: 0}
+      dispatched_kg: {source: PesoDespachado, type: float, default: 0}
+      ordered_units: {source: PedidoDetalleCantidad, type: float, default: 0}
+      dispatched_units: {source: CantidadDespachada, type: float, default: 0}
+      zone: {source: PedidoZona, nullable: true}
+      registered_on: {source: FechaRegistro, type: date}
+      delivery_date: {source: FechaEntrega, type: date}
+      seller: {source: Vendedor, nullable: true}
+
+  ventas:
+    label: VENTAS de ARIS
+    description: >-
+      Export de ARIS con la venta al público en tiendas (boletas y facturas), una fila por
+      línea. No se guarda quién compró: no hace falta para planificar.
+    used_by:
+      - "Modelo de demanda: dato de apoyo"
+      - "Aviso de datos de ARIS: hasta qué día llegan las ventas"
+    upload: aris
+    sheet: VENTAS
+    detect: [source_line_id, date, material, quantity]
+    table: store_sales
+    date_field: date
+    unique: source_line_id
+    columns:
+      source_line_id: {source: PedidoOdooDetalleID, type: int}
+      document: {source: CodigoDocumentoEmitido}
+      document_type: {source: TipoDocumentoEmitidoDescripcion}
+      grouping: {source: TipoAgrupacion, nullable: true}
+      date: {source: FechaPedido, type: date}
+      store_code: {source: TiendaCodigo}
+      store: {source: Tienda}
+      material_code: {source: MaterialCodigoSAP}
+      material: {source: MaterialDescripcion}
+      quantity: {source: Cantidad, type: float, default: 0}
+      unit: {source: UnidadMedidaCodigo_DET, nullable: true, aliases: [UnidadMedidaCodigo]}
+      unit_price: {source: PrecioUnitario, type: float, default: 0}
+
+  tiendas:
+    label: reporte de pedidos en tienda
+    description: >-
+      «Reporte pedidos en tienda detalle» (Proyección tiendas.xlsx): lo que pide cada tienda
+      para los próximos días. Se toman solo las líneas de pollo entero para brasa.
+    used_by:
+      - "Dashboards: columna «Tiendas» de cada zona, indicadores y gráfico"
+      - "Cálculo de saca: pedidos del día (sin vendedor)"
+    detect: [zone, store, date, material]
+    table: dispatch_orders
+    keep_if:
+      - {field: material, contains: [POLLO ENTERO, BRASA]}
+    # Pedidos anulados: no cuentan.
+    drop_if:
+      - {field: status, contains: [ANULADO]}
+    columns:
+      zone: {source: ZONA, nullable: true}
+      store: {source: TIENDA}
+      date: {source: FECHA, type: date}
+      code: {source: CODIGO, nullable: true}
+      material: {source: MATERIAL}
+      order_number: {source: COD. PEDIDO, type: int}
+      kg: {source: CANTIDAD 1, type: float, default: 0}
+      units: {source: CANTIDAD 2, type: float, default: 0}
+      range: {source: RANGO, nullable: true, required: false}
+      status: {source: ESTADO, nullable: true, required: false}
+
+  produccion:
+    label: Excel de producción (hoja DB_CALIDA_B)
+    description: >-
+      Una fila por fecha y rango (B0..B9) con lo pedido a granja, lo producido, la calidad B y
+      el peso promedio de la parvada. El rango Bn es la Brasa n+1.
+    used_by:
+      - "Producción: historia diaria por rango"
+      - "Cálculo de saca: peso promedio y llegada esperada"
+    sheet: DB_CALIDA_B
+    detect: [date, range, ordered, produced, quality_b]
+    columns:
+      date: {source: FECHA, type: date, nullable: true}
+      range: {source: RANGO, nullable: true}
+      ordered: {source: PEDIDO, type: float, default: 0}
+      produced: {source: PRODUCCION, type: float, default: 0}
+      quality_b: {source: CALIDAD B, type: float, default: 0}
+      weight: {source: PESO PROMEDIO, nullable: true, required: false}

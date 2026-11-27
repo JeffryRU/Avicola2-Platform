@@ -21,3 +21,21 @@ tables:
   projections: np_projections
   projection_lines: np_projection_lines
   notifications: np_notifications
+  settings: np_settings
+  edit_unlocks: np_edit_unlocks
+  projection_changes: np_projection_changes
+  dispatch_stock: np_dispatch_stock
+  production: np_production
+  production_weights: np_production_weights
+  saca_snapshots: np_saca_snapshots
+  model_runs: np_model_runs
+  model_predictions: np_model_predictions
+  # Asistente: historial, canales (Telegram y WhatsApp) y borradores de fotos (ADR 0024)
+  assistant_conversations: np_assistant_conversations
+  assistant_messages: np_assistant_messages
+  assistant_channel_links: np_assistant_channel_links
+  assistant_link_codes: np_assistant_link_codes
+  assistant_drafts: np_assistant_drafts
+  # Historia del negocio (cargada desde los CSV de ARIS y de las tiendas)
+  dispatch_orders: np_dispatch_orders
+  store_sales: np_store_sales

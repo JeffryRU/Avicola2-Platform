@@ -1,6 +1,8 @@
 import { ApiError } from '@/shared/application/ports'
+import { fromStored, toStored, type UiPreferences } from '@/shared/domain/preferences'
 import type { AuthGateway, LogoutCleanup, SessionRepository } from '@/features/auth/application/ports'
-import { credentialsSchema, type Credentials, type Session } from '@/features/auth/domain/session'
+import { type Credentials, credentialsSchema } from '@/features/auth/domain/credentials'
+import type { Session } from '@/shared/domain/session'
 
 type Listener = (session: Session | null) => void
 
@@ -35,6 +37,19 @@ export class AuthService {
    *  conserva el perfil guardado (la PWA funciona offline y la cola se envía después). */
   async verify() {
     if (!this.session) return
+    // Varias llamadas seguidas (al volver a la pestaña, un 403) comparten la misma consulta.
+    this.verifying ??= this.check().finally(() => {
+      this.verifying = null
+    })
+    return this.verifying
+  }
+
+  private verifying: Promise<void> | null = null
+
+  /** La cookie es del navegador, no de la pestaña: si en otra pestaña se entró con otra cuenta,
+   *  esta pasa a ser esa cuenta. Aquí se adopta la que el servidor reconoce. */
+  private async check() {
+    if (!this.session) return
     try {
       this.store(await this.gateway.me(), this.remember)
     } catch (e) {
@@ -47,6 +62,16 @@ export class AuthService {
     const session = await this.gateway.updateProfile(name)
     this.store(session, this.remember)
     return session
+  }
+
+  /** Preferencias de la interfaz de la cuenta, saneadas (null si la cuenta aún no tiene). */
+  async getPreferences(): Promise<UiPreferences | null> {
+    const raw = await this.gateway.getPreferences()
+    return raw == null ? null : fromStored(raw)
+  }
+
+  savePreferences(preferences: UiPreferences): Promise<void> {
+    return this.gateway.savePreferences(toStored(preferences))
   }
 
   async changePassword(current: string, next: string): Promise<Session> {

@@ -3,7 +3,7 @@ import { ApiError } from '@/shared/application/ports'
 import { addDays, today } from '@/shared/domain/dates'
 import type { ProjectionsGateway, SubmissionQueue } from '@/features/projections/application/ports'
 import { PlanningService } from '@/features/projections/application/planning-service'
-import { Catalog } from '@/features/catalog/domain/catalog'
+import { Catalog } from '@/features/catalog'
 import { newDraft } from '@/features/projections/domain/draft'
 import type { Submission } from '@/features/projections/domain/schemas'
 
@@ -61,5 +61,22 @@ describe('envío de proyecciones con cola offline', () => {
     const { planning } = service(ok)
     const empty = { ...draft, start: addDays(today(), 1), units: {} }
     await expect(planning.submit(empty, catalog, 'ana')).rejects.toThrow()
+  })
+
+  it('el supervisor envía por un vendedor y la cola es de quien envió', async () => {
+    let online = false
+    const sent: Submission[] = []
+    const { planning } = service(async (s) => {
+      if (!online) throw new ApiError('No se pudo conectar con el servidor.', 0)
+      sent.push(s)
+      return ok(s)
+    })
+    const out = await planning.submit(draft, catalog, 'ana', 'supervisor')
+    expect(out.submission).toMatchObject({ seller: 'ana', author: 'supervisor' })
+    online = true
+    // La vendedora no reenvía lo que dejó el supervisor; el supervisor sí.
+    expect(await planning.flush('ana')).toMatchObject({ sent: 0 })
+    expect(await planning.flush('supervisor')).toMatchObject({ sent: 1, pending: 0 })
+    expect(sent[0].seller).toBe('ana')
   })
 })

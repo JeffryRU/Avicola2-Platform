@@ -13,6 +13,8 @@ from app.shared.domain.errors import (
     DomainError,
     ForbiddenError,
     NotFoundError,
+    TooManyRequestsError,
+    UnavailableError,
 )
 
 logger = logging.getLogger("app.http")
@@ -22,6 +24,8 @@ STATUS_BY_ERROR: dict[type[DomainError], int] = {
     ForbiddenError: status.HTTP_403_FORBIDDEN,
     NotFoundError: status.HTTP_404_NOT_FOUND,
     ConflictError: status.HTTP_409_CONFLICT,
+    TooManyRequestsError: status.HTTP_429_TOO_MANY_REQUESTS,
+    UnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
     DomainError: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 

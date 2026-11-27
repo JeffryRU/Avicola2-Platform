@@ -1,0 +1,1281 @@
+{
+  "id": "avicola2WhatsappAris06",
+  "name": "06_whatsapp_aris",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ]
+      },
+      "id": "d4a10006-0001-4c0e-9f00-000000000001",
+      "name": "Mensaje de WhatsApp",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "d4a10006-0901-4c0e-9f00-000000000901",
+      "notes": "Credencial: app de Meta (WhatsApp Business Cloud). Solo responde a los números de ARIS_WHATSAPP_NUMBERS."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10006-0102-4c0e-9f00-000000000102",
+              "leftValue": "={{ Array.isArray($json.messages) && $json.messages.length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10006-0002-4c0e-9f00-000000000002",
+      "name": "¿Es un mensaje?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10006-0103-4c0e-9f00-000000000103",
+              "leftValue": "={{ ($env.ARIS_WHATSAPP_NUMBERS || '').split(',').map(s => s.replace(/\\D/g, '')).includes($json.messages[0].from) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10006-0003-4c0e-9f00-000000000003",
+      "name": "¿Número autorizado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        860,
+        -200
+      ],
+      "notes": "Solo para el Excel o CSV de ARIS. El texto y las fotos no pasan por esta lista: el asistente exige cuenta vinculada."
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.messages[0].document.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {}
+      },
+      "id": "d4a10006-0005-4c0e-9f00-000000000005",
+      "name": "Pedir el enlace del archivo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "d4a10006-0006-4c0e-9f00-000000000006",
+      "name": "Descargar el archivo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1300,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/aris",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "source",
+              "value": "whatsapp"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          },
+          "timeout": 600000
+        }
+      },
+      "id": "d4a10006-0007-4c0e-9f00-000000000007",
+      "name": "Cargar en el backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1520,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $('Mensaje de WhatsApp').item.json.metadata.phone_number_id }}",
+        "recipientPhoneNumber": "={{ $('Mensaje de WhatsApp').item.json.messages[0].from }}",
+        "textBody": "={{ $json.statusCode === 200 ? '✅ Datos de ARIS cargados: ' + $json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. ' + ($json.body.flatMap(l => l.issues || []).length ? 'Revisa en el archivo: ' + $json.body.flatMap(l => l.issues || []).join(' · ') + '. ' : '') + 'El modelo se reentrena en unos minutos.' : '❌ No se pudo cargar el archivo: ' + (($json.body && $json.body.detail) || ('error ' + $json.statusCode)) }}",
+        "additionalFields": {}
+      },
+      "id": "d4a10006-0008-4c0e-9f00-000000000008",
+      "name": "Responder con el resultado",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        1740,
+        -300
+      ],
+      "webhookId": "d4a10006-0908-4c0e-9f00-000000000908"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10006-0109-4c0e-9f00-000000000109",
+              "leftValue": "={{ $('Cargar en el backend').item.json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10006-0009-4c0e-9f00-000000000009",
+      "name": "¿Se cargó?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/notifications",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ audience: 'supervisors', title: 'Datos de ARIS cargados', body: ('Llegó por WhatsApp: ' + $('Cargar en el backend').item.json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. ' + ($json.body.flatMap(l => l.issues || []).length ? 'Revisa en el archivo: ' + $json.body.flatMap(l => l.issues || []).join(' · ') + '. ' : '') + 'El modelo se reentrena en unos minutos.').slice(0, 500), link: '/modelo' }) }}",
+        "options": {}
+      },
+      "id": "d4a10006-0010-4c0e-9f00-000000000010",
+      "name": "Avisar a los supervisores",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2180,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $('Mensaje de WhatsApp').item.json.metadata.phone_number_id }}",
+        "recipientPhoneNumber": "={{ $('Mensaje de WhatsApp').item.json.messages[0].from }}",
+        "textBody": "Puedo ayudarte con tres cosas. 1) Escríbeme tu pregunta (proyecciones, saca, stock). 2) Mándame una foto de tu hoja o pizarra de proyección o de stock y te preparo el registro para que lo confirmes. 3) Si tu chat está autorizado, envía el export de ARIS (DESPACHO y/o VENTAS) como documento Excel (.xlsx) o CSV. Para empezar, vincula tu cuenta: en la app abre el asistente, toca «Usar en Telegram o WhatsApp» y escríbeme el código: vincular ABC123",
+        "additionalFields": {}
+      },
+      "id": "d4a10006-0011-4c0e-9f00-000000000011",
+      "name": "Explicar qué enviar",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        860,
+        600
+      ],
+      "webhookId": "d4a10006-0911-4c0e-9f00-000000000911"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $('Mensaje de WhatsApp').item.json.metadata.phone_number_id }}",
+        "recipientPhoneNumber": "={{ $('Mensaje de WhatsApp').item.json.messages[0].from }}",
+        "textBody": "=Este número no está autorizado para cargar datos de ARIS. Pide a un supervisor que agregue {{ $json.messages[0].from }} a ARIS_WHATSAPP_NUMBERS.",
+        "additionalFields": {}
+      },
+      "id": "d4a10006-0012-4c0e-9f00-000000000012",
+      "name": "No autorizado",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        -60
+      ],
+      "webhookId": "d4a10006-0912-4c0e-9f00-000000000912"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d4a10006-0201-4c0e-9f00-000000000201",
+                    "leftValue": "={{ ($json.messages[0].document && $json.messages[0].document.filename) || '' }}",
+                    "rightValue": "\\.(xlsx|xlsm|csv)$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Excel o CSV"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d4a10006-0202-4c0e-9f00-000000000202",
+                    "leftValue": "={{ $json.messages[0].type === 'text' && !!($json.messages[0].text && String($json.messages[0].text.body).trim()) }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Texto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d4a10006-0203-4c0e-9f00-000000000203",
+                    "leftValue": "={{ $json.messages[0].type === 'image' }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Foto"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Otro tipo"
+        }
+      },
+      "id": "d4a10006-0031-4c0e-9f00-000000000031",
+      "name": "Tipo de mensaje",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        640,
+        0
+      ],
+      "notes": "Excel o CSV: sigue a ARIS (solo números autorizados). Texto: asistente. Foto: lectura de la foto. Otro: explica qué se puede enviar. ADR 0024."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/channel/message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: 'whatsapp', sender: $('Mensaje de WhatsApp').item.json.messages[0].from, text: $('Mensaje de WhatsApp').item.json.messages[0].text.body }) }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "d4a10006-0032-4c0e-9f00-000000000032",
+      "name": "Preguntar al asistente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        860,
+        160
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Manda el texto al asistente del backend (ADR 0024): vincula la cuenta, confirma borradores y responde como la persona vinculada. Si falla, responde un texto amable."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/channel/context",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "whatsapp"
+            },
+            {
+              "name": "sender",
+              "value": "={{ $('Mensaje de WhatsApp').item.json.messages[0].from }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "d4a10006-0033-4c0e-9f00-000000000033",
+      "name": "Contexto de la persona",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        860,
+        420
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Quién es, qué puede registrar y qué productos y fechas hay. Se le da a Claude para leer la foto."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10006-0204-4c0e-9f00-000000000204",
+              "leftValue": "={{ $json.statusCode === 200 && $json.body.linked === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10006-0034-4c0e-9f00-000000000034",
+      "name": "¿Está vinculada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  \"model\": $env.ASSISTANT_VISION_MODEL || 'claude-sonnet-5-5',\n  \"max_tokens\": 4000,\n  \"system\": \"Lees una foto de una hoja o pizarra de proyección de pollo, o de stock, de Avícola 2 (Perú) y devuelves solo los datos en el formato pedido. Reglas: 1) kind es «projection» si la foto es una proyección de ventas o pedidos por producto, «stock» si es un conteo de existencias, «unknown» si no es ninguna de las dos o no se entiende. 2) date es la fecha de la proyección (o del conteo) en AAAA-MM-DD; si la foto no trae fecha usa la del pie de foto; si tampoco, null. 3) rows: una fila por producto, con product tal como está escrito en la foto (usa solo productos de la lista que te doy; si lo escrito no corresponde a ninguno, copia el texto leído para que lo revise una persona). 4) units son unidades enteras y kg el peso; si la foto solo trae uno de los dos, el otro va null. lot_date (fecha del lote) solo si es stock y la foto la trae; si no, null. 5) No inventes ni calcules nada: si un número no se lee con claridad, déjalo null. 6) notes: una frase corta con lo que dudes o no pudiste leer (vacío si todo está claro). Responde en español.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"image\",\n          \"source\": {\n            \"type\": \"base64\",\n            \"media_type\": $json.mediaType,\n            \"data\": $json.imageBase64\n          }\n        },\n        {\n          \"type\": \"text\",\n          \"text\": $json.contextText\n        }\n      ]\n    }\n  ],\n  \"output_config\": {\n    \"format\": {\n      \"type\": \"json_schema\",\n      \"schema\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"kind\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"projection\",\n              \"stock\",\n              \"unknown\"\n            ]\n          },\n          \"date\": {\n            \"type\": [\n              \"string\",\n              \"null\"\n            ]\n          },\n          \"rows\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"product\": {\n                  \"type\": \"string\"\n                },\n                \"units\": {\n                  \"type\": [\n                    \"integer\",\n                    \"null\"\n                  ]\n                },\n                \"kg\": {\n                  \"type\": [\n                    \"number\",\n                    \"null\"\n                  ]\n                },\n                \"lot_date\": {\n                  \"type\": [\n                    \"string\",\n                    \"null\"\n                  ]\n                }\n              },\n              \"required\": [\n                \"product\",\n                \"units\",\n                \"kg\",\n                \"lot_date\"\n              ],\n              \"additionalProperties\": false\n            }\n          },\n          \"notes\": {\n            \"type\": \"string\"\n          }\n        },\n        \"required\": [\n          \"kind\",\n          \"date\",\n          \"rows\",\n          \"notes\"\n        ],\n        \"additionalProperties\": false\n      }\n    }\n  }\n}) }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "d4a10006-0035-4c0e-9f00-000000000035",
+      "name": "Leer la foto con Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1960,
+        420
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "aviplannerAnthropic",
+          "name": "Anthropic (AviPlanner)"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Visión con salida estructurada (JSON Schema del ADR 0024). Modelo: ASSISTANT_VISION_MODEL (claude-sonnet-5-5 por defecto). Sin temperature. Clave en la credencial «Anthropic (AviPlanner)»."
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.item.json;\nlet extraction = null;\ntry {\n  const block = ((r.body && r.body.content) || []).find(b => b.type === 'text');\n  extraction = JSON.parse(block.text);\n} catch (e) {\n  extraction = null;\n}\nreturn { json: { ok: r.statusCode === 200 && !!extraction && typeof extraction === 'object', extraction } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "d4a10006-0036-4c0e-9f00-000000000036",
+      "name": "Leer la extracción",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2180,
+        420
+      ],
+      "notes": "Parsea content[0].text. Si no es JSON válido, ok = false y se responde que no se pudo leer."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10006-0205-4c0e-9f00-000000000205",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10006-0037-4c0e-9f00-000000000037",
+      "name": "¿Se leyó la foto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/channel/photo",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: 'whatsapp', sender: $('Mensaje de WhatsApp').item.json.messages[0].from, extraction: $json.extraction }) }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "d4a10006-0038-4c0e-9f00-000000000038",
+      "name": "Enviar la foto al backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2620,
+        360
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "El backend valida productos, fechas y permisos, guarda un borrador y responde con la tabla a confirmar (sí / no)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10006-0206-4c0e-9f00-000000000206",
+              "leftValue": "={{ $json.statusCode === 200 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10006-0039-4c0e-9f00-000000000039",
+      "name": "¿Respondió bien?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2840,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Contexto de la persona').first().json.body || {};\nconst msg = $('Mensaje de WhatsApp').first().json.messages[0] || {};\nconst item = $input.first();\nconst bin = item.binary.data;\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];\nconst mt = String(($('Pedir el enlace de la foto').first().json.mime_type || bin.mimeType) || '').toLowerCase();\nconst mediaType = allowed.includes(mt) ? mt : 'image/jpeg';\nconst dates = (ctx.dates || []).map(d => (typeof d === 'string' ? d : (d.date || JSON.stringify(d)))).join(', ');\nconst products = (ctx.products || []).map(p => '- ' + p.id + ': ' + p.name + (p.category ? ' (' + p.category + (p.unit ? ', ' + p.unit : '') + ')' : '')).join('\\n');\nconst caption = (msg.image && msg.image.caption) || '';\nconst contextText = [\n  'Hoy: ' + (ctx.today || ''),\n  'Fechas válidas: ' + (dates || '(ninguna)'),\n  'Puede proyectar: ' + (ctx.can_project ? 'sí' : 'no'),\n  'Puede registrar stock: ' + (ctx.can_stock ? 'sí' : 'no'),\n  'Productos (id: nombre):',\n  products || '(sin lista)',\n  caption ? 'Pie de foto: ' + caption : 'La foto no trae pie de foto.',\n  'Lee la foto y devuelve los datos en el formato pedido.'\n].join('\\n');\nreturn [{ json: { imageBase64: buf.toString('base64'), mediaType, contextText } }];\n"
+      },
+      "id": "d4a10006-0040-4c0e-9f00-000000000040",
+      "name": "Preparar la foto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        420
+      ],
+      "notes": "Pasa la imagen a base64, elige el media_type real y arma el contexto (hoy, fechas, productos, permisos, pie de foto)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10006-0207-4c0e-9f00-000000000207",
+              "leftValue": "={{ Array.isArray($json.body.files) && $json.body.files.length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10006-0041-4c0e-9f00-000000000041",
+      "name": "¿Trae archivos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3060,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "body.files",
+        "options": {}
+      },
+      "id": "d4a10006-0042-4c0e-9f00-000000000042",
+      "name": "Un ítem por archivo",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        3280,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BACKEND_URL }}{{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "d4a10006-0043-4c0e-9f00-000000000043",
+      "name": "Descargar el archivo generado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3500,
+        340
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Excel generado por el backend; el enlace vence en 15 minutos."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://graph.facebook.com/v21.0/{{ $('Mensaje de WhatsApp').item.json.messages[0].image.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "d4a10006-0044-4c0e-9f00-000000000044",
+      "name": "Pedir el enlace de la foto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1300,
+        420
+      ],
+      "notes": "Graph API: devuelve la url temporal y el mime_type real de la foto."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "d4a10006-0045-4c0e-9f00-000000000045",
+      "name": "Descargar la foto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1520,
+        420
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $('Mensaje de WhatsApp').item.json.metadata.phone_number_id }}",
+        "recipientPhoneNumber": "={{ $('Mensaje de WhatsApp').item.json.messages[0].from }}",
+        "textBody": "={{ String($json.body.text || 'Listo.').slice(0, 4000) }}",
+        "additionalFields": {}
+      },
+      "id": "d4a10006-0046-4c0e-9f00-000000000046",
+      "name": "Responder al chat",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        3060,
+        120
+      ],
+      "webhookId": "d4a10006-0931-4c0e-9f00-000000000931",
+      "notes": "WhatsApp muestra ```texto``` en monoespaciado: se envía el texto del backend tal cual."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $('Mensaje de WhatsApp').item.json.metadata.phone_number_id }}/media",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "messaging_product",
+              "value": "whatsapp"
+            },
+            {
+              "name": "type",
+              "value": "={{ $binary.data.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "d4a10006-0047-4c0e-9f00-000000000047",
+      "name": "Subir a WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3720,
+        340
+      ],
+      "notes": "Sube el Excel a /{phone-number-id}/media y devuelve el id del archivo."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $('Mensaje de WhatsApp').item.json.metadata.phone_number_id }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $('Mensaje de WhatsApp').item.json.messages[0].from, type: 'document', document: { id: $json.id, filename: $('Un ítem por archivo').item.json.name } }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "d4a10006-0048-4c0e-9f00-000000000048",
+      "name": "Enviar el documento",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3940,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $('Mensaje de WhatsApp').item.json.metadata.phone_number_id }}",
+        "recipientPhoneNumber": "={{ $('Mensaje de WhatsApp').item.json.messages[0].from }}",
+        "textBody": "={{ $json.statusCode === 429 ? 'Me estás escribiendo muy seguido. Espera un minuto e inténtalo de nuevo.' : 'No pude responderte en este momento. Inténtalo de nuevo en un minuto.' }}",
+        "additionalFields": {}
+      },
+      "id": "d4a10006-0049-4c0e-9f00-000000000049",
+      "name": "Responder: no se pudo",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        3060,
+        520
+      ],
+      "webhookId": "d4a10006-0932-4c0e-9f00-000000000932"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $('Mensaje de WhatsApp').item.json.metadata.phone_number_id }}",
+        "recipientPhoneNumber": "={{ $('Mensaje de WhatsApp').item.json.messages[0].from }}",
+        "textBody": "={{ ($json.statusCode === 200 && $json.body && typeof $json.body.text === 'string' && $json.body.text) || 'Todavía no tienes tu cuenta vinculada. En la app abre el asistente, toca «Usar en Telegram o WhatsApp», pide tu código y envíamelo así: vincular ABC123' }}",
+        "additionalFields": {}
+      },
+      "id": "d4a10006-0050-4c0e-9f00-000000000050",
+      "name": "Responder: falta vincular",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        620
+      ],
+      "webhookId": "d4a10006-0933-4c0e-9f00-000000000933"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $('Mensaje de WhatsApp').item.json.metadata.phone_number_id }}",
+        "recipientPhoneNumber": "={{ $('Mensaje de WhatsApp').item.json.messages[0].from }}",
+        "textBody": "No pude leer la foto. Prueba con otra más nítida, de frente y con buena luz, o escríbeme los datos.",
+        "additionalFields": {}
+      },
+      "id": "d4a10006-0051-4c0e-9f00-000000000051",
+      "name": "Responder: no se leyó la foto",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        2620,
+        620
+      ],
+      "webhookId": "d4a10006-0934-4c0e-9f00-000000000934"
+    }
+  ],
+  "connections": {
+    "Mensaje de WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "¿Es un mensaje?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es un mensaje?": {
+      "main": [
+        [
+          {
+            "node": "Tipo de mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "¿Número autorizado?": {
+      "main": [
+        [
+          {
+            "node": "Pedir el enlace del archivo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No autorizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedir el enlace del archivo": {
+      "main": [
+        [
+          {
+            "node": "Descargar el archivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar el archivo": {
+      "main": [
+        [
+          {
+            "node": "Cargar en el backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cargar en el backend": {
+      "main": [
+        [
+          {
+            "node": "Responder con el resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder con el resultado": {
+      "main": [
+        [
+          {
+            "node": "¿Se cargó?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Se cargó?": {
+      "main": [
+        [
+          {
+            "node": "Avisar a los supervisores",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Tipo de mensaje": {
+      "main": [
+        [
+          {
+            "node": "¿Número autorizado?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preguntar al asistente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Contexto de la persona",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar qué enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preguntar al asistente": {
+      "main": [
+        [
+          {
+            "node": "¿Respondió bien?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contexto de la persona": {
+      "main": [
+        [
+          {
+            "node": "¿Está vinculada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Está vinculada?": {
+      "main": [
+        [
+          {
+            "node": "Pedir el enlace de la foto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: falta vincular",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedir el enlace de la foto": {
+      "main": [
+        [
+          {
+            "node": "Descargar la foto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar la foto": {
+      "main": [
+        [
+          {
+            "node": "Preparar la foto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar la foto": {
+      "main": [
+        [
+          {
+            "node": "Leer la foto con Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer la foto con Claude": {
+      "main": [
+        [
+          {
+            "node": "Leer la extracción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer la extracción": {
+      "main": [
+        [
+          {
+            "node": "¿Se leyó la foto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Se leyó la foto?": {
+      "main": [
+        [
+          {
+            "node": "Enviar la foto al backend",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: no se leyó la foto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar la foto al backend": {
+      "main": [
+        [
+          {
+            "node": "¿Respondió bien?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Respondió bien?": {
+      "main": [
+        [
+          {
+            "node": "Responder al chat",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "¿Trae archivos?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: no se pudo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Trae archivos?": {
+      "main": [
+        [
+          {
+            "node": "Un ítem por archivo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Un ítem por archivo": {
+      "main": [
+        [
+          {
+            "node": "Descargar el archivo generado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar el archivo generado": {
+      "main": [
+        [
+          {
+            "node": "Subir a WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir a WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Enviar el documento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

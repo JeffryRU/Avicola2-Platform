@@ -2,27 +2,75 @@
 
 La sesión viaja en una cookie HttpOnly (`nv_session`): el JavaScript de la página no puede
 leer el token, y no aparece en el cuerpo de ninguna respuesta ni en el almacenamiento local.
+
+La app móvil no usa cookies: pide el token con `POST /api/auth/token` y lo envía en
+`Authorization: Bearer <token>` (ADR 0009). El navegador nunca recibe el token en el cuerpo.
 """
 
+import json
 from dataclasses import asdict
-from datetime import date
-from typing import Annotated
+from datetime import date, datetime, time, timedelta
+from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Cookie, Depends, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Cookie,
+    Depends,
+    File,
+    Form,
+    Header,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.planning.application.accounts import Session as AuthSession
+from app.planning.application.production import ProductionEntry
+from app.planning.application.stock import StockEntry
 from app.planning.application.use_cases import DayUnits
 from app.planning.bootstrap import PlanningUseCases, build_use_cases
+from app.planning.domain.channels import ExtractedRow, Extraction
+from app.planning.domain.editing import CutoffPolicy, EditUnlock
 from app.planning.domain.models import Projection, Seller, SellerAccount
+from app.planning.domain.permissions import (
+    FORBIDDEN,
+    GENERAL_SUPERVISOR,
+    Permission,
+    assignable_roles,
+    can_manage,
+    manageable_roles,
+    permissions_of,
+)
+from app.planning.domain.production import (
+    MIN_HISTORY_DAYS,
+    DailyProduction,
+    overall_error,
+)
+from app.planning.domain.stock import DailyStock
+from app.planning.infrastructure.exporters import WRITERS, ExportFormat
 from app.planning.infrastructure.http import schemas as s
-from app.shared.domain.errors import AuthenticationError, ForbiddenError
+from app.planning.infrastructure.http.saca_view import saca_out
+from app.shared.domain.errors import AuthenticationError, DomainError, ForbiddenError
 from app.shared.infrastructure.database.session import get_session
+from app.shared.infrastructure.http.params import DbIdPath
+from app.shared.infrastructure.http.paths import API_PREFIX
 from app.shared.infrastructure.http.service_token import require_service_token
 
+# El export de ARIS: un día pesa unos cientos de KB; el completo de varios meses, decenas de MB.
+MAX_ARIS_MB = 80
+MAX_ARIS_BYTES = MAX_ARIS_MB * 1024 * 1024
+# Autor de las cargas que llegan por n8n, según el medio.
+ARIS_SERVICE_USER = "n8n"
+ARIS_SOURCES = {"drive": "Google Drive", "telegram": "Telegram", "whatsapp": "WhatsApp"}
+
 SESSION_COOKIE = "nv_session"
-COOKIE_PATH = "/api"
+COOKIE_PATH = API_PREFIX
 
 
 def get_use_cases(session: Annotated[Session, Depends(get_session)]) -> PlanningUseCases:
@@ -30,19 +78,36 @@ def get_use_cases(session: Annotated[Session, Depends(get_session)]) -> Planning
 
 
 UseCases = Annotated[PlanningUseCases, Depends(get_use_cases)]
-SessionToken = Annotated[str | None, Cookie(alias=SESSION_COOKIE)]
+SessionCookie = Annotated[str | None, Cookie(alias=SESSION_COOKIE)]
+AuthorizationHeader = Annotated[str | None, Header(alias="Authorization")]
 
 
-def current_account(use_cases: UseCases, token: SessionToken = None) -> SellerAccount:
+def session_token(
+    cookie: SessionCookie = None, authorization: AuthorizationHeader = None
+) -> str | None:
+    """Token de la sesión: `Authorization: Bearer` (app móvil) o la cookie (navegador).
+
+    El encabezado no lo adjunta el navegador por su cuenta, así que no abre la puerta a CSRF.
+    """
+    if authorization:
+        scheme, _, value = authorization.partition(" ")
+        if scheme.lower() == "bearer" and value.strip():
+            return value.strip()
+    return cookie
+
+
+SessionToken = Annotated[str | None, Depends(session_token)]
+
+
+def current_account(use_cases: UseCases, token: SessionToken) -> SellerAccount:
     if not token:
         raise AuthenticationError("Inicia sesión para continuar.")
     return use_cases.current_account(token)
 
 
 def active_account(account: Annotated[SellerAccount, Depends(current_account)]) -> SellerAccount:
-    """Con contraseña temporal solo se puede cambiar la contraseña o cerrar sesión."""
-    if account.must_change_password:
-        raise ForbiddenError("Debes cambiar tu contraseña antes de continuar.")
+    """Cuenta con sesión válida. Ya no se obliga a cambiar la contraseña temporal al entrar:
+    cada uno puede cambiarla cuando quiera desde su perfil."""
     return account
 
 
@@ -54,9 +119,40 @@ Account = Annotated[SellerAccount, Depends(current_account)]
 ActiveAccount = Annotated[SellerAccount, Depends(active_account)]
 CurrentSeller = Annotated[Seller, Depends(current_seller)]
 
-public = APIRouter(prefix="/api", tags=["planning"])
-router = APIRouter(prefix="/api", tags=["planning"], dependencies=[Depends(active_account)])
-admin = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(active_account)])
+
+def requires(permission: Permission):
+    """Primera barrera, a nivel de router: sin el permiso, ningún endpoint del grupo responde.
+    Los casos de uso vuelven a comprobarlo (y las reglas sobre la cuenta destino)."""
+
+    def check(account: ActiveAccount) -> SellerAccount:
+        if not account.seller.can(permission):
+            raise ForbiddenError(FORBIDDEN)
+        return account
+
+    return Depends(check)
+
+
+public = APIRouter(prefix=API_PREFIX, tags=["planning"])
+router = APIRouter(prefix=API_PREFIX, tags=["planning"], dependencies=[Depends(active_account)])
+admin = APIRouter(
+    prefix=f"{API_PREFIX}/admin",
+    tags=["admin"],
+    dependencies=[requires(Permission.MANAGE_ACCOUNTS)],
+)
+editing_admin = APIRouter(
+    prefix=f"{API_PREFIX}/admin", tags=["admin"], dependencies=[requires(Permission.MANAGE_EDITING)]
+)
+production = APIRouter(
+    prefix=f"{API_PREFIX}/production",
+    tags=["production"],
+    dependencies=[requires(Permission.VIEW_PRODUCTION)],
+)
+saca = APIRouter(
+    prefix=f"{API_PREFIX}/saca", tags=["saca"], dependencies=[requires(Permission.VIEW_SACA)]
+)
+stock = APIRouter(
+    prefix=f"{API_PREFIX}/stock", tags=["stock"], dependencies=[requires(Permission.VIEW_STOCK)]
+)
 
 
 def _set_session_cookie(response: Response, token: str, remember: bool) -> None:
@@ -73,18 +169,26 @@ def _set_session_cookie(response: Response, token: str, remember: bool) -> None:
 
 
 def _account_out(account: SellerAccount) -> s.AccountOut:
+    role = account.seller.role
     return s.AccountOut(
         seller=s.SellerOut(**asdict(account.seller)),
         must_change_password=account.must_change_password,
+        permissions=[p.value for p in Permission if p in permissions_of(role)],
+        manageable_roles=list(manageable_roles(role)),
     )
 
 
-def _admin_out(account: SellerAccount) -> s.AdminAccountOut:
+def _admin_out(account: SellerAccount, actor: SellerAccount) -> s.AdminAccountOut:
+    own = account.seller.username == actor.seller.username
+    actor_role, role = actor.seller.role, account.seller.role
     return s.AdminAccountOut(
         **asdict(account.seller),
         is_active=account.is_active,
         must_change_password=account.must_change_password,
         locked_until=account.locked_until,
+        # La propia cuenta se gestiona desde Perfil, nunca desde Usuarios.
+        can_manage=not own and can_manage(actor_role, role),
+        assignable_roles=[] if own else list(assignable_roles(actor_role, role)),
     )
 
 
@@ -105,6 +209,7 @@ def _projection_out(p: Projection) -> s.ProjectionOut:
         total_kg=p.total_kg,
         submitted_at=p.submitted_at,
         units=p.units,
+        sheet=p.sheet,
     )
 
 
@@ -115,6 +220,15 @@ def _projection_out(p: Projection) -> s.ProjectionOut:
 def login(use_cases: UseCases, body: s.LoginIn, response: Response) -> s.AccountOut:
     session = use_cases.authenticate(body.username, body.password)
     return _login_response(response, session, body.remember)
+
+
+@public.post("/auth/token")
+def issue_token(use_cases: UseCases, body: s.TokenLoginIn) -> s.TokenOut:
+    """Login de la app móvil: el token va en el cuerpo y la app lo guarda cifrado."""
+    session = use_cases.authenticate(body.username, body.password)
+    account = _account_out(session.account)
+    ttl = get_settings().auth_token_ttl_hours * 3600
+    return s.TokenOut(**account.model_dump(), token=session.token, expires_in=ttl)
 
 
 @public.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -140,6 +254,20 @@ def update_profile(use_cases: UseCases, account: Account, body: s.ProfileIn) -> 
     return _account_out(use_cases.update_profile(account, body.name))
 
 
+@public.get("/auth/preferences")
+def get_preferences(use_cases: UseCases, account: Account) -> dict[str, Any] | None:
+    """Preferencias de la interfaz de la cuenta (tema, color, accesibilidad); null si no hay."""
+    return use_cases.get_preferences(account)
+
+
+@public.put("/auth/preferences")
+def save_preferences(
+    use_cases: UseCases, account: Account, body: Annotated[dict[str, Any], Body()]
+) -> dict[str, Any]:
+    """Guarda las preferencias tal como las manda la app (solo se acota su forma)."""
+    return use_cases.save_preferences(account, body)
+
+
 @public.post("/auth/password")
 def change_password(
     use_cases: UseCases, account: Account, body: s.ChangePasswordIn, response: Response
@@ -160,7 +288,15 @@ def api_status(use_cases: UseCases) -> s.StatusOut:
 
 @router.get("/catalog")
 def catalog(use_cases: UseCases) -> list[s.ProductOut]:
-    return [s.ProductOut(**asdict(p)) for p in use_cases.get_catalog()]
+    settings = get_settings()
+    categories, products = (
+        set(settings.planning_projected_categories),
+        set(settings.planning_projected_products),
+    )
+    return [
+        s.ProductOut(**asdict(p), projected=p.category in categories or p.id in products)
+        for p in use_cases.get_catalog()
+    ]
 
 
 @router.get("/sellers")
@@ -192,13 +328,68 @@ def submit_projection(
 ) -> s.SubmissionOut:
     """El vendedor sale de la sesión, nunca del cuerpo de la petición."""
     saved = use_cases.submit_projection(
-        seller, body.category, [DayUnits(d.date, d.units) for d in body.days], body.submission_id
+        seller,
+        body.category,
+        [DayUnits(d.date, d.units) for d in body.days],
+        body.submission_id,
+        body.seller,
     )
     return s.SubmissionOut(
         submission_id=saved[0].submission_id,
         days=len(saved),
         total_units=sum(p.total_units for p in saved),
         total_kg=round(sum(p.total_kg for p in saved), 2),
+    )
+
+
+@router.get("/projections/history")
+def projection_history(
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    date_from: DateFrom,
+    date_to: DateTo,
+    seller: SellerFilter = None,
+) -> list[s.ChangeOut]:
+    """Quién cambió qué y cuándo: el vendedor, lo suyo; el supervisor, todo (o un vendedor)."""
+    return [
+        s.ChangeOut(
+            id=c.id or 0,
+            seller=c.seller,
+            date=c.date,
+            category=c.category,
+            author=c.author,
+            action=c.action,
+            before=c.before,
+            after=c.after,
+            before_total=c.before_total,
+            after_total=c.after_total,
+            after_cutoff=c.after_cutoff,
+            changed_at=c.changed_at,
+            sheet=c.sheet,
+        )
+        for c in use_cases.list_changes(viewer, date_from, date_to, seller)
+    ]
+
+
+@router.get("/projections/export", response_class=Response)
+def export_projections(
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    date_from: DateFrom,
+    date_to: DateTo,
+    seller: SellerFilter = None,
+    format: Annotated[ExportFormat, Query()] = "xlsx",  # noqa: A002 (nombre del parámetro HTTP)
+) -> Response:
+    """Las proyecciones en Excel, PDF o CSV (lo usa la app móvil; la web arma la misma tabla):
+    el vendedor, lo suyo; el supervisor, el equipo o un vendedor. Incluye la venta real y
+    quién no registró cada día."""
+    table = use_cases.export_projections(viewer, date_from, date_to, seller)
+    writer = WRITERS[format]
+    name = f"proyecciones_{date_from.isoformat()}_{date_to.isoformat()}.{format}"
+    return Response(
+        writer.write(table),
+        media_type=writer.media_type,
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
     )
 
 
@@ -214,6 +405,64 @@ def sales(
     return [s.DailyUnitsOut(**asdict(d)) for d in found]
 
 
+@router.get("/model-projections")
+def model_projections(
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    date_from: DateFrom,
+    date_to: DateTo,
+    seller: SellerFilter = None,
+) -> list[s.DailyUnitsOut]:
+    """Lo que el modelo habría sugerido cada día (con la historia anterior), por vendedor."""
+    found = use_cases.model_projections(viewer, date_from, date_to, seller)
+    return [s.DailyUnitsOut(**asdict(d)) for d in found]
+
+
+@router.get("/store-orders")
+def store_orders(
+    use_cases: UseCases, viewer: CurrentSeller, date_from: DateFrom, date_to: DateTo
+) -> list[s.StoreOrderDayOut]:
+    """Lo que piden las tiendas por zona y día (reporte de pedidos en tienda): en los
+    dashboards va como una columna «Tiendas» junto a los vendedores de cada zona."""
+    found = use_cases.store_orders(viewer, date_from, date_to)
+    return [s.StoreOrderDayOut(**asdict(d)) for d in found]
+
+
+@router.get("/aris/status")
+def aris_status(use_cases: UseCases, viewer: CurrentSeller) -> dict[str, Any]:
+    """Hasta qué día llegan los datos de ARIS y si conviene subir los que faltan (no es
+    obligatorio: la app solo avisa)."""
+    return asdict(use_cases.aris_status(viewer))
+
+
+@router.post("/aris/import")
+def aris_import(
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    file: Annotated[UploadFile, File(description="Export de ARIS: Excel o CSV")],
+) -> list[dict[str, Any]]:
+    """Carga el export de ARIS (solo las fechas que trae) y pide reentrenar el modelo."""
+    return [
+        asdict(r) for r in use_cases.import_aris(viewer, _read_upload(file), file.filename or "")
+    ]
+
+
+def _read_upload(file: UploadFile) -> bytes:
+    content = file.file.read(MAX_ARIS_BYTES + 1)
+    if len(content) > MAX_ARIS_BYTES:
+        raise DomainError(
+            f"El archivo pesa más de {MAX_ARIS_MB} MB: exporta menos días (un día o una semana)."
+        )
+    return content
+
+
+@router.get("/model/summary")
+def model_summary(use_cases: UseCases, viewer: CurrentSeller) -> dict[str, Any] | None:
+    """Última corrida del modelo de demanda: división temporal, error de cada modelo por nivel,
+    qué modelo se usa en cada lugar y lo predicho frente a lo real por día (ADR 0020)."""
+    return use_cases.model_summary(viewer)
+
+
 @router.get("/suggestions")
 def suggestions(
     use_cases: UseCases,
@@ -221,9 +470,10 @@ def suggestions(
     category: Annotated[str, Query(max_length=30)],
     start: Annotated[date, Query()],
     days: Annotated[int, Query(ge=1)] = 1,
+    on_behalf: SellerFilter = None,
 ) -> s.SuggestionOut:
-    result = use_cases.suggest_projection(seller, category, start, days)
-    method = use_cases.suggest_projection.forecaster.name
+    result = use_cases.suggest_projection(seller, category, start, days, on_behalf)
+    method = use_cases.suggest_projection.method
     return s.SuggestionOut(method=method, days=[s.DailyUnitsOut(**asdict(d)) for d in result])
 
 
@@ -232,7 +482,7 @@ def suggestions(
 
 @admin.get("/accounts")
 def list_accounts(use_cases: UseCases, actor: ActiveAccount) -> list[s.AdminAccountOut]:
-    return [_admin_out(a) for a in use_cases.list_accounts(actor)]
+    return [_admin_out(a, actor) for a in use_cases.list_accounts(actor)]
 
 
 @admin.post("/accounts", status_code=status.HTTP_201_CREATED)
@@ -241,7 +491,8 @@ def create_account(
 ) -> s.NewCredentialsOut:
     created = use_cases.create_account(actor, body.username, body.name, body.zone, body.role)
     return s.NewCredentialsOut(
-        account=_admin_out(created.account), temporary_password=created.temporary_password
+        account=_admin_out(created.account, actor),
+        temporary_password=created.temporary_password,
     )
 
 
@@ -250,7 +501,7 @@ def reset_password(use_cases: UseCases, actor: ActiveAccount, username: str) -> 
     """Recuperación de contraseña: genera una temporal que el vendedor cambia al entrar."""
     reset = use_cases.reset_password(actor, username)
     return s.NewCredentialsOut(
-        account=_admin_out(reset.account), temporary_password=reset.temporary_password
+        account=_admin_out(reset.account, actor), temporary_password=reset.temporary_password
     )
 
 
@@ -258,7 +509,23 @@ def reset_password(use_cases: UseCases, actor: ActiveAccount, username: str) -> 
 def set_active(
     use_cases: UseCases, actor: ActiveAccount, username: str, body: s.SetActiveIn
 ) -> s.AdminAccountOut:
-    return _admin_out(use_cases.set_account_active(actor, username, body.active))
+    return _admin_out(use_cases.set_account_active(actor, username, body.active), actor)
+
+
+@admin.put("/accounts/{username}")
+def edit_account(
+    use_cases: UseCases, actor: ActiveAccount, username: str, body: s.EditAccountIn
+) -> s.AdminAccountOut:
+    """Corrige nombre y zona. El usuario no cambia (es la llave de sus datos)."""
+    return _admin_out(use_cases.edit_account(actor, username, body.name, body.zone), actor)
+
+
+@admin.put("/accounts/{username}/role", dependencies=[requires(Permission.CHANGE_ROLES)])
+def change_role(
+    use_cases: UseCases, actor: ActiveAccount, username: str, body: s.ChangeRoleIn
+) -> s.AdminAccountOut:
+    """Solo el supervisor general. La cuenta cambiada vuelve a iniciar sesión."""
+    return _admin_out(use_cases.change_role(actor, username, body.role), actor)
 
 
 # --- Notificaciones --------------------------------------------------------------------
@@ -278,9 +545,20 @@ def _notification_out(n) -> s.NotificationOut:
 
 @router.get("/notifications")
 def list_notifications(
-    use_cases: UseCases, account: ActiveAccount, limit: Annotated[int, Query(ge=1, le=100)] = 50
+    use_cases: UseCases,
+    account: ActiveAccount,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
 ) -> s.NotificationsOut:
-    page = use_cases.list_notifications(account, limit)
+    """Las últimas notificaciones; con `date_from`/`date_to`, solo las de esos días (en la hora
+    del negocio, ambos incluidos)."""
+    if date_from and date_to and date_from > date_to:
+        raise DomainError("La fecha inicial no puede ser posterior a la final.")
+    tz = ZoneInfo(get_settings().tz)
+    since = datetime.combine(date_from, time.min, tz) if date_from else None
+    until = datetime.combine(date_to + timedelta(days=1), time.min, tz) if date_to else None
+    page = use_cases.list_notifications(account, limit, since, until)
     return s.NotificationsOut(items=[_notification_out(n) for n in page.items], unread=page.unread)
 
 
@@ -294,7 +572,9 @@ def mark_notifications_read(
 # --- Llamadas de n8n (token de servicio) -----------------------------------------------
 
 internal = APIRouter(
-    prefix="/api/internal", tags=["internal"], dependencies=[Depends(require_service_token)]
+    prefix=f"{API_PREFIX}/internal",
+    tags=["internal"],
+    dependencies=[Depends(require_service_token)],
 )
 
 
@@ -308,3 +588,525 @@ def announce(use_cases: UseCases, body: s.AnnouncementIn) -> s.CreatedOut:
 def projection_reminders(use_cases: UseCases) -> s.CreatedOut:
     """Recordatorio diario (cron de n8n): a cada vendedor sin proyección para hoy."""
     return s.CreatedOut(created=use_cases.send_projection_reminders())
+
+
+@internal.post("/notifications/closing-soon")
+def closing_soon(use_cases: UseCases) -> s.CreatedOut:
+    """Aviso previo al corte a quien aún no registró (la API ya lo revisa cada minuto)."""
+    return s.CreatedOut(created=use_cases.notify_closing_soon())
+
+
+@internal.post("/notifications/missed-projections")
+def missed_projections(use_cases: UseCases) -> s.CreatedOut:
+    """Avisos de quién no registró pasado el corte (la API ya lo revisa cada minuto)."""
+    return s.CreatedOut(created=use_cases.notify_missed_projections())
+
+
+# --- Hora de corte y habilitaciones de edición -----------------------------------------
+
+
+def _unlock_out(u: EditUnlock) -> s.UnlockOut:
+    return s.UnlockOut(
+        id=u.id or 0,  # siempre viene de la base, con id
+        seller=u.seller,
+        date=u.date,
+        reason=u.reason,
+        status=u.status,
+        requested_at=u.requested_at,
+        decided_by=u.decided_by,
+        decided_at=u.decided_at,
+    )
+
+
+def _cutoff_out(policy: CutoffPolicy) -> s.CutoffOut:
+    return s.CutoffOut(
+        cutoff_time=f"{policy.cutoff:%H:%M}",
+        days_before=policy.days_before,
+        open_days=policy.open_days,
+        starts_in=policy.starts_in,
+        enabled=policy.enabled,
+    )
+
+
+@router.get("/assistant")
+def assistant(use_cases: UseCases, account: ActiveAccount) -> s.AssistantOut:
+    """¿Hay asistente? Y las preguntas sugeridas para empezar (ADR 0022)."""
+    ask = use_cases.ask_assistant
+    return s.AssistantOut(
+        enabled=ask.enabled,
+        suggestions=list(ask.starters(account)) if ask.enabled else [],
+    )
+
+
+@router.post("/assistant/messages")
+def ask_assistant(
+    use_cases: UseCases, account: ActiveAccount, body: s.AssistantMessageIn
+) -> s.AssistantReplyOut:
+    """Una pregunta al asistente: la respuesta y preguntas para seguir. Solo ve lo de quien
+    pregunta (el agente consulta con un pase de esta persona)."""
+    answer = use_cases.ask_assistant(account, body.message, body.conversation)
+    return s.AssistantReplyOut(
+        reply=answer.reply,
+        suggestions=list(answer.suggestions),
+        message_id=answer.message_id,
+        blocks=list(answer.blocks),
+    )
+
+
+@router.post("/assistant/messages/stream")
+def ask_assistant_stream(
+    use_cases: UseCases, account: ActiveAccount, body: s.AssistantMessageIn
+) -> StreamingResponse:
+    """La misma pregunta, con la respuesta en partes (una línea JSON por evento: `delta` con el
+    texto que se agrega, y al final `done` con la respuesta y sus sugerencias, o `error`)."""
+    events = use_cases.ask_assistant.stream(account, body.message, body.conversation)
+    return StreamingResponse(
+        (json.dumps(e, ensure_ascii=False) + "\n" for e in events),
+        media_type="application/x-ndjson",
+        # Sin búfer en los proxys: cada parte sale apenas llega.
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# --- Historial, tablas y canales del asistente (ADR 0024) ---------------------------------
+
+
+@router.get("/assistant/conversations")
+def list_conversations(
+    use_cases: UseCases,
+    account: ActiveAccount,
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+    before: Annotated[datetime | None, Query()] = None,
+) -> list[s.ConversationSummaryOut]:
+    """Mis conversaciones con el asistente, de la más reciente a la más vieja."""
+    return [
+        s.ConversationSummaryOut(
+            id=str(c.id),
+            title=c.title,
+            channel=c.channel,
+            updated_at=c.updated_at,
+            preview=c.preview,
+        )
+        for c in use_cases.assistant_history.conversations_of(account, limit, before)
+    ]
+
+
+@router.get("/assistant/conversations/{conversation_id}")
+def get_conversation(
+    use_cases: UseCases, account: ActiveAccount, conversation_id: str
+) -> s.ConversationOut:
+    conversation, found = use_cases.assistant_history.get(account, conversation_id)
+    return s.ConversationOut(
+        id=str(conversation.id),
+        title=conversation.title,
+        channel=conversation.channel,
+        messages=[
+            s.StoredMessageOut(
+                id=str(m.id),
+                role=m.role,
+                text=m.text,
+                blocks=list(m.blocks),
+                suggestions=list(m.suggestions),
+                created_at=m.created_at,
+            )
+            for m in found
+        ],
+    )
+
+
+@router.delete("/assistant/conversations/{conversation_id}", status_code=204)
+def archive_conversation(use_cases: UseCases, account: ActiveAccount, conversation_id: str) -> None:
+    """Archiva la conversación: deja de aparecer en el historial."""
+    use_cases.assistant_history.archive(account, conversation_id)
+
+
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _xlsx_response(file) -> Response:
+    return Response(
+        content=file.content,
+        media_type=XLSX,
+        headers={"Content-Disposition": f'attachment; filename="{file.name}"'},
+    )
+
+
+@router.get("/assistant/messages/{message_id}/tables/{index}.xlsx", response_class=Response)
+def download_table(
+    use_cases: UseCases, account: ActiveAccount, message_id: str, index: int
+) -> Response:
+    """Una tabla de un mensaje guardado, en Excel (solo para el dueño de la conversación;
+    `index` es la posición entre las tablas del mensaje, desde 0)."""
+    file = use_cases.assistant_history.table_file(account.seller.username, message_id, index)
+    return _xlsx_response(file)
+
+
+@router.post("/assistant/channels/link-code")
+def link_code(use_cases: UseCases, account: ActiveAccount) -> s.LinkCodeOut:
+    """Código para vincular Telegram o WhatsApp: se envía al bot como `vincular ABC123`."""
+    created = use_cases.create_link_code(account)
+    return s.LinkCodeOut(code=created.code, expires_at=created.expires_at)
+
+
+@router.get("/editing")
+def editing_window(use_cases: UseCases, viewer: CurrentSeller) -> s.EditingWindowOut:
+    """Días que se pueden registrar, hasta cuándo y si hay habilitación (pantalla Registrar)."""
+    window = use_cases.editing_window(viewer)
+    return s.EditingWindowOut(
+        policy=_cutoff_out(window.policy),
+        days=[
+            s.EditingDayOut(
+                date=d.date,
+                closes_at=d.closes_at,
+                open=d.open,
+                unlock=_unlock_out(d.unlock) if d.unlock else None,
+            )
+            for d in window.days
+        ],
+    )
+
+
+@router.get("/editing/unlocks")
+def list_unlocks(use_cases: UseCases, viewer: CurrentSeller) -> list[s.UnlockOut]:
+    return [_unlock_out(u) for u in use_cases.list_unlocks(viewer)]
+
+
+@router.post("/editing/unlocks", status_code=status.HTTP_201_CREATED)
+def request_unlock(
+    use_cases: UseCases, seller: CurrentSeller, body: s.UnlockRequestIn
+) -> s.UnlockOut:
+    """El vendedor pide editar un día ya cerrado (el vendedor sale de la sesión)."""
+    return _unlock_out(use_cases.request_unlock(seller, body.date, body.reason))
+
+
+@editing_admin.post("/editing/unlocks/{unlock_id}")
+def decide_unlock(
+    use_cases: UseCases, actor: ActiveAccount, unlock_id: DbIdPath, body: s.UnlockDecisionIn
+) -> s.UnlockOut:
+    return _unlock_out(use_cases.decide_unlock(actor.seller, unlock_id, body.action))
+
+
+@editing_admin.put("/editing/cutoff")
+def update_cutoff(use_cases: UseCases, actor: ActiveAccount, body: s.CutoffIn) -> s.CutoffOut:
+    return _cutoff_out(
+        use_cases.update_cutoff(actor.seller, body.cutoff_time, body.days_before, body.enabled)
+    )
+
+
+@editing_admin.post("/editing/sellers/{username}/grant")
+def grant_editing(
+    use_cases: UseCases, actor: ActiveAccount, username: str, body: s.GrantEditingIn
+) -> list[s.UnlockOut]:
+    """El supervisor habilita la edición de un vendedor para los días elegidos."""
+    return [_unlock_out(u) for u in use_cases.grant_editing(actor.seller, username, body.dates)]
+
+
+@editing_admin.post("/editing/sellers/{username}/revoke")
+def revoke_editing(use_cases: UseCases, actor: ActiveAccount, username: str) -> list[s.UnlockOut]:
+    """El supervisor cierra las habilitaciones vigentes del vendedor."""
+    return [_unlock_out(u) for u in use_cases.revoke_editing(actor.seller, username)]
+
+
+# --- Stock de despacho -------------------------------------------------------------------
+
+
+def _stock_out(day: DailyStock) -> s.StockDayOut:
+    return s.StockDayOut(
+        date=day.date,
+        lines=[
+            s.StockLineOut(
+                product_id=line.product_id,
+                units=line.units,
+                kg=line.kg,
+                location=line.location,
+                lot_date=line.lot_date or day.date,
+            )
+            for line in day.lines
+        ],
+        total_units=day.total_units,
+        total_kg=day.total_kg,
+        recorded_by=day.recorded_by,
+        recorded_at=day.recorded_at,
+    )
+
+
+@stock.get("/options")
+def stock_options(use_cases: UseCases, viewer: CurrentSeller) -> s.StockOptionsOut:
+    """Artículos (con calidad B) y ubicaciones para armar el formulario de stock."""
+    options = use_cases.stock_options(viewer)
+    return s.StockOptionsOut(
+        items=[s.ProductOut(**asdict(p)) for p in options.items],
+        locations=options.locations,
+        lot_days=options.lot_days,
+    )
+
+
+@stock.get("")
+def list_stock(
+    use_cases: UseCases, viewer: CurrentSeller, date_from: DateFrom, date_to: DateTo
+) -> list[s.StockDayOut]:
+    """Stock registrado por día (solo los días con registro), del más reciente al más antiguo."""
+    return [_stock_out(d) for d in use_cases.list_stock(viewer, date_from, date_to)]
+
+
+@stock.put("/{day}", dependencies=[requires(Permission.MANAGE_STOCK)])
+def register_stock(
+    use_cases: UseCases, actor: CurrentSeller, day: date, body: s.StockIn
+) -> s.StockDayOut:
+    """El jefe de despacho registra (o corrige) el stock del día en una ubicación: unidades por
+    producto y lote. Reemplaza lo de esa ubicación; las demás no se tocan."""
+    entries = [StockEntry(line.product_id, line.units, line.lot_date) for line in body.lines]
+    return _stock_out(use_cases.register_stock(actor, day, entries, body.location))
+
+
+# --- Cálculo de saca ----------------------------------------------------------------------
+
+
+@saca.get("")
+def calculate_saca(
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    day: Annotated[date, Query(alias="date")],
+) -> s.SacaOut:
+    """Cuánto pedir a granja, calculado el día `date`: por tipo, stock − pedidos de mañana
+    + proyección de pasado mañana + plus. La de hoy se guarda al verla; la de un día pasado es
+    la que quedó guardada (no se recalcula)."""
+    saved = use_cases.saca_history.saved(viewer, day)
+    if saved:
+        out = s.SacaOut.model_validate_json(saved.payload)
+        return out.model_copy(update={"saved_at": saved.saved_at, "saved_by": saved.saved_by})
+    plan = use_cases.calculate_saca(viewer, day)
+    out = saca_out(plan)
+    snapshot = use_cases.saca_history.record(viewer, plan, out.model_dump_json())
+    if snapshot:
+        out = out.model_copy(update={"saved_at": snapshot.saved_at, "saved_by": snapshot.saved_by})
+    return out
+
+
+@saca.get("/history")
+def saca_history(
+    use_cases: UseCases, viewer: CurrentSeller, date_from: DateFrom, date_to: DateTo
+) -> list[s.SacaHistoryOut]:
+    """Sacas guardadas del rango (la más reciente primero), con el pedido a granja por tipo."""
+    found = []
+    for snap in use_cases.saca_history.list(viewer, date_from, date_to):
+        plan = s.SacaOut.model_validate_json(snap.payload)
+        found.append(
+            s.SacaHistoryOut(
+                date=snap.date,
+                saved_at=snap.saved_at,
+                saved_by=snap.saved_by,
+                farm_order=snap.farm_order,
+                groups=[
+                    s.SacaHistoryGroupOut(
+                        name=g.name,
+                        projected=g.projected,
+                        ordered=g.ordered,
+                        stock=g.stock,
+                        plus=g.plus,
+                        farm_order=g.farm_order,
+                    )
+                    for g in plan.groups
+                ],
+            )
+        )
+    return found
+
+
+@saca.put("/plus", dependencies=[requires(Permission.MANAGE_EDITING)])
+def set_saca_plus(use_cases: UseCases, actor: CurrentSeller, body: s.SacaPlusIn) -> s.SacaPlusOut:
+    """Un supervisor cambia el plus (aves extra) de cada tipo."""
+    return s.SacaPlusOut(plus=use_cases.set_saca_plus(actor, body.plus))
+
+
+# --- Producción diaria --------------------------------------------------------------------
+
+
+def _production_out(day: DailyProduction) -> s.ProductionDayOut:
+    return s.ProductionDayOut(
+        date=day.date,
+        lines=[
+            s.ProductionLineOut(
+                product_id=line.product_id,
+                ordered=line.ordered,
+                produced=line.produced,
+                quality_a=line.quality_a,
+                quality_b=line.quality_b,
+            )
+            for line in day.lines
+        ],
+        ordered=day.ordered,
+        produced=day.produced,
+        quality_b=day.quality_b,
+        weights=day.weights,
+        recorded_by=day.recorded_by,
+        recorded_at=day.recorded_at,
+    )
+
+
+@production.get("")
+def list_production(
+    use_cases: UseCases, viewer: CurrentSeller, date_from: DateFrom, date_to: DateTo
+) -> list[s.ProductionDayOut]:
+    """Producción registrada por día (solo los días con registro), del más reciente primero."""
+    return [_production_out(d) for d in use_cases.list_production(viewer, date_from, date_to)]
+
+
+def _second(pair: tuple[str, float]) -> float:
+    return pair[1]
+
+
+@production.get("/forecast")
+def forecast_arrival(
+    use_cases: UseCases,
+    viewer: CurrentSeller,
+    weight: Annotated[list[float] | None, Query(max_length=10)] = None,
+) -> s.ArrivalForecastOut:
+    """El modelo de llegada por rango, listo para proyectar, y su acierto en los últimos días.
+
+    `weight` (repetido, en el orden de `groups`): peso promedio esperado de la parvada de cada
+    tipo; 0 o ausente usa el último anotado."""
+    forecast = use_cases.forecast_arrival(viewer, weight)
+    fitted = forecast.fitted
+    rates, checks = (fitted.rates, fitted.checks) if fitted else (None, [])
+    products = [p.id for _, items in forecast.groups for p in items]
+    return s.ArrivalForecastOut(
+        available=rates is not None,
+        method=fitted.model if fitted else "",
+        candidates=[
+            s.ForecastCandidateOut(name=name, error=error)
+            for name, error in sorted((fitted.candidates if fitted else {}).items(), key=_second)
+        ],
+        weights_used=fitted.weights if fitted else {},
+        min_days=MIN_HISTORY_DAYS,
+        days=rates.days if rates else 0,
+        date_from=rates.date_from if rates else None,
+        date_to=rates.date_to if rates else None,
+        groups=[
+            s.ForecastGroupOut(
+                name=name,
+                last_ordered=forecast.last_request.get(name, 0.0),
+                last_weight=forecast.last_weights.get(name),
+                products=[
+                    s.ForecastProductOut(
+                        product_id=p.id,
+                        share=round(rates.share.get(p.id, 0.0), 6) if rates else 0.0,
+                        quality_a_rate=round(1 - rates.b_rate.get(p.id, 0.0), 6) if rates else 1.0,
+                    )
+                    for p in items
+                ],
+            )
+            for name, items in forecast.groups
+        ],
+        accuracy=s.ForecastAccuracyOut(
+            days=len(checks),
+            error=round(overall_error(checks), 4),
+            naive_error=round(overall_error(checks, naive=True), 4),
+            by_day=[
+                s.ForecastCheckOut(
+                    date=c.date, error=round(c.error, 4), naive_error=round(c.naive_error, 4)
+                )
+                for c in checks
+            ],
+            by_product=[
+                s.ForecastProductCheckOut(
+                    product_id=p,
+                    ordered=round(sum(c.ordered.get(p, 0.0) for c in checks), 2),
+                    expected=sum(c.expected.get(p, 0) for c in checks),
+                    produced=sum(c.produced.get(p, 0) for c in checks),
+                )
+                for p in products
+            ],
+        )
+        if checks
+        else None,
+    )
+
+
+@production.put("/{day}", dependencies=[requires(Permission.MANAGE_PRODUCTION)])
+def register_production(
+    use_cases: UseCases, actor: CurrentSeller, day: date, body: s.ProductionIn
+) -> s.ProductionDayOut:
+    """El jefe de despacho registra (o corrige) lo pedido a granja y lo que llegó, por producto."""
+    entries = [
+        ProductionEntry(line.product_id, line.ordered, line.produced, line.quality_b)
+        for line in body.lines
+    ]
+    return _production_out(use_cases.register_production(actor, day, entries, body.weights))
+
+
+@internal.post("/aris")
+def aris_ingest(
+    use_cases: UseCases,
+    file: Annotated[UploadFile, File(description="Export de ARIS: Excel o CSV")],
+    source: Annotated[str, Form(description="drive | telegram | whatsapp")] = "drive",
+) -> list[dict[str, Any]]:
+    """Lo mismo, para n8n (Google Drive, Telegram o WhatsApp), con X-Api-Token."""
+    label = ARIS_SOURCES.get(source, source)
+    system = Seller(
+        f"{ARIS_SERVICE_USER}-{source}"[:50], f"n8n ({label})", None, GENERAL_SUPERVISOR
+    )
+    content = _read_upload(file)
+    return [asdict(r) for r in use_cases.import_aris(system, content, file.filename or "")]
+
+
+# --- Canales del asistente: Telegram y WhatsApp (ADR 0024) --------------------------------
+
+CHANNEL_FILES = f"{API_PREFIX}/internal/channel/files"
+
+
+def _channel_reply(reply) -> s.ChannelReplyOut:
+    return s.ChannelReplyOut(
+        text=reply.text,
+        files=[
+            s.ChannelFileOut(name=f.name, url=f"{CHANNEL_FILES}/{f.token}") for f in reply.files
+        ],
+        suggestions=list(reply.suggestions),
+    )
+
+
+@internal.post("/channel/message")
+def channel_message(use_cases: UseCases, body: s.ChannelMessageIn) -> s.ChannelReplyOut:
+    """Un mensaje de texto de Telegram o WhatsApp: vincula, confirma, o le pregunta al asistente
+    como la persona vinculada."""
+    return _channel_reply(use_cases.channel_assistant.message(body.channel, body.sender, body.text))
+
+
+@internal.post("/channel/photo")
+def channel_photo(use_cases: UseCases, body: s.ChannelPhotoIn) -> s.ChannelReplyOut:
+    """Lo que el modelo leyó de una foto: arma el borrador de proyección o de stock."""
+    extraction = Extraction(
+        body.extraction.kind,
+        body.extraction.date,
+        tuple(ExtractedRow(r.product, r.units, r.kg, r.lot_date) for r in body.extraction.rows),
+        body.extraction.notes,
+    )
+    return _channel_reply(use_cases.channel_assistant.photo(body.channel, body.sender, extraction))
+
+
+@internal.get("/channel/context")
+def channel_context(
+    use_cases: UseCases,
+    channel: Annotated[str, Query(max_length=10)],
+    sender: Annotated[str, Query(max_length=64)],
+) -> s.ChannelContextOut:
+    """Para el paso de visión: quién es, qué puede registrar y con qué catálogo y fechas."""
+    ctx = use_cases.channel_assistant.context(channel, sender)
+    return s.ChannelContextOut(
+        linked=ctx.linked,
+        name=ctx.name,
+        can_project=ctx.can_project,
+        can_stock=ctx.can_stock,
+        today=ctx.today,
+        dates=list(ctx.dates),
+        products=[
+            s.ChannelProductOut(id=p.id, name=p.name, category=p.category, unit="unidad")
+            for p in ctx.products
+        ],
+    )
+
+
+@internal.get("/channel/files/{token}", response_class=Response)
+def channel_file(use_cases: UseCases, token: str) -> Response:
+    """El Excel de una tabla para el canal (token firmado, vence en 15 minutos)."""
+    return _xlsx_response(use_cases.channel_assistant.file(token))

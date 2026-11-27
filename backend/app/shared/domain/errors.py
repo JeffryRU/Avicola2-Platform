@@ -23,3 +23,11 @@ class ForbiddenError(DomainError):
 
 class ConflictError(DomainError):
     """La operación choca con el estado actual del recurso."""
+
+
+class TooManyRequestsError(DomainError):
+    """Demasiadas peticiones seguidas de la misma persona."""
+
+
+class UnavailableError(DomainError):
+    """Un servicio del que depende la operación no responde ahora (reintentar más tarde)."""

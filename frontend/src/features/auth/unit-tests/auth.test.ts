@@ -3,12 +3,15 @@ import { type z } from 'zod'
 import { ApiError, type KeyValueStore } from '@/shared/application/ports'
 import { AuthService } from '@/features/auth/application/auth-service'
 import type { AuthGateway } from '@/features/auth/application/ports'
-import { newPasswordSchema, profileSchema, type Session } from '@/features/auth/domain/session'
+import { newPasswordSchema } from '@/features/auth/domain/credentials'
+import type { Session } from '@/shared/domain/session'
 import { StoredSessionRepository } from '@/features/auth/infrastructure/stored-session-repository'
 
 const SESSION: Session = {
   seller: { username: 'jperez', name: 'Juan Pérez', zone: 'Zona Norte', role: 'seller' },
   must_change_password: false,
+  permissions: [],
+  manageable_roles: [],
 }
 
 class MemoryStore implements KeyValueStore {
@@ -40,6 +43,13 @@ class FakeGateway implements AuthGateway {
   }
   async changePassword() {
     return SESSION
+  }
+  stored: unknown = null
+  async getPreferences() {
+    return this.stored
+  }
+  async savePreferences(preferences: unknown) {
+    this.stored = preferences
   }
   async updateProfile(name: string) {
     return { ...SESSION, seller: { ...SESSION.seller, name } }
@@ -122,10 +132,5 @@ describe('perfil', () => {
     // Al reabrir la app, el perfil guardado ya trae el nombre nuevo.
     const reopened = new AuthService(gateway, new StoredSessionRepository(local, tab))
     expect(reopened.current()?.seller.name).toBe('Roberto Navarro Ruiz')
-  })
-
-  it('normaliza los espacios del nombre y exige uno', () => {
-    expect(profileSchema.parse({ name: '  Ana   Torres ' }).name).toBe('Ana Torres')
-    expect(profileSchema.safeParse({ name: '   ' }).success).toBe(false)
   })
 })

@@ -1,0 +1,120 @@
+/**
+ * Única fuente de las claves de TanStack Query ("query key factory"). Cada módulo tiene `all`
+ * (su prefijo: invalidarlo refresca todas sus consultas) y funciones para cada consulta.
+ * Ninguna pantalla escribe una clave a mano: así se ve qué invalida qué.
+ *
+ * Mapa con los endpoints (ver shared/infrastructure/api/endpoints.ts):
+ * - auth.session          → GET /auth/me
+ * - accounts.all          → GET /admin/accounts
+ * - catalog.all           → GET /catalog
+ * - sellers.all           → GET /sellers
+ * - status.all            → GET /status
+ * - projections.range     → GET /projections + GET /sales (un mismo rango de fechas)
+ * - suggestions.get       → GET /suggestions
+ * - history.list          → GET /projections/history
+ * - saca.plan             → GET /saca
+ * - stock.range/options   → GET /stock, GET /stock/options
+ * - production.range      → GET /production; production.forecast → GET /production/forecast
+ * - editing.window        → GET /editing; editing.unlocks → GET /editing/unlocks
+ * - notifications.all     → GET /notifications
+ * - versions.catalog       → public/versions.json; versions.changes → historial de GitHub
+ */
+/** Datos de referencia que cambian poco (catálogo, vendedores, opciones del stock): 10 minutos frescos. */
+export const REFERENCE_DATA_STALE_MS = 10 * 60_000
+
+export const queryKeys = {
+  auth: {
+    all: ['auth'] as const,
+    /** Confirmación de la cookie con el servidor, por usuario. */
+    session: (username: string) => ['auth', 'session', username] as const,
+  },
+
+  accounts: {
+    all: ['admin', 'accounts'] as const,
+  },
+
+  catalog: {
+    all: ['catalog'] as const,
+  },
+
+  sellers: {
+    all: ['sellers'] as const,
+  },
+
+  status: {
+    all: ['status'] as const,
+  },
+
+  projections: {
+    /** Proyecciones y ventas de todos los rangos (dashboards, inicio, mis proyecciones). */
+    all: ['projections'] as const,
+    range: (from: string, to: string) => ['projections', from, to] as const,
+    /** Lo que el modelo habría sugerido (GET /model-projections). */
+    model: (from: string, to: string) => ['projections', 'model', from, to] as const,
+    /** Pedidos de las tiendas por zona (GET /store-orders). */
+    stores: (from: string, to: string) => ['projections', 'stores', from, to] as const,
+  },
+
+  suggestions: {
+    all: ['suggestions'] as const,
+    get: (category: string, start: string, days: number, seller?: string) =>
+      ['suggestions', category, start, days, seller ?? null] as const,
+  },
+
+  history: {
+    all: ['history'] as const,
+    list: (from: string, to: string, seller?: string) => ['history', from, to, seller ?? null] as const,
+  },
+
+  model: {
+    summary: ['model', 'summary'] as const,
+  },
+
+  aris: {
+    status: ['aris', 'status'] as const,
+  },
+
+  assistant: {
+    /** GET /assistant (por usuario: las preguntas dependen del rol). */
+    info: (username: string) => ['assistant', username] as const,
+    /** GET /assistant/conversations (historial de la persona). */
+    conversations: (username: string) => ['assistant', username, 'conversations'] as const,
+  },
+
+  saca: {
+    all: ['saca'] as const,
+    plan: (day: string) => ['saca', day] as const,
+    history: (from: string, to: string) => ['saca', 'history', from, to] as const,
+  },
+
+  stock: {
+    /** Incluye las opciones: registrar stock refresca la lista y las opciones. */
+    all: ['stock'] as const,
+    range: (from: string, to: string) => ['stock', from, to] as const,
+    options: ['stock', 'options'] as const,
+  },
+
+  production: {
+    /** Incluye la estimación de llegada: registrar producción refresca ambas. */
+    all: ['production'] as const,
+    range: (from: string, to: string) => ['production', from, to] as const,
+    forecast: (weights: readonly number[]) => ['production', 'forecast', ...weights] as const,
+  },
+
+  editing: {
+    all: ['editing'] as const,
+    window: ['editing', 'window'] as const,
+    unlocks: ['editing', 'unlocks'] as const,
+  },
+
+  notifications: {
+    all: ['notifications'] as const,
+  },
+
+  versions: {
+    all: ['versions'] as const,
+    catalog: ['versions', 'catalog'] as const,
+    /** Cambios entre dos puntos del historial (rama, tag o commit). */
+    changes: (repo: string, from: string | null, to: string | null) => ['versions', 'changes', repo, from, to] as const,
+  },
+} as const

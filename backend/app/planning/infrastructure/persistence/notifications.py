@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.planning.domain.notifications import Notification
@@ -60,11 +60,22 @@ class SqlNotificationRepository:
             id=new_id,
         )
 
-    def list_for(self, username: str, limit: int) -> list[Notification]:
+    def list_for(
+        self,
+        username: str,
+        limit: int,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> list[Notification]:
+        t = notifications.c
+        when = [
+            *([t.created_at >= _utc(since)] if since else []),
+            *([t.created_at < _utc(until)] if until else []),
+        ]
         rows = self.session.execute(
             select(notifications)
             .join(sellers, sellers.c.id == notifications.c.seller_id)
-            .where(sellers.c.username == username)
+            .where(sellers.c.username == username, *when)
             .order_by(notifications.c.created_at.desc(), notifications.c.id.desc())
             .limit(limit)
         ).mappings()
@@ -103,3 +114,11 @@ class SqlNotificationRepository:
         count = self.session.execute(query.values(read_at=_utc(now))).rowcount
         self.session.commit()
         return count
+
+    def delete_for(self, username: str) -> None:
+        seller_id = self._seller_id(username)
+        if seller_id is not None:
+            self.session.execute(
+                delete(notifications).where(notifications.c.seller_id == seller_id)
+            )
+            self.session.commit()

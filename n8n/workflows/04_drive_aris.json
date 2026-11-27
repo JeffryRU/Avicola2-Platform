@@ -1,0 +1,323 @@
+{
+  "id": "avicola2DriveAris04",
+  "name": "04_drive_aris",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 15,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $env.ARIS_DRIVE_FOLDER_URL }}"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "id": "d4a10001-0001-4c0e-9f00-000000000001",
+      "name": "Archivo nuevo en la carpeta de Drive",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Conectar la credencial de Google Drive (OAuth2) y poner ARIS_DRIVE_FOLDER_URL en el .env de n8n."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10001-0002-4c0e-9f00-00000000000a",
+              "leftValue": "={{ $json.name }}",
+              "rightValue": "\\.(xlsx|xlsm|csv)$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10001-0003-4c0e-9f00-000000000002",
+      "name": "¿Es Excel o CSV?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "sheetsToFormat": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }
+          },
+          "fileName": "={{ $json.name.match(/\\.(xlsx|xlsm|csv)$/i) ? $json.name : $json.name + '.xlsx' }}"
+        }
+      },
+      "id": "d4a10001-0004-4c0e-9f00-000000000003",
+      "name": "Descargar de Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        480,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/aris",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "source",
+              "value": "drive"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          },
+          "timeout": 600000
+        }
+      },
+      "id": "d4a10001-0005-4c0e-9f00-000000000004",
+      "name": "Cargar en el backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        -100
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4a10001-0006-4c0e-9f00-00000000000b",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4a10001-0007-4c0e-9f00-000000000005",
+      "name": "¿Se cargó?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/notifications",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ audience: 'supervisors', title: 'Datos de ARIS cargados desde Drive', body: ($('Archivo nuevo en la carpeta de Drive').item.json.name + ': ' + $json.body.map(l => l.rows + ' filas de ' + l.kind + ' (' + l.date_from + ' a ' + l.date_to + ')').join(' y ') + '. ' + ($json.body.flatMap(l => l.issues || []).length ? 'Revisa en el archivo: ' + $json.body.flatMap(l => l.issues || []).join(' · ') + '. ' : '') + 'El modelo se reentrena en unos minutos.').slice(0, 500), link: '/modelo' }) }}",
+        "options": {}
+      },
+      "id": "d4a10001-0008-4c0e-9f00-000000000006",
+      "name": "Avisar: datos cargados",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/api/internal/notifications",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Token",
+              "value": "={{ $env.INGEST_API_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ audience: 'supervisors', title: 'No se pudo cargar el archivo de ARIS', body: ($('Archivo nuevo en la carpeta de Drive').item.json.name + ': ' + (($json.body && $json.body.detail) || ('error ' + $json.statusCode))).slice(0, 500), link: '/modelo' }) }}",
+        "options": {}
+      },
+      "id": "d4a10001-0009-4c0e-9f00-000000000007",
+      "name": "Avisar: no se pudo cargar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "d4a10001-0010-4c0e-9f00-000000000008",
+      "name": "Ignorar (no es Excel/CSV)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        480,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "Archivo nuevo en la carpeta de Drive": {
+      "main": [
+        [
+          {
+            "node": "¿Es Excel o CSV?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es Excel o CSV?": {
+      "main": [
+        [
+          {
+            "node": "Descargar de Drive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignorar (no es Excel/CSV)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar de Drive": {
+      "main": [
+        [
+          {
+            "node": "Cargar en el backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cargar en el backend": {
+      "main": [
+        [
+          {
+            "node": "¿Se cargó?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Se cargó?": {
+      "main": [
+        [
+          {
+            "node": "Avisar: datos cargados",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar: no se pudo cargar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

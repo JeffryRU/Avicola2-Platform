@@ -1,0 +1,71 @@
+# Pruebas del backend y del frontend en cada push y pull request.
+name: CI
+
+on:
+  push:
+    branches: [main, develop, migracion-kotlin]
+    paths: [backend/**, frontend/**, .github/workflows/ci.yml]
+  pull_request:
+    paths: [backend/**, frontend/**, .github/workflows/ci.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest + ruff)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      # Arquitectura hexagonal: contratos de import-linter en pyproject.toml (ADR 0016).
+      - run: uv run lint-imports
+      - run: uv run pytest -q -m "not fuzz"
+
+  backend-fuzz:
+    # Fuzzing de la API (Schemathesis) y máquina de estados de roles (Hypothesis), en paralelo.
+    name: Backend (fuzzing + propiedades)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run pytest -q -m fuzz
+
+  frontend:
+    name: Frontend (lint + vitest + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build

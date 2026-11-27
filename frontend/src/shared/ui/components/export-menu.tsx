@@ -10,7 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/ui/components/shadcn/dropdown-menu'
-import { cn } from '@/shared/ui/lib/utils'
 
 const ICON: Record<ExportFormat, typeof FileText> = { xlsx: FileSpreadsheet, pdf: FileType2, csv: FileText }
 
@@ -44,9 +43,9 @@ export function ExportMenu({
             {busy ? <Loader2 className="animate-spin" /> : <Download />}
           </Button>
         ) : (
-          <Button variant="outline" className={cn('h-[46px] rounded-xl font-bold', className)}>
+          <Button variant="outline" className={className}>
             {busy ? <Loader2 className="animate-spin" /> : <Download />} Exportar
-            <ChevronDown className="opacity-60" />
+            <ChevronDown className="text-muted-foreground" />
           </Button>
         )}
       </DropdownMenuTrigger>
@@ -57,10 +56,10 @@ export function ExportMenu({
           const Icon = ICON[format]
           return (
             <DropdownMenuItem key={format} onSelect={() => void run(format)} className="gap-3 py-2">
-              <Icon className="size-5 text-primary" />
+              <Icon className="size-4.5 text-muted-foreground" />
               <span className="grid">
-                <b className="text-[14px]">{label}</b>
-                <small className="text-muted-foreground">{hint}</small>
+                <b className="text-base font-medium">{label}</b>
+                <small className="text-xs text-muted-foreground">{hint}</small>
               </span>
             </DropdownMenuItem>
           )

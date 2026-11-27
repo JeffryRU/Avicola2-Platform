@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { unitsSchema } from '@/features/catalog/domain/schemas'
+import { unitsSchema } from '@/shared/domain/products'
 import { isoDateSchema } from '@/shared/domain/schemas'
 
 /** Contratos de la API de proyecciones y ventas, validados al recibirlos. */
@@ -15,11 +15,17 @@ export const projectionSchema = z.object({
   total_kg: z.number(),
   submitted_at: z.string(),
   units: unitsSchema,
+  // Hoja de registro vigente (1 la primera; cada registro nuevo abre otra que la reemplaza).
+  sheet: z.number().int().positive().default(1),
 })
 export type Projection = z.infer<typeof projectionSchema>
 
 export const dailyUnitsSchema = z.object({ seller: z.string(), date: isoDateSchema, units: unitsSchema })
 export type DailyUnits = z.infer<typeof dailyUnitsSchema>
+
+/** Lo que piden las tiendas de una zona un día (reporte de pedidos en tienda). */
+export const storeOrderSchema = z.object({ zone: z.string().nullable(), date: isoDateSchema, units: unitsSchema })
+export type StoreOrder = z.infer<typeof storeOrderSchema>
 
 export const suggestionSchema = z.object({ method: z.string(), days: z.array(dailyUnitsSchema) })
 export type Suggestion = z.infer<typeof suggestionSchema>
@@ -36,11 +42,11 @@ export type SubmissionResult = z.infer<typeof submissionResultSchema>
 export const submissionSchema = z.object({
   submission_id: z.string(),
   seller: z.string(),
+  // Quien la envía, si no es el vendedor (el supervisor registrando por él).
+  author: z.string().optional(),
   category: z.string(),
   days: z.array(z.object({ date: isoDateSchema, units: unitsSchema })).min(1),
   created_at: z.string(),
   error: z.string().nullable().optional(),
 })
 export type Submission = z.infer<typeof submissionSchema>
-
-export const CONFIRMED = 'confirmed'

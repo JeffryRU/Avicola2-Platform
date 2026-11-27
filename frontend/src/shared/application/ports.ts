@@ -9,19 +9,57 @@ export interface KeyValueStore {
   remove(key: string): void
 }
 
-/** Cliente HTTP que valida cada respuesta con un esquema de zod. */
-export interface HttpClient {
-  get<T>(path: string, schema: z.ZodType<T>, query?: Record<string, string | number | undefined>): Promise<T>
-  post<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
-  patch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
+/** Opciones de una subida de archivos. */
+export interface UploadOptions {
+  /** Progreso de 0 a 100 mientras se envía el archivo (sirve para una barra de progreso). */
+  onProgress?: (percent: number) => void
+  /** Cancela la subida (p. ej., la persona toca "Cancelar"). */
+  signal?: AbortSignal
+  /** Campos de texto que acompañan al archivo en el mismo formulario. */
+  fields?: Record<string, string>
+  /** Nombre del campo del archivo en el formulario (por defecto, "file"). */
+  fieldName?: string
+  /** Las subidas pesadas tardan más que una consulta: por defecto, 5 minutos. */
+  timeoutMs?: number
 }
 
-/** Error de la API con el código HTTP (0 = sin conexión o sin respuesta). */
+/** Parámetros de una consulta; una lista se envía repitiendo el nombre (?weight=1&weight=2). */
+export type QueryParams = Record<string, string | number | readonly (string | number)[] | undefined>
+
+/** Cliente HTTP que valida cada respuesta con un esquema de zod. */
+export interface HttpClient {
+  get<T>(path: string, schema: z.ZodType<T>, query?: QueryParams): Promise<T>
+  /** `timeoutMs`: para lo que tarda más que una consulta (p. ej. el asistente). */
+  post<T>(path: string, body: unknown, schema: z.ZodType<T>, options?: { timeoutMs?: number }): Promise<T>
+  patch<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
+  put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>
+  /** Sube un archivo (multipart/form-data) e informa el progreso. */
+  upload<T>(path: string, file: Blob, schema: z.ZodType<T>, options?: UploadOptions): Promise<T>
+}
+
+/** Cabecera con el id de cada petición: el backend lo acepta, lo imprime en su log y lo devuelve. */
+export const REQUEST_ID_HEADER = 'X-Request-ID'
+
+/**
+ * Error de la API con el código HTTP (0 = sin conexión, sin respuesta o cancelada) y el id de la
+ * petición (`requestId`), el mismo que aparece entre corchetes en el log del backend.
+ */
 export class ApiError extends Error {
   readonly status: number
-  constructor(message: string, status: number) {
+  readonly requestId: string | undefined
+  constructor(message: string, status: number, requestId?: string) {
     super(message)
+    this.name = 'ApiError'
     this.status = status
+    this.requestId = requestId
+  }
+
+  /**
+   * Falla pasajera (sin conexión, timeout, servidor saturado o reiniciando: 408, 429, 502-504):
+   * reintentar más tarde puede funcionar. Un 500 es un error del servidor y se repetiría igual.
+   */
+  get isTransient() {
+    return [0, 408, 429, 502, 503, 504].includes(this.status)
   }
 
   /** 4xx: la petición es inválida y reintentarla no sirve. */
@@ -46,8 +84,14 @@ export interface LogSink {
  */
 export type InstallState = 'available' | 'ios' | 'installed' | 'unavailable'
 
+/** Sistema del equipo: decide si se ofrece la app nativa además de la app web. */
+export type DevicePlatform = 'android' | 'ios' | 'other'
+
 export interface AppInstaller {
   state(): InstallState
+  platform(): DevicePlatform
+  /** Instalador de la app nativa para este equipo (APK de la última Release), o null si no hay. */
+  nativeAppUrl(): string | null
   subscribe(listener: () => void): () => void
   /** Muestra el diálogo del navegador; true si la persona aceptó. */
   install(): Promise<boolean>

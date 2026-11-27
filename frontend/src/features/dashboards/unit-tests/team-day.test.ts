@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { Seller } from '@/features/auth/domain/session'
-import { Catalog } from '@/features/catalog/domain/catalog'
+import type { Seller } from '@/shared/domain/session'
+import { Catalog } from '@/features/catalog'
 import { teamDay } from '@/features/dashboards/domain/team-day'
-import type { Projection } from '@/features/projections/domain/schemas'
+import type { Projection } from '@/features/projections'
 
 const catalog = new Catalog([
   { id: 'P1', category: 'BRASA', name: 'Brasa 1', kg_per_unit: 1, sort_order: 0, subcategory: 'Brasa chica' },
@@ -15,6 +15,7 @@ const DAY = '2026-11-03'
 const projection = (who: string, units: Record<string, number>, status = 'confirmed'): Projection => ({
   id: `${who}-${DAY}`,
   submission_id: 's',
+  sheet: 1,
   seller: who,
   date: DAY,
   category: 'BRASA',
@@ -47,7 +48,7 @@ describe('día del equipo', () => {
     expect(day.rows[0].real).toBeNull()
   })
 
-  it('sin ventas, la venta real queda vacía', () => {
+  it('sin pedidos, el pedido real queda vacío', () => {
     expect(teamDay(DAY, SELLERS, [], [], catalog).real).toBeNull()
   })
 })

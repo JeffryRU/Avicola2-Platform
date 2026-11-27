@@ -1,19 +1,89 @@
-import { useQuery } from '@tanstack/react-query'
+import { useCallback, useState } from 'react'
+import { z } from 'zod'
 import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
 import { addDays, dShort, type IsoDate } from '@/shared/domain/dates'
-import type { Period } from '@/features/dashboards/domain/period'
-import { dataWindow, useRangeData } from '@/features/projections/ui/hooks'
-import { isSupervisor } from '@/features/auth/domain/session'
-import type { Catalog } from '@/features/catalog/domain/catalog'
-import { zonesOf } from '@/features/dashboards/domain/product-matrix'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
-import { ALL, NO_ZONE_LABEL, type FilterChip } from '@/features/dashboards/types/product-detail'
+import { useSearchParams } from 'react-router'
+import {
+  MONTH_PARAM,
+  checkPeriod,
+  customPeriod,
+  monthPeriod,
+  parseMonth,
+  weekPeriod,
+  type Period,
+} from '@/features/dashboards/domain/period'
+import { weekOptions } from '@/features/dashboards/domain/weeks'
+import { DEFAULT_MEASURE, MEASURE_PARAM, parseMeasure, type Measure } from '@/features/dashboards/domain/versus'
+import { isoDateSchema } from '@/shared/domain/schemas'
+import { dataWindow, useRangeData, useStoreOrders } from '@/features/projections'
+import { isSupervisor } from '@/shared/domain/session'
+import type { Catalog } from '@/features/catalog'
+import { storeEntries, zoneOfStores, zonesOf, type MatrixEntry } from '@/features/dashboards/domain/product-matrix'
+import { useRequiredSession } from '@/features/auth'
+import { useTeamSellers } from '@/features/sellers'
+import { ALL, ALL_PRODUCTS_LABEL, NO_ZONE_LABEL, type FilterChip } from '@/features/dashboards/types/product-detail'
 
-export function useSellers() {
-  const { sellers } = useContainer()
-  return useQuery({ queryKey: ['sellers'], queryFn: () => sellers.sellers(), staleTime: 10 * 60_000 })
+/**
+ * Pedidos de las tiendas del período y del anterior (para comparar), como entradas de la tabla.
+ * Solo para supervisión y sin filtro de vendedor (las tiendas no son vendedores); `zones` vacía = todas.
+ */
+export function useStoreEntries(dates: IsoDate[], sellers: readonly string[], zones: readonly string[]): MatrixEntry[] {
+  const enabled = isSupervisor(useRequiredSession().seller) && sellers.length === 0 && dates.length > 0
+  const from = dates.length ? addDays(dates[0], -dates.length) : ''
+  const orders = useStoreOrders(from, dates.at(-1) ?? '', enabled)
+  if (!enabled) return []
+  const pick = new Set(zones)
+  return storeEntries(orders.data ?? [], NO_ZONE_LABEL).filter(
+    (e) => pick.size === 0 || pick.has(zoneOfStores(e.seller)),
+  )
+}
+
+/**
+ * Filtros de los dashboards guardados en la URL para poder compartirla:
+ * ?semana=, ?mes=AAAA-MM o ?desde=&hasta= (rango personalizado; gana sobre el mes, y este sobre la semana), &vendedor=a,b (vacío = todos)&dia=&zona=&tamano=
+ * y &medida=kg|unidades|ambos (Proyección vs pedido real; kg si falta).
+ */
+export function useDashboardFilters() {
+  const [params, setParams] = useSearchParams()
+  const weeks = weekOptions()
+  const asked = params.get('semana') ?? ''
+  const week = weeks.includes(asked) ? asked : weeks[0]
+  const sellers = (params.get('vendedor') ?? '').split(',').filter((v) => v && v !== 'all')
+  const from = params.get('desde') ?? ''
+  const to = params.get('hasta') ?? ''
+  const valid = isoDateSchema.safeParse(from).success && isoDateSchema.safeParse(to).success
+  const month = parseMonth(params.get(MONTH_PARAM))
+  const period =
+    valid && !checkPeriod(from, to) ? customPeriod(from, to) : month ? monthPeriod(month) : weekPeriod(week)
+  const measure = parseMeasure(params.get(MEASURE_PARAM))
+  /** Cambia varios filtros a la vez (null o '' los quita). Se puede llamar varias veces seguidas. */
+  const update = (patch: Record<string, string | null>) => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        for (const [key, value] of Object.entries(patch)) {
+          if (value) next.set(key, value)
+          else next.delete(key)
+        }
+        return next
+      },
+      { replace: true },
+    )
+  }
+  return {
+    week,
+    period,
+    sellers,
+    measure,
+    param: (key: string) => params.get(key),
+    update,
+    setWeek: (w: string) => update({ semana: w, [MONTH_PARAM]: null, desde: null, hasta: null }),
+    setMonth: (m: string) => update({ [MONTH_PARAM]: m, semana: null, desde: null, hasta: null }),
+    setCustom: (a: string, b: string) => update({ desde: a, hasta: b, [MONTH_PARAM]: null }),
+    setSellers: (list: string[]) => update({ vendedor: list.join(',') || null }),
+    setMeasure: (m: Measure) => update({ [MEASURE_PARAM]: m === DEFAULT_MEASURE ? null : m }),
+  }
 }
 
 /** A dónde lleva tocar un día: el vendedor ve su proyección; el supervisor, la de todo el equipo. */
@@ -40,31 +110,29 @@ export function useDetailFilters() {
 /** Clave de una opción de «Tamaño»: "BRASA|" (todas) o "BRASA|Brasa chica". */
 export const choiceKey = (category: string, subcategory: string | null) => `${category}|${subcategory ?? ''}`
 
-/** Marca o desmarca un valor de una lista. */
-export const toggleIn = (list: string[], value: string) =>
-  list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
-
 /** Filtros de la tabla ya validados contra la semana, el catálogo y las zonas, con sus etiquetas. */
 export function useDetailSelection(dates: IsoDate[], catalog: Catalog | null | undefined) {
   const f = useDetailFilters()
-  const team = (useSellers().data ?? []).filter((s) => !isSupervisor(s))
+  const team = useTeamSellers()
   const weekDays = dates
   const allZones = zonesOf(team, NO_ZONE_LABEL)
   // En el orden de la semana / alfabético, sin valores que ya no existen.
   const days = weekDays.filter((d) => f.days.includes(d))
   const zones = allZones.filter((z) => f.zones.includes(z))
   const choices = catalog?.choices ?? []
-  // «Todas las brasas» es no elegir ninguno; las opciones marcables son los tamaños.
+  // «Todas las brasas» (o «Todos los productos») es no elegir ninguno; las opciones marcables son los
+  // tamaños y las categorías sin tamaños (el pollo sin menudencia).
   const allSizes = choices.at(0)
-  const sizeOptions = choices.filter((c) => c.subcategory !== null)
+  const several = (catalog?.categories.length ?? 0) > 1
+  const sizeOptions = choices.filter(
+    (c) => c.subcategory !== null || (catalog?.subcategories(c.category).length ?? 0) === 0,
+  )
   const sizes = sizeOptions.filter((c) => f.sizes.includes(choiceKey(c.category, c.subcategory)))
   const products = !catalog
     ? []
     : sizes.length
       ? catalog.products.filter((p) => sizes.some((c) => c.category === p.category && c.subcategory === p.subcategory))
-      : allSizes
-        ? catalog.selected(allSizes)
-        : catalog.products
+      : catalog.products
   const chips: FilterChip[] = [
     ...(days.length ? [{ key: 'dia', label: days.map(dShort).join(', '), onClear: () => f.setDays([]) }] : []),
     ...(zones.length ? [{ key: 'zona', label: zones.join(', '), onClear: () => f.setZones([]) }] : []),
@@ -79,7 +147,7 @@ export function useDetailSelection(dates: IsoDate[], catalog: Catalog | null | u
     allZones,
     days,
     zones,
-    allSizesLabel: allSizes?.label ?? '',
+    allSizesLabel: several ? ALL_PRODUCTS_LABEL : (allSizes?.label ?? ''),
     sizeOptions,
     selectedSizes: sizes,
     products,
@@ -91,6 +159,30 @@ export function useDetailSelection(dates: IsoDate[], catalog: Catalog | null | u
 export function usePeriodData(period: Period) {
   const w = dataWindow()
   const prevFrom = addDays(period.from, -period.dates.length)
-  // Sin salir de la ventana habitual comparte su caché; un rango más antiguo pide lo que falta.
-  return useRangeData(prevFrom < w.from ? prevFrom : w.from, period.to > w.to ? period.to : w.to)
+  // Un período antiguo (p. ej. la historia de ARIS) pide solo sus días, no hasta hoy. Si no,
+  // sin salir de la ventana habitual comparte su caché y un rango más antiguo pide lo que falta.
+  const old = period.to < w.from
+  const from = old || prevFrom < w.from ? prevFrom : w.from
+  const to = old ? period.to : period.to > w.to ? period.to : w.to
+  return useRangeData(from, to)
+}
+
+const wideSchema = z.boolean()
+
+/**
+ * Gráfico a todo el ancho (la tabla de al lado pasa abajo): se recuerda en este equipo, por
+ * pantalla (`screen`).
+ */
+export function useWideChart(screen = 'versus'): [boolean, (wide: boolean) => void] {
+  const { preferences } = useContainer()
+  const key = `nv_${screen}_wide_chart`
+  const [wide, setWide] = useState(() => preferences.get(key, wideSchema) ?? false)
+  const set = useCallback(
+    (w: boolean) => {
+      setWide(w)
+      preferences.set(key, w)
+    },
+    [preferences, key],
+  )
+  return [wide, set]
 }

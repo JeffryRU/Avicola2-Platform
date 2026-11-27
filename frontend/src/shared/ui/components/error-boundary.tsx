@@ -27,10 +27,10 @@ export class ErrorBoundary extends Component<Props, { failed: boolean }> {
         role="alert"
         className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6 text-center"
       >
-        <Mascot size={96} />
+        <Mascot size={64} />
         <div>
-          <h1 className="text-lg font-bold text-foreground">Algo salió mal</h1>
-          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+          <h1 className="text-xl font-semibold text-foreground hc:font-extrabold">Algo salió mal</h1>
+          <p className="mt-1 max-w-sm text-base text-muted-foreground">
             Ya registramos el problema. Tus proyecciones guardadas y las pendientes de sincronizar no se pierden.
           </p>
         </div>

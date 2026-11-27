@@ -20,7 +20,7 @@ import pyarrow.fs as pafs
 from deltalake import DeltaTable, write_deltalake
 from deltalake.exceptions import TableNotFoundError
 
-from app.core.config import Settings, get_settings
+from app.core.config import REPO_ROOT, Settings, get_settings
 
 _write_lock = threading.Lock()
 
@@ -128,5 +128,5 @@ def get_lakehouse(settings: Settings | None = None) -> Lakehouse:
     settings = settings or get_settings()
     uri = settings.lakehouse_uri
     if "://" not in uri and not Path(uri).is_absolute():
-        uri = str((settings.config_dir.parents[1] / uri).resolve())
+        uri = str((REPO_ROOT / uri).resolve())
     return Lakehouse(uri)

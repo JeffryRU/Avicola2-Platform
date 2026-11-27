@@ -29,10 +29,10 @@ Además, la app será un **módulo de ARIS**, el sistema que registra a los clie
 
 ### Cuentas
 
-- **Roles `seller` y `supervisor`:** `varchar` validado por la app, no un ENUM.
-- **El supervisor crea las cuentas** (pantalla Usuarios). Nadie se registra solo, porque es una app interna. El primer supervisor se crea por consola (`cli supervisor`).
+- **Roles `seller` y `supervisor`:** `varchar` validado por la app, no un ENUM. Se agregó `general_supervisor` y los permisos pasaron a una sola fuente ([ADR 0010](0010-roles-y-permisos.md)).
+- **El supervisor crea las cuentas** (pantalla Usuarios). Nadie se registra solo, porque es una app interna. El primer supervisor se crea por consola (`cli supervisor --general`).
 - **Recuperación de contraseña asistida:** el supervisor la restablece y obtiene una **contraseña temporal**, que se muestra una sola vez.
-  - Con la contraseña temporal, la API solo permite cambiar la contraseña o cerrar sesión (`must_change_password`).
+  - ~~Con la contraseña temporal, la API solo permite cambiar la contraseña o cerrar sesión (`must_change_password`).~~ Retirado el 2026-11-15 a pedido del negocio: con la contraseña inicial se entra directo y cada uno la cambia desde su perfil si quiere. El campo `must_change_password` sigue en la API, siempre en falso, por compatibilidad con versiones anteriores de la app.
   - Restablecer también desbloquea la cuenta y cierra las sesiones abiertas.
 - **Bloqueo por intentos:** tras 5 fallos seguidos, la cuenta se bloquea 15 minutos (`LOGIN_MAX_ATTEMPTS`, `LOGIN_LOCK_MINUTES`). El contador se guarda en la base, así que vale con varios procesos y sobrevive a reinicios.
 - **Respuesta igual para "no existe" y "contraseña incorrecta"**, con el mismo tiempo de respuesta (se verifica un hash de relleno).

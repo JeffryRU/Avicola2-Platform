@@ -1,13 +1,12 @@
 import { useMemo, useSyncExternalStore } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useContainer } from '@/app/di'
+import { queryKeys } from '@/shared/application/query-keys'
 import { addDays, today, weekStart } from '@/shared/domain/dates'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
+import { useRequiredSession } from '@/features/auth'
 import { myDays } from '@/features/projections/domain/aggregation'
-
-export const keys = {
-  window: (from: string, to: string) => ['window', from, to] as const,
-}
+import type { Catalog } from '@/features/catalog'
+import type { Draft } from '@/features/projections/domain/draft'
 
 /** Ventana de datos que usa toda la app: 3 semanas atrás y 2 adelante (como el mockup). */
 export function dataWindow(ref = today()) {
@@ -25,11 +24,31 @@ export function useWindowData() {
 export function useRangeData(from: string, to: string) {
   const { projections: gateway } = useContainer()
   return useQuery({
-    queryKey: keys.window(from, to),
+    queryKey: queryKeys.projections.range(from, to),
     queryFn: async () => {
       const [projections, sales] = await Promise.all([gateway.projections({ from, to }), gateway.sales({ from, to })])
       return { projections, sales }
     },
+  })
+}
+
+/** Lo que el modelo habría sugerido cada día del rango (para comparar en los dashboards). */
+export function useModelProjections(from: string, to: string) {
+  const { projections: gateway } = useContainer()
+  return useQuery({
+    queryKey: queryKeys.projections.model(from, to),
+    queryFn: () => gateway.modelProjections({ from, to }),
+    staleTime: 10 * 60_000,
+  })
+}
+
+/** Pedidos de las tiendas por zona y día (solo para quien ve al equipo). */
+export function useStoreOrders(from: string, to: string, enabled: boolean) {
+  const { projections: gateway } = useContainer()
+  return useQuery({
+    queryKey: queryKeys.projections.stores(from, to),
+    queryFn: () => gateway.storeOrders({ from, to }),
+    enabled,
   })
 }
 
@@ -42,13 +61,68 @@ export function useQueue() {
 }
 
 /** Proyecciones propias por fecha (servidor + cola offline). */
-export function useMyDays() {
+/** Días del vendedor con sesión (o de otro, si se pide su nombre). */
+export function useMyDays(username?: string) {
   const session = useRequiredSession()
   const data = useWindowData()
   const queue = useQueue()
-  const days = useMemo(
-    () => myDays(data.data?.projections ?? [], queue, session.seller.username),
-    [data.data, queue, session.seller.username],
-  )
+  const owner = username ?? session.seller.username
+  const days = useMemo(() => myDays(data.data?.projections ?? [], queue, owner), [data.data, queue, owner])
   return { days, isLoading: data.isLoading, error: data.error }
+}
+
+/**
+ * Reenvía la cola offline de quien tiene la sesión (POST /projections por cada envío pendiente).
+ * Si algo llegó, refresca las proyecciones; `mutateAsync` espera ese refresco.
+ */
+export function useFlushQueue() {
+  const { planning } = useContainer()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (seller: string) => planning.flush(seller),
+    onSuccess: async (r) => {
+      if (r.sent) await client.invalidateQueries({ queryKey: queryKeys.projections.all })
+    },
+  })
+}
+
+/** Envía una proyección (con cola offline: sin conexión queda pendiente) y refresca los datos. */
+export function useSubmitProjection() {
+  const { planning } = useContainer()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      draft,
+      catalog,
+      owner,
+      author,
+    }: {
+      draft: Draft
+      catalog: Catalog
+      owner: string
+      author: string
+    }) => planning.submit(draft, catalog, owner, author),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.projections.all }),
+  })
+}
+
+/** Sugerencia con el historial: se pide al tocar el botón y siempre fresca (GET /suggestions). */
+/**
+ * Sugerencia del modelo para la tabla de Nueva proyección: se pide sola al abrir el paso 2 y se
+ * muestra junto a cada casilla (y se usa con «Llenar»). `seller`: solo el supervisor.
+ */
+export function useSuggestion(
+  category: string,
+  start: string,
+  days: number,
+  seller: string | undefined,
+  enabled: boolean,
+) {
+  const { projections } = useContainer()
+  return useQuery({
+    queryKey: queryKeys.suggestions.get(category, start, days, seller),
+    queryFn: () => projections.suggestions(category, start, days, seller),
+    enabled,
+    staleTime: 5 * 60_000,
+  })
 }

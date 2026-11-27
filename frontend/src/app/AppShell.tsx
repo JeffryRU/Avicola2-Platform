@@ -1,184 +1,316 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+import { MODEL_TITLE } from '@/features/model'
+import { ArisNotice } from '@/features/aris'
 import {
-  BarChart3,
   Bell,
-  Box,
-  ChevronDown,
-  ClipboardList,
-  Home,
-  LogOut,
-  Plus,
-  Settings,
-  User,
+  CalendarDays,
+  Calculator,
+  ChartColumn,
+  ChartLine,
+  ClipboardPen,
+  Drumstick,
+  Factory,
+  History,
+  House,
+  Inbox,
+  ListChecks,
+  LockOpen,
+  TrendingUp,
   Users,
+  Warehouse,
+  type LucideIcon,
+  BrainCircuit,
 } from 'lucide-react'
-import { NavLink, Outlet, useLocation } from 'react-router'
-import { useContainer } from '@/app/di'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { InstallBanner } from '@/app/install'
+import { TopControls } from '@/app/top-controls'
+import { FloatingActions } from '@/app/floating-actions'
+import { UserBar } from '@/app/user-bar'
 import { DASHBOARDS, isFlowPath, paths } from '@/app/routes'
-import { initials } from '@/shared/domain/format'
-import { isSupervisor, roleLabel } from '@/features/auth/domain/session'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import { useUnreadCount } from '@/features/notifications/ui/hooks'
+import { can, hasTeamView, type Session } from '@/shared/domain/session'
+import { useRequiredSession } from '@/features/auth'
+import { useUnreadCount } from '@/features/notifications'
+import { useUnlocks, MY_REQUESTS_TITLE, UNLOCKS_TITLE } from '@/features/editing'
 import { Logo } from '@/shared/ui/components/brand'
 import { cn } from '@/shared/ui/lib/utils'
+import { STOCK_TITLE } from '@/features/stock'
+import { FORECAST_NAV_LABEL, PRODUCTION_TITLE } from '@/features/production'
+import { SACA_TITLE } from '@/features/saca'
 
-const itemCls = (active: boolean) =>
+interface NavItem {
+  to: string
+  label: string
+  /** Solo activo en la ruta exacta (Inicio). */
+  end?: boolean
+  /** Cifra a la derecha (pendientes, no leídas). */
+  count?: number
+  /** Icono propio; si no, el de la ruta (NAV_ICONS). */
+  icon?: LucideIcon
+}
+interface NavGroup {
+  title?: string
+  items: NavItem[]
+}
+
+/** Icono de cada pantalla del menú lateral. */
+const NAV_ICONS: Record<string, LucideIcon> = {
+  [paths.home]: House,
+  [paths.register]: ClipboardPen,
+  [paths.mine]: ListChecks,
+  [paths.requests]: Inbox,
+  [paths.saca]: Calculator,
+  [paths.model]: BrainCircuit,
+  [paths.stock]: Warehouse,
+  [paths.production]: Factory,
+  [paths.forecast]: TrendingUp,
+  [paths.dashSummary]: ChartColumn,
+  [paths.dashVersus]: ChartLine,
+  [paths.dashStatus]: CalendarDays,
+  [paths.history]: History,
+  [paths.unlocks]: LockOpen,
+  [paths.accounts]: Users,
+  [paths.products]: Drumstick,
+  [paths.notifications]: Bell,
+}
+
+/** Menú lateral por rol: grupos con título, cada pantalla con su icono. */
+function navGroups(session: Session, counts: { unread: number; unlocks: number }): NavGroup[] {
+  const production = can(session, 'view_production')
+  const bell: NavItem = { to: paths.notifications, label: 'Notificaciones', count: counts.unread }
+  // El jefe de despacho solo ve el stock: no proyecta ni tiene dashboards.
+  if (!hasTeamView(session) && can(session, 'view_stock')) {
+    return [
+      {
+        items: [
+          { to: paths.home, label: 'Inicio', end: true },
+          { to: paths.stock, label: STOCK_TITLE },
+          ...(production
+            ? [
+                { to: paths.production, label: PRODUCTION_TITLE },
+                { to: paths.forecast, label: FORECAST_NAV_LABEL },
+              ]
+            : []),
+          bell,
+        ],
+      },
+    ]
+  }
+  const dashboards: NavGroup = {
+    title: 'Dashboards',
+    items: [
+      ...DASHBOARDS.map((d) => ({ to: d.to, label: d.label })),
+      // El modelo de demanda (cómo se eligió y cuánto se equivoca): solo supervisión.
+      ...(hasTeamView(session) ? [{ to: paths.model, label: MODEL_TITLE }] : []),
+    ],
+  }
+  const operation: NavItem[] = [
+    ...(can(session, 'view_saca') ? [{ to: paths.saca, label: SACA_TITLE }] : []),
+    ...(can(session, 'view_stock') ? [{ to: paths.stock, label: STOCK_TITLE }] : []),
+    ...(production
+      ? [
+          { to: paths.production, label: PRODUCTION_TITLE },
+          { to: paths.forecast, label: FORECAST_NAV_LABEL },
+        ]
+      : []),
+  ]
+  if (hasTeamView(session)) {
+    // La supervisión revisa: no registra proyecciones (ni propias ni por un vendedor).
+    return [
+      {
+        items: [{ to: paths.home, label: 'Inicio', end: true }],
+      },
+      ...(operation.length ? [{ title: 'Operación', items: operation }] : []),
+      dashboards,
+      {
+        title: 'Equipo',
+        items: [
+          { to: paths.history, label: 'Historial' },
+          ...(can(session, 'manage_editing')
+            ? [{ to: paths.unlocks, label: UNLOCKS_TITLE, count: counts.unlocks }]
+            : []),
+          ...(can(session, 'manage_accounts') ? [{ to: paths.accounts, label: 'Usuarios' }] : []),
+        ],
+      },
+      { title: 'Consultas', items: [{ to: paths.products, label: 'Productos' }, bell] },
+    ]
+  }
+  return [
+    {
+      items: [
+        { to: paths.home, label: 'Inicio', end: true },
+        { to: paths.register, label: 'Registrar' },
+        { to: paths.mine, label: 'Mis proyecciones' },
+        { to: paths.requests, label: MY_REQUESTS_TITLE },
+      ],
+    },
+    ...(operation.length ? [{ title: 'Operación', items: operation }] : []),
+    dashboards,
+    {
+      title: 'Consultas',
+      items: [{ to: paths.history, label: 'Historial' }, { to: paths.products, label: 'Productos' }, bell],
+    },
+  ]
+}
+
+const sideItemCls = (active: boolean) =>
   cn(
-    'flex w-full items-center gap-3 rounded-xl px-3 py-[11px] text-left font-semibold text-ink-2 transition-colors hover:bg-muted hover:text-foreground [&>svg]:size-5',
-    active && 'bg-primary text-white shadow-[0_6px_16px_var(--primary-ring)] hover:bg-primary hover:text-white',
+    'flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-1 text-left text-base font-medium text-chrome-muted transition-colors hover:bg-chrome-hover hover:text-chrome-foreground',
+    'hc:min-h-9 hc:text-md hc:font-semibold hc:text-foreground',
+    active &&
+      'bg-chrome-active font-semibold text-chrome-active-foreground hover:bg-chrome-active hover:text-chrome-active-foreground hc:font-extrabold',
   )
 
-function SideItem({
-  to,
-  icon,
-  label,
-  extra,
-  end,
-}: {
-  to: string
-  icon: React.ReactNode
-  label: string
-  extra?: React.ReactNode
-  end?: boolean
-}) {
+function SideItem({ to, label, end, count, icon }: NavItem) {
   const { pathname } = useLocation()
+  const Icon = icon ?? NAV_ICONS[to]
   // "Registrar" sigue activo en la pantalla de éxito y "Mis proyecciones" en el detalle.
   return (
-    <NavLink to={to} end={end} className={({ isActive }) => itemCls(isActive || (!end && pathname.startsWith(to)))}>
-      {icon}
-      <span>{label}</span>
-      {extra}
+    <NavLink to={to} end={end} className={({ isActive }) => sideItemCls(isActive || (!end && pathname.startsWith(to)))}>
+      {Icon && <Icon aria-hidden className="size-4 flex-none" />}
+      <span className="min-w-0 flex-1">{label}</span>
+      {!!count && (
+        <span
+          className={cn(
+            'num grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-semibold hc:font-bold',
+            to === paths.notifications
+              ? 'bg-bad-fill text-bad-fill-foreground'
+              : 'bg-warn-fill text-warn-fill-foreground',
+          )}
+          aria-label={to === paths.notifications ? `${count} sin leer` : `${count} pendientes`}
+        >
+          {count}
+        </span>
+      )}
     </NavLink>
   )
 }
 
 function Sidebar() {
-  const { auth } = useContainer()
-  const { seller } = useRequiredSession()
-  const { pathname } = useLocation()
+  const session = useRequiredSession()
   const unread = useUnreadCount()
-  const inDash = pathname.startsWith('/dashboards')
-  const [expanded, setExpanded] = useState(true)
-  // El supervisor no registra proyecciones: administra usuarios y ve los dashboards del equipo.
-  const supervisor = isSupervisor(seller)
+  const editing = can(session, 'manage_editing')
+  const unlocks = (useUnlocks(editing).data ?? []).filter((u) => u.status === 'requested').length
+  const groups = navGroups(session, { unread, unlocks })
   return (
-    <aside className="sticky top-0 hidden h-dvh w-[268px] flex-none flex-col overflow-y-auto border-r bg-side px-3.5 pt-[22px] pb-4 dsk:flex">
-      <div className="px-2.5 pb-[22px]">
-        <Logo />
-      </div>
-      <nav className="grid gap-0.5" aria-label="Principal">
-        <SideItem to={paths.home} end icon={<Home />} label="Inicio" />
-        {!supervisor && <SideItem to={paths.register} icon={<Plus />} label="Registrar" />}
-        <button
-          type="button"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((v) => !v)}
-          className={cn(itemCls(false), inDash && 'bg-secondary text-primary hover:bg-secondary hover:text-primary')}
-        >
-          <BarChart3 />
-          <span>Dashboards</span>
-          <ChevronDown className={cn('ml-auto !size-[18px] transition-transform', expanded && 'rotate-180')} />
-        </button>
-        {expanded && (
-          <div className="grid gap-0.5 py-1 pl-[22px]">
-            {DASHBOARDS.map((d) => (
-              <NavLink
-                key={d.to}
-                to={d.to}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-2.5 rounded-[10px] px-3 py-[9px] text-sm font-semibold text-muted-foreground before:size-1.5 before:rounded-full hover:text-foreground',
-                    isActive && 'bg-secondary text-primary before:bg-primary',
-                  )
-                }
-              >
-                {d.label}
-              </NavLink>
-            ))}
-          </div>
-        )}
-        {supervisor ? (
-          <SideItem to={paths.accounts} icon={<Users />} label="Usuarios" />
-        ) : (
-          <SideItem to={paths.mine} icon={<ClipboardList />} label="Mis proyecciones" />
-        )}
-        <SideItem to={paths.products} icon={<Box />} label="Productos" />
-        <SideItem
-          to={paths.notifications}
-          icon={<Bell />}
-          label="Notificaciones"
-          extra={
-            unread > 0 && (
-              <em className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1.5 text-[11px] font-extrabold text-white not-italic">
-                {unread}
-              </em>
-            )
-          }
-        />
-      </nav>
-      <div className="mt-auto grid gap-0.5 pt-4">
-        <div className="mb-2 flex items-center gap-3 px-3 py-2.5">
-          <div className="grid size-10 flex-none place-items-center rounded-full bg-secondary text-sm font-extrabold text-primary">
-            {initials(seller.name)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <b className="block text-sm">{seller.name}</b>
-            <small className="text-muted-foreground">{roleLabel(seller)}</small>
-          </div>
+    // El fondo y el borde van en el contenedor que se estira a todo el alto de la página;
+    // lo de adentro se queda fijo al hacer scroll (antes el fondo se cortaba).
+    <aside className="bg-chrome-pattern hidden w-60 flex-none border-r border-chrome-edge bg-chrome text-chrome-foreground dsk:block hc:border-r-2 hc:border-foreground">
+      <div className="sticky top-0 flex max-h-dvh min-h-dvh flex-col overflow-y-auto px-3 pt-5 pb-4 hc:top-14 hc:max-h-[calc(100dvh-3.5rem)] hc:min-h-[calc(100dvh-3.5rem)]">
+        <div className="px-2.5 pb-5 hc:hidden">
+          <Logo onDark="chrome" />
         </div>
-        <SideItem to={paths.profile} icon={<Settings />} label="Configuración" />
-        <button type="button" className={itemCls(false)} onClick={auth.logout}>
-          <LogOut />
-          <span>Cerrar sesión</span>
-        </button>
+        <nav aria-label="Principal" className="grid gap-0.5">
+          {groups.map((g, i) => (
+            <div key={g.title ?? i} className={cn('grid gap-px', i > 0 && 'mt-3.5')}>
+              {g.title && (
+                <div className="mb-1 px-2.5 text-xs font-semibold text-chrome-muted/75 hc:text-xs hc:text-foreground">
+                  {g.title}
+                </div>
+              )}
+              {g.items.map((item) => (
+                <SideItem key={item.to} {...item} />
+              ))}
+            </div>
+          ))}
+        </nav>
       </div>
     </aside>
   )
 }
 
-const BOTTOM = [
-  { to: paths.home, icon: Home, label: 'Inicio', end: true },
-  { to: paths.register, icon: Plus, label: 'Registrar' },
-  { to: paths.mine, icon: ClipboardList, label: 'Mis proyecciones' },
-  { to: paths.profile, icon: User, label: 'Perfil' },
+/**
+ * Barra superior. En celular: marca y campana. En escritorio solo aparece en alto contraste
+ * (barra de la marca, como en la dirección B), con el nombre de quien entró.
+ */
+function TopBar() {
+  const { seller } = useRequiredSession()
+  const unread = useUnreadCount()
+  return (
+    <header className="bg-chrome-pattern flex h-14 items-center gap-3 bg-chrome pr-1 pl-4 text-chrome-foreground dsk:hidden hc:border-0 hc:bg-head hc:dsk:sticky hc:dsk:top-0 hc:dsk:z-30 hc:dsk:flex hc:dsk:px-7">
+      <Link to={paths.home} aria-label="Inicio" className="flex min-w-0 flex-1 items-center">
+        <Logo onDark="chrome" compact />
+      </Link>
+      <span className="hidden text-sm text-head-muted hc:dsk:inline">{seller.name}</span>
+      <TopControls
+        versions={false}
+        a11y={false}
+        className="dsk:hidden hc:text-head-foreground [&_button]:text-chrome-foreground [&_button]:hover:bg-chrome-hover [&_button]:hc:text-head-foreground [&_button]:hc:hover:bg-transparent"
+      />
+      <Link
+        to={paths.notifications}
+        aria-label={unread > 0 ? `Notificaciones: ${unread} sin leer` : 'Notificaciones'}
+        className="relative grid size-touch place-items-center rounded-md text-chrome-foreground hover:bg-chrome-hover dsk:hidden hc:text-head-foreground hc:hover:bg-transparent"
+      >
+        <Bell className="size-5" aria-hidden />
+        {unread > 0 && (
+          <i className="absolute top-2.5 right-2.5 size-2.5 rounded-full bg-brand-accent ring-2 ring-chrome hc:bg-bad hc:ring-head" />
+        )}
+      </Link>
+    </header>
+  )
+}
+
+interface BottomItem {
+  to: string
+  label: string
+  end?: boolean
+}
+const BOTTOM: BottomItem[] = [
+  { to: paths.home, label: 'Inicio', end: true },
+  { to: paths.register, label: 'Registrar' },
+  { to: paths.mine, label: 'Proyecciones' },
+  { to: paths.profile, label: 'Perfil' },
 ]
-const BOTTOM_SUPERVISOR = [
-  { to: paths.home, icon: Home, label: 'Inicio', end: true },
-  { to: paths.dashSummary, icon: BarChart3, label: 'Dashboards', end: false },
-  { to: paths.accounts, icon: Users, label: 'Usuarios', end: false },
-  { to: paths.notifications, icon: Bell, label: 'Avisos', end: false },
-  { to: paths.profile, icon: User, label: 'Perfil', end: false },
+const BOTTOM_SUPERVISOR: BottomItem[] = [
+  { to: paths.home, label: 'Inicio', end: true },
+  { to: paths.dashSummary, label: 'Dashboards' },
+  { to: paths.accounts, label: 'Usuarios' },
+  { to: paths.notifications, label: 'Avisos' },
+  { to: paths.profile, label: 'Perfil' },
+]
+const BOTTOM_DISPATCH: BottomItem[] = [
+  { to: paths.home, label: 'Inicio', end: true },
+  { to: paths.stock, label: 'Stock' },
+  { to: paths.production, label: PRODUCTION_TITLE },
+  { to: paths.notifications, label: 'Avisos' },
+  { to: paths.profile, label: 'Perfil' },
 ]
 
 function BottomNav() {
-  const items = isSupervisor(useRequiredSession().seller) ? BOTTOM_SUPERVISOR : BOTTOM
+  const session = useRequiredSession()
+  const { pathname } = useLocation()
+  const items = hasTeamView(session)
+    ? BOTTOM_SUPERVISOR.filter((i) => i.to !== paths.accounts || can(session, 'manage_accounts'))
+    : can(session, 'view_stock')
+      ? BOTTOM_DISPATCH
+      : BOTTOM
   const unread = useUnreadCount()
   return (
     <nav
       aria-label="Navegación"
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
-      className="fixed inset-x-0 bottom-0 z-30 grid border-t bg-white/95 px-1.5 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))] backdrop-blur-md dsk:hidden"
+      className="bg-chrome-pattern fixed inset-x-0 bottom-0 z-30 grid bg-chrome pb-[env(safe-area-inset-bottom)] dsk:hidden hc:border-t-heavy hc:border-foreground hc:bg-surface"
     >
-      {items.map(({ to, icon: Icon, label, end }) => (
+      {items.map(({ to, label, end }) => (
         <NavLink
           key={to}
           to={to}
           end={end}
-          className={({ isActive }) =>
-            cn(
-              'flex flex-col items-center gap-[3px] py-1 text-[11.5px] font-semibold text-faint transition-colors',
-              isActive && 'text-primary [&>svg]:animate-pop',
+          className={({ isActive: exact }) => {
+            // «Dashboards» sigue activo en Vs. venta, Estado y el detalle del día.
+            const isActive = exact || (to === paths.dashSummary && pathname.startsWith(paths.dashboards))
+            return cn(
+              'relative flex h-14 items-center justify-center gap-1 px-0.5 text-center text-xs leading-tight text-chrome-muted transition-colors',
+              'hc:h-15 hc:text-xs hc:font-semibold hc:text-foreground',
+              isActive &&
+                'font-semibold text-chrome-foreground before:absolute before:inset-x-3 before:top-0 before:h-1 before:rounded-b-sm before:bg-chrome-active hc:bg-nav-active hc:font-extrabold hc:text-nav-active-foreground hc:before:hidden',
             )
-          }
+          }}
         >
-          <span className="relative">
-            <Icon className="size-[22px]" />
-            {to === paths.notifications && unread > 0 && (
-              <i className="absolute -top-0.5 -right-1 size-[9px] rounded-full border-2 border-white bg-destructive" />
-            )}
-          </span>
           {label}
+          {to === paths.notifications && unread > 0 && (
+            <i aria-label={`${unread} sin leer`} className="size-2 flex-none rounded-full bg-brand-accent hc:bg-bad" />
+          )}
         </NavLink>
       ))}
     </nav>
@@ -194,20 +326,25 @@ export function AppShell() {
     window.scrollTo({ top: 0 })
   }, [pathname])
   return (
-    <div className="flex min-h-dvh">
-      <Sidebar />
-      <main className="@container/main min-w-0 flex-1">
-        <div
-          key={pathname}
-          className={cn(
-            'mx-auto max-w-[1360px] animate-enter dsk:px-[30px] dsk:pt-[26px] dsk:pb-12',
-            flow ? 'pb-6' : 'pb-24',
-          )}
-        >
-          <Outlet />
-        </div>
-      </main>
+    <div className="min-h-dvh">
+      {!flow && <TopBar />}
+      <div className="flex min-h-dvh">
+        <Sidebar />
+        <main className="@container/main min-w-0 flex-1">
+          {/* Escritorio: arriba a la derecha, apariencia, modo oscuro y la cuenta. */}
+          {!flow && <UserBar />}
+          <div
+            key={pathname}
+            className={cn('mx-auto max-w-7xl animate-enter dsk:px-9 dsk:pt-7 dsk:pb-24', flow ? 'pb-6' : 'pb-24')}
+          >
+            {/* Aviso de datos de ARIS: solo a quien los sube y solo si faltan días. */}
+            {!flow && <ArisNotice />}
+            <Outlet />
+          </div>
+        </main>
+      </div>
       {!flow && <BottomNav />}
+      {!flow && <FloatingActions />}
       {/* Aviso de instalación solo en la pantalla de entrada de cada rol. */}
       {(pathname === paths.home || pathname === paths.dashSummary) && <InstallBanner />}
     </div>

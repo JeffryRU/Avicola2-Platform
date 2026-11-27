@@ -1,4 +1,5 @@
-import type { Session } from '@/features/auth/domain/session'
+import type { StoredPreferences } from '@/shared/domain/preferences'
+import type { Session } from '@/shared/domain/session'
 
 /** API de sesión. La cookie HttpOnly la pone y la quita el servidor. */
 export interface AuthGateway {
@@ -9,6 +10,9 @@ export interface AuthGateway {
   changePassword(current: string, next: string, remember: boolean): Promise<Session>
   /** Guarda el nombre visible de la propia cuenta. */
   updateProfile(name: string): Promise<Session>
+  /** Preferencias de la interfaz guardadas en la cuenta (null si aún no tiene). */
+  getPreferences(): Promise<unknown>
+  savePreferences(preferences: StoredPreferences): Promise<void>
 }
 
 /** Perfil guardado en el dispositivo para abrir la app sin esperar a la red (sin secretos). */

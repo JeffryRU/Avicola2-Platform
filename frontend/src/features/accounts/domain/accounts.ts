@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { roleSchema } from '@/features/auth/domain/session'
+import { type Role, roleSchema } from '@/shared/domain/session'
 import type { AccountState } from '@/features/accounts/types/accounts'
 
 export type { AccountState }
@@ -9,14 +9,21 @@ export const adminAccountSchema = z.object({
   username: z.string(),
   name: z.string(),
   zone: z.string().nullable(),
-  role: roleSchema,
+  // Texto libre: una cuenta con un rol que esta versión no conoce (dato antiguo, rol nuevo del
+  // backend) se muestra tal cual en vez de dejar toda la pantalla Usuarios sin cargar.
+  role: z.string(),
   is_active: z.boolean(),
   must_change_password: z.boolean(),
   locked_until: z.string().nullable(),
+  // Lo que quien mira puede hacer con esta cuenta: lo decide el backend (domain/permissions.py).
+  can_manage: z.boolean(),
+  assignable_roles: z
+    .array(z.string())
+    .transform((list) => list.filter((r): r is Role => roleSchema.safeParse(r).success)),
 })
 export type AdminAccount = z.infer<typeof adminAccountSchema>
 
-/** La contraseña temporal llega una sola vez: se muestra y no se guarda en ningún lado. */
+/** La contraseña inicial llega una sola vez: se muestra y no se guarda en ningún lado. */
 export const newCredentialsSchema = z.object({ account: adminAccountSchema, temporary_password: z.string() })
 export type NewCredentials = z.infer<typeof newCredentialsSchema>
 
@@ -37,9 +44,15 @@ export const newAccountSchema = z.object({
 })
 export type NewAccount = z.infer<typeof newAccountSchema>
 
+/** Formulario "Editar usuario": el usuario (login) no cambia; el rol tiene su propio diálogo. */
+export const editAccountSchema = newAccountSchema.pick({ name: true, zone: true })
+export type AccountEdit = z.infer<typeof editAccountSchema>
+
 export function accountState(account: AdminAccount, now: Date): AccountState {
   if (!account.is_active) return 'inactive'
   if (account.locked_until && new Date(account.locked_until) > now) return 'locked'
-  if (account.must_change_password) return 'must_change'
   return 'active'
 }
+
+/** Roles a los que se puede pasar la cuenta, sin contar el que ya tiene (vacío: no se puede cambiar). */
+export const otherRoles = (account: AdminAccount): Role[] => account.assignable_roles.filter((r) => r !== account.role)

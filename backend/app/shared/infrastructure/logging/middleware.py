@@ -10,6 +10,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
+from app.shared.infrastructure.http.paths import API_PATH_PREFIXES
 from app.shared.infrastructure.logging.context import request_id
 
 logger = logging.getLogger("app.http")
@@ -18,7 +19,7 @@ HEADER = "X-Request-ID"
 # Se acepta el id que mande el cliente (p. ej., n8n) solo si es corto y seguro de imprimir.
 _VALID_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 # Solo la API se registra en INFO; el healthcheck (cada 10 s) y los estáticos van en DEBUG.
-API_PREFIXES = ("/api/", "/ingest/")
+API_PREFIXES = API_PATH_PREFIXES
 
 
 def _level(path: str, status: int) -> int:

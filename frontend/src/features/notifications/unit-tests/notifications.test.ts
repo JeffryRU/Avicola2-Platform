@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { realtimeEventSchema } from '@/features/notifications/domain/events'
-import { notificationPageSchema, safeLink, whenLabel } from '@/features/notifications/domain/notifications'
+import {
+  byDay,
+  inRange,
+  notificationPageSchema,
+  presetOf,
+  presetRange,
+  safeLink,
+  whenLabel,
+} from '@/features/notifications/domain/notifications'
 
 const NOTIFICATION = {
   id: 1,
@@ -41,5 +49,33 @@ describe('notificaciones', () => {
         .success,
     ).toBe(true)
     expect(realtimeEventSchema.safeParse({ type: 'otra.cosa', data: {} }).success).toBe(false)
+  })
+})
+
+describe('filtro por día', () => {
+  const at = (iso: string) => ({ id: 1, kind: 'x', title: '', body: '', link: null, created_at: iso, read_at: null })
+  const today = '2026-11-23'
+
+  it('reconoce los atajos y si no, es un rango elegido', () => {
+    expect(presetOf(null, today)).toBe('all')
+    expect(presetOf(presetRange('today', today), today)).toBe('today')
+    expect(presetOf({ from: '2026-11-22', to: '2026-11-22' }, today)).toBe('yesterday')
+    expect(presetOf({ from: '2026-11-17', to: today }, today)).toBe('week')
+    expect(presetOf({ from: '2026-11-01', to: '2026-11-05' }, today)).toBe('custom')
+  })
+
+  it('filtra por el día local de la notificación (ambos extremos incluidos)', () => {
+    const n = at('2026-11-22T14:00:00')
+    expect(inRange(n, { from: '2026-11-22', to: '2026-11-22' })).toBe(true)
+    expect(inRange(n, { from: '2026-11-23', to: '2026-11-23' })).toBe(false)
+    expect(inRange(n, null)).toBe(true)
+  })
+
+  it('agrupa por día respetando el orden', () => {
+    const groups = byDay([at('2026-11-23T09:00:00'), at('2026-11-23T08:00:00'), at('2026-11-21T10:00:00')])
+    expect(groups.map((g) => [g.day, g.items.length])).toEqual([
+      ['2026-11-23', 2],
+      ['2026-11-21', 1],
+    ])
   })
 })

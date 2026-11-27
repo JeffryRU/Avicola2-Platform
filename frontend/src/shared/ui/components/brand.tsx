@@ -1,17 +1,8 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import type { BrandId } from '@/shared/types/brands'
+import { BrandContext, useBrand } from '@/shared/ui/hooks/use-brand'
+import { BRANDS } from '@/shared/types/brands'
 import { cn } from '@/shared/ui/lib/utils'
-
-export type BrandId = 'noraves' | 'rocio'
-export const BRANDS: Record<BrandId, { name: string; tag: string }> = {
-  noraves: { name: 'Noraves', tag: 'Proyección inteligente para una mejor producción' },
-  rocio: { name: 'Grupo Rocío', tag: 'Transformamos realidades para mejorar vidas' },
-}
-
-interface BrandState {
-  brand: BrandId
-  setBrand: (b: BrandId) => void
-}
-const BrandContext = createContext<BrandState>({ brand: 'noraves', setBrand: () => {} })
 
 /** Marca activa (colores y logo); se guarda con la función `persist` que recibe. */
 export function BrandProvider({
@@ -31,23 +22,20 @@ export function BrandProvider({
   return <BrandContext.Provider value={{ brand, setBrand }}>{children}</BrandContext.Provider>
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const useBrand = () => useContext(BrandContext)
-
-/** Mascota de Noraves en un círculo con borde dorado (y salto opcional). */
+/** Mascota de Noraves en un círculo con borde fino dorado (y salto opcional). Identidad del cliente. */
 export function Mascot({ size, animated, shadow }: { size: number; animated?: boolean; shadow?: boolean }) {
   return (
-    <div className="flex flex-col items-center">
+    <div data-decor className="flex flex-col items-center">
       <div
         className={cn(
-          'relative flex-none overflow-hidden rounded-full border-brand-accent bg-white',
+          'relative flex-none overflow-hidden rounded-full border-brand-accent bg-head-foreground',
           animated && 'animate-hop',
         )}
-        style={{ width: size, height: size, borderWidth: Math.max(2, Math.round(size * 0.04)) }}
+        style={{ width: size, height: size, borderWidth: Math.max(1.5, Math.round(size * 0.025)) }}
       >
         <img src="/mascot.png" alt="" className="absolute top-0 h-full w-auto max-w-none" style={{ left: '-17.3%' }} />
       </div>
-      {shadow && <div className={cn('mt-2 h-2 w-[56%] rounded-full bg-head/20', animated && 'animate-shad')} />}
+      {shadow && <div className={cn('mt-2 h-1.5 w-1/2 rounded-full bg-foreground/15', animated && 'animate-shad')} />}
     </div>
   )
 }
@@ -88,7 +76,7 @@ const ISO_PATHS = (() => {
   })
 })()
 
-export function IsoMark({ size, onDark, animated }: { size: number; onDark?: boolean; animated?: boolean }) {
+export function IsoMark({ size, onDark, animated }: { size: number; onDark?: boolean | 'chrome'; animated?: boolean }) {
   return (
     <svg className={cn(animated && 'iso-anim')} width={size} height={size} viewBox="4 6 92 92" aria-hidden="true">
       <g className="spin">
@@ -96,8 +84,10 @@ export function IsoMark({ size, onDark, animated }: { size: number; onDark?: boo
           <path
             key={d}
             d={d}
-            fill={onDark ? '#fff' : '#E2231A'}
-            stroke={onDark ? '#1F1D1B' : '#fff'}
+            fill={
+              onDark === 'chrome' ? 'var(--chrome-logo)' : onDark ? 'var(--head-foreground)' : 'var(--brand-accent)'
+            }
+            stroke={onDark === 'chrome' ? 'var(--chrome)' : onDark ? 'var(--head)' : 'var(--surface)'}
             strokeWidth={4.5}
             strokeLinejoin="round"
           />
@@ -115,7 +105,7 @@ export function BrandMark({
   shadow,
 }: {
   size: number
-  onDark?: boolean
+  onDark?: boolean | 'chrome'
   animated?: boolean
   shadow?: boolean
 }) {
@@ -127,19 +117,34 @@ export function BrandMark({
   )
 }
 
-export function Logo({ onDark }: { onDark?: boolean }) {
+/**
+ * Marca del producto: la mascota (o el isotipo de Rocío), «AviPlanner» y la marca del cliente debajo.
+ * `onDark="chrome"`: sobre el marco de la app, con el color de texto del tema elegido.
+ */
+export function Logo({ onDark, compact }: { onDark?: boolean | 'chrome'; compact?: boolean }) {
   const { brand } = useBrand()
   return (
     <div className="flex items-center gap-2.5">
-      {brand === 'rocio' ? <IsoMark size={34} onDark={onDark} /> : <Mascot size={44} />}
-      <span
-        className={cn(
-          'font-extrabold tracking-[-0.04em]',
-          brand === 'rocio' ? 'text-[22px]' : 'text-[26px]',
-          onDark ? 'text-white' : 'text-foreground',
+      <BrandMark size={compact ? 30 : 34} onDark={onDark} />
+      <span className="flex min-w-0 flex-col leading-tight">
+        <span
+          className={cn(
+            'text-md font-semibold hc:font-extrabold',
+            onDark === 'chrome' ? 'text-chrome-logo' : onDark ? 'text-head-foreground' : 'text-foreground',
+          )}
+        >
+          AviPlanner
+        </span>
+        {!compact && (
+          <span
+            className={cn(
+              'text-xs',
+              onDark === 'chrome' ? 'text-chrome-muted' : onDark ? 'text-head-muted' : 'text-muted-foreground',
+            )}
+          >
+            {BRANDS[brand].name}
+          </span>
         )}
-      >
-        {BRANDS[brand].name}
       </span>
     </div>
   )

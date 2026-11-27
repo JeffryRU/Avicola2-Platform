@@ -1,36 +1,14 @@
-import { useState, type ReactNode } from 'react'
-import { useCountUp } from '@/shared/ui/hooks/use-count-up'
+import type { ReactNode } from 'react'
+import { cn } from '@/shared/ui/lib/utils'
+import { PART_COLOR, PREV_COLOR } from '@/shared/ui/lib/chart-dash'
+import { nf0, nf1 } from '@/shared/domain/format'
+import { niceMax } from '@/shared/domain/chart-scale'
+import { useTooltip } from '@/shared/ui/hooks/use-tooltip'
 import { useElementWidth } from '@/shared/ui/hooks/use-element-width'
+import { useElementSize } from '@/shared/ui/hooks/use-element-size'
 
 /** Por debajo de este ancho (px) el gráfico usa su versión compacta. */
 const COMPACT = 560
-
-/** Tooltip que sigue al mouse (gráficos y tarjetas del mockup). */
-export function useTooltip() {
-  const [tip, setTip] = useState<{ x: number; y: number; content: ReactNode } | null>(null)
-  const bind = (content: ReactNode) => ({
-    onMouseMove: (e: React.MouseEvent) => setTip({ x: e.clientX, y: e.clientY, content }),
-    onMouseLeave: () => setTip(null),
-  })
-  const node = tip && (
-    <div
-      role="tooltip"
-      className="pointer-events-none fixed z-[80] -translate-x-1/2 -translate-y-[calc(100%+12px)] rounded-[10px] bg-head px-[11px] py-2 text-[13px] leading-snug whitespace-nowrap text-white shadow-lg [&_b]:font-extrabold"
-      style={{ left: tip.x, top: tip.y }}
-    >
-      {tip.content}
-    </div>
-  )
-  return { bind, node }
-}
-
-function niceMax(m: number) {
-  if (m <= 0) return 10
-  const p = Math.pow(10, Math.floor(Math.log10(m)))
-  return ([1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((s) => m / p <= s) ?? 10) * p
-}
-
-const fmt0 = (n: number) => Math.round(n).toLocaleString('es-PE')
 
 export interface Bar {
   key: string
@@ -38,21 +16,29 @@ export interface Bar {
   label: string
   sublabel: string
   tip: ReactNode
+  /** Día sin confirmar: la barra va más tenue (no solo el color: también lo dice el detalle). */
+  pending?: boolean
 }
 
-/** Barras animadas (unidades por día). */
+/** Barras (unidades por día). */
 export function BarChart({
   bars,
   onSelect,
   width = 760,
   height = 270,
   label,
+  empty,
+  unitLabel,
 }: {
   bars: Bar[]
   onSelect?: (key: string) => void
   width?: number
   height?: number
   label: string
+  /** Se muestra sobre la cuadrícula cuando todas las barras están en cero. */
+  empty?: ReactNode
+  /** Medida del eje (p. ej. «unid.» o «kg»), arriba de las cifras. */
+  unitLabel?: string
 }) {
   // Se dibuja al ancho real de su tarjeta: textos y barras no se agrandan con la pantalla.
   const [ref, measured] = useElementWidth<HTMLDivElement>()
@@ -62,37 +48,41 @@ export function BarChart({
   const H = mob ? 230 : height
   const L = mob ? 30 : 44
   const R = 8
-  const T = 26
+  const T = unitLabel ? 34 : 26
   const B = mob ? 40 : 46
-  const max = niceMax(Math.max(...bars.map((b) => b.value), 0) * 1.08)
+  const max = niceMax(Math.max(...bars.map((b) => b.value), 0) * 1.08, 4)
   const iw = W - L - R
   const ih = H - T - B
   const step = iw / bars.length
   const bw = Math.min(mob ? 30 : 92, step * 0.58)
   // Con muchos días (rango personalizado) se muestra una etiqueta cada tanto, sin encimarse.
   const every = Math.max(1, Math.ceil((mob ? 34 : 84) / step))
-  const showValues = step >= (mob ? 22 : 30)
+  // Sin ningún dato, los «0» sobre cada barra solo ensucian (lo explica el aviso vacío).
+  const showValues = step >= (mob ? 22 : 30) && bars.some((b) => b.value)
   const y = (v: number) => T + ih - (v / max) * ih
   return (
     <div ref={ref} className="chart relative">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
+        {unitLabel && (
+          <text className="ax2" x={L - 8} y={12} textAnchor="end">
+            {unitLabel}
+          </text>
+        )}
         {[0, 1, 2, 3, 4].map((i) => (
           <g key={i}>
             <line className="gl" x1={L} x2={W - R} y1={y((max * i) / 4)} y2={y((max * i) / 4)} />
             <text className="ax" x={L - 8} y={y((max * i) / 4) + 4} textAnchor="end">
-              {fmt0((max * i) / 4)}
+              {nf0((max * i) / 4)}
             </text>
           </g>
         ))}
-        <line x1={L} x2={W - R} y1={T + ih} y2={T + ih} stroke="var(--border)" />
+        <line x1={L} x2={W - R} y1={T + ih} y2={T + ih} stroke="var(--rule-strong)" />
         {bars.map((b, i) => {
           const cx = L + step * i + step / 2
           const h = Math.max((b.value / max) * ih, 3)
           const x = cx - bw / 2
           const top = T + ih - h
-          const r = Math.min(6, h)
-          const d = `M${x} ${T + ih} V${top + r} Q${x} ${top} ${x + r} ${top} H${x + bw - r} Q${x + bw} ${top} ${x + bw} ${top + r} V${T + ih} Z`
-          const delay = { '--d': `${i * Math.min(0.06, 0.9 / bars.length)}s` } as React.CSSProperties
+          const d = `M${x} ${T + ih} V${top} H${x + bw} V${T + ih} Z`
           return (
             <g
               key={b.key}
@@ -102,10 +92,10 @@ export function BarChart({
               {...bind(b.tip)}
             >
               <rect fill="transparent" x={L + step * i} y={T} width={step} height={ih} />
-              <path className={b.value ? 'bar' : 'bar zero'} style={delay} d={d} />
+              <path className={cn('bar', !b.value && 'zero', b.pending && 'pending')} d={d} />
               {showValues && (
-                <text className="val" style={delay} x={cx} y={top - 8} textAnchor="middle">
-                  {fmt0(b.value)}
+                <text className="val" x={cx} y={top - 8} textAnchor="middle">
+                  {nf0(b.value)}
                 </text>
               )}
               {i % every === 0 && (
@@ -122,6 +112,14 @@ export function BarChart({
           )
         })}
       </svg>
+      {empty && bars.every((b) => !b.value) && (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 grid place-items-center px-6 text-center"
+          style={{ bottom: B }}
+        >
+          <div className="rounded-md bg-surface/85 px-4 py-3">{empty}</div>
+        </div>
+      )}
       {node}
     </div>
   )
@@ -131,119 +129,263 @@ export interface LinePoint {
   key: string
   label: string
   sublabel: string
-  a: number
+  /** Serie A (proyección vigente); null = el día no tiene dato (la línea se corta). */
+  a: number | null
   b: number | null
+  /** Serie C (lo que habría sugerido el modelo); null = sin dato ese día. */
+  c?: number | null
+  /** Rondas anteriores de la serie A (hojas 1, 2… antes de la vigente), en orden. */
+  earlier?: (number | null)[]
+  /** Partes de A apiladas bajo la línea (p. ej. kg por tamaño de brasa), de abajo hacia arriba. */
+  parts?: number[]
   tip: ReactNode
 }
 
-/** Dos series (proyección vs venta real) con área y puntos animados. */
-export function LineChart({ points, label }: { points: LinePoint[]; label: string }) {
-  const [ref, measured] = useElementWidth<HTMLDivElement>()
+type Pt = readonly [number, number]
+
+/**
+ * Proyección vs venta real: línea continua (A), discontinua (B) y, tenues, las rondas anteriores
+ * de A. Bajo A, franjas apiladas con sus partes. Ocupa todo el alto de su contenedor (que debe
+ * tener altura: p. ej. flex-1 con un mínimo) y, sin datos, muestra `empty` sobre la cuadrícula.
+ */
+/**
+ * Serie del gráfico de líneas: `a` (proyección vigente), `b` (pedido real), `c` (modelo),
+ * `e0`, `e1`… (rondas anteriores de A) y `parts` (franjas apiladas bajo A).
+ */
+export type LineSeriesId = 'a' | 'b' | 'c' | 'parts' | `e${number}`
+
+export function LineChart({
+  points,
+  label,
+  empty,
+  show = () => true,
+  focus = null,
+  unitLabel,
+}: {
+  points: LinePoint[]
+  label: string
+  empty?: ReactNode
+  /** Qué series se dibujan (el filtro «Líneas»); por defecto, todas. */
+  show?: (id: LineSeriesId) => boolean
+  /** Serie resaltada (p. ej. al pasar el mouse por su fila de la tabla): las demás se atenúan. */
+  focus?: LineSeriesId | null
+  /** Medida del eje (p. ej. «unid.» o «kg»), arriba de las cifras. */
+  unitLabel?: string
+}) {
+  const [ref, size] = useElementSize<HTMLDivElement>()
   const { bind, node } = useTooltip()
-  const W = measured || 720
+  const W = size.width || 720
   const mob = W < COMPACT
-  const H = mob ? 250 : 330
+  const H = Math.max(size.height, mob ? 240 : 280)
   const L = mob ? 40 : 56
   const R = 14
-  const T = 16
+  const T = unitLabel ? 26 : 16
   const B = 44
-  const max = niceMax(Math.max(...points.flatMap((p) => [p.a, p.b ?? 0]), 1) * 1.05)
+  // La escala sigue a lo que se ve: con una sola línea, ocupa todo el alto.
+  const values = points.flatMap((p) => [
+    show('a') ? (p.a ?? 0) : 0,
+    show('b') ? (p.b ?? 0) : 0,
+    show('c') ? (p.c ?? 0) : 0,
+    ...(p.earlier ?? []).map((v, r) => (show(`e${r}`) ? (v ?? 0) : 0)),
+    show('parts') ? (p.parts ?? []).reduce((s, v) => s + v, 0) : 0,
+  ])
+  const max = niceMax(Math.max(...values, 1) * 1.05, 5)
   const iw = W - L - R
   const ih = H - T - B
-  const step = iw / Math.max(points.length - 1, 1)
-  const x = (i: number) => L + step * i
+  // Cada día en el centro de su columna: con 1 solo día, igual queda centrado.
+  const step = iw / Math.max(points.length, 1)
+  // Ancho de un rótulo del eje (día y fecha): si no caben todos, uno de cada `every`.
+  const every = Math.max(1, Math.ceil(52 / step))
+  const x = (i: number) => L + step * (i + 0.5)
   const y = (v: number) => T + ih - (v / max) * ih
-  const p1 = points.map((p, i) => [x(i), y(p.a)] as const)
-  const p2 = points.flatMap((p, i) => (p.b == null ? [] : [[x(i), y(p.b)] as const]))
-  const path = (pts: readonly (readonly [number, number])[]) =>
+  const base = T + ih
+  // Los días sin dato se saltan: la línea une los días que sí tienen (sin cortarse).
+  const runs = (vals: (number | null)[]): Pt[][] => {
+    const pts = vals.flatMap((v, i) => (v == null ? [] : [[x(i), y(v)] as const]))
+    return pts.length ? [pts] : []
+  }
+  const path = (pts: readonly Pt[]) =>
     pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
-  const area = `${path(p1)} L${p1[p1.length - 1][0]} ${T + ih} L${p1[0][0]} ${T + ih} Z`
+  const area = (top: readonly Pt[], bottom: readonly Pt[]) =>
+    `${path(top)} ${[...bottom]
+      .reverse()
+      .map((p) => `L${p[0].toFixed(1)} ${p[1].toFixed(1)}`)
+      .join(' ')} Z`
+  const a = points.map((p) => p.a)
+  const aRuns = runs(a)
+  const b = runs(points.map((p) => p.b))
+  const c = runs(points.map((p) => p.c ?? null))
+  const rounds = Math.max(0, ...points.map((p) => p.earlier?.length ?? 0))
+  const earlier = Array.from({ length: rounds }, (_, r) =>
+    runs(points.map((p) => (p.a == null ? null : (p.earlier?.[r] ?? p.a)))),
+  )
+  // Franjas apiladas: la parte k va entre la suma de las anteriores y la suma hasta ella.
+  const nParts = Math.max(0, ...points.map((p) => p.parts?.length ?? 0))
+  const cum = (p: LinePoint, k: number) => (p.parts ?? []).slice(0, k).reduce((s, v) => s + v, 0)
+  const withParts = points.flatMap((p, i) => (p.a != null && p.parts ? [{ p, i }] : []))
+  const bands = Array.from({ length: nParts }, (_, k) =>
+    withParts.length
+      ? [
+          area(
+            withParts.map(({ p, i }) => [x(i), y(cum(p, k + 1))] as const),
+            withParts.map(({ p, i }) => [x(i), y(cum(p, k))] as const),
+          ),
+        ]
+      : [],
+  )
+  const hasData = points.some((p) => p.a != null || p.b != null || p.c != null)
+  /** Clase de una serie: atenuada si otra está resaltada, marcada si es ella. */
+  const dim = (id: LineSeriesId) => (focus == null ? 'series' : focus === id ? 'series focus' : 'series dim')
   return (
-    <div ref={ref} className="chart relative">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
+    <div ref={ref} className="chart absolute inset-0">
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={label} className="block">
+        {unitLabel && (
+          <text className="ax2" x={L - 8} y={12} textAnchor="end">
+            {unitLabel}
+          </text>
+        )}
         {[0, 1, 2, 3, 4, 5].map((i) => (
           <g key={i}>
             <line className="gl" x1={L} x2={W - R} y1={y((max * i) / 5)} y2={y((max * i) / 5)} />
             <text className="ax" x={L - 8} y={y((max * i) / 5) + 4} textAnchor="end">
-              {fmt0((max * i) / 5)}
+              {nf0((max * i) / 5)}
             </text>
           </g>
         ))}
-        <path className="area" d={area} />
+        {show('parts') && nParts ? (
+          <g className={dim('parts')}>
+            {bands.map((ds, k) =>
+              ds.map((d, j) => (
+                <path key={`${k}-${j}`} className="band" d={d} style={{ fill: PART_COLOR[k % PART_COLOR.length] }} />
+              )),
+            )}
+          </g>
+        ) : (
+          show('a') &&
+          !nParts && (
+            <g className={dim('a')}>
+              {aRuns.map((run, j) => (
+                <path
+                  key={j}
+                  className="area"
+                  d={area(
+                    run,
+                    run.map((p) => [p[0], base] as const),
+                  )}
+                />
+              ))}
+            </g>
+          )
+        )}
         {points.map((p, i) => (
-          <g key={p.key} className="col" {...bind(p.tip)}>
+          <g key={p.key} className="col" {...(p.a != null || p.b != null || p.c != null ? bind(p.tip) : {})}>
             <rect fill="transparent" x={x(i) - step / 2} y={T} width={step} height={ih} />
             <line className="guide" x1={x(i)} x2={x(i)} y1={T} y2={T + ih} />
-            <text className="ax2" x={x(i)} y={H - B + 20} textAnchor="middle">
-              {p.label}
-            </text>
-            <text className="ax" x={x(i)} y={H - B + 35} textAnchor="middle">
-              {p.sublabel}
-            </text>
+            {/* Con muchos puntos (un mes) se rotula uno de cada `every` para que no se encimen. */}
+            {i % every === 0 && (
+              <>
+                <text className="ax2" x={x(i)} y={H - B + 20} textAnchor="middle">
+                  {p.label}
+                </text>
+                <text className="ax" x={x(i)} y={H - B + 35} textAnchor="middle">
+                  {p.sublabel}
+                </text>
+              </>
+            )}
           </g>
         ))}
-        <path className="ln s1" pathLength={1} d={path(p1)} />
-        {p2.length > 1 && <path className="ln s2" pathLength={1} d={path(p2)} />}
-        {p1.map((p, i) => (
-          <circle
-            key={`a${i}`}
-            className="pt s1"
-            style={{ '--d': `${0.25 + i * 0.12}s` } as React.CSSProperties}
-            cx={p[0]}
-            cy={p[1]}
-            r={5}
-          />
-        ))}
-        {p2.map((p, i) => (
-          <circle
-            key={`b${i}`}
-            className="pt s2"
-            style={{ '--d': `${0.25 + i * 0.12}s` } as React.CSSProperties}
-            cx={p[0]}
-            cy={p[1]}
-            r={5}
-          />
-        ))}
+        {earlier.map(
+          (rs, r) =>
+            show(`e${r}`) && (
+              <g key={`r${r}`} className={dim(`e${r}`)}>
+                {rs.map((pts, j) => (
+                  <g key={j}>
+                    <path className="halo" d={path(pts)} />
+                    <path
+                      className="ln prev"
+                      d={path(pts)}
+                      style={{
+                        strokeDasharray: `var(--dash-chart-prev-${String((r % 3) + 1)})`,
+                        stroke: PREV_COLOR[r % PREV_COLOR.length],
+                      }}
+                    />
+                    {pts.map((p, i) => (
+                      <circle
+                        key={i}
+                        className="pt prev"
+                        cx={p[0]}
+                        cy={p[1]}
+                        r={3}
+                        style={{ stroke: PREV_COLOR[r % PREV_COLOR.length] }}
+                      />
+                    ))}
+                  </g>
+                ))}
+              </g>
+            ),
+        )}
+        {show('a') && (
+          <g className={dim('a')}>
+            {aRuns.map((run, j) => (
+              <g key={j}>
+                <path className="halo" d={path(run)} />
+                <path className="ln s1" d={path(run)} />
+              </g>
+            ))}
+            {aRuns.flat().map((p, i) => (
+              <circle key={`ap${i}`} className="pt s1" cx={p[0]} cy={p[1]} r={4} />
+            ))}
+          </g>
+        )}
+        {show('c') && (
+          <g className={dim('c')}>
+            {c.map((run, j) => (
+              <g key={j}>
+                <path className="halo" d={path(run)} />
+                <path className="ln s3" d={path(run)} />
+              </g>
+            ))}
+            {c.flat().map((p, i) => (
+              <path
+                key={`cp${i}`}
+                className="pt s3"
+                d={`M${p[0]} ${p[1] - 5} L${p[0] + 5} ${p[1]} L${p[0]} ${p[1] + 5} L${p[0] - 5} ${p[1]} Z`}
+              />
+            ))}
+          </g>
+        )}
+        {show('b') && (
+          <g className={dim('b')}>
+            {b.map((run, j) => (
+              <g key={j}>
+                <path className="halo" d={path(run)} />
+                <path className="ln s2" d={path(run)} />
+              </g>
+            ))}
+            {b.flat().map((p, i) => (
+              <rect key={`bp${i}`} className="pt s2" x={p[0] - 3.5} y={p[1] - 3.5} width={7} height={7} />
+            ))}
+          </g>
+        )}
       </svg>
+      {!hasData && empty && (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 grid place-items-center px-6 text-center"
+          style={{ bottom: B }}
+        >
+          <div className="rounded-md bg-surface/85 px-4 py-3">{empty}</div>
+        </div>
+      )}
       {node}
     </div>
   )
 }
 
-export function Donut({ pct }: { pct: number }) {
-  return (
-    <div className="relative size-[60px] flex-none dsk:size-[68px]">
-      <svg viewBox="0 0 84 84" className="size-full -rotate-90">
-        <circle cx="42" cy="42" r="34" fill="none" stroke="var(--border)" strokeWidth="9" />
-        <circle
-          className="donut-value"
-          cx="42"
-          cy="42"
-          r="34"
-          fill="none"
-          stroke="var(--primary)"
-          strokeWidth="9"
-          strokeLinecap="round"
-          pathLength={100}
-          strokeDasharray={`${pct} 100`}
-        />
-      </svg>
-      <b className="absolute inset-0 grid place-items-center text-[13px] font-extrabold dsk:text-base">
-        {Math.round(pct)}%
-      </b>
-    </div>
-  )
-}
-
-/** Número que cuenta hacia arriba al aparecer. */
+/** Cifra formateada (sin animación: el dato se lee al instante). */
 export function CountUp({ value, decimals = 0, suffix = '' }: { value: number; decimals?: number; suffix?: string }) {
-  const v = useCountUp(value)
-  const text = decimals
-    ? (Math.round(v * 10) / 10).toLocaleString('es-PE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-    : fmt0(v)
   return (
     <span>
-      {text}
+      {decimals ? nf1(value) : nf0(value)}
       {suffix}
     </span>
   )

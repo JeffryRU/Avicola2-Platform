@@ -12,3 +12,15 @@ Cada decisión de arquitectura relevante o supuesto de proceso se registra aquí
 | [0006](0006-notificaciones-y-tiempo-real.md) | Notificaciones reales y tiempo real con SSE | aceptado |
 | [0007](0007-frontend-en-vercel-con-proxy-api.md) | Frontend en Vercel con proxy de /api al backend | aceptado |
 | [0008](0008-frontend-por-features.md) | Frontend por features (screaming) y vocabulario en una sola fuente | aceptado |
+| [0009](0009-app-movil-kotlin-multiplatform.md) | App móvil con Kotlin Multiplatform, distribuida por GitHub Releases | aceptado |
+| [0010](0010-roles-y-permisos.md) | Roles y permisos en una sola fuente, con supervisor general | aceptado |
+| [0014](0014-cache-en-memoria-o-redis.md) | Caché de lecturas frecuentes, en memoria o en Redis | aceptado |
+| [0015](0015-nombre-del-producto-aviplanner.md) | El producto se llama AviPlanner (Avícola 2 sigue siendo el cliente) | aceptado |
+| [0016](0016-capas-con-import-linter-y-fuentes-unicas.md) | Capas verificadas con import-linter, `shared/` como módulo común y una sola fuente por regla | aceptado |
+| [0017](0017-agente-de-ia-con-mcp-y-n8n.md) | Agente de IA: servidor MCP de solo lectura en el backend y workflow de n8n con AI Agent | aceptado |
+| [0018](0018-sistema-visual-y-temas.md) | Sistema visual propio en tokens, modo oscuro y alto contraste | aceptado |
+| [0019](0019-modelo-de-demanda-contra-la-venta-real.md) | Modelo de demanda medido contra la venta real: ninguno es mucho mejor; hacen falta datos nuevos | aceptado |
+| [0020](0020-un-modelo-de-demanda-por-uso.md) | Un modelo de demanda por uso (combinación robusta, alumno destilado y apilado), entrenado en la app cada noche | aceptado |
+| [0021](0021-archivos-de-carga-en-yaml.md) | Las columnas de los archivos de carga (ARIS, tiendas, producción) en `config/imports.yaml`, con un solo validador | aceptado |
+| [0022](0022-asistente-en-la-app-para-todos.md) | Asistente dentro de la app para todos los roles: n8n consulta el MCP con un pase de quien pregunta; preguntas sugeridas | aceptado |
+| [0023](0023-base-local-en-el-vps-y-copia-en-supabase.md) | Postgres local en el VPS como base principal (rápida, sin límite de 15 conexiones) y copia completa en Supabase cada 15 min | propuesto |

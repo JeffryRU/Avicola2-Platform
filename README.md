@@ -1,6 +1,6 @@
-# Avícola 2 — Plataforma de planificación de saca
+# AviPlanner — Plataforma de planificación de saca
 
-Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la demanda de pollo y planificar la saca sobre una sola fuente de verdad. Proyecto de taller (UPAO, Ingeniería de Sistemas).
+**AviPlanner** es la plataforma para centralizar los datos de las áreas de Avícola 2 (el cliente), predecir la demanda de pollo y planificar la saca sobre una sola fuente de verdad. Proyecto de taller (UPAO, Ingeniería de Sistemas).
 
 - Arquitectura: [`docs/architecture.md`](docs/architecture.md)
 - Supuestos por validar: [`docs/assumptions.md`](docs/assumptions.md)
@@ -30,6 +30,11 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
 - API `/api/*` en el backend con arquitectura hexagonal (`backend/app/planning`), login de vendedores con JWT.
 - Base de datos intercambiable por `DATABASE_URL`: Supabase hoy; Azure SQL configurado para más adelante. Nombres de tablas en `backend/config/tables.yaml`.
 
+**App móvil (Android e iOS)** — [ADR 0009](docs/adr/0009-app-movil-kotlin-multiplatform.md), [`mobile/README.md`](mobile/README.md):
+- Kotlin Multiplatform + Compose Multiplatform en `mobile/`, con la misma lógica que la web: registro con cola offline, avisos en tiempo real, sugerencias y vista del supervisor.
+- Se publica en GitHub Releases al crear un tag `v*`. En Android, el botón "Instalar" de la web ofrece la app nativa (APK) o la app web.
+- El backend acepta `Authorization: Bearer` para la app (`POST /api/auth/token`); la web sigue con la cookie HttpOnly.
+
 ## Requisitos
 
 - Docker Desktop (con Compose v2.20 o superior).
@@ -54,8 +59,9 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
    ```
    El backend aplica las migraciones al arrancar.
    - App de vendedores (PWA): http://127.0.0.1:8000
-   - Backend: http://127.0.0.1:8000/health · documentación de la API: http://127.0.0.1:8000/docs
+   - Backend: http://127.0.0.1:8000/health (proceso vivo) · http://127.0.0.1:8000/health/ready (con base) · documentación de la API: http://127.0.0.1:8000/docs
    - n8n: http://127.0.0.1:5678
+   - Redis: caché compartida de configuración, catálogo y vendedores ([ADR 0014](docs/adr/0014-cache-en-memoria-o-redis.md)). Sin Redis, `CACHE_BACKEND=memory`.
 
 3. **Sin internet (Postgres local en lugar de Supabase):** ajusta `.env` según la sección "perfil localdb" de `.env.example` y luego:
    ```bash
@@ -73,20 +79,23 @@ Plataforma para centralizar los datos de las áreas de Avícola 2, predecir la d
 
 - **Base de datos:** la elige `DATABASE_URL` (Supabase, Azure SQL, Postgres local o SQLite para demos). Para Azure SQL ver la sección correspondiente de `.env.example`.
 - **Nombres de tablas:** `backend/config/tables.yaml` (renombrar una tabla ya creada requiere una migración).
-- **Catálogo y usuarios de prueba:** `backend/config/planning_seed.yaml`. Los usuarios de prueba (`supervisor` y los 7 vendedores de la tabla maestra, contraseña `demo1234`) solo se crean con `APP_ENV=local`.
-- **Comandos** (`cd backend`): `uv run python -m app.planning.infrastructure.cli init | seed | show [n] | clear --yes | supervisor <usuario> "<nombre>"`.
+- **Catálogo y usuarios de prueba:** `backend/config/planning_seed.yaml`. Los usuarios de prueba (`general` como supervisor general, `supervisor`, `despacho` como jefe de despacho y los 7 vendedores de la tabla maestra, contraseña `demo1234`) solo se crean con `APP_ENV=local`.
+- **Comandos** (`cd backend`): `uv run python -m app.planning.infrastructure.cli init | historia [carpeta] | produccion <archivo.xlsx> | seed | show [n] | clear --yes | supervisor <usuario> "<nombre>" [--general] | rol <usuario> <rol>`.
+- **Datos reales:** copia `DESPACHO.csv`, `VENTAS.csv` y el Excel de producción en `data/inbox/` (no se versiona) y ejecuta `cli historia`. Carga el catálogo, los pedidos de despacho (`np_dispatch_orders`), las ventas en tienda (`np_store_sales`) y la producción (`np_production`); cada ejecución reemplaza lo anterior.
 - **Cuentas y seguridad** ([ADR 0005](docs/adr/0005-seguridad-de-sesion-y-cuentas.md)):
   - La sesión va en una cookie HttpOnly. El token no aparece en las respuestas ni en el almacenamiento del navegador.
-  - El **supervisor** crea las cuentas y restablece las contraseñas olvidadas desde la pantalla **Usuarios**: entrega una contraseña temporal que el vendedor cambia al entrar.
+  - El **supervisor** crea las cuentas de los vendedores y restablece las contraseñas olvidadas desde la pantalla **Usuarios**: entrega una contraseña inicial con la que el vendedor entra directo; puede cambiarla cuando quiera desde su perfil.
+  - El **supervisor general** además gestiona a los supervisores y cambia roles. Los permisos están en una sola fuente ([ADR 0010](docs/adr/0010-roles-y-permisos.md)).
   - Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.
   - Cada vendedor ve solo sus datos.
 - **Notificaciones en tiempo real** ([ADR 0006](docs/adr/0006-notificaciones-y-tiempo-real.md)):
   - Llegan al instante por SSE (`/api/events`) y se guardan en la base, con "leído" sincronizado entre dispositivos.
   - El supervisor recibe cada proyección enviada; los vendedores, el recordatorio diario de n8n.
   - n8n puede enviar avisos con `POST /api/internal/notifications`.
+- **Agente de IA** ([ADR 0017](docs/adr/0017-agente-de-ia-con-mcp-y-n8n.md)): servidor MCP de solo lectura en `/mcp` (proyecciones, quién registró, saca, stock, producción y cargas), con los permisos de cada rol, límite de llamadas y auditoría. El workflow `n8n/workflows/03_agente_chatbot.json` lo usa desde un chat de supervisores.
 - **En producción** (`APP_ENV` distinto de `local`):
   - La API no arranca sin un `AUTH_SECRET` de al menos 32 caracteres, sin `INGEST_API_TOKEN` o sin HTTPS para la cookie.
-  - El primer supervisor se crea con `cli supervisor`.
+  - El primer supervisor se crea con `cli supervisor <usuario> "<nombre>" --general` (supervisor general, [ADR 0010](docs/adr/0010-roles-y-permisos.md)).
 - **Venta real:** todavía simulada, como en el mockup. **"Sugerir con historial":** promedio del mismo día de la semana; ahí se conectará el modelo de ML.
 
 ## Desarrollo del frontend
@@ -99,6 +108,13 @@ pnpm lint && pnpm test && pnpm build
 ```
 
 Las capas (`domain`, `application`, `infrastructure`, `ui`) las vigila ESLint: el dominio no importa React y la interfaz no importa adaptadores.
+
+- **HTTP:** axios detrás del puerto `HttpClient`. Para subir archivos con barra de progreso: `http.upload(path, file, schema, { onProgress, signal, fields })`.
+- **`VITE_ANDROID_APK_URL`:** enlace del botón "App de Android". Por defecto apunta a la última Release de GitHub; vacío lo oculta.
+
+## Desarrollo de la app móvil
+
+Ver [`mobile/README.md`](mobile/README.md) (requisitos, comandos, pruebas contra el backend local y cómo publicar una versión).
 
 ## Datos sintéticos y plantilla
 
@@ -139,6 +155,7 @@ uv run alembic upgrade head          # aplica migraciones a DATABASE_URL
 uv run alembic revision --autogenerate -m "descripción"   # nueva migración
 uv run uvicorn app.main:app --reload
 uv run ruff check . && uv run ruff format .
+uv run lint-imports                  # capas hexagonales (ADR 0016)
 uv run pytest
 ```
 

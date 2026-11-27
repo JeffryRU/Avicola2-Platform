@@ -1,8 +1,9 @@
 import type { IsoDate } from '@/shared/domain/dates'
-import type { Seller } from '@/features/auth/domain/session'
-import { addUnits, sumUnits, type Catalog } from '@/features/catalog/domain/catalog'
-import type { Units } from '@/features/catalog/domain/schemas'
-import { CONFIRMED, type DailyUnits, type Projection } from '@/features/projections/domain/schemas'
+import type { Seller } from '@/shared/domain/session'
+import { addUnits, sumUnits, type Units } from '@/shared/domain/products'
+import type { Catalog } from '@/features/catalog'
+import { CONFIRMED } from '@/shared/types/labels'
+import type { DailyUnits, Projection } from '@/features/projections'
 
 /** Un vendedor en el día: lo que proyectó (todas sus categorías) y su venta real, si ya llegó. */
 export interface SellerDay {

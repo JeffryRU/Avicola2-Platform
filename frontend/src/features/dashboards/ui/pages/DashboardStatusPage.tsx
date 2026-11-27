@@ -1,21 +1,24 @@
-import { Check, Clock } from 'lucide-react'
+import { SyncStatus } from '@/shared/ui/components/sync-status'
 import { useNavigate } from 'react-router'
-import { dDM, dDow, dFull, dShort, rangeLabel } from '@/shared/domain/dates'
+import { dDM, dDow, dFull, dShort, fromIso, rangeLabel } from '@/shared/domain/dates'
 import { nf0, nf1 } from '@/shared/domain/format'
-import { periodAgg } from '@/features/projections/domain/aggregation'
-import { DashboardTabs, useDashboardFilters } from '@/features/dashboards/ui/components/dashboard'
+import { periodAgg } from '@/features/projections'
+import { DashboardTabs } from '@/features/dashboards/ui/components/dashboard'
+import { useTooltip } from '@/shared/ui/hooks/use-tooltip'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { DashboardFilterBar } from '@/features/dashboards/ui/components/filter-bar'
-import { useCatalog } from '@/features/catalog/ui/hooks'
-import { BarChart, useTooltip } from '@/shared/ui/components/charts'
-import { StatusBadge } from '@/shared/ui/components/feedback'
-import { PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
+import { useCatalog } from '@/features/catalog'
+import { ProjectionBars } from '@/features/dashboards/ui/components/projection-bars'
+import { StatusBadge, StatusDot } from '@/shared/ui/components/feedback'
+import { PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
 import { cn } from '@/shared/ui/lib/utils'
-import { STATUS_LABEL } from '@/shared/types/labels'
-import { kgAmount, unitsCount } from '@/shared/types/labels'
-import { useDayPath, usePeriodData } from '@/features/dashboards/ui/hooks'
+import { kgAmount, STATUS_LABEL, unitsCount } from '@/shared/types/labels'
+import { useDayPath, usePeriodData, useDashboardFilters, useWideChart } from '@/features/dashboards/ui/hooks'
+import { col } from '@/shared/ui/lib/table-columns'
 
 export function DashboardStatusPage() {
   const { period, sellers } = useDashboardFilters()
+  const wide = useWideChart('estado')
   const { catalog } = useCatalog()
   const data = usePeriodData(period)
   const navigate = useNavigate()
@@ -23,27 +26,14 @@ export function DashboardStatusPage() {
   const { bind, node } = useTooltip()
   const title = 'Estado de proyecciones'
   const subtitle = rangeLabel(period.from, period.to, true)
-  if (!catalog || !data.data) return <PageHeader title={title} subtitle={subtitle} />
+  const source = data.data ?? { projections: [], sales: [] }
 
-  const days = periodAgg(period.dates, sellers, data.data.projections, data.data.sales, catalog)
+  const days = periodAgg(period.dates, sellers, source.projections, source.sales, catalog)
+  type Day = (typeof days)[number]
+  // Un mes se dibuja como calendario: el día 1 cae en su día de la semana.
+  const leading = period.kind === 'month' ? (fromIso(period.from).getDay() + 6) % 7 : 0
   const units = days.reduce((s, d) => s + d.u, 0)
   const kg = days.reduce((s, d) => s + d.kg, 0)
-  const legend = (
-    <div className="mb-3 flex justify-start gap-[18px] text-sm font-semibold text-ink-2 dsk:-mt-2 dsk:mb-3.5 dsk:justify-end">
-      <span className="flex items-center gap-2">
-        <span className="grid size-6 place-items-center rounded-full bg-ok text-white">
-          <Check className="size-3.5" strokeWidth={3} />
-        </span>
-        Confirmada
-      </span>
-      <span className="flex items-center gap-2">
-        <span className="grid size-6 place-items-center rounded-full bg-pend text-white">
-          <Clock className="size-3.5" strokeWidth={2.5} />
-        </span>
-        Pendiente
-      </span>
-    </div>
-  )
 
   return (
     <div>
@@ -51,12 +41,19 @@ export function DashboardStatusPage() {
       <DashboardFilterBar />
       <DashboardTabs />
       <PageBody>
-        {legend}
-        <div className="mb-3 grid grid-cols-7 gap-[5px] dsk:mb-4 dsk:gap-3">
-          {days.map((d, i) => (
+        <SyncStatus queries={[data]} />
+        <section
+          aria-label="Estado por día"
+          className="mb-4 grid grid-cols-7 gap-px overflow-hidden rounded-md border border-border bg-rule hc:rounded-none hc:border-x-0 hc:border-t-heavy hc:border-b-heavy hc:bg-foreground"
+        >
+          {Array.from({ length: leading }, (_, i) => (
+            <span key={`blank-${String(i)}`} aria-hidden className="bg-surface" />
+          ))}
+          {days.map((d) => (
             <button
               key={d.date}
               type="button"
+              aria-label={`${dShort(d.date)}: ${STATUS_LABEL[d.confirmed ? 'confirmed' : 'pending']}`}
               onClick={() => void navigate(dayPath(d.date))}
               {...bind(
                 <>
@@ -66,93 +63,62 @@ export function DashboardStatusPage() {
                 </>,
               )}
               className={cn(
-                'grid justify-items-center gap-0.5 rounded-xl bg-card px-0.5 py-2.5 text-center shadow-card transition dsk:rounded-2xl dsk:px-2 dsk:py-4',
-                'hover:-translate-y-[3px]',
+                'flex min-h-touch flex-col items-center gap-1 bg-surface px-0.5 py-3 text-center transition-colors hover:bg-muted dsk:items-start dsk:px-4 dsk:text-left',
+                !d.confirmed && 'hc:bg-warn-soft',
               )}
             >
-              <b className="text-[13px] font-extrabold dsk:text-[19px]">{dDow(d.date)}</b>
-              <span className="text-[11.5px] text-ink-2 dsk:text-base">{dDM(d.date)}</span>
-              <span
-                className={cn(
-                  'mt-1.5 grid size-[30px] animate-popin place-items-center rounded-full text-white dsk:mt-2.5 dsk:size-14',
-                  d.confirmed ? 'bg-ok' : 'bg-pend',
-                )}
-                style={{ animationDelay: `${i * 0.08}s` }}
-              >
-                {d.confirmed ? (
-                  <Check className="size-4 dsk:size-7" strokeWidth={3} />
-                ) : (
-                  <Clock className="size-4 dsk:size-7" strokeWidth={3} />
-                )}
+              <span className="text-xs text-muted-foreground hc:font-semibold hc:text-foreground">{dDow(d.date)}</span>
+              <span className="num text-sm font-medium dsk:text-lg">{dDM(d.date)}</span>
+              <span className="mt-1 flex items-center gap-1.5">
+                <StatusDot tone={d.confirmed ? 'ok' : 'warn'} />
+                <span
+                  className={cn(
+                    'hidden text-sm dsk:inline',
+                    d.confirmed ? 'text-foreground' : 'font-medium text-warn hc:font-bold',
+                  )}
+                >
+                  {STATUS_LABEL[d.confirmed ? 'confirmed' : 'pending']}
+                </span>
               </span>
-              <small className="mt-1.5 hidden text-[12.5px] text-muted-foreground dsk:block">
-                {STATUS_LABEL[d.confirmed ? 'confirmed' : 'pending']}
-              </small>
             </button>
           ))}
-        </div>
+        </section>
         {node}
-        <div className="grid gap-4 @6xl/main:grid-cols-2">
-          <Section title="Total proyectado por día (unidades)">
-            <div className="px-4 pt-1.5 pb-4 dsk:px-5 dsk:pb-5">
-              <BarChart
-                label="Unidades proyectadas por día"
-                width={560}
-                height={330}
-                onSelect={(d) => void navigate(dayPath(d))}
-                bars={days.map((d) => ({
-                  key: d.date,
-                  value: d.u,
-                  label: dDow(d.date),
-                  sublabel: dDM(d.date),
-                  tip: (
+        <div className={cn('grid grid-cols-1 items-start gap-4', !wide[0] && '@4xl/main:grid-cols-2')}>
+          <ProjectionBars
+            title="Total proyectado por día"
+            days={days}
+            period={subtitle}
+            onSelect={(d) => void navigate(dayPath(d))}
+            wide={wide}
+          />
+          <Section title="Detalle por día (unidades y kg)">
+            <DataTable
+              rows={days}
+              rowKey={(d) => d.date}
+              onRowClick={(d) => void navigate(dayPath(d.date))}
+              totalLabel="Total"
+              columns={[
+                {
+                  key: 'date',
+                  header: 'Fecha',
+                  cell: (d) => (
                     <>
-                      <b>{dShort(d.date)}</b>
-                      <br />
-                      {nf0(d.u)} unidades, {nf1(d.kg)} kg
+                      {dDow(d.date)} <span className="num dsk:hidden">{dDM(d.date)}</span>
+                      <span className="num hidden dsk:inline">{dFull(d.date)}</span>
                     </>
                   ),
-                }))}
-              />
-            </div>
-          </Section>
-          <Section title="Detalle por día (unidades y kg)">
-            <div className="overflow-x-auto px-3 pb-3.5">
-              <table className={tableCls.table}>
-                <thead>
-                  <tr>
-                    <th className={tableCls.th}>Fecha</th>
-                    <th className={tableCls.th}>Unidades</th>
-                    <th className={tableCls.th}>Kilos (aprox.)</th>
-                    <th className={tableCls.th}>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {days.map((d) => (
-                    <tr
-                      key={d.date}
-                      className={cn(tableCls.row, 'cursor-pointer')}
-                      onClick={() => void navigate(dayPath(d.date))}
-                    >
-                      <td className={tableCls.td}>
-                        {dDow(d.date)} {dFull(d.date)}
-                      </td>
-                      <td className={tableCls.td}>{nf0(d.u)}</td>
-                      <td className={cn(tableCls.td, !d.u && 'text-faint')}>{d.u ? nf1(d.kg) : '-'}</td>
-                      <td className={cn(tableCls.td, '!text-left')}>
-                        <StatusBadge kind={d.confirmed ? 'confirmed' : 'pending'} />
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className={tableCls.total}>
-                    <td>Total</td>
-                    <td className="text-center">{nf0(units)}</td>
-                    <td className="text-center">{nf1(kg)}</td>
-                    <td className="text-center">-</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                },
+                col.units<Day>('units', 'Unidades', (d) => d.u, { total: nf0(units) }),
+                col.kg<Day>('kg', 'Kilos (aprox.)', (d) => (d.u ? d.kg : null), { total: nf1(kg) }),
+                {
+                  key: 'status',
+                  header: 'Estado',
+                  cell: (d) => <StatusBadge kind={d.confirmed ? 'confirmed' : 'pending'} />,
+                  total: null,
+                },
+              ]}
+            />
           </Section>
         </div>
       </PageBody>

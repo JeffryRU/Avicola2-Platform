@@ -24,12 +24,22 @@ class Catalog:
             raise DomainError(f"La categoría {category} no existe.")
         return found
 
-    def lines_for(self, category: str, units: Mapping[str, int]) -> tuple[ProjectionLine, ...]:
-        """Valida las unidades de un día y calcula los kg con el peso del catálogo."""
+    def lines_for(
+        self, category: str, units: Mapping[str, int], allowed: Iterable[str] | None = None
+    ) -> tuple[ProjectionLine, ...]:
+        """Valida las unidades de un día y calcula los kg con el peso del catálogo.
+
+        `allowed`: solo esos productos de la categoría (los que se proyectan); None = todos."""
         products = self.of(category)
         unknown = set(units) - set(products)
         if unknown:
             raise DomainError(f"Productos fuera de {category}: {', '.join(sorted(unknown))}.")
+        if allowed is not None:
+            keep = set(allowed)
+            if left_out := {pid for pid, n in units.items() if n and pid not in keep}:
+                names = ", ".join(sorted(products[pid].name for pid in left_out))
+                raise DomainError(f"No se proyecta: {names}.")
+            products = {pid: p for pid, p in products.items() if pid in keep}
         lines = []
         for product_id, product in products.items():
             n = units.get(product_id, 0)

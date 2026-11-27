@@ -1,14 +1,25 @@
 import { useState, type ReactNode } from 'react'
+import { bucketsOf, granularityOf } from '@/features/dashboards/domain/buckets'
+import { bucketLabels } from '@/features/dashboards/types/buckets'
 import { CalendarDays, Layers, MapPin } from 'lucide-react'
 import { dShort, type IsoDate } from '@/shared/domain/dates'
-import { nf0, nf1 } from '@/shared/domain/format'
-import { isSupervisor } from '@/features/auth/domain/session'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import type { Catalog } from '@/features/catalog/domain/catalog'
-import { dayColumns, productMatrix, sellerColumns } from '@/features/dashboards/domain/product-matrix'
+import { nf0, nf1, toggleIn } from '@/shared/domain/format'
+import { isSupervisor } from '@/shared/domain/session'
+import { useRequiredSession } from '@/features/auth'
+import type { Catalog } from '@/features/catalog'
+import {
+  dayColumns,
+  isStores,
+  productMatrix,
+  sellerColumns,
+  zoneColumns,
+  zoneOfStores,
+  type MatrixEntry,
+  type MatrixRow,
+} from '@/features/dashboards/domain/product-matrix'
 import { FilterMenu } from '@/features/dashboards/ui/components/filter-bar'
-import { choiceKey, toggleIn, useDetailSelection } from '@/features/dashboards/ui/hooks'
-import type { Projection } from '@/features/projections/domain/schemas'
+import { choiceKey, useDetailSelection, useStoreEntries } from '@/features/dashboards/ui/hooks'
+import type { Projection } from '@/features/projections'
 import {
   ALL_ZONES_LABEL,
   DAY_FILTER_LABEL,
@@ -18,6 +29,7 @@ import {
   PRODUCT_COLUMN_LABEL,
   SIZE_COLUMN_LABEL,
   SIZE_FILTER_LABEL,
+  STORES_COLUMN_LABEL,
   TOTAL_KG_LABEL,
   TOTAL_UNITS_LABEL,
   WHOLE_PERIOD_LABEL,
@@ -27,22 +39,17 @@ import {
   sizesCount,
   type DetailView,
 } from '@/features/dashboards/types/product-detail'
-import { Section, tableCls } from '@/shared/ui/components/layout'
+import { Section } from '@/shared/ui/components/layout'
+import { EmptyState } from '@/shared/ui/components/feedback'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Segmented } from '@/shared/ui/components/segmented'
 import { DropdownMenuCheckboxItem, DropdownMenuSeparator } from '@/shared/ui/components/shadcn/dropdown-menu'
 import { daysCount } from '@/shared/types/labels'
-import { cn } from '@/shared/ui/lib/utils'
 
-/** Color de cada tamaño (chica, mediana, grande...), como en la planilla de Comercial. */
-const SIZE_TONES = [
-  'bg-[#DBEAFE] text-[#1D4ED8]',
-  'bg-ok-soft text-ok',
-  'bg-[#CCFBF1] text-[#0F766E]',
-  'bg-warn-soft text-warn',
-]
-const ZONE_TONES = ['bg-[#FEF9C3]', 'bg-[#DCFCE7]', 'bg-[#FFEDD5]', 'bg-[#E0F2FE]', 'bg-[#F3E8FF]', 'bg-[#FCE7F3]']
-
-/** «Detalle por producto»: filas por tamaño y producto; columnas por vendedor (agrupados por zona) o por día. */
+/**
+ * «Detalle por producto»: filas por tamaño y producto; columnas por vendedor (agrupados por zona, con
+ * las tiendas de cada zona al final) o por día.
+ */
 export function ProductDetail({
   dates: periodDates,
   custom,
@@ -71,128 +78,96 @@ export function ProductDetail({
       )
     : [me]
   const dates = f.days.length ? f.days : f.weekDays
+  // Las tiendas no son vendedores: si se filtra por vendedor, no van.
+  const stores = useStoreEntries(periodDates, sellers, f.zones)
+  // Solo las zonas con pedidos en los días que se muestran (el hook trae también el período anterior).
+  const storeZones = [...new Set(stores.filter((e) => dates.includes(e.date)).map((e) => zoneOfStores(e.seller)))]
+  const entries: MatrixEntry[] = [...projections, ...stores]
+  const inScope = (p: MatrixEntry) => isStores(p.seller) || shown.some((s) => s.username === p.seller)
 
   const columns = bySeller
-    ? sellerColumns(shown, dates, NO_ZONE_LABEL)
-    : dayColumns(dates, null, dShort).map((c) => ({
-        ...c,
-        match: (p: Projection) => c.match(p) && shown.some((s) => s.username === p.seller),
-      }))
-  const m = productMatrix(columns, f.products, projections)
-  const zoneTone = (name: string | null) => ZONE_TONES[Math.max(0, f.allZones.indexOf(name ?? '')) % ZONE_TONES.length]
-  const sizeTone = (category: string, name: string | null) =>
-    SIZE_TONES[Math.max(0, catalog.subcategories(category).indexOf(name ?? '')) % SIZE_TONES.length]
+    ? sellerColumns(shown, dates, NO_ZONE_LABEL, [], { zones: storeZones, label: STORES_COLUMN_LABEL })
+    : supervisor && view === 'zone'
+      ? zoneColumns(shown, dates, NO_ZONE_LABEL, [], storeZones)
+      : granularityOf(dates.length) === 'day'
+        ? dayColumns(dates, null, dShort).map((c) => ({
+            ...c,
+            match: (p: MatrixEntry) => c.match(p) && inScope(p),
+          }))
+        : // Período largo: una columna por semana o por mes.
+          bucketsOf(dates).map((b) => ({
+            key: b.key,
+            label: bucketLabels(b, granularityOf(dates.length)).title,
+            group: null,
+            match: (p: MatrixEntry) => b.dates.includes(p.date) && inScope(p),
+          }))
+  const m = productMatrix(columns, f.products, entries)
   const title = f.days.length
     ? `Detalle por producto · ${f.days.length > 2 ? daysCount(f.days.length) : f.days.map(dShort).join(', ')}`
     : `Detalle por producto (${custom ? 'período' : 'semana'})`
-  const span = bySeller ? 2 : 1
+  const viewSwitch = (
+    <Segmented
+      value={view}
+      onChange={setView}
+      full
+      className="w-full dsk:inline-flex dsk:w-auto [&>button]:whitespace-nowrap"
+      options={(['seller', 'zone', 'day'] as const).map((v) => ({ value: v, label: DETAIL_VIEW_LABEL[v] }))}
+    />
+  )
 
   return (
-    <Section
-      title={title}
-      aside={
-        supervisor && (
-          <Segmented
-            value={view}
-            onChange={setView}
-            full
-            className="w-full dsk:inline-flex dsk:w-auto [&>button]:whitespace-nowrap"
-            options={(['seller', 'day'] as const).map((v) => ({ value: v, label: DETAIL_VIEW_LABEL[v] }))}
-          />
-        )
-      }
-    >
+    <Section title={title} aside={supervisor && <div className="hidden dsk:block">{viewSwitch}</div>}>
+      {supervisor && <div className="border-b border-rule px-4 py-2.5 dsk:hidden">{viewSwitch}</div>}
       {m.columns.length === 0 ? (
-        <p className="px-5 pb-5 text-muted-foreground">{EMPTY_DETAIL_LABEL}</p>
+        <EmptyState title="Sin datos">{EMPTY_DETAIL_LABEL}</EmptyState>
       ) : (
-        <div className="overflow-x-auto px-3 pt-1.5 pb-3.5">
-          <table className={tableCls.table}>
-            <thead>
-              <tr>
-                <th rowSpan={span} className={cn(tableCls.th, 'text-left')}>
-                  {SIZE_COLUMN_LABEL}
-                </th>
-                <th rowSpan={span} className={cn(tableCls.th, 'text-left')}>
-                  {PRODUCT_COLUMN_LABEL}
-                </th>
-                {bySeller
-                  ? m.headerGroups.map((g, i) => (
-                      <th
-                        key={`${g.name ?? ''}-${String(i)}`}
-                        colSpan={g.span}
-                        className={cn(
-                          'border-x-2 border-card px-3 py-2 text-center text-xs font-extrabold tracking-wide whitespace-nowrap uppercase',
-                          zoneTone(g.name),
-                        )}
-                      >
-                        {g.name}
-                      </th>
-                    ))
-                  : m.columns.map((c) => (
-                      <th key={c.key} className={tableCls.th}>
-                        {c.label}
-                      </th>
-                    ))}
-                <th rowSpan={span} className={tableCls.th}>
-                  {TOTAL_UNITS_LABEL}
-                </th>
-                <th rowSpan={span} className={tableCls.th}>
-                  {TOTAL_KG_LABEL}
-                </th>
-              </tr>
-              {bySeller && (
-                <tr>
-                  {m.columns.map((c) => (
-                    <th
-                      key={c.key}
-                      title={c.label}
-                      className="border-x-2 border-card bg-secondary px-3 py-2 text-center text-[13px] font-bold whitespace-nowrap"
-                    >
-                      {c.label.split(' ')[0]}
-                    </th>
-                  ))}
-                </tr>
-              )}
-            </thead>
-            <tbody>
-              {m.groups.map((g) =>
-                g.rows.map((r, i) => (
-                  <tr key={r.product.id} className={tableCls.row}>
-                    {i === 0 && (
-                      <td
-                        rowSpan={g.rows.length}
-                        className={cn(
-                          'border-b-2 border-card px-3 py-2 text-left text-[12.5px] font-extrabold whitespace-nowrap uppercase',
-                          sizeTone(r.product.category, g.name),
-                        )}
-                      >
-                        {g.name ?? r.product.category}
-                      </td>
-                    )}
-                    <td className={cn(tableCls.td, 'text-left font-semibold')}>{r.product.name}</td>
-                    {r.cells.map((u, j) => (
-                      <td key={m.columns[j].key} className={cn(tableCls.td, u === 0 && 'text-faint')}>
-                        {u === 0 ? '-' : nf0(u)}
-                      </td>
-                    ))}
-                    <td className={cn(tableCls.td, 'font-extrabold', r.total === 0 && 'text-faint')}>{nf0(r.total)}</td>
-                    <td className={cn(tableCls.td, r.total === 0 && 'text-faint')}>{nf1(r.kg)}</td>
-                  </tr>
-                )),
-              )}
-              <tr className={tableCls.total}>
-                <td colSpan={2}>Total</td>
-                {m.cells.map((u, j) => (
-                  <td key={m.columns[j].key} className="text-center">
-                    {nf0(u)}
-                  </td>
-                ))}
-                <td className="text-center">{nf0(m.total)}</td>
-                <td className="text-center">{nf1(m.kg)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          groups={m.groups.map((g) => ({
+            key: g.name ?? g.rows[0]?.product.category ?? '',
+            label: g.name ?? g.rows[0]?.product.category,
+            rows: g.rows,
+          }))}
+          groupHeader={SIZE_COLUMN_LABEL}
+          rowKey={(r) => r.product.id}
+          totalLabel="Total"
+          columns={[
+            // En celular el tamaño ya va en el nombre del grupo: el producto queda fijo al deslizar.
+            {
+              key: 'product',
+              header: PRODUCT_COLUMN_LABEL,
+              sticky: true,
+              className: 'font-medium',
+              cell: (r) => r.product.name,
+            },
+            ...m.columns.map((c, j) => ({
+              key: c.key,
+              // Por vendedor: el nombre de pila bajo su zona (el completo, al pasar el mouse).
+              header: bySeller ? c.label.split(' ')[0] : c.label,
+              title: c.label,
+              group: bySeller ? c.group : null,
+              numeric: true,
+              faint: (r: MatrixRow) => r.cells[j] === 0,
+              cell: (r: MatrixRow) => (r.cells[j] === 0 ? '—' : nf0(r.cells[j])),
+              total: nf0(m.cells[j]),
+            })),
+            {
+              key: 'total-units',
+              header: TOTAL_UNITS_LABEL,
+              numeric: true,
+              tone: (r) => (r.total === 0 ? 'faint' : 'strong'),
+              cell: (r) => (r.total === 0 ? '—' : nf0(r.total)),
+              total: nf0(m.total),
+            },
+            {
+              key: 'total-kg',
+              header: TOTAL_KG_LABEL,
+              numeric: true,
+              faint: (r) => r.total === 0,
+              cell: (r) => (r.total === 0 ? '—' : nf1(r.kg)),
+              total: nf1(m.kg),
+            },
+          ]}
+        />
       )}
     </Section>
   )
@@ -205,26 +180,25 @@ export function DetailFilterMenus({ dates, custom, catalog }: { dates: IsoDate[]
   const f = useDetailSelection(dates, catalog)
   return (
     <>
-      {supervisor && (
-        <FilterMenu
-          icon={<CalendarDays />}
-          label={
-            f.days.length === 0 ? whole : f.days.length > 2 ? daysCount(f.days.length) : f.days.map(dShort).join(', ')
-          }
-          title={DAY_FILTER_LABEL}
-          active={f.days.length > 0}
-        >
-          <CheckItem checked={f.days.length === 0} onToggle={() => f.setDays([])}>
-            {whole}
+      {/* Día: también para el vendedor (filtra las columnas de su vista por día). */}
+      <FilterMenu
+        icon={<CalendarDays />}
+        label={
+          f.days.length === 0 ? whole : f.days.length > 2 ? daysCount(f.days.length) : f.days.map(dShort).join(', ')
+        }
+        title={DAY_FILTER_LABEL}
+        active={f.days.length > 0}
+      >
+        <CheckItem checked={f.days.length === 0} onToggle={() => f.setDays([])}>
+          {whole}
+        </CheckItem>
+        <DropdownMenuSeparator />
+        {f.weekDays.map((d) => (
+          <CheckItem key={d} checked={f.days.includes(d)} onToggle={() => f.setDays(toggleIn(f.days, d))}>
+            {dShort(d)}
           </CheckItem>
-          <DropdownMenuSeparator />
-          {f.weekDays.map((d) => (
-            <CheckItem key={d} checked={f.days.includes(d)} onToggle={() => f.setDays(toggleIn(f.days, d))}>
-              {dShort(d)}
-            </CheckItem>
-          ))}
-        </FilterMenu>
-      )}
+        ))}
+      </FilterMenu>
       {supervisor && f.allZones.length > 1 && (
         <FilterMenu
           icon={<MapPin />}
@@ -279,7 +253,15 @@ export function DetailFilterMenus({ dates, custom, catalog }: { dates: IsoDate[]
 }
 
 /** Opción marcable de un menú que queda abierto para elegir varias. */
-function CheckItem({ checked, onToggle, children }: { checked: boolean; onToggle: () => void; children: ReactNode }) {
+export function CheckItem({
+  checked,
+  onToggle,
+  children,
+}: {
+  checked: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
   return (
     <DropdownMenuCheckboxItem
       checked={checked}

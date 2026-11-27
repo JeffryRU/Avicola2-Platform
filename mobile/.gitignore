@@ -1,0 +1,14 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+*.jks
+*.keystore
+captures/
+.idea/
+*.iml
+# iOS: el proyecto de Xcode se genera con XcodeGen (iosApp/project.yml)
+iosApp/*.xcodeproj/
+iosApp/build/
+iosApp/DerivedData/
+xcuserdata/

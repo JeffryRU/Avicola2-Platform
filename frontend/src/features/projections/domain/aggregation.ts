@@ -1,7 +1,8 @@
 import { weekDates, type IsoDate } from '@/shared/domain/dates'
-import { addUnits, sumUnits, type Catalog } from '@/features/catalog/domain/catalog'
-import { CONFIRMED, type DailyUnits, type Projection, type Submission } from '@/features/projections/domain/schemas'
-import { type Units } from '@/features/catalog/domain/schemas'
+import { addUnits, sumUnits, type Units } from '@/shared/domain/products'
+import type { Catalog } from '@/features/catalog'
+import { CONFIRMED } from '@/shared/types/labels'
+import type { DailyUnits, Projection, Submission } from '@/features/projections/domain/schemas'
 
 export type SyncState = 'ok' | 'pending'
 
@@ -13,6 +14,8 @@ export interface MyDay {
   submittedAt: string
   sync: SyncState
   error?: string | null
+  /** Hoja de registro vigente en el servidor (los envíos en cola aún no tienen número). */
+  sheet?: number
 }
 
 /** Lo confirmado en el servidor + lo que está en la cola del dispositivo (gana la cola). */
@@ -20,7 +23,14 @@ export function myDays(projections: Projection[], queue: Submission[], me: strin
   const out = new Map<IsoDate, MyDay>()
   for (const p of projections) {
     if (p.seller === me && p.status === CONFIRMED) {
-      out.set(p.date, { date: p.date, category: p.category, units: p.units, submittedAt: p.submitted_at, sync: 'ok' })
+      out.set(p.date, {
+        date: p.date,
+        category: p.category,
+        units: p.units,
+        submittedAt: p.submitted_at,
+        sync: 'ok',
+        sheet: p.sheet,
+      })
     }
   }
   for (const s of queue.filter((q) => q.seller === me)) {
@@ -59,7 +69,9 @@ export function dayAgg(
   const mine = (x: { seller: string; date: string }) => x.date === date && (pick.size === 0 || pick.has(x.seller))
   const days = projections.filter((p) => mine(p) && p.status === CONFIRMED)
   const units = days.reduce<Units>((acc, p) => addUnits(acc, p.units), {})
-  const realDays = sales.filter(mine)
+  // Un pedido sin ningún producto (fila vacía del ERP) no es «pidió 0»: es que aún no hay dato.
+  // Contarlo como 0 daría −100 % de diferencia y bajaría la exactitud.
+  const realDays = sales.filter((s) => mine(s) && Object.keys(s.units).length > 0)
   const real = realDays.length ? realDays.reduce<Units>((acc, s) => addUnits(acc, s.units), {}) : null
   return { date, confirmed: days.length > 0, units, u: sumUnits(units), kg: catalog.kg(units), real }
 }

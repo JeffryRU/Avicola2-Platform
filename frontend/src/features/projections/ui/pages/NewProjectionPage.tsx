@@ -1,60 +1,53 @@
 import { useMemo, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, ArrowRight, Calendar, ChevronLeft, Info, Loader2, Wand2 } from 'lucide-react'
+import { AlertCircle, ArrowRight, ChevronLeft, Copy, Files, Info, Loader2, Lock, Wand2 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useContainer } from '@/app/di'
 import { paths } from '@/app/routes'
-import { dFull, dShort, daysText, today, type IsoDate } from '@/shared/domain/dates'
-import { useRequiredSession } from '@/features/auth/ui/use-session'
-import type { MyDay } from '@/features/projections/domain/aggregation'
-import type { Catalog } from '@/features/catalog/domain/catalog'
-import { draftDates, emptyDays, newDraft, submittableDraft, type Draft } from '@/features/projections/domain/draft'
+import { addDays, dFull, dShort, daysText, today, type IsoDate } from '@/shared/domain/dates'
+import { useRequiredSession } from '@/features/auth'
+import { capitalize, categoryName, kgPerUnitLabel, shortSizeLabel, useCatalog } from '@/features/catalog'
+import {
+  copyPreviousSheets,
+  draftDates,
+  emptyDays,
+  normalizeDraft,
+  newDraft,
+  previousSheets,
+  submittableDraft,
+  withNewSheets,
+  type Draft,
+} from '@/features/projections/domain/draft'
 import { isoDateSchema } from '@/shared/domain/schemas'
 import { DaysSlider } from '@/features/projections/ui/components/days-slider'
 import { ProjectionMatrix } from '@/features/projections/ui/components/projection-matrix'
 import { ReviewDialog } from '@/features/projections/ui/components/review-dialog'
-import { useCatalog } from '@/features/catalog/ui/hooks'
-import { useMyDays } from '@/features/projections/ui/hooks'
+import { useMyDays, useSubmitProjection, useSuggestion } from '@/features/projections/ui/hooks'
 import { LoadingOverlay, Note } from '@/shared/ui/components/feedback'
-import { FooterActions, PageBody, PageHeader, Section, tableCls } from '@/shared/ui/components/layout'
+import { FooterActions, PageBody, PageHeader, Section } from '@/shared/ui/components/layout'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Button } from '@/shared/ui/components/shadcn/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/components/shadcn/select'
 import { useIsMobile } from '@/shared/ui/hooks/use-is-mobile'
 import { cn } from '@/shared/ui/lib/utils'
-import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
-import { daysCount } from '@/shared/types/labels'
-
-/** Completa las unidades de cada fecha con lo ya confirmado (si es de la misma categoría). */
-function withExisting(draft: Draft, days: Map<IsoDate, MyDay>): Draft {
-  const units = { ...draft.units }
-  for (const d of draftDates(draft)) {
-    if (!units[d]) {
-      const mine = days.get(d)
-      units[d] = mine?.category === draft.category ? { ...mine.units } : {}
-    }
-  }
-  return { ...draft, units }
-}
-
-function normalize(draft: Draft, catalog: Catalog, days: Map<IsoDate, MyDay>): Draft {
-  let d = draft
-  if (!catalog.categories.includes(d.category)) {
-    d = { ...d, category: days.get(d.start)?.category ?? catalog.categories[0], subcategory: null, units: {} }
-  }
-  if (d.subcategory && !catalog.subcategories(d.category).includes(d.subcategory)) d = { ...d, subcategory: null }
-  return d.step === 1 ? withExisting(d, days) : d
-}
+import { daysCount, CANCEL_LABEL } from '@/shared/types/labels'
+import { closedDays, closedDaysNote, EditingDays, openDates, useEditingWindow, windowDates } from '@/features/editing'
 
 export function NewProjectionPage() {
-  const { drafts, planning, projections } = useContainer()
+  const { drafts } = useContainer()
   const { seller } = useRequiredSession()
-  const { catalog } = useCatalog()
+  // Solo lo que se proyecta (la brasa): el pollo de mercado queda para el stock y la saca.
+  const { projection: catalog } = useCatalog()
+  const [params] = useSearchParams()
+  // Solo el vendedor registra, y solo lo suyo (la supervisión revisa: no tiene esta pantalla).
+  const owner = seller.username
   const { days } = useMyDays()
+  const editing = useEditingWindow().data
+  // Días que se pueden registrar (desde mañana); sin datos aún, sin tope.
+  const allowed = editing ? windowDates(editing) : null
+  const firstOpen = editing ? openDates(editing)[0] : undefined
   const mobile = useIsMobile()
   const navigate = useNavigate()
-  const client = useQueryClient()
-  const [params] = useSearchParams()
+  const submit = useSubmitProjection()
   // ?dia=AAAA-MM-DD abre la edición de un solo día (desde Inicio o el detalle).
   const [stored, setStored] = useState<Draft>(() => {
     const day = params.get('dia')
@@ -63,143 +56,175 @@ export function NewProjectionPage() {
   })
   const [reviewing, setReviewing] = useState(false)
   const [sending, setSending] = useState(false)
-  const [suggesting, setSuggesting] = useState(false)
 
   // Borrador efectivo: categoría válida y días ya confirmados precargados (derivado, sin efectos).
-  const draft = useMemo(() => (catalog ? normalize(stored, catalog, days) : stored), [stored, catalog, days])
+  const draft = useMemo(() => {
+    let d = catalog ? normalizeDraft(stored, catalog, days) : stored
+    if (allowed?.length) {
+      // Se empieza en el primer día abierto: hoy (y quizá mañana) ya cerró por la hora de corte,
+      // y un borrador guardado puede ser de otro día.
+      const closedStart = closedDays(editing, [d.start]).length > 0
+      if (firstOpen && (!allowed.includes(d.start) || closedStart)) d = { ...d, start: firstOpen, units: {} }
+      const room = allowed.length - allowed.indexOf(d.start)
+      if (d.days > room) d = { ...d, days: room }
+    }
+    return d
+  }, [stored, catalog, days, allowed, editing, firstOpen])
   const setDraft = (next: Draft) => {
     setStored(next)
     drafts.save(next)
   }
 
   const dates = useMemo(() => draftDates(draft), [draft])
+  // Sugerencia del modelo: se pide sola en la tabla (paso 2) y va junto a cada casilla.
+  const suggestion = useSuggestion(draft.category, draft.start, draft.days, undefined, draft.step === 1 && !!owner)
   if (!catalog) return <PageHeader title="Nueva proyección" />
   const loaded = catalog
 
   const products = catalog.selected(draft)
   const choiceLabel = catalog.label(draft)
   const choices = catalog.choices
-  const choiceIndex = choices.findIndex((c) => c.category === draft.category && c.subcategory === draft.subcategory)
   const invalid = draft.tried ? emptyDays(draft) : []
   const alreadyConfirmed = dates.filter((d) => days.has(d))
+  // Hojas vigentes de esos días: lo que se envíe ahora es la hoja siguiente y las reemplaza.
+  const previous = previousSheets(draft, days)
+  const visibleIds = new Set(products.map((p) => p.id))
+  const closed = closedDays(editing, dates)
+  const lastAllowed = allowed?.at(-1)
+  const room = allowed ? allowed.length - Math.max(0, allowed.indexOf(draft.start)) : undefined
 
   if (draft.step === 0) {
     return (
       <div>
         <PageHeader title="Nueva proyección" mobileActions={<StepPill n={1} />} actions={<StepPill n={1} />} />
         <PageBody>
-          <div className="grid gap-4 @3xl/main:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-4 @3xl/main:grid-cols-2">
             <Section>
-              <div className="px-4 pt-[22px] pb-4 dsk:px-5 dsk:pb-5">
-                <div className="mb-[22px]">
-                  <label htmlFor="np-start" className="mb-2.5 block text-base font-bold">
+              <div className="grid gap-6 px-4 pt-5 pb-4 dsk:px-5 dsk:pb-5">
+                <div>
+                  <span id="np-cat-label" className="mb-2 block text-base font-semibold">
+                    Categoría
+                  </span>
+                  {/* Todas las opciones a la vista: cada categoría con «todas» y sus tamaños. */}
+                  <div role="radiogroup" aria-labelledby="np-cat-label" className="grid gap-3">
+                    {catalog.categories.map((category) => (
+                      <div key={category}>
+                        <span className="eyebrow mb-1.5 block">{categoryName(category)}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {choices
+                            .filter((c) => c.category === category)
+                            .map((c) => {
+                              const on = c.category === draft.category && c.subcategory === draft.subcategory
+                              return (
+                                <button
+                                  key={c.subcategory ?? ''}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={on}
+                                  onClick={() => {
+                                    // Cambiar solo el tamaño conserva lo escrito; cambiar de categoría lo borra.
+                                    const units = c.category === draft.category ? draft.units : {}
+                                    setDraft({ ...draft, category: c.category, subcategory: c.subcategory, units })
+                                  }}
+                                  className={cn(
+                                    'min-h-touch rounded-md border-control border-border-strong bg-surface px-3.5 text-base font-medium text-foreground transition-colors hover:bg-muted dsk:min-h-10',
+                                    on &&
+                                      'border-primary bg-selected font-semibold text-selected-foreground ring-1 ring-primary hover:bg-selected hc:border-foreground hc:bg-nav-active hc:text-nav-active-foreground hc:ring-foreground',
+                                  )}
+                                >
+                                  {c.subcategory ? capitalize(shortSizeLabel(c.category, c.subcategory)) : c.label}
+                                </button>
+                              )
+                            })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="np-start" className="mb-2 block text-base font-semibold">
                     Fecha de inicio
                   </label>
                   <div className="relative">
-                    <Calendar className="absolute top-4 left-[15px] size-[22px] text-ink-2" />
                     <input
                       id="np-start"
                       type="date"
-                      min={today()}
+                      min={firstOpen ?? addDays(today(), 1)}
+                      max={lastAllowed}
                       value={draft.start}
                       onChange={(e) => {
-                        if (!e.target.value || e.target.value < today())
-                          return void toast('Elige hoy o una fecha futura')
+                        if (!e.target.value || e.target.value < (allowed?.[0] ?? addDays(today(), 1)))
+                          return void toast('Las proyecciones son para los días siguientes: elige desde mañana')
+                        if (lastAllowed && e.target.value > lastAllowed)
+                          return void toast(`Solo puedes registrar hasta el ${dShort(lastAllowed)}`)
+                        if (closedDays(editing, [e.target.value]).length)
+                          return void toast(closedDaysNote([e.target.value]))
                         setDraft({ ...draft, start: e.target.value, units: {} })
                       }}
-                      className="h-[54px] w-full rounded-[14px] border-[1.5px] bg-white pr-3 pl-12 text-[17px] font-semibold outline-none focus:border-primary focus:ring-4 focus:ring-primary-ring"
+                      className="num h-12 w-full rounded-md border-control border-input bg-surface px-3 text-md text-foreground focus-visible:border-ring"
                     />
                   </div>
                 </div>
-                <div className="mb-[22px]">
-                  <span className="mb-2.5 block text-base font-bold">Días de proyección</span>
-                  <DaysSlider value={draft.days} onChange={(n) => setDraft({ ...draft, days: n, units: {} })} />
-                  <Note icon={<Calendar />} className="mt-[18px]">
-                    <div>
-                      Se proyectarán <b>{daysCount(draft.days)}:</b>
-                      <br />
-                      {daysText(dates)}
-                    </div>
-                  </Note>
+                <div>
+                  <span className="mb-2 block text-base font-semibold">Días de proyección</span>
+                  <DaysSlider
+                    value={draft.days}
+                    max={room}
+                    onChange={(n) => setDraft({ ...draft, days: n, units: {} })}
+                  />
+                  <p className="mt-3 text-sm text-ink-2">
+                    Se proyectarán <b className="font-semibold text-foreground">{daysCount(draft.days)}</b>:{' '}
+                    {daysText(dates)}
+                  </p>
+                  {closed.length > 0 && (
+                    <Note tone="bad" icon={<Lock />} className="mt-3">
+                      <div>{closedDaysNote(closed)}</div>
+                    </Note>
+                  )}
                   {alreadyConfirmed.length > 0 && (
                     <Note tone="warn" icon={<Info />} className="mt-3">
-                      <div>
-                        Ya confirmaste {alreadyConfirmed.map(dShort).join(', ')}. Si continúas, verás esos valores y
-                        podrás corregirlos.
+                      <div className="min-w-0 flex-1">
+                        Ya registraste {alreadyConfirmed.map(dShort).join(', ')}. Al continuar se abre una hoja nueva en
+                        blanco para {alreadyConfirmed.length === 1 ? 'ese día' : 'esos días'}: al enviarla reemplaza a
+                        la anterior (no se suman).
                       </div>
                     </Note>
                   )}
                 </div>
-                <div className="mb-1.5">
-                  <label id="np-cat-label" className="mb-2.5 block text-base font-bold">
-                    Categoría
-                  </label>
-                  <Select
-                    value={String(choiceIndex)}
-                    onValueChange={(i) => {
-                      const c = choices[Number(i)]
-                      // Cambiar solo el tamaño conserva lo escrito; cambiar de categoría lo borra.
-                      const units = c.category === draft.category ? draft.units : {}
-                      setDraft({ ...draft, category: c.category, subcategory: c.subcategory, units })
-                    }}
-                  >
-                    <SelectTrigger
-                      aria-labelledby="np-cat-label"
-                      className="!h-[54px] w-full rounded-[14px] border-[1.5px] bg-white text-[17px] font-semibold"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {choices.map((c, i) => (
-                        <SelectItem key={`${c.category}|${c.subcategory ?? ''}`} value={String(i)}>
-                          {c.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <EditingDays />
               </div>
             </Section>
             <Section
               title={`Productos: ${choiceLabel}`}
-              aside={<span className="text-muted-foreground">{products.length}</span>}
+              aside={<span className="num">{products.length}</span>}
               className="hidden @3xl/main:block"
             >
-              <div className="overflow-x-auto px-5 pb-5">
-                <table className={tableCls.table}>
-                  <thead>
-                    <tr>
-                      <th className={cn(tableCls.th, '!text-left')}>Producto</th>
-                      <th className={cn(tableCls.th, '!text-left')}>Presentación</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {products.map((p) => (
-                      <tr key={p.id}>
-                        <td className={tableCls.td}>{p.name}</td>
-                        <td className={cn(tableCls.td, '!text-left text-muted-foreground')}>
-                          {kgPerUnitLabel(p.kg_per_unit)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                rows={products}
+                rowKey={(p) => p.id}
+                hover={false}
+                columns={[
+                  { key: 'name', header: 'Producto', cell: (p) => p.name },
+                  {
+                    key: 'kg',
+                    header: 'Presentación',
+                    tone: 'muted',
+                    cell: (p) => kgPerUnitLabel(p.kg_per_unit),
+                  },
+                ]}
+              />
             </Section>
           </div>
           <FooterActions>
-            <Button
-              variant="ghost"
-              className="h-10 flex-none font-bold text-ink-2"
-              onClick={() => navigate(paths.home)}
-            >
-              Cancelar
+            <Button variant="ghost" className="flex-none" onClick={() => navigate(paths.home)}>
+              {CANCEL_LABEL}
             </Button>
             <Button
-              className="h-[54px] flex-1 rounded-[14px] text-[16.5px] font-bold dsk:min-w-[220px] dsk:flex-none"
-              onClick={() => setDraft(withExisting({ ...draft, step: 1, tried: false }, days))}
+              className="h-12 flex-1 text-md dsk:h-control dsk:min-w-56 dsk:flex-none dsk:text-base"
+              disabled={closed.length > 0}
+              onClick={() => setDraft(withNewSheets({ ...draft, step: 1, tried: false }, loaded, days))}
             >
-              Continuar <ArrowRight className="size-5" />
+              Continuar <ArrowRight />
             </Button>
           </FooterActions>
         </PageBody>
@@ -215,29 +240,33 @@ export function NewProjectionPage() {
     setDraft({ ...draft, units: { ...draft.units, [date]: day } })
   }
 
-  async function suggest() {
-    setSuggesting(true)
-    try {
-      const s = await projections.suggestions(draft.category, draft.start, draft.days)
-      const filled = s.days.filter((d) => Object.keys(d.units).length)
-      if (!filled.length) return void toast('Aún no hay historial suficiente para sugerir.')
-      const units = { ...draft.units }
-      // Con un tamaño elegido, solo se sugieren sus productos; el resto queda como estaba.
-      const visible = new Set(products.map((p) => p.id))
-      for (const d of filled) {
-        const picked = Object.entries(d.units).filter(([id]) => visible.has(id))
-        units[d.date] = { ...units[d.date], ...Object.fromEntries(picked) }
-      }
-      setDraft({ ...draft, units })
-      toast.success(`Sugerencia cargada (${filled.length} de ${draft.days} días). Revísala antes de enviar.`)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo obtener la sugerencia.')
-    } finally {
-      setSuggesting(false)
+  const suggested = Object.fromEntries((suggestion.data?.days ?? []).map((d) => [d.date, d.units]))
+  /** Llena con la sugerencia del modelo todos los días, o solo `only`. Pisa solo lo sugerido. */
+  function fill(only?: IsoDate) {
+    if (suggestion.isError) {
+      void suggestion.refetch()
+      return void toast.error('No se pudo obtener la sugerencia. Se vuelve a intentar.')
     }
+    const filled = (suggestion.data?.days ?? []).filter(
+      (d) => (!only || d.date === only) && Object.entries(d.units).some(([id, u]) => u > 0 && visibleIds.has(id)),
+    )
+    if (!filled.length) return void toast('Aún no hay historial suficiente para sugerir.')
+    const units = { ...draft.units }
+    // Con un tamaño elegido, solo se sugieren sus productos; el resto queda como estaba.
+    for (const d of filled) {
+      const picked = Object.entries(d.units).filter(([id]) => visibleIds.has(id))
+      units[d.date] = { ...units[d.date], ...Object.fromEntries(picked) }
+    }
+    setDraft({ ...draft, units })
+    toast.success(
+      only
+        ? `Sugerencia cargada para ${dShort(only)}. Revísala antes de enviar.`
+        : `Sugerencia cargada (${String(filled.length)} de ${String(draft.days)} días). Revísala antes de enviar.`,
+    )
   }
 
   function review() {
+    if (closed.length) return void toast.error(closedDaysNote(closed))
     const tried = { ...draft, tried: true }
     setDraft(tried)
     if (!submittableDraft().safeParse(tried).success) return
@@ -249,10 +278,10 @@ export function NewProjectionPage() {
     setSending(true)
     const started = Date.now()
     try {
-      const outcome = await planning.submit(draft, loaded, seller.username)
+      // Al terminar, la mutación ya refrescó las proyecciones.
+      const outcome = await submit.mutateAsync({ draft, catalog: loaded, owner, author: seller.username })
       await new Promise((r) => setTimeout(r, Math.max(0, 1200 - (Date.now() - started))))
       drafts.clear()
-      await client.invalidateQueries({ queryKey: ['window'] })
       void navigate(paths.registered, { state: { outcome, draft } })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo enviar la proyección.')
@@ -262,8 +291,8 @@ export function NewProjectionPage() {
   }
 
   const suggestBtn = (
-    <Button variant="ghost" disabled={suggesting} className="h-10 font-bold text-ink-2" onClick={suggest}>
-      {suggesting ? <Loader2 className="animate-spin" /> : <Wand2 />} Sugerir con historial
+    <Button variant="outline" disabled={suggestion.isFetching} onClick={() => fill()}>
+      {suggestion.isFetching ? <Loader2 className="animate-spin" /> : <Wand2 />} Llenar todo con la sugerencia
     </Button>
   )
 
@@ -273,29 +302,58 @@ export function NewProjectionPage() {
         title="Nueva proyección"
         subtitle={`Proyección por producto, ${choiceLabel}`}
         mobileActions={<StepPill n={2} />}
-        actions={suggestBtn}
       />
       <PageBody>
-        <Section className="mb-3.5">
-          <div className="flex flex-wrap items-end gap-x-7 gap-y-3 px-4 py-3 dsk:px-[18px] dsk:py-3.5">
+        <Section className="mb-4">
+          <div className="flex flex-wrap items-end gap-x-7 gap-y-3 px-4 py-3 dsk:px-5">
             <Summary label="Fecha de inicio" value={dFull(draft.start)} />
             <Summary label="Días de proyección" value={daysCount(draft.days)} />
             <Summary label="Categoría" value={choiceLabel} />
-            <button type="button" className="ml-auto text-sm font-bold text-primary hover:underline" onClick={back}>
+            <button
+              type="button"
+              className="ml-auto min-h-touch px-1 text-sm font-medium text-primary underline-offset-4 hover:underline dsk:min-h-8"
+              onClick={back}
+            >
               Cambiar
             </button>
           </div>
         </Section>
+        {previous.length > 0 && (
+          <Note tone="warn" icon={<Files />} className="mb-4">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="min-w-0 flex-1 basis-56">
+                <b>Hoja nueva.</b> {previous.map((p) => `${dShort(p.date)}: hoja ${String(p.sheet + 1)}`).join(' · ')}.
+                Reemplaza a la anterior al enviarla; no se suman.
+              </span>
+              <Button
+                variant="outline"
+                className="flex-none"
+                onClick={() => setDraft(copyPreviousSheets(draft, previous, visibleIds))}
+              >
+                <Copy /> Copiar la hoja anterior
+              </Button>
+            </div>
+          </Note>
+        )}
         {invalid.length > 0 && (
-          <Note tone="bad" icon={<AlertCircle />} className="mb-3.5 animate-shake">
+          <Note tone="bad" icon={<AlertCircle />} className="mb-4 animate-shake">
             <div>Ingresa al menos un producto para {invalid.map(dShort).join(', ')}.</div>
           </Note>
         )}
         {mobile && dates.length > 3 && (
-          <p className="mx-0.5 mt-3 flex items-center gap-1.5 text-[12.5px] font-semibold text-primary">
-            <ArrowRight className="size-4" /> Desliza la tabla para ver los {dates.length} días
+          <p className="mx-0.5 mb-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <ArrowRight className="size-4" aria-hidden /> Desliza la tabla para ver los {dates.length} días
           </p>
         )}
+        {/* Sugerencia del modelo: el número junto a cada casilla, «Llenar» por día y todo junto. */}
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <p className="mx-1 min-w-0 flex-1 basis-64 text-sm text-muted-foreground">
+            {suggestion.isError
+              ? 'No se pudo obtener la sugerencia del modelo; se reintenta al usarla.'
+              : 'Junto a cada casilla, en azul, va lo que sugiere el modelo. Tócalo para usarlo, o llena un día o todos.'}
+          </p>
+          {suggestBtn}
+        </div>
         <ProjectionMatrix
           draft={draft}
           dates={dates}
@@ -303,21 +361,24 @@ export function NewProjectionPage() {
           invalid={invalid}
           mobile={mobile}
           onChange={setCell}
+          suggested={suggested}
+          onFillDay={fill}
         />
-        <div className="mx-1 mt-3 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
-          <Info className="size-4" />
-          <span className="flex-1">Ingresa solo las unidades. Los kilogramos se calculan automáticamente.</span>
-          <span className="dsk:hidden">{suggestBtn}</span>
+        <div className="mx-1 mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <Info className="size-4 flex-none" aria-hidden />
+          <span className="min-w-0 flex-1 basis-56">
+            Ingresa solo las unidades. Los kilogramos se calculan automáticamente.
+          </span>
         </div>
         <FooterActions>
-          <Button variant="ghost" className="h-10 flex-none font-bold text-ink-2" onClick={back}>
+          <Button variant="ghost" className="flex-none" onClick={back}>
             <ChevronLeft /> Atrás
           </Button>
           <Button
-            className="h-[54px] flex-1 rounded-[14px] text-[16.5px] font-bold dsk:min-w-[240px] dsk:flex-none"
+            className="h-12 flex-1 text-md dsk:h-control dsk:min-w-56 dsk:flex-none dsk:text-base"
             onClick={review}
           >
-            Revisar y enviar <ArrowRight className="size-5" />
+            Revisar y enviar <ArrowRight />
           </Button>
         </FooterActions>
       </PageBody>
@@ -335,19 +396,16 @@ export function NewProjectionPage() {
   )
 }
 
+/** Paso del flujo, en texto (sin pastilla). */
 function StepPill({ n }: { n: 1 | 2 }) {
-  return (
-    <span className="inline-flex items-center rounded-full bg-secondary px-3 py-1.5 text-[13px] font-bold whitespace-nowrap text-primary">
-      Paso {n} de 2
-    </span>
-  )
+  return <span className="text-sm whitespace-nowrap text-muted-foreground">Paso {n} de 2</span>
 }
 
 function Summary({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <small className="block text-[11.5px] font-semibold text-muted-foreground dsk:text-[13px]">{label}</small>
-      <b className="text-[15px]">{value}</b>
+      <small className="block text-xs text-muted-foreground">{label}</small>
+      <b className="text-md font-semibold">{value}</b>
     </div>
   )
 }

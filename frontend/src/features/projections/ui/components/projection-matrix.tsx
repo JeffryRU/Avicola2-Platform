@@ -1,12 +1,13 @@
 import { Fragment } from 'react'
+import { Wand2 } from 'lucide-react'
 import { dShort, relativeDay, type IsoDate } from '@/shared/domain/dates'
-import { nf0, nf1 } from '@/shared/domain/format'
-import { bySubcategory } from '@/features/catalog/domain/catalog'
+import { CELL_MAX_DIGITS, nf0, nf1, parseCell } from '@/shared/domain/format'
+import { bySubcategory, type Product, type Units } from '@/shared/domain/products'
 import type { Draft } from '@/features/projections/domain/draft'
-import { parseCell } from '@/shared/domain/format'
-import type { Product } from '@/features/catalog/domain/schemas'
+import { tableStyles } from '@/shared/ui/lib/table-styles'
 import { cn } from '@/shared/ui/lib/utils'
-import { kgPerUnitLabel } from '@/features/catalog/types/catalog'
+import { kgPerUnitLabel } from '@/features/catalog'
+import { kgAmount } from '@/shared/types/labels'
 
 interface Props {
   draft: Draft
@@ -15,7 +16,13 @@ interface Props {
   invalid: IsoDate[]
   mobile: boolean
   onChange: (date: IsoDate, productId: string, units: number | null) => void
+  /** Sugerencia del modelo por día: se muestra junto a cada casilla y se usa al tocarla. */
+  suggested?: Partial<Record<IsoDate, Units>>
+  /** Llena solo ese día con la sugerencia (botón sobre cada día). */
+  onFillDay?: (date: IsoDate) => void
 }
+
+const ed = tableStyles.edit
 
 /** Navegación tipo hoja de cálculo: Enter/↓ baja, ↑ sube. */
 function onCellKey(e: React.KeyboardEvent<HTMLInputElement>, columns: number) {
@@ -31,8 +38,31 @@ function onCellKey(e: React.KeyboardEvent<HTMLInputElement>, columns: number) {
 }
 
 /** Matriz producto × día para escribir unidades; los kg se calculan solos. */
-export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onChange }: Props) {
+export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onChange, suggested, onFillDay }: Props) {
   const value = (d: IsoDate, p: Product) => draft.units[d]?.[p.id]
+  const hintOf = (d: IsoDate, p: Product) => suggested?.[d]?.[p.id] ?? 0
+  const daySuggested = (d: IsoDate) => products.some((p) => hintOf(d, p) > 0)
+  // Número sugerido por el modelo junto a la casilla: tocarlo lo usa. Fuera del Tab (la tabla se
+  // recorre como hoja de cálculo); con teclado se usa «Llenar» del día.
+  const hint = (d: IsoDate, p: Product) => {
+    const s = hintOf(d, p)
+    if (!s) return null
+    return (
+      <button
+        type="button"
+        tabIndex={-1}
+        title="Sugerencia del modelo: tócala para usarla"
+        aria-label={`Usar la sugerencia: ${nf0(s)} de ${p.name}, ${dShort(d)}`}
+        onClick={() => onChange(d, p.id, s)}
+        className={cn(
+          'num rounded px-1 text-xs font-medium whitespace-nowrap text-primary/80 transition-colors hover:bg-primary/10 hover:text-primary hc:text-primary hc:underline',
+          value(d, p) === s && 'text-faint',
+        )}
+      >
+        {nf0(s)}
+      </button>
+    )
+  }
   // Totales de los productos a la vista (con un tamaño elegido, solo los suyos).
   const dayUnits = (d: IsoDate) => products.reduce((s, p) => s + (value(d, p) ?? 0), 0)
   const dayKg = (d: IsoDate) => products.reduce((s, p) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0)
@@ -44,7 +74,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
   const grouped = groups.length > 1
   const groupUnits = (d: IsoDate, ps: Product[]) => ps.reduce((s, p) => s + (value(d, p) ?? 0), 0)
   const groupKg = (d: IsoDate, ps: Product[]) => ps.reduce((s, p) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0)
-  const groupCls = '[&>td]:bg-side [&>td]:text-[11.5px] [&>td]:font-bold [&>td]:text-ink-2'
+  const groupCls = ed.groupRow
 
   const cell = (d: IsoDate, p: Product) => {
     const v = value(d, p)
@@ -54,7 +84,7 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
           data-cell={`${d}|${p.id}`}
           inputMode="numeric"
           pattern="[0-9]*"
-          maxLength={4}
+          maxLength={CELL_MAX_DIGITS}
           placeholder={mobile ? '0' : undefined}
           value={v ?? ''}
           aria-label={`${p.name}, ${dShort(d)}, unidades`}
@@ -63,94 +93,118 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
           onKeyDown={(e) => onCellKey(e, dates.length)}
           onFocus={(e) => e.target.select()}
           className={cn(
-            'h-[38px] rounded-[10px] border-[1.5px] bg-white text-center text-[15px] font-bold transition outline-none focus:border-primary focus:ring-[3px] focus:ring-primary-ring',
-            mobile ? 'w-[52px]' : 'w-16',
-            invalid.includes(d) && 'border-[#F3B3B4] focus:border-destructive',
+            ed.input({ size: mobile ? 'touch' : 'desktop', invalid: invalid.includes(d) }),
+            mobile ? 'w-16' : 'w-[4.5rem]',
           )}
         />
         {mobile && (
-          <small className="mt-0.5 block text-[10px] whitespace-nowrap text-muted-foreground">
-            {v ? `${nf1(v * p.kg_per_unit)} kg` : ' '}
+          <small className="num mt-0.5 block text-xs whitespace-nowrap text-muted-foreground">
+            {v ? kgAmount(v * p.kg_per_unit) : (hint(d, p) ?? ' ')}
           </small>
         )}
       </>
     )
   }
+  const deskCell = (d: IsoDate, p: Product) => (
+    <div className="flex items-center justify-center gap-1">
+      {cell(d, p)}
+      {suggested && <span className="inline-flex w-8 justify-start">{hint(d, p)}</span>}
+    </div>
+  )
 
-  const th = 'bg-secondary px-2 py-2.5 text-center font-bold whitespace-nowrap'
+  const th = cn(ed.th, 'text-center align-bottom')
   const head = (d: IsoDate) => (
     <>
-      {dShort(d)}
-      <small className="block text-[11px] font-bold text-primary">{relativeDay(d) ?? ' '}</small>
+      {onFillDay && (
+        <button
+          type="button"
+          onClick={() => onFillDay(d)}
+          disabled={!daySuggested(d)}
+          title={daySuggested(d) ? 'Llenar este día con la sugerencia del modelo' : 'Sin sugerencia para este día'}
+          aria-label={`Llenar ${dShort(d)} con la sugerencia`}
+          className="mx-auto mb-1 flex min-h-7 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-40 hc:border-foreground"
+        >
+          <Wand2 aria-hidden className="size-3.5" /> Llenar
+        </button>
+      )}
+      <span className="block text-sm font-semibold text-foreground">{dShort(d)}</span>
+      {/* Sin «Mañana» también ocupa su línea: así todos los días quedan a la misma altura. */}
+      <small className="block text-xs font-medium text-primary">{relativeDay(d) ?? ' '}</small>
     </>
   )
 
   if (mobile) {
-    const stk =
-      'sticky left-0 z-[2] min-w-24 max-w-24 bg-white pl-3 text-left shadow-[6px_0_8px_-6px_rgba(11,44,97,0.18)]'
+    const stk = cn(ed.stickyCol, 'z-[2] min-w-24 max-w-28 border-r border-rule pl-3 text-left')
     return (
-      <div className="mt-2.5 overflow-hidden rounded-[18px] bg-card py-1.5 shadow-card">
-        <div className="overflow-x-auto overscroll-x-contain">
-          <table id="mx" className="min-w-full border-separate border-spacing-0 text-[12.5px]">
+      <div className="panel overflow-hidden">
+        <div className="relative overflow-x-auto overscroll-x-contain">
+          <table id="mx" className={cn(ed.table, 'min-w-full text-sm')}>
             <thead>
               <tr>
-                <th className={cn(th, stk, 'z-[3] bg-secondary')}>
-                  Producto<small className="block font-medium text-muted-foreground">Presentación</small>
+                <th className={cn(th, stk, 'z-[3] text-left')}>
+                  <span className="block text-sm font-semibold text-foreground">Producto</span>
+                  <small className="block text-xs">Presentación</small>
                 </th>
                 {dates.map((d) => (
-                  <th key={d} className={cn(th, invalid.includes(d) && 'text-destructive')}>
+                  <th key={d} className={cn(th, invalid.includes(d) && '[&>span]:text-bad')}>
                     {head(d)}
                   </th>
                 ))}
-                <th className={cn(th, 'pr-3')}>Total</th>
+                <th className={cn(th, 'pr-3')}>
+                  <span className="block text-sm font-semibold text-foreground">Total</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {groups.map((g) => (
                 <Fragment key={g.name ?? ''}>
                   {grouped && (
-                    <tr className={cn(groupCls, '[&>td]:py-1.5 [&>td]:text-center')}>
-                      <td className={cn(stk, '!bg-side')}>{g.name ?? 'Otros'}</td>
+                    <tr className={cn(groupCls, '[&>td]:py-1.5 [&>td]:text-center [&>td:first-child]:text-left')}>
+                      <td className={cn(stk, '!bg-muted')}>{g.name ?? 'Otros'}</td>
                       {dates.map((d) => (
-                        <td key={d}>{nf0(groupUnits(d, g.products))}</td>
+                        <td key={d} className="num">
+                          {nf0(groupUnits(d, g.products))}
+                        </td>
                       ))}
-                      <td className="pr-3">{nf0(dates.reduce((s, d) => s + groupUnits(d, g.products), 0))}</td>
+                      <td className="num pr-3">{nf0(dates.reduce((s, d) => s + groupUnits(d, g.products), 0))}</td>
                     </tr>
                   )}
                   {g.products.map((p) => (
                     <tr key={p.id}>
-                      <td className={cn(stk, 'border-b border-muted py-[7px]')}>
-                        <b className="block text-[13.5px]">{p.name}</b>
-                        <small className="text-[10.5px] text-muted-foreground">{kgPerUnitLabel(p.kg_per_unit)}</small>
+                      <td className={cn(stk, 'border-b border-b-rule py-2')}>
+                        <span className="block text-sm font-medium">{p.name}</span>
+                        <small className="text-xs text-muted-foreground">{kgPerUnitLabel(p.kg_per_unit)}</small>
                       </td>
                       {dates.map((d) => (
-                        <td key={d} className="min-w-16 border-b border-muted px-1 py-[7px] text-center">
+                        <td key={d} className="min-w-16 border-b border-rule px-1 py-2 text-center">
                           {cell(d, p)}
                         </td>
                       ))}
-                      <td className="min-w-[60px] border-b border-muted pr-3 text-center">
-                        <b className="text-sm font-extrabold">{nf0(productUnits(p))}</b>
-                        <small className="block text-[10.5px] font-semibold text-ink-2">
-                          {nf1(productUnits(p) && dates.reduce((s, d) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0))} kg
+                      <td className="min-w-16 border-b border-rule pr-3 text-center">
+                        <b className="num text-sm font-semibold">{nf0(productUnits(p))}</b>
+                        <small className="num block text-xs text-muted-foreground">
+                          {kgAmount(
+                            productUnits(p) && dates.reduce((s, d) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0),
+                          )}
                         </small>
                       </td>
                     </tr>
                   ))}
                 </Fragment>
               ))}
-              <tr className="[&>td]:border-0 [&>td]:bg-secondary [&>td]:py-[11px] [&>td]:text-center [&>td]:font-extrabold">
-                <td className={cn(stk, '!bg-secondary text-[12.5px]')}>Total por día</td>
+              <tr className={cn(ed.totalRow, '[&>td]:text-center')}>
+                <td className={cn(stk, '!bg-muted text-sm')}>Total por día</td>
                 {dates.map((d) => (
                   <td key={d}>
-                    <b className="text-sm">{nf0(dayUnits(d))}</b>
-                    <small className="block text-[10.5px] font-semibold text-ink-2">{nf1(dayKg(d))} kg</small>
+                    <b className="num text-sm font-semibold">{nf0(dayUnits(d))}</b>
+                    <small className="num block text-xs font-normal text-ink-2">{kgAmount(dayKg(d))}</small>
                   </td>
                 ))}
                 <td className="pr-3">
-                  <b className="text-sm" data-testid="grand-units">
+                  <b className="num text-sm font-semibold" data-testid="grand-units">
                     {nf0(totalUnits)}
                   </b>
-                  <small className="block text-[10.5px] font-semibold text-ink-2">{nf1(totalKg)} kg</small>
+                  <small className="num block text-xs font-normal text-ink-2">{kgAmount(totalKg)}</small>
                 </td>
               </tr>
             </tbody>
@@ -161,72 +215,107 @@ export function ProjectionMatrix({ draft, dates, products, invalid, mobile, onCh
   }
 
   return (
-    <div className="overflow-x-auto rounded-[18px] bg-card p-2.5 shadow-card">
-      <table id="mx" className="w-full border-separate border-spacing-0 text-[13.5px]">
+    <div className="panel relative overflow-x-auto">
+      <table id="mx" className={cn(ed.table, 'text-base')}>
         <thead>
           <tr>
-            <th rowSpan={2} className={cn(th, 'rounded-tl-[10px] text-left')}>
-              Producto
-              <br />
-              <small className="font-medium text-muted-foreground">Presentación</small>
+            <th rowSpan={2} className={cn(th, 'pl-5 text-left')}>
+              <span className="block text-sm font-semibold text-foreground">Producto</span>
+              <small className="text-xs">Presentación</small>
             </th>
             {dates.map((d) => (
-              <th key={d} colSpan={2} className={cn(th, invalid.includes(d) && 'text-destructive')}>
+              <th key={d} colSpan={2} className={cn(th, 'border-b-rule', invalid.includes(d) && '[&>span]:text-bad')}>
                 {head(d)}
               </th>
             ))}
-            <th colSpan={2} className={cn(th, 'rounded-tr-[10px]')}>
-              Total producto
+            <th colSpan={2} className={cn(th, 'border-b-rule pr-5')}>
+              <span className="block text-sm font-semibold text-foreground">Total producto</span>
             </th>
           </tr>
-          <tr className="[&>th]:bg-side [&>th]:px-2 [&>th]:py-1.5 [&>th]:text-[11.5px] [&>th]:font-semibold [&>th]:text-muted-foreground">
+          <tr className="[&>th]:border-b [&>th]:border-rule-strong [&>th]:px-2 [&>th]:py-1 [&>th]:text-xs [&>th]:font-medium [&>th]:text-muted-foreground hc:[&>th]:border-b-heavy hc:[&>th]:border-foreground">
             {dates.map((d) => [<th key={`${d}u`}>Unid.</th>, <th key={`${d}k`}>Kg</th>])}
             <th>Unid.</th>
-            <th>Kg</th>
+            <th className="pr-5">Kg</th>
           </tr>
         </thead>
         <tbody>
           {groups.map((g) => (
             <Fragment key={g.name ?? ''}>
               {grouped && (
-                <tr className={cn(groupCls, '[&>td]:px-2 [&>td]:py-1.5 [&>td]:text-center')}>
-                  <td className="!text-left">{g.name ?? 'Otros'}</td>
+                <tr
+                  className={cn(
+                    groupCls,
+                    '[&>td]:px-2 [&>td]:py-1.5 [&>td]:text-center [&>td:first-child]:pl-5 [&>td:first-child]:text-left [&>td:last-child]:pr-5',
+                  )}
+                >
+                  <td>{g.name ?? 'Otros'}</td>
                   {dates.map((d) => [
-                    <td key={`${d}u`}>{nf0(groupUnits(d, g.products))}</td>,
-                    <td key={`${d}k`}>{nf1(groupKg(d, g.products))}</td>,
+                    <td key={`${d}u`} className="num">
+                      {nf0(groupUnits(d, g.products))}
+                    </td>,
+                    <td key={`${d}k`} className="num">
+                      {nf1(groupKg(d, g.products))}
+                    </td>,
                   ])}
-                  <td>{nf0(dates.reduce((s, d) => s + groupUnits(d, g.products), 0))}</td>
-                  <td>{nf1(dates.reduce((s, d) => s + groupKg(d, g.products), 0))}</td>
+                  <td className="num">{nf0(dates.reduce((s, d) => s + groupUnits(d, g.products), 0))}</td>
+                  <td className="num">{nf1(dates.reduce((s, d) => s + groupKg(d, g.products), 0))}</td>
                 </tr>
               )}
               {g.products.map((p) => (
                 <tr
                   key={p.id}
-                  className="[&>td]:border-b [&>td]:border-muted [&>td]:px-2 [&>td]:py-1.5 [&>td]:text-center"
+                  className="[&>td]:border-b [&>td]:border-rule [&>td]:px-2 [&>td]:py-1.5 [&>td]:text-center [&>td:first-child]:pl-5 [&>td:first-child]:text-left [&>td:last-child]:pr-5"
                 >
-                  <td className="!text-left whitespace-nowrap">
-                    <b className="block text-sm">{p.name}</b>
-                    <small className="text-[11.5px] text-muted-foreground">{kgPerUnitLabel(p.kg_per_unit)}</small>
+                  <td className="whitespace-nowrap">
+                    <span className="block font-medium">{p.name}</span>
+                    <small className="text-xs text-muted-foreground">{kgPerUnitLabel(p.kg_per_unit)}</small>
                   </td>
                   {dates.map((d) => [
-                    <td key={`${d}u`}>{cell(d, p)}</td>,
-                    <td key={`${d}k`} className="min-w-[52px] text-[13px] text-muted-foreground">
-                      {value(d, p) ? nf1((value(d, p) ?? 0) * p.kg_per_unit) : '-'}
+                    <td key={`${d}u`}>{deskCell(d, p)}</td>,
+                    <td key={`${d}k`} className="num min-w-14 text-sm text-muted-foreground">
+                      {/* Los kg de lo escrito y, debajo, los de la sugerencia (solo se muestran). */}
+                      <span className="flex flex-col items-center leading-tight">
+                        <span className={cn(!value(d, p) && 'text-faint')}>
+                          {value(d, p) ? kgAmount((value(d, p) ?? 0) * p.kg_per_unit) : '—'}
+                        </span>
+                        {hintOf(d, p) > 0 && value(d, p) !== hintOf(d, p) && (
+                          <span
+                            title="Kg según la sugerencia del modelo"
+                            className="mt-0.5 text-[0.6875rem] text-primary/80 hc:text-primary"
+                          >
+                            <span className="sr-only">Sugerencia: </span>≈ {kgAmount(hintOf(d, p) * p.kg_per_unit)}
+                          </span>
+                        )}
+                      </span>
                     </td>,
                   ])}
-                  <td className="font-extrabold">{nf0(productUnits(p))}</td>
-                  <td className="font-extrabold text-ink-2">
+                  <td className="num font-semibold">{nf0(productUnits(p))}</td>
+                  <td className="num text-ink-2">
                     {nf1(dates.reduce((s, d) => s + (value(d, p) ?? 0) * p.kg_per_unit, 0))}
                   </td>
                 </tr>
               ))}
             </Fragment>
           ))}
-          <tr className="[&>td]:border-0 [&>td]:bg-secondary [&>td]:px-2 [&>td]:py-3 [&>td]:text-center [&>td]:font-extrabold">
-            <td className="rounded-bl-[10px] !text-left">Total por día</td>
-            {dates.map((d) => [<td key={`${d}u`}>{nf0(dayUnits(d))}</td>, <td key={`${d}k`}>{nf1(dayKg(d))}</td>])}
-            <td data-testid="grand-units">{nf0(totalUnits)}</td>
-            <td className="rounded-br-[10px]">{nf1(totalKg)}</td>
+          <tr
+            className={cn(
+              ed.totalRow,
+              '[&>td]:px-2 [&>td]:text-center [&>td:first-child]:pl-5 [&>td:first-child]:text-left [&>td:last-child]:pr-5',
+            )}
+          >
+            <td>Total por día</td>
+            {dates.map((d) => [
+              <td key={`${d}u`} className="num">
+                {nf0(dayUnits(d))}
+              </td>,
+              <td key={`${d}k`} className="num">
+                {nf1(dayKg(d))}
+              </td>,
+            ])}
+            <td className="num" data-testid="grand-units">
+              {nf0(totalUnits)}
+            </td>
+            <td className="num">{nf1(totalKg)}</td>
           </tr>
         </tbody>
       </table>

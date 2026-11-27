@@ -8,21 +8,21 @@ reconecta solo, usa la misma cookie de sesión y pasa sin problemas por Caddy o 
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.config import get_settings
 from app.planning.bootstrap import build_use_cases
 from app.planning.domain.models import SellerAccount
-from app.planning.domain.notifications import SESSION_REVOKED, Event
+from app.planning.domain.notifications import SESSION_REVOKED, Audience, Event
 from app.planning.infrastructure.events import Subscription, event_bus
-from app.planning.infrastructure.http.router import SESSION_COOKIE
+from app.planning.infrastructure.http.router import SessionToken
 from app.shared.domain.errors import AuthenticationError, ForbiddenError
 from app.shared.infrastructure.database.session import SessionLocal
+from app.shared.infrastructure.http.paths import API_PREFIX
 
-router = APIRouter(prefix="/api", tags=["events"])
+router = APIRouter(prefix=API_PREFIX, tags=["events"])
 
 # Comentario cada 20 s: los proxies no cierran la conexión por inactividad y el servidor
 # detecta antes a los navegadores que se fueron.
@@ -36,22 +36,34 @@ def _authenticate(token: str | None) -> SellerAccount:
     if not token:
         raise AuthenticationError("Inicia sesión para continuar.")
     with SessionLocal() as session:
-        account = build_use_cases(session, get_settings()).current_account(token)
-    if account.must_change_password:
-        raise ForbiddenError("Debes cambiar tu contraseña antes de continuar.")
-    return account
+        return build_use_cases(session, get_settings()).current_account(token)
 
 
 def _format(event: Event) -> str:
     return f"event: {event.type}\ndata: {json.dumps(event.data, ensure_ascii=False)}\n\n"
 
 
-async def _stream(request: Request, subscription: Subscription) -> AsyncIterator[str]:
+async def _still_valid(token: str | None) -> bool:
+    try:
+        await asyncio.to_thread(_authenticate, token)
+    except (AuthenticationError, ForbiddenError):
+        return False
+    return True
+
+
+async def _stream(
+    request: Request, subscription: Subscription, token: str | None
+) -> AsyncIterator[str]:
     yield f"retry: {RETRY_MS}\n: conectado\n\n"
     while not await request.is_disconnected():
         try:
             event = await asyncio.wait_for(subscription.next(), HEARTBEAT_SECONDS)
         except TimeoutError:
+            # Revalida la sesión: un cambio hecho por otro proceso (la consola, otra réplica)
+            # no llega por este bus en memoria, pero sí sube la versión de sesión en la base.
+            if not await _still_valid(token):
+                yield _format(Event(SESSION_REVOKED, Audience(), {"reason": "Sesión vencida."}))
+                return
             yield ": ping\n\n"
             continue
         yield _format(event)
@@ -60,14 +72,12 @@ async def _stream(request: Request, subscription: Subscription) -> AsyncIterator
 
 
 @router.get("/events")
-async def events(
-    request: Request, token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None
-) -> StreamingResponse:
+async def events(request: Request, token: SessionToken) -> StreamingResponse:
     account = await asyncio.to_thread(_authenticate, token)
 
     async def body() -> AsyncIterator[str]:
         async with event_bus.subscribe(account.seller.username, account.seller.role) as sub:
-            async for chunk in _stream(request, sub):
+            async for chunk in _stream(request, sub, token):
                 yield chunk
 
     return StreamingResponse(

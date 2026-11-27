@@ -1,13 +1,15 @@
 [project]
-name = "avicola2-backend"
+name = "aviplanner-backend"
 version = "0.1.0"
-description = "Backend de la plataforma de planificación de saca de Avícola 2"
+description = "Backend de AviPlanner, la plataforma de planificación de saca (cliente: Avícola 2)"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.0",
     "deltalake>=1.6.6",
     "fastapi[standard]>=0.143.2",
+    "fpdf2>=2.8",
     "holidays>=0.106",
+    "mcp>=2.3.0",
     "numpy>=2.5.4",
     "openpyxl>=3.1.5",
     "pandas>=3.0.6",
@@ -17,6 +19,8 @@ dependencies = [
     "pyjwt>=2.15.1",
     "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
+    "redis>=5",
+    "scikit-learn>=1.5",
     "sqlalchemy>=2",
 ]
 
@@ -27,8 +31,12 @@ azure = [
 
 [dependency-groups]
 dev = [
+    "fakeredis>=2.40.0",
+    "hypothesis>=6.170.15",
+    "import-linter>=2.16",
     "pytest>=9.1.1",
     "ruff>=0.17.1",
+    "schemathesis>=4.33.1",
 ]
 
 [tool.uv]
@@ -82,6 +90,8 @@ ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106", "S107", "PLR2004", "PLC0415", "ARG001", "DTZ001"]
+# El fixture `db` se importa de adv_support y se recibe como parámetro (patrón de pytest).
+"tests/adversarial/**" = ["F811"]
 # Comandos de consola: imprimen en pantalla y generan datos de ejemplo.
 "app/**/cli.py" = ["T201", "S311", "PLR2004"]
 "../scripts/**" = ["T201", "S311", "DTZ011"]
@@ -89,3 +99,122 @@ ban-relative-imports = "all"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "fuzz: fuzzing y máquinas de estados de Hypothesis (lentos; job aparte en CI, FUZZ_EXAMPLES)",
+]
+
+# Reglas de la arquitectura hexagonal (ADR 0004 y 0016). En CI: `uv run lint-imports`.
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+id = "capas-de-cada-modulo"
+name = "Cada módulo: infraestructura → aplicación → dominio"
+type = "layers"
+containers = ["app.ingest", "app.planning"]
+# `bootstrap` (raíz de composición) e `infrastructure` van al mismo nivel: los adaptadores de
+# entrada (HTTP, MCP, consola, tareas periódicas) piden a bootstrap los casos de uso ya cableados.
+# El contrato `bootstrap-solo-desde-entradas` limita quién puede hacerlo.
+layers = ["bootstrap : infrastructure", "application", "domain"]
+
+[[tool.importlinter.contracts]]
+id = "bootstrap-solo-desde-entradas"
+name = "Solo los adaptadores de entrada usan la raíz de composición"
+type = "protected"
+protected_modules = ["app.ingest.bootstrap", "app.planning.bootstrap"]
+allowed_importers = [
+    "app.main",
+    "app.ingest.infrastructure.http",
+    "app.ingest.infrastructure.mcp",
+    "app.planning.infrastructure.http",
+    "app.planning.infrastructure.mcp",
+    "app.planning.infrastructure.cli",
+    "app.planning.infrastructure.scheduler",
+]
+
+[[tool.importlinter.contracts]]
+id = "modulos-independientes"
+name = "ingest y planning no se importan entre sí (lo común va a shared)"
+type = "independence"
+modules = ["app.ingest", "app.planning"]
+
+[[tool.importlinter.contracts]]
+id = "plataforma-por-capas"
+name = "main → módulos → shared → core"
+type = "layers"
+layers = ["app.main", "app.ingest | app.planning", "app.shared", "app.core"]
+
+[[tool.importlinter.contracts]]
+id = "shared-por-capas"
+name = "shared: infraestructura → dominio"
+type = "layers"
+layers = ["app.shared.infrastructure", "app.shared.domain"]
+
+[[tool.importlinter.contracts]]
+id = "dominio-puro"
+name = "El dominio y la aplicación no conocen frameworks, base de datos ni configuración"
+type = "forbidden"
+source_modules = [
+    "app.ingest.domain",
+    "app.ingest.application",
+    "app.planning.domain",
+    "app.planning.application",
+    "app.shared.domain",
+]
+forbidden_modules = [
+    "app.core",
+    "app.db",
+    "app.shared.infrastructure",
+    "alembic",
+    "deltalake",
+    "duckdb",
+    "email_validator",
+    "fastapi",
+    "fpdf",
+    "holidays",
+    "httpx",
+    "jinja2",
+    "jwt",
+    "mcp",
+    "multipart",
+    "numpy",
+    "openpyxl",
+    "pandas",
+    "psycopg",
+    "pyarrow",
+    "pydantic",
+    "pydantic_settings",
+    "pymssql",
+    "redis",
+    "sklearn",
+    "sqlalchemy",
+    "starlette",
+    "uvicorn",
+    "yaml",
+    # E/S de la biblioteca estándar: también es trabajo de un adaptador.
+    "http",
+    "socket",
+    "sqlite3",
+    "subprocess",
+    "urllib",
+]
+
+[[tool.importlinter.contracts]]
+id = "adaptadores-de-salida"
+name = "Los adaptadores de salida no dependen de los de entrada (HTTP, MCP, consola, tareas)"
+type = "forbidden"
+source_modules = [
+    "app.ingest.infrastructure.persistence",
+    "app.ingest.infrastructure.files",
+    "app.ingest.infrastructure.lakehouse",
+    "app.planning.infrastructure.persistence",
+]
+forbidden_modules = [
+    "app.ingest.infrastructure.http",
+    "app.ingest.infrastructure.mcp",
+    "app.planning.infrastructure.http",
+    "app.planning.infrastructure.mcp",
+    "app.planning.infrastructure.cli",
+    "app.planning.infrastructure.scheduler",
+]

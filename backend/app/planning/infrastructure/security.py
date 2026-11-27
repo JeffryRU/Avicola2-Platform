@@ -36,7 +36,10 @@ class JwtTokenService:
     """JWT firmado (HS256). Viaja en una cookie HttpOnly: el JavaScript de la página no lo lee."""
 
     ALGORITHM = "HS256"
-    AUDIENCE = "avicola2-planning"
+    AUDIENCE = "aviplanner-planning"
+    # Audiencia anterior al cambio de nombre (ADR 0015): se sigue aceptando para no cerrar las
+    # sesiones abiertas. Se puede quitar cuando pasen `AUTH_TOKEN_TTL_HOURS` desde el despliegue.
+    ACCEPTED_AUDIENCES = (AUDIENCE, "avicola2-planning")
 
     def __init__(self, secret: str, ttl_hours: int) -> None:
         self.secret, self.ttl = secret, timedelta(hours=ttl_hours)
@@ -58,7 +61,7 @@ class JwtTokenService:
                 token,
                 self.secret,
                 algorithms=[self.ALGORITHM],
-                audience=self.AUDIENCE,
+                audience=list(self.ACCEPTED_AUDIENCES),
                 options={"require": ["sub", "ver", "exp"]},
             )
         except jwt.PyJWTError:
@@ -66,6 +69,17 @@ class JwtTokenService:
         if not isinstance(claims["sub"], str) or not isinstance(claims["ver"], int):
             return None
         return TokenClaims(claims["sub"], claims["ver"])
+
+
+class AssistantTickets(JwtTokenService):
+    """Pase del asistente (ADR 0022): dura minutos y solo sirve en el MCP, junto con el token
+    del agente. Otra audiencia: no abre la API ni vale como sesión."""
+
+    AUDIENCE = "aviplanner-assistant"
+    ACCEPTED_AUDIENCES = (AUDIENCE,)
+
+    def __init__(self, secret: str, ttl_minutes: int) -> None:
+        self.secret, self.ttl = secret, timedelta(minutes=ttl_minutes)
 
 
 class RandomTemporaryPasswords:
@@ -78,3 +92,42 @@ class RandomTemporaryPasswords:
             chars = "".join(secrets.choice(self._ALPHABET) for _ in range(12))
             if any(c.isdigit() for c in chars) and any(c.isalpha() for c in chars):
                 return f"{chars[:4]}-{chars[4:8]}-{chars[8:]}"
+
+
+class ChannelFileTokens:
+    """Token de un solo archivo para los canales (ADR 0024): una tabla de un mensaje, de una
+    persona, que vence en pocos minutos. Otra audiencia: no abre la API ni vale como sesión."""
+
+    AUDIENCE = "aviplanner-channel-file"
+    ALGORITHM = "HS256"
+
+    def __init__(self, secret: str, ttl_minutes: int) -> None:
+        self.secret, self.ttl = secret, timedelta(minutes=ttl_minutes)
+
+    def issue(self, username: str, message_id: str, index: int) -> str:
+        now = datetime.now(UTC)
+        claims = {
+            "sub": username,
+            "mid": message_id,
+            "idx": index,
+            "aud": self.AUDIENCE,
+            "iat": now,
+            "exp": now + self.ttl,
+        }
+        return jwt.encode(claims, self.secret, algorithm=self.ALGORITHM)
+
+    def decode(self, token: str) -> tuple[str, str, int] | None:
+        try:
+            claims = jwt.decode(
+                token,
+                self.secret,
+                algorithms=[self.ALGORITHM],
+                audience=self.AUDIENCE,
+                options={"require": ["sub", "mid", "idx", "exp"]},
+            )
+        except jwt.PyJWTError:
+            return None
+        sub, mid, idx = claims["sub"], claims["mid"], claims["idx"]
+        if not (isinstance(sub, str) and isinstance(mid, str) and isinstance(idx, int)):
+            return None
+        return sub, mid, idx

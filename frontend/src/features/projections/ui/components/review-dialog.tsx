@@ -1,11 +1,10 @@
-import type { ReactNode } from 'react'
 import { BarChart3, Calendar, Clock, Send, Tag } from 'lucide-react'
 import { dFull, dShort, type IsoDate } from '@/shared/domain/dates'
 import { nf0 } from '@/shared/domain/format'
-import type { Catalog } from '@/features/catalog/domain/catalog'
-import { sumUnits } from '@/features/catalog/domain/catalog'
+import type { Catalog } from '@/features/catalog'
+import { sumUnits } from '@/shared/domain/products'
 import type { Draft } from '@/features/projections/domain/draft'
-import { tableCls } from '@/shared/ui/components/layout'
+import { DataTable } from '@/shared/ui/components/data-table'
 import { Button } from '@/shared/ui/components/shadcn/button'
 import {
   Dialog,
@@ -16,18 +15,7 @@ import {
 } from '@/shared/ui/components/shadcn/dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/shared/ui/components/shadcn/sheet'
 import { daysCount, kgAmount, unitsCount } from '@/shared/types/labels'
-
-export function SummaryRow({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
-  return (
-    <div className="grid grid-cols-[24px_auto_minmax(0,1fr)] items-center gap-3 border-b border-muted py-[13px] last:border-0 [&>svg]:size-5">
-      {icon}
-      <span className="text-ink-2">{label}</span>
-      <b className="min-w-0 text-right [overflow-wrap:anywhere] [&_small]:block [&_small]:font-medium [&_small]:text-muted-foreground">
-        {children}
-      </b>
-    </div>
-  )
-}
+import { SummaryRow } from '@/shared/ui/components/summary-row'
 
 interface Props {
   open: boolean
@@ -62,38 +50,27 @@ export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onC
           {nf0(units)} unidades<small>{kgAmount(kg, true)}</small>
         </SummaryRow>
       </div>
-      <table className={`${tableCls.table} mt-2.5 mb-[18px]`}>
-        <thead>
-          <tr>
-            <th className={tableCls.th}>Fecha</th>
-            <th className={tableCls.th}>Unidades</th>
-            <th className={tableCls.th}>Kg (aprox.)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {dates.map((d) => (
-            <tr key={d}>
-              <td className={tableCls.td}>{dShort(d)}</td>
-              <td className={tableCls.td}>{unitsCount(sumUnits(dayUnits(d)))}</td>
-              <td className={tableCls.td}>{kgAmount(catalog.kg(dayUnits(d)))}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <DataTable
+        flush
+        wrapperClassName="mt-2 mb-4"
+        rows={dates}
+        rowKey={(d) => d}
+        columns={[
+          { key: 'date', header: 'Fecha', cell: (d) => dShort(d) },
+          { key: 'units', header: 'Unidades', numeric: true, cell: (d) => unitsCount(sumUnits(dayUnits(d))) },
+          { key: 'kg', header: 'Kg (aprox.)', numeric: true, cell: (d) => kgAmount(catalog.kg(dayUnits(d))) },
+        ]}
+      />
       {kept > 0 && (
-        <p className="-mt-2 mb-[18px] text-[13px] text-muted-foreground">
+        <p className="-mt-2 mb-4 text-sm text-muted-foreground">
           Se mantienen {nf0(kept)} unidades que ya registraste de otros tamaños.
         </p>
       )}
       <div className="grid gap-2.5">
-        <Button autoFocus className="h-[54px] rounded-[14px] text-[16.5px] font-bold" onClick={onConfirm}>
+        <Button autoFocus className="h-12 text-md" onClick={onConfirm}>
           <Send /> Confirmar y enviar
         </Button>
-        <Button
-          variant="outline"
-          className="h-[54px] rounded-[14px] border-[1.5px] border-primary text-[16.5px] font-bold text-primary"
-          onClick={onClose}
-        >
+        <Button variant="outline" className="h-12 text-md" onClick={onClose}>
           Seguir editando
         </Button>
       </div>
@@ -106,10 +83,10 @@ export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onC
       <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
         <SheetContent
           side="bottom"
-          className="max-h-[88vh] overflow-y-auto rounded-t-3xl px-5 pb-[calc(20px+env(safe-area-inset-bottom))]"
+          className="max-h-[88vh] overflow-y-auto rounded-t-lg border-t border-border px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] hc:border-t-heavy hc:border-foreground"
         >
-          <SheetHeader className="px-0">
-            <SheetTitle className="text-[22px] font-extrabold">{title}</SheetTitle>
+          <SheetHeader className="px-0 pr-10">
+            <SheetTitle className="text-xl font-semibold hc:font-extrabold">{title}</SheetTitle>
             <SheetDescription>{description}</SheetDescription>
           </SheetHeader>
           {body}
@@ -119,9 +96,9 @@ export function ReviewDialog({ open, mobile, draft, dates, catalog, onClose, onC
   }
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-[560px] rounded-3xl p-6">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-[22px] font-extrabold">{title}</DialogTitle>
+          <DialogTitle className="text-xl font-semibold hc:font-extrabold">{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         {body}

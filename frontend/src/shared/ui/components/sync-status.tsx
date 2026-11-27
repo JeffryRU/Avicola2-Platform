@@ -1,0 +1,65 @@
+import { Loader2, RefreshCw, WifiOff } from 'lucide-react'
+import { cn } from '@/shared/ui/lib/utils'
+import { RETRY_LABEL } from '@/shared/types/labels'
+
+/** Estado de una consulta, en lo mínimo que hace falta para avisar. */
+export interface SyncQuery {
+  isFetching: boolean
+  isError: boolean
+  error?: Error | null
+  refetch: () => unknown
+}
+
+/**
+ * Aviso discreto de carga: una barra fina fija arriba mientras llegan los datos (no ocupa lugar,
+ * así la pantalla no salta al aparecer o irse) y, si el servidor no responde, un aviso en la
+ * página de que se muestra sin datos y se reintenta sola. La pantalla se dibuja igual.
+ */
+export function SyncStatus({ queries, className }: { queries: SyncQuery[]; className?: string }) {
+  const failed = queries.some((q) => q.isError)
+  const detail = queries.find((q) => q.isError)?.error?.message
+  const loading = queries.some((q) => q.isFetching)
+  if (!failed && !loading) return null
+  if (!failed) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-none fixed inset-x-0 top-0 z-[80] h-0.5 overflow-hidden"
+      >
+        <span className="sr-only">Cargando datos…</span>
+        <i aria-hidden className="sync-bar block h-full bg-primary" />
+      </div>
+    )
+  }
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn(
+        'mb-3 flex items-center gap-2 rounded-md px-3 py-2 text-sm',
+        failed
+          ? 'border border-warn-border bg-warn-soft text-warn-foreground [&>svg]:text-warn'
+          : 'text-muted-foreground',
+        className,
+      )}
+    >
+      {failed ? <WifiOff className="size-4 flex-none" /> : <Loader2 className="size-4 flex-none animate-spin" />}
+      <span className="min-w-0 flex-1">
+        {failed
+          ? 'No se pudieron traer los datos del servidor. Se muestra la pantalla sin datos y se reintenta sola.'
+          : 'Cargando datos…'}
+        {failed && detail && <small className="block text-xs">{detail}</small>}
+      </span>
+      {failed && (
+        <button
+          type="button"
+          onClick={() => queries.forEach((q) => void q.refetch())}
+          className="inline-flex min-h-touch flex-none items-center gap-1 rounded-sm px-2 font-semibold underline-offset-4 hover:underline dsk:min-h-8"
+        >
+          {loading ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} {RETRY_LABEL}
+        </button>
+      )}
+    </div>
+  )
+}

@@ -1,12 +1,22 @@
 """Repositorios SQL de la planificación: SQLAlchemy Core portable, sirve para cualquier motor."""
 
+import json
 from collections import defaultdict
 from datetime import UTC, date, datetime
 
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, insert, or_, select, update
 from sqlalchemy.orm import Session
 
-from app.planning.domain.models import Product, Projection, ProjectionLine, Seller, SellerAccount
+from app.planning.domain.accounts import AccountChange, ChangeOutcome
+from app.planning.domain.models import (
+    Product,
+    Projection,
+    ProjectionLine,
+    Seller,
+    SellerAccount,
+    projectable,
+)
+from app.planning.domain.preferences import Preferences
 from app.planning.infrastructure.persistence.tables import (
     products,
     projection_lines,
@@ -21,6 +31,11 @@ class SqlProductRepository:
         self.session = session
 
     def list_active(self) -> list[Product]:
+        """Lo que se proyecta y se pide: productos activos de calidad A."""
+        return projectable(self.list_stock_items())
+
+    def list_stock_items(self) -> list[Product]:
+        """Todo lo que se cuenta en el stock: los de calidad A y también los de calidad B."""
         rows = self.session.execute(
             select(products).where(products.c.is_active.is_(True))
         ).mappings()
@@ -32,6 +47,7 @@ class SqlProductRepository:
                 float(r["kg_per_unit"]),
                 r["sort_order"],
                 r["subcategory"],
+                r["quality"],
             )
             for r in rows
         ]
@@ -98,19 +114,109 @@ class SqlSellerRepository:
         )
         self.session.commit()
 
-    def save_security(self, account: SellerAccount) -> None:
-        self.session.execute(
+    def save_security(self, account: SellerAccount, expected_version: int) -> bool:
+        values = _security_values(account)
+        del values["is_active"]  # el estado solo lo cambia `apply` (administración)
+        result = self.session.execute(
             update(sellers)
-            .where(sellers.c.username == account.seller.username)
-            .values(_security_values(account))
+            .where(
+                sellers.c.username == account.seller.username,
+                sellers.c.token_version == expected_version,
+            )
+            .values(values)
         )
         self.session.commit()
+        return result.rowcount == 1
+
+    def apply(self, change: AccountChange) -> ChangeOutcome:
+        try:
+            outcome = self._apply(change)
+        except Exception:
+            self.session.rollback()
+            raise
+        if outcome is ChangeOutcome.APPLIED:
+            self.session.commit()
+        else:
+            self.session.rollback()
+        return outcome
+
+    def _apply(self, change: AccountChange) -> ChangeOutcome:
+        # Bloquea (en orden fijo, sin interbloqueos) al actor, a la cuenta destino y a todas las
+        # cuentas del rol que no puede quedar vacío: dos peticiones simultáneas que se degradan
+        # mutuamente se ejecutan una tras otra, y la segunda ve lo que hizo la primera.
+        names = [change.target, *([change.actor] if change.actor else [])]
+        rows = {
+            r["username"]: r
+            for r in self.session.execute(
+                select(sellers)
+                .where(or_(sellers.c.username.in_(names), sellers.c.role == change.keep_one_active))
+                .order_by(sellers.c.username)
+                .with_for_update()
+            ).mappings()
+        }
+        target = rows.get(change.target)
+        if target is None:
+            return ChangeOutcome.NOT_FOUND
+        if change.actor is not None:
+            actor = rows.get(change.actor)
+            if (
+                actor is None
+                or not actor["is_active"]
+                or actor["role"] != change.actor_role
+                or actor["token_version"] != change.actor_version
+            ):
+                return ChangeOutcome.ACTOR_CHANGED
+        if target["role"] not in change.target_roles:
+            return ChangeOutcome.TARGET_CHANGED
+        if change.removes_guardian(target["role"], target["is_active"]):
+            others = [
+                r
+                for name, r in rows.items()
+                if name != change.target and r["role"] == change.keep_one_active and r["is_active"]
+            ]
+            if not others:
+                return ChangeOutcome.LAST_GUARDIAN
+
+        values: dict = {}
+        if change.role is not None:
+            values["role"] = change.role
+        if change.active is not None:
+            values["is_active"] = change.active
+        if change.profile is not None:
+            values.update(name=change.profile[0], zone=change.profile[1])
+        if change.password_hash is not None:
+            values.update(
+                password_hash=change.password_hash,
+                failed_logins=0,
+                locked_until=None,
+            )
+        if change.revoke_sessions:
+            values["token_version"] = sellers.c.token_version + 1
+        if values:
+            self.session.execute(
+                update(sellers).where(sellers.c.username == change.target).values(values)
+            )
+        return ChangeOutcome.APPLIED
 
     def save_profile(self, seller: Seller) -> None:
         self.session.execute(
             update(sellers)
             .where(sellers.c.username == seller.username)
             .values(name=seller.name, zone=seller.zone)
+        )
+        self.session.commit()
+
+    def get_preferences(self, username: str) -> Preferences | None:
+        raw = self.session.execute(
+            select(sellers.c.preferences).where(sellers.c.username == username)
+        ).scalar_one_or_none()
+        return None if raw is None else json.loads(raw)
+
+    def save_preferences(self, username: str, preferences: Preferences) -> None:
+        self.session.execute(
+            update(sellers)
+            .where(sellers.c.username == username)
+            .values(preferences=json.dumps(preferences, separators=(",", ":")))
         )
         self.session.commit()
 
@@ -154,6 +260,7 @@ class SqlProjectionRepository:
                 lines=tuple(lines[h["id"]]),
                 submitted_at=h["updated_at"] or h["submitted_at"],
                 status=h["status"],
+                sheet=h["sheet"],
             )
             for h in heads
         ]
@@ -182,6 +289,7 @@ class SqlProjectionRepository:
                 "status": p.status,
                 "total_units": p.total_units,
                 "total_kg": p.total_kg,
+                "sheet": p.sheet,
             }
             if current is None:
                 current = p.id

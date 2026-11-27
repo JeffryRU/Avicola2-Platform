@@ -6,9 +6,14 @@
 #   - VPS sin panel o VM de GCP: sumar Caddy para el HTTPS:
 #       docker compose -f deploy/compose.prod.yml -f deploy/compose.caddy.yml --env-file .env up -d
 #
-# La base es Supabase Cloud. Los datos del servidor van en volúmenes con nombre (no rutas del
-# host), así los respaldos de volúmenes de Dokploy/Coolify los incluyen.
+# Base (ADR 0023): Postgres en este mismo servidor (`db`) es la principal y Supabase Cloud
+# recibe una copia cada COPY_EVERY_MINUTES (`db-copy`). Mientras DATABASE_URL apunte a Supabase,
+# todo sigue como antes (ADR 0002) y `db` queda sin usar: el cambio es explícito, en el .env.
+# Los datos del servidor van en volúmenes con nombre (no rutas del host), así los respaldos de
+# volúmenes de Dokploy/Coolify los incluyen.
 
+# Nombre del proyecto de Compose: se mantiene `avicola2` tras el cambio a AviPlanner porque
+# prefija los volúmenes (cambiarlo deja los datos en volúmenes huérfanos). ADR 0015.
 name: avicola2
 
 x-logging: &logging
@@ -25,12 +30,32 @@ services:
     restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV:-production}
-      DATABASE_URL: ${DATABASE_URL:?Falta DATABASE_URL (Supabase, pooler en modo sesión)}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      # Base local: postgresql+psycopg://aviplanner:<LOCAL_DB_PASSWORD>@db:5432/aviplanner
+      # Supabase: el pooler en modo sesión (como antes del ADR 0023).
+      DATABASE_URL: ${DATABASE_URL:?Falta DATABASE_URL (base local `db` o Supabase)}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-3}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-10}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-60}
+      # Caché compartida en Redis (ADR 0014). memory = sin Redis, por proceso. Si Redis cae, la
+      # API sigue leyendo de la base.
+      CACHE_BACKEND: ${CACHE_BACKEND:-redis}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       DB_SCHEMA: ${DB_SCHEMA:-}
       # Fuera de local la API no arranca sin estos dos (ver docs/adr/0005).
       AUTH_SECRET: ${AUTH_SECRET:?Falta AUTH_SECRET (openssl rand -hex 32)}
       INGEST_API_TOKEN: ${INGEST_API_TOKEN:?Falta INGEST_API_TOKEN (openssl rand -hex 24)}
+      # Servidor MCP para el agente de IA (ADR 0017). Vacío = sin agente de servicio.
+      MCP_AGENT_TOKEN: ${MCP_AGENT_TOKEN:-}
+      MCP_RATE_LIMIT: ${MCP_RATE_LIMIT:-30}
+      MCP_RATE_WINDOW_SECONDS: ${MCP_RATE_WINDOW_SECONDS:-60}
+      # Asistente dentro de la app (ADR 0022). Vacío = sin asistente.
+      ASSISTANT_WEBHOOK_URL: ${ASSISTANT_WEBHOOK_URL:-}
+      ASSISTANT_WEBHOOK_TOKEN: ${ASSISTANT_WEBHOOK_TOKEN:-}
+      ASSISTANT_RATE_LIMIT: ${ASSISTANT_RATE_LIMIT:-10}
+      # Historial del asistente y chats de Telegram/WhatsApp (ADR 0024).
+      ASSISTANT_HISTORY_DAYS: ${ASSISTANT_HISTORY_DAYS:-90}
+      ASSISTANT_CHANNEL_IDLE_HOURS: ${ASSISTANT_CHANNEL_IDLE_HOURS:-12}
       AUTH_TOKEN_TTL_HOURS: ${AUTH_TOKEN_TTL_HOURS:-12}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-}
       # Frontend servido aparte (Vercel reenviando /api aquí): su dominio, para no bloquearlo.
@@ -54,14 +79,32 @@ services:
       - logs:/data/logs
     expose:
       - "8000"
+    depends_on:
+      redis: {condition: service_started}
     healthcheck:
-      # /health consulta la base cada 10 s: además mantiene activo el proyecto de Supabase.
+      # /health no toca la base: un pico que agote el pool no saca al backend del proxy.
+      # La base se comprueba en /health/ready (la revisión de cortes, cada minuto, ya mantiene
+      # activo el proyecto de Supabase).
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
       timeout: 3s
       retries: 10
       start_period: 30s
     mem_limit: ${BACKEND_MEM_LIMIT:-768m}
+    logging: *logging
+
+  # Caché de lecturas frecuentes (ADR 0014). Solo caché: sin disco ni puertos publicados; si se
+  # reinicia vacío, la API vuelve a llenarlo desde la base.
+  redis:
+    image: redis:7.4.2-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "48mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 64m
     logging: *logging
 
   n8n:
@@ -78,6 +121,9 @@ services:
       DB_POSTGRESDB_POOL_SIZE: ${N8N_DB_POOL_SIZE:-2}
       DB_POSTGRESDB_SSL_ENABLED: ${N8N_DB_SSL_ENABLED:-true}
       DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED: ${N8N_DB_SSL_REJECT_UNAUTHORIZED:-false}
+      # Puerto interno fijo: N8N_PORT del .env es solo el del host (abajo) y Coolify
+      # pasa todo el .env al contenedor; con 5679 choca con el Task Broker de n8n.
+      N8N_PORT: "5678"
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Falta N8N_ENCRYPTION_KEY (no cambiarla después)}
       # URL pública de n8n (la que recibe los webhooks, p. ej., Telegram).
       N8N_HOST: ${N8N_DOMAIN:?Falta N8N_DOMAIN}
@@ -92,6 +138,18 @@ services:
       NODES_EXCLUDE: '["n8n-nodes-base.executeCommand"]'
       BACKEND_URL: http://backend:8000
       INGEST_API_TOKEN: ${INGEST_API_TOKEN}
+      # Carpeta de Google Drive donde dejan el export de ARIS (04_drive_aris).
+      ARIS_DRIVE_FOLDER_URL: ${ARIS_DRIVE_FOLDER_URL:-}
+      # Quién puede mandar el export por Telegram (ids de chat) o WhatsApp (números), separados por comas.
+      ARIS_TELEGRAM_CHAT_IDS: ${ARIS_TELEGRAM_CHAT_IDS:-}
+      ARIS_WHATSAPP_NUMBERS: ${ARIS_WHATSAPP_NUMBERS:-}
+      # Modelo del agente 03_agente_chatbot (ADR 0017); la clave va en una credencial de n8n.
+      AGENT_MODEL: ${AGENT_MODEL:-claude-sonnet-5-5}
+      # Modelo del asistente de la app (07_asistente_app, ADR 0022); la clave va en la credencial
+      # «Anthropic (AviPlanner)» de n8n, la misma del agente 03.
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-claude-haiku-5-5}
+      # Modelo con visión que lee las fotos en 05_telegram_aris y 06_whatsapp_aris (ADR 0024).
+      ASSISTANT_VISION_MODEL: ${ASSISTANT_VISION_MODEL:-claude-sonnet-5-5}
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:
       - n8n_data:/home/node/.n8n
@@ -108,6 +166,66 @@ services:
 
   # Respaldo diario de los esquemas `app` y `n8n` de Supabase (pg_dump), con retención.
   # Queda en el volumen `backups`: cópialo fuera del servidor (docs/deploy.md).
+  # Postgres local (ADR 0023): la base principal cuando DATABASE_URL y N8N_DB_HOST apuntan a
+  # `db`. Sin puerto publicado: solo la ven los servicios de este compose.
+  db:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aviplanner
+      POSTGRES_USER: aviplanner
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-cambia-esta-clave}
+      TZ: ${TZ:-America/Lima}
+    # 100 conexiones: backend (DB_POOL_SIZE + DB_MAX_OVERFLOW por worker) + n8n + copias, con
+    # holgura para 50+ personas a la vez (en Supabase gratuito eran 15 en total).
+    command: >-
+      postgres -c max_connections=100 -c shared_buffers=128MB -c effective_cache_size=384MB
+      -c work_mem=4MB -c maintenance_work_mem=64MB -c wal_compression=on
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aviplanner -d aviplanner"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: ${DB_MEM_LIMIT:-512m}
+    logging: *logging
+
+  # Copia de la base local en Supabase cada COPY_EVERY_MINUTES (ADR 0023): si este servidor se
+  # pierde, los datos siguen allí (se pierden a lo sumo esos minutos). Cada copia entra en una sola
+  # transacción: Supabase nunca queda a medias. Sin SUPABASE_COPY_URL, apagada.
+  db-copy:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SUPABASE_COPY_URL: ${SUPABASE_COPY_URL:-}
+      COPY_EVERY_MINUTES: ${COPY_EVERY_MINUTES:-15}
+      TZ: ${TZ:-America/Lima}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        plain() { echo "$$1" | sed 's#^postgresql+[a-z0-9]*://#postgresql://#'; }
+        src=$$(plain "$$DATABASE_URL"); dst=$$(plain "$$SUPABASE_COPY_URL")
+        if [ -z "$$dst" ] || [ "$$src" = "$$dst" ]; then
+          echo "Copia a Supabase apagada (sin SUPABASE_COPY_URL o la base ya es Supabase)."
+          exec sleep infinity
+        fi
+        while true; do
+          if pg_dump "$$src" --schema=app --schema=n8n --no-owner --no-privileges --format=custom --file=/tmp/copia.dump             && pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction --dbname="$$dst" /tmp/copia.dump; then
+            echo "Copia en Supabase al día: $$(date '+%F %T')"
+          else
+            echo "ERROR: no se pudo copiar la base a Supabase (se reintenta en $$COPY_EVERY_MINUTES min)" >&2
+          fi
+          rm -f /tmp/copia.dump
+          sleep $$((COPY_EVERY_MINUTES * 60))
+        done
+    depends_on:
+      db: {condition: service_healthy}
+    mem_limit: 256m
+    logging: *logging
+
   db-backup:
     image: postgres:17.11-alpine
     restart: unless-stopped
@@ -126,19 +244,20 @@ services:
       - |
         url=$$(echo "$$DATABASE_URL" | sed 's#^postgresql+[a-z0-9]*://#postgresql://#')
         while true; do
-          file=/backups/avicola2-$$(date +%Y%m%d-%H%M).dump
+          file=/backups/aviplanner-$$(date +%Y%m%d-%H%M).dump
           if pg_dump "$$url" --schema=app --schema=n8n --no-owner --format=custom --file="$$file.tmp"; then
             mv "$$file.tmp" "$$file" && echo "Respaldo listo: $$file"
           else
             rm -f "$$file.tmp" && echo "ERROR: falló el respaldo de la base" >&2
           fi
-          find /backups -name 'avicola2-*.dump' -mtime +"$$BACKUP_KEEP_DAYS" -delete
+          find /backups \( -name 'aviplanner-*.dump' -o -name 'avicola2-*.dump' \) -mtime +"$$BACKUP_KEEP_DAYS" -delete
           sleep $$((BACKUP_EVERY_HOURS * 3600))
         done
     mem_limit: 256m
     logging: *logging
 
 volumes:
+  pgdata:
   lakehouse:
   logs:
   n8n_data:

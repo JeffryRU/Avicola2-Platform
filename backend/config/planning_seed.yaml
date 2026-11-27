@@ -2,7 +2,9 @@
 # `python -m app.planning.infrastructure.cli init` los carga o actualiza; los productos que ya
 # no están aquí se desactivan (no se borran: las proyecciones antiguas los siguen citando).
 # `subcategory` agrupa la tabla de proyección (Brasa chica/mediana/grande); la proyección es por
-# categoría, como en el mockup. `kg_per_unit` es la columna «Peso» (kg por unidad, promedio).
+# categoría, como en el mockup. Los grupos son los del negocio al pedir a granja (cuadro de
+# agrupación, 18/11/2026): chica = Brasa 1–4, mediana = Brasa 5–6, grande = Brasa 7–10.
+# `kg_per_unit` es la columna «Peso» (kg por unidad, promedio).
 
 products:
   BRASA:
@@ -16,13 +18,33 @@ products:
     - {id: P0008, name: Brasa 8, subcategory: Brasa grande, kg_per_unit: 1.8}
     - {id: P0009, name: Brasa 9, subcategory: Brasa grande, kg_per_unit: 1.9}
     - {id: P0010, name: Brasa 10, subcategory: Brasa grande, kg_per_unit: 2.0}
+    # Calidad B: no se proyecta; se cuenta en el stock por tipo (como en el cuadro de despacho).
+    # Peso: el promedio de las brasas del grupo.
+    - {id: P0101, name: Brasa chica B, subcategory: Brasa chica, kg_per_unit: 1.23, quality: B}
+    - {id: P0102, name: Brasa mediana B, subcategory: Brasa mediana, kg_per_unit: 1.55, quality: B}
+    - {id: P0103, name: Brasa grande B, subcategory: Brasa grande, kg_per_unit: 1.85, quality: B}
+  # Pollo de mercado. SUPUESTO: el peso por unidad es el promedio despachado en 2026 (ARIS).
+  Pollo de mercado:
+    - {id: P0011, name: Pollo entero con menudencia, kg_per_unit: 2.07}
+    # El sin menudencia también se proyecta (PLANNING_PROJECTED_PRODUCTS); pesa 1,70 kg (dato del
+    # negocio, 18/11/2026).
+    - {id: P0012, name: Pollo entero carne sin menudencia, kg_per_unit: 1.7}
+    - {id: P0112, name: Pollo entero carne sin menudencia B, kg_per_unit: 1.7, quality: B}
+  # Descartes: se cuentan en el stock de despacho, pero no se proyectan ni entran al pedido a
+  # granja (calidad D). SUPUESTO: nombres y pesos promedio a confirmar con el negocio.
+  Descarte:
+    - {id: P0201, name: Descarte brasa, kg_per_unit: 1.5, quality: D}
+    - {id: P0202, name: Descarte pollo de mercado, kg_per_unit: 1.8, quality: D}
 
 # Vendedores (id_usuario U0001..U0007 de la tabla maestra). Solo se crean con APP_ENV=local, con la
 # contraseña de PLANNING_DEMO_PASSWORD (por defecto demo1234). En producción, el primer supervisor
-# se crea con `cli supervisor` y él da de alta a los vendedores desde la app.
-# SUPUESTO: el supervisor es de prueba; la tabla maestra no indica quién administra las cuentas.
+# se crea con `cli supervisor --general` y él da de alta las demás cuentas desde la app.
+# El jefe de despacho de prueba (`despacho`) registra el stock de despacho.
+# SUPUESTO: los supervisores son de prueba; la tabla maestra no indica quién administra las cuentas.
 users:
+  - {username: general, name: Supervisor general de prueba, role: general_supervisor}
   - {username: supervisor, name: Supervisor de prueba, role: supervisor}
+  - {username: despacho, name: Jefe de despacho de prueba, role: dispatch_chief}
   - {username: rnavarro, name: Roberto Navarro, zone: Trujillo}       # U0001
   - {username: hdias, name: Hebert Días, zone: Chiclayo}               # U0002
   - {username: mcordova, name: Miguel Córdova, zone: Piura}            # U0003

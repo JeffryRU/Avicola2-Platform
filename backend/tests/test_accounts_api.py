@@ -48,6 +48,8 @@ def test_login_sets_httponly_cookie_and_never_returns_the_token(client):
             "role": "seller",
         },
         "must_change_password": False,
+        "permissions": [],
+        "manageable_roles": [],
     }
     cookie = r.headers["set-cookie"]
     assert cookie.startswith("nv_session=")
@@ -159,7 +161,8 @@ def test_supervisor_creates_account_with_temporary_password(client):
     )
     assert r.status_code == 201, r.text
     body = r.json()
-    assert body["account"]["username"] == "ltorres" and body["account"]["must_change_password"]
+    assert body["account"]["username"] == "ltorres"
+    assert body["account"]["must_change_password"] is False
     temporary = body["temporary_password"]
     assert (
         client.post("/api/admin/accounts", json={"username": "ltorres", "name": "Otro"}).status_code
@@ -168,9 +171,10 @@ def test_supervisor_creates_account_with_temporary_password(client):
 
     seller = TestClient(app)
     login = _login(seller, "ltorres", temporary)
-    assert login.json()["must_change_password"] is True
-    # Con la temporal solo puede cambiar la contraseña.
-    assert seller.get("/api/catalog").status_code == 403
+    # Ya no se obliga a cambiarla al entrar: con la contraseña inicial usa la app de inmediato.
+    assert login.json()["must_change_password"] is False
+    assert seller.get("/api/catalog").status_code == 200
+    # Y puede cambiarla cuando quiera.
     changed = seller.post(
         "/api/auth/password", json={"current_password": temporary, "new_password": NEW_PASSWORD}
     )
@@ -189,7 +193,7 @@ def test_reset_password_unlocks_and_closes_sessions(client):
     assert r.status_code == 200
     temporary = r.json()["temporary_password"]
     assert seller.get("/api/auth/me").status_code == 401  # sesión anterior cerrada
-    assert _login(TestClient(app), "rnavarro", temporary).json()["must_change_password"]
+    assert _login(TestClient(app), "rnavarro", temporary).json()["must_change_password"] is False
 
 
 def test_deactivated_account_cannot_log_in(client):
@@ -201,6 +205,33 @@ def test_deactivated_account_cannot_log_in(client):
     assert seller.get("/api/catalog").status_code == 401
     assert _login(TestClient(app)).status_code == 401
     assert client.patch("/api/admin/accounts/supervisor", json={"active": False}).status_code == 422
+
+
+def test_supervisor_edits_name_and_zone_but_not_the_username(client):
+    _login(client, "supervisor")
+    r = client.put(
+        "/api/admin/accounts/rnavarro", json={"name": "  Rosa   Navarro ", "zone": " Norte "}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["username"] == "rnavarro"
+    assert (r.json()["name"], r.json()["zone"]) == ("Rosa Navarro", "Norte")
+    listed = {a["username"]: a for a in client.get("/api/admin/accounts").json()}
+    assert listed["rnavarro"]["name"] == "Rosa Navarro"
+    # Zona vacía = sin zona; igual que en el alta.
+    r = client.put("/api/admin/accounts/rnavarro", json={"name": "Rosa Navarro", "zone": " "})
+    assert r.json()["zone"] is None
+
+
+def test_edit_account_validates_and_checks_permissions(client):
+    _login(client, "supervisor")
+    assert client.put("/api/admin/accounts/rnavarro", json={"name": "   "}).status_code == 422
+    assert client.put("/api/admin/accounts/rnavarro", json={"name": "x" * 101}).status_code == 422
+    assert client.put("/api/admin/accounts/nadie", json={"name": "Nadie"}).status_code == 404
+    # Su propia cuenta se edita desde el perfil.
+    assert client.put("/api/admin/accounts/supervisor", json={"name": "Yo"}).status_code == 422
+    seller = TestClient(app)
+    _login(seller)
+    assert seller.put("/api/admin/accounts/hdias", json={"name": "Otro"}).status_code == 403
 
 
 def test_temporary_passwords_are_random_and_mixed():
@@ -217,6 +248,26 @@ def test_tokens_from_another_secret_or_without_version_are_rejected():
     assert tokens.decode(tokens.issue("rnavarro", 3)).version == 3
     assert JwtTokenService("b" * 40, 1).decode(tokens.issue("rnavarro", 3)) is None
     assert tokens.decode("no-es-un-jwt") is None
+
+
+def test_tokens_keep_working_after_the_rename_but_other_audiences_are_rejected():
+    import jwt
+
+    secret = "a" * 40
+    tokens = JwtTokenService(secret, 1)
+    claims = {"sub": "rnavarro", "ver": 1, "exp": 4102444800}
+    for audience, accepted in [
+        ("aviplanner-planning", True),
+        ("avicola2-planning", True),  # sesiones abiertas antes del cambio de nombre (ADR 0015)
+        ("otra-app", False),
+        (["otra-app"], False),
+    ]:
+        token = jwt.encode({**claims, "aud": audience}, secret, algorithm="HS256")
+        assert (tokens.decode(token) is not None) is accepted, audience
+    assert tokens.decode(jwt.encode(claims, secret, algorithm="HS256")) is None  # sin `aud`
+    assert jwt.decode(
+        tokens.issue("rnavarro", 1), secret, algorithms=["HS256"], audience="aviplanner-planning"
+    )
 
 
 # --- CSRF y cabeceras ----------------------------------------------------------------
@@ -306,8 +357,56 @@ def test_update_profile_requires_session(client):
     assert client.patch("/api/auth/profile", json={"name": "Alguien"}).status_code == 401
 
 
+# --- Preferencias de la interfaz por cuenta ----------------------------------------------
+
+PREFS = {
+    "theme": "dark",
+    "contrast": "system",
+    "accent": "green",
+    "a11y": {"textSize": "large", "readAloud": True, "hideImages": False},
+}
+
+
+def test_preferences_follow_the_account_not_the_device(client):
+    _login(client)
+    assert client.get("/api/auth/preferences").json() is None
+    r = client.put("/api/auth/preferences", json=PREFS)
+    assert r.status_code == 200, r.text
+    assert r.json() == PREFS
+    # Otro dispositivo (otro cliente, sin cookies compartidas) recibe lo mismo.
+    other = TestClient(app)
+    _login(other)
+    assert other.get("/api/auth/preferences").json() == PREFS
+    # Cada cuenta tiene las suyas.
+    _login(client, "hdias")
+    assert client.get("/api/auth/preferences").json() is None
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        ["dark"],
+        {"theme": "x" * 41},
+        {"a11y": {"nested": {"too": "deep"}}},
+        {"size": 3},
+        {f"k{i}": True for i in range(41)},
+        {"": True},
+    ],
+)
+def test_preferences_shape_is_bounded(client, bad):
+    _login(client)
+    assert client.put("/api/auth/preferences", json=bad).status_code == 422
+    assert client.get("/api/auth/preferences").json() is None
+
+
+def test_preferences_require_session(client):
+    client.cookies.clear()
+    assert client.get("/api/auth/preferences").status_code == 401
+    assert client.put("/api/auth/preferences", json=PREFS).status_code == 401
+
+
 def test_cli_creates_the_master_table_sellers_with_temporary_passwords(capsys):
-    """`cli vendedores` (producción): 7 cuentas que deben cambiar su contraseña al entrar."""
+    """`cli vendedores` (producción): 7 cuentas con contraseña inicial, sin cambio obligatorio."""
     metadata.drop_all(engine)
     metadata.create_all(engine)
     with SessionLocal() as session:
@@ -321,11 +420,11 @@ def test_cli_creates_the_master_table_sellers_with_temporary_passwords(capsys):
     client = TestClient(app)
     r = _login(client, "cvillalobos", temporary)
     assert r.status_code == 200
-    assert r.json()["must_change_password"] is True
+    assert r.json()["must_change_password"] is False
     assert r.json()["seller"]["zone"] == "Trujillo"
 
 
-def test_cli_simple_reset_gives_username_passwords_that_must_be_changed(capsys):
+def test_cli_simple_reset_gives_username_passwords(capsys):
     metadata.drop_all(engine)
     metadata.create_all(engine)
     with SessionLocal() as session:
@@ -335,7 +434,7 @@ def test_cli_simple_reset_gives_username_passwords_that_must_be_changed(capsys):
     client = TestClient(app)
     r = _login(client, "eauleste", "eauleste2026")
     assert r.status_code == 200
-    assert r.json()["must_change_password"] is True
+    assert r.json()["must_change_password"] is False
     # La contraseña simple no sirve como contraseña definitiva (contiene el usuario).
     with pytest.raises(DomainError):
         check_new_password("eauleste2026", "eauleste")

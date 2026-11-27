@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { Seller } from '@/features/auth/domain/session'
-import { Catalog } from '@/features/catalog/domain/catalog'
+import type { Seller } from '@/shared/domain/session'
+import { Catalog } from '@/features/catalog'
 import { dayColumns, productMatrix, sellerColumns, zonesOf } from '@/features/dashboards/domain/product-matrix'
-import type { Projection } from '@/features/projections/domain/schemas'
+import type { Projection, StoreOrder } from '@/features/projections'
 
 const catalog = new Catalog([
   { id: 'P1', category: 'BRASA', name: 'Brasa 1', kg_per_unit: 1, sort_order: 0, subcategory: 'Brasa chica' },
@@ -26,6 +26,7 @@ const TUE = '2026-11-03'
 const projection = (who: string, date: string, units: Record<string, number>, status = 'confirmed'): Projection => ({
   id: `${who}-${date}`,
   submission_id: 's',
+  sheet: 1,
   seller: who,
   date,
   category: 'BRASA',
@@ -89,5 +90,74 @@ describe('detalle por producto', () => {
 
   it('zonas del equipo, con «Sin zona» para quien no tiene', () => {
     expect(zonesOf([...SELLERS, seller('x', 'X', null)], 'Sin zona')).toEqual(['Piura', 'Sin zona', 'Trujillo'])
+  })
+})
+
+describe('columnas por zona', () => {
+  it('suma a los vendedores de cada zona', async () => {
+    const { zoneColumns, productMatrix } = await import('@/features/dashboards/domain/product-matrix')
+    const team = [
+      { username: 'a', name: 'A', zone: 'TRUJILLO', role: 'seller' },
+      { username: 'b', name: 'B', zone: 'TRUJILLO', role: 'seller' },
+      { username: 'c', name: 'C', zone: 'PIURA', role: 'seller' },
+    ] as Parameters<typeof zoneColumns>[0]
+    const p = (seller: string, units: number) =>
+      ({ id: seller, seller, date: '2026-11-16', status: 'confirmed', units: { P1: units } }) as never
+    const cols = zoneColumns(team, ['2026-11-16'], 'Sin zona')
+    expect(cols.map((c) => c.label)).toEqual(['PIURA', 'TRUJILLO'])
+    const products = [{ id: 'P1', category: 'BRASA', name: 'Brasa 1', kg_per_unit: 1, sort_order: 0 }]
+    const m = productMatrix(cols, products, [p('a', 2), p('b', 3), p('c', 4)])
+    expect(m.cells).toEqual([4, 5])
+  })
+})
+
+describe('tiendas en el detalle', () => {
+  const ORDERS: StoreOrder[] = [
+    { zone: 'Trujillo', date: TUE, units: { P1: 7 } },
+    { zone: 'Chiclayo', date: TUE, units: { P5: 2 } },
+  ]
+
+  it('cada zona con pedidos suma una columna «Tiendas» al final de sus vendedores', async () => {
+    const { storeEntries } = await import('@/features/dashboards/domain/product-matrix')
+    const stores = { zones: ['Trujillo', 'Chiclayo'], label: 'Tiendas' }
+    const cols = sellerColumns(SELLERS, [MON, TUE], 'Sin zona', [], stores)
+    expect(cols.map((c) => [c.group, c.label])).toEqual([
+      ['Chiclayo', 'Tiendas'],
+      ['Piura', 'Miguel'],
+      ['Trujillo', 'César'],
+      ['Trujillo', 'Roberto'],
+      ['Trujillo', 'Tiendas'],
+    ])
+    const m = productMatrix(cols, catalog.products, [...DATA, ...storeEntries(ORDERS, 'Sin zona')])
+    expect(m.cells).toEqual([2, 0, 5, 6, 7])
+    expect(m.headerGroups).toEqual([
+      { name: 'Chiclayo', span: 1 },
+      { name: 'Piura', span: 1 },
+      { name: 'Trujillo', span: 3 },
+    ])
+  })
+
+  it('por zona, las tiendas se suman a la zona', async () => {
+    const { storeEntries, zoneColumns } = await import('@/features/dashboards/domain/product-matrix')
+    const cols = zoneColumns(SELLERS, [TUE], 'Sin zona', [], ['Trujillo', 'Chiclayo'])
+    const m = productMatrix(cols, catalog.products, [...DATA, ...storeEntries(ORDERS, 'Sin zona')])
+    expect(cols.map((c) => c.label)).toEqual(['Chiclayo', 'Piura', 'Trujillo'])
+    expect(m.cells).toEqual([2, 0, 13])
+  })
+})
+
+describe('tiendas en los totales', () => {
+  it('suma a cada día lo que piden las tiendas', async () => {
+    const { addStores, storeEntries } = await import('@/features/dashboards/domain/product-matrix')
+    const days: { date: string; units: Record<string, number>; u: number; kg: number }[] = [
+      { date: MON, units: { P1: 2 }, u: 2, kg: 2 },
+      { date: TUE, units: {}, u: 0, kg: 0 },
+    ]
+    const stores = storeEntries([{ zone: 'Piura', date: TUE, units: { P5: 4 } }], 'Sin zona')
+    const out = addStores(days, stores, (u) => catalog.kg(u))
+    expect(out.map((d) => [d.u, d.kg])).toEqual([
+      [2, 2],
+      [4, 6],
+    ])
   })
 })

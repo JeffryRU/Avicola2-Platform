@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from app.core.config import DEFAULT_AVG_LIVE_WEIGHT_KG, DEFAULT_YIELD_FACTOR
 from app.shared.domain import calendar as cal
 from app.shared.infrastructure.calendar import special_days
 
@@ -85,8 +86,8 @@ class SyntheticConfig:
     plan_margin: float = 0.05  # margen que agrega Producción al planificar la saca
     plan_calendar_awareness: float = 0.7  # 0 = ignora feriados al planificar, 1 = los anticipa
     live_weight_sigma: float = 0.015  # variación del peso real de la saca vs. lo planificado
-    yield_factor: float = 0.75
-    avg_live_weight_kg: float = 2.6
+    yield_factor: float = DEFAULT_YIELD_FACTOR
+    avg_live_weight_kg: float = DEFAULT_AVG_LIVE_WEIGHT_KG
 
     @property
     def start(self) -> date:

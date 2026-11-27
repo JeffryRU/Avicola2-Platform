@@ -56,7 +56,11 @@ def test_endpoints_require_session(client) -> None:
 def test_seller_sees_only_himself(client) -> None:
     _login(client)
     catalog = client.get("/api/catalog").json()
-    assert {p["category"] for p in catalog} == {"BRASA"}
+    assert {p["category"] for p in catalog} == {"BRASA", "Pollo de mercado"}
+    # Solo la brasa se proyecta; el pollo de mercado queda para el stock y la saca.
+    # Se proyecta la brasa y, del pollo de mercado, solo el sin menudencia.
+    assert {p["id"] for p in catalog if p["projected"] and p["category"] != "BRASA"} == {"P0012"}
+    assert {p["quality"] for p in catalog} == {"A"}  # la calidad B solo existe en el stock
     assert [s["username"] for s in client.get("/api/sellers").json()] == ["rnavarro"]
 
 
@@ -94,10 +98,81 @@ def test_submit_replaces_same_day_and_lists(client) -> None:
     assert rows[0]["total_units"] == 4 and rows[0]["units"]["P0002"] == 4
 
 
-def test_supervisor_cannot_submit(client) -> None:
-    _login(client, "supervisor")
+@pytest.mark.parametrize("supervisor", ["supervisor", "general"])
+def test_supervision_reviews_but_never_registers(client, supervisor) -> None:
+    """Supervisor y supervisor general revisan: no registran, ni propias ni por un vendedor."""
+    _login(client, supervisor)
     body = {"category": "BRASA", "days": [{"date": _day(0), "units": {"P0001": 1}}]}
+    for extra in ({}, {"seller": supervisor}, {"seller": "rnavarro"}):
+        r = client.post("/api/projections", json={**body, **extra})
+        assert r.status_code == 403 and "revisa" in r.json()["detail"]
+    stored = client.get(
+        "/api/projections", params={"date_from": _day(0), "date_to": _day(0), "seller": "rnavarro"}
+    ).json()
+    assert stored == []
+
+
+def test_seller_cannot_submit_for_someone_else(client) -> None:
+    _login(client)
+    body = {
+        "category": "BRASA",
+        "days": [{"date": _day(0), "units": {"P0001": 1}}],
+        "seller": "hdias",
+    }
     assert client.post("/api/projections", json=body).status_code == 403
+
+
+def test_history_records_who_changed_what(client) -> None:
+    _login(client)
+    day = {"date": _day(1), "units": {"P0001": 4}}
+    assert (
+        client.post("/api/projections", json={"category": "BRASA", "days": [day]}).status_code
+        == 201
+    )
+    # Reenviar lo mismo no es un cambio.
+    assert (
+        client.post("/api/projections", json={"category": "BRASA", "days": [day]}).status_code
+        == 201
+    )
+    edited = {"category": "BRASA", "days": [{"date": _day(1), "units": {"P0001": 9}}]}
+    assert client.post("/api/projections", json=edited).status_code == 201
+
+    params = {"date_from": _day(0), "date_to": _day(0)}
+    history = client.get("/api/projections/history", params=params).json()
+    assert [(h["author"], h["action"], h["before_total"], h["after_total"]) for h in history] == [
+        ("rnavarro", "updated", 4, 9),
+        ("rnavarro", "created", None, 4),
+    ]
+    # El supervisor lo ve en su historial del equipo.
+    _login(client, "supervisor")
+    team = client.get("/api/projections/history", params={**params, "seller": "rnavarro"}).json()
+    assert len(team) == 2
+    # Otro vendedor no ve el historial de Roberto.
+    _login(client, "hdias")
+    assert client.get("/api/projections/history", params=params).json() == []
+
+
+def test_brasa_and_chicken_without_giblets_are_projected(client) -> None:
+    """Se proyecta la brasa y, del pollo de mercado, solo el entero sin menudencia (P0012)."""
+    _login(client)
+    projected = {p["id"] for p in client.get("/api/catalog").json() if p["projected"]}
+    assert "P0012" in projected and "P0011" not in projected and "P0001" in projected
+    body = {"category": "Pollo de mercado", "days": [{"date": _day(1), "units": {"P0011": 4}}]}
+    r = client.post("/api/projections", json=body)
+    assert (
+        r.status_code == 422 and "No se proyecta: Pollo entero con menudencia" in r.json()["detail"]
+    )
+    body["days"][0]["units"] = {"P0012": 6}
+    r = client.post("/api/projections", json=body)
+    assert r.status_code == 201, r.text
+    # Es otra proyección del mismo día: no reemplaza la de brasa.
+    brasa = {"category": "BRASA", "days": [{"date": _day(1), "units": {"P0001": 3}}]}
+    assert client.post("/api/projections", json=brasa).status_code == 201
+    saved = client.get("/api/projections", params={"date_from": _day(1), "date_to": _day(1)}).json()
+    assert {(p["category"], p["total_units"]) for p in saved} == {
+        ("Pollo de mercado", 6),
+        ("BRASA", 3),
+    }
 
 
 def test_submit_validation_errors_are_422(client) -> None:
@@ -133,3 +208,155 @@ def test_supervisor_can_filter_any_seller(client) -> None:
     params = {"date_from": _day(-7), "date_to": _day(-1), "seller": "hdias"}
     sales = client.get("/api/sales", params=params).json()
     assert len(sales) == 7 and all(s["seller"] == "hdias" for s in sales)
+
+
+# --- App móvil: token Bearer -----------------------------------------------------------
+
+
+def _token(client, username="rnavarro", password="demo1234") -> str:
+    r = client.post("/api/auth/token", json={"username": username, "password": password})
+    assert r.status_code == 200, r.text
+    return r.json()["token"]
+
+
+def test_token_login_returns_bearer_without_cookie(client) -> None:
+    r = client.post("/api/auth/token", json={"username": "rnavarro", "password": "demo1234"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["token_type"] == "bearer"
+    assert body["expires_in"] == get_settings().auth_token_ttl_hours * 3600
+    assert body["seller"]["username"] == "rnavarro"
+    assert "nv_session" not in r.cookies
+    assert not client.cookies
+
+
+def test_token_login_rejects_bad_password(client) -> None:
+    r = client.post("/api/auth/token", json={"username": "rnavarro", "password": "mal"})
+    assert r.status_code == 401
+    assert "token" not in r.json()
+
+
+def test_bearer_token_authenticates_requests(client) -> None:
+    token = _token(client)
+    r = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+    assert r.json()["seller"]["username"] == "rnavarro"
+    r = client.get("/api/sellers", headers={"Authorization": f"bearer {token}"})
+    assert r.status_code == 200
+
+
+def test_invalid_bearer_is_rejected(client) -> None:
+    r = client.get("/api/sellers", headers={"Authorization": "Bearer nope"})
+    assert r.status_code == 401
+
+
+def test_bearer_takes_precedence_over_cookie(client) -> None:
+    _login(client)  # cookie de rnavarro
+    r = client.get("/api/auth/me", headers={"Authorization": "Bearer nope"})
+    assert r.status_code == 401
+
+
+def test_non_bearer_authorization_falls_back_to_cookie(client) -> None:
+    _login(client)
+    r = client.get("/api/auth/me", headers={"Authorization": "Basic abc"})
+    assert r.status_code == 200
+
+
+def test_web_login_never_returns_token_in_body(client) -> None:
+    r = client.post("/api/auth/login", json={"username": "rnavarro", "password": "demo1234"})
+    assert "token" not in r.json()
+
+
+# --- Exportar a Excel ---------------------------------------------------------------------
+
+
+def _xlsx_rows(content: bytes) -> list[tuple]:
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    return list(load_workbook(BytesIO(content)).active.iter_rows(values_only=True))
+
+
+def test_export_projections_xlsx(client) -> None:
+    _login(client, "rnavarro")
+    day = TODAY.isoformat()
+    body = {"category": "BRASA", "days": [{"date": day, "units": {"P0001": 5}}]}
+    assert client.post("/api/projections", json=body).status_code == 201
+
+    _login(client, "supervisor")
+    r = client.get(f"/api/projections/export?date_from={day}&date_to={day}")
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("application/vnd.openxmlformats")
+    assert f"proyecciones_{day}_{day}.xlsx" in r.headers["content-disposition"]
+    rows = _xlsx_rows(r.content)
+    assert rows[0][0] == "Proyecciones del equipo"
+    header, data = rows[2], rows[3:]
+    assert header[3] == "Vendedor" and header[11] == "Estado"
+    mine = [row for row in data if row[3] == "Roberto Navarro"]
+    assert any(row[5] == "P0001" and row[8] == 5 for row in mine)
+    # Quien no registró aparece con una fila «Sin proyección».
+    assert any(row[11] == "Sin proyección" and row[3] != "Roberto Navarro" for row in data)
+
+
+def test_seller_exports_only_their_own(client) -> None:
+    _login(client, "hdias")
+    day = TODAY.isoformat()
+    r = client.get(f"/api/projections/export?date_from={day}&date_to={day}&seller=rnavarro")
+    assert r.status_code == 200
+    sellers = {row[3] for row in _xlsx_rows(r.content)[3:]}
+    assert sellers == {"Hebert Días"}
+
+
+def test_export_range_is_limited(client) -> None:
+    _login(client, "supervisor")
+    far = (TODAY + timedelta(days=120)).isoformat()
+    r = client.get(f"/api/projections/export?date_from={TODAY.isoformat()}&date_to={far}")
+    assert r.status_code == 422
+
+
+def test_export_in_the_same_formats_as_the_web(client) -> None:
+    _login(client, "supervisor")
+    day = TODAY.isoformat()
+    base = f"/api/projections/export?date_from={day}&date_to={day}"
+    pdf = client.get(f"{base}&format=pdf")
+    assert pdf.status_code == 200 and pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content.startswith(b"%PDF") and f"_{day}.pdf" in pdf.headers["content-disposition"]
+    csv = client.get(f"{base}&format=csv")
+    assert csv.status_code == 200 and csv.headers["content-type"].startswith("text/csv")
+    text = csv.content.decode("utf-8")
+    assert text.startswith('\ufeff"Fecha","Día","Zona","Vendedor"')
+    assert '"Sin proyección"' in text
+    assert client.get(f"{base}&format=docx").status_code == 422
+
+
+def test_each_new_registration_opens_a_new_sheet(client) -> None:
+    """INS-06: registrar de nuevo un día abre otra hoja que reemplaza a la anterior (no suma)."""
+    _login(client)
+    day = _day(1)
+
+    def submit(units: int) -> None:
+        body = {"category": "BRASA", "days": [{"date": day, "units": {"P0001": units}}]}
+        assert client.post("/api/projections", json=body).status_code == 201
+
+    params = {"date_from": day, "date_to": day}
+    submit(100)
+    assert client.get("/api/projections", params=params).json()[0]["sheet"] == 1
+    submit(60)  # segunda hoja del mismo día
+    rows = client.get("/api/projections", params=params).json()
+    assert len(rows) == 1 and rows[0]["sheet"] == 2
+    assert rows[0]["total_units"] == 60  # vale la última hoja: no se suman 100 + 60
+    submit(60)  # reenviar lo mismo no abre una hoja nueva
+    assert client.get("/api/projections", params=params).json()[0]["sheet"] == 2
+    submit(75)
+    assert client.get("/api/projections", params=params).json()[0]["sheet"] == 3
+
+    today = str(TODAY)
+    history = client.get(
+        "/api/projections/history", params={"date_from": today, "date_to": today}
+    ).json()
+    assert [(h["sheet"], h["before_total"], h["after_total"]) for h in reversed(history)] == [
+        (1, None, 100),
+        (2, 100, 60),
+        (3, 60, 75),
+    ]

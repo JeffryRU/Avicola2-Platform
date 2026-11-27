@@ -1,4 +1,4 @@
-import type { Product, Units } from '@/features/catalog/domain/schemas'
+import type { Product, Units } from '@/shared/domain/products'
 import {
   allOfLabel,
   joinLabels,
@@ -17,6 +17,11 @@ export class Catalog {
     this.byId = new Map(this.products.map((p) => [p.id, p]))
   }
 
+  /** Lo que registran los vendedores en sus proyecciones (el resto queda para el stock y la saca). */
+  forProjection(): Catalog {
+    return new Catalog(this.products.filter((p) => p.projected !== false))
+  }
+
   get categories(): string[] {
     return [...new Set(this.products.map((p) => p.category))]
   }
@@ -30,11 +35,20 @@ export class Catalog {
     return [...new Set(this.of(category).flatMap((p) => (p.subcategory ? [p.subcategory] : [])))]
   }
 
+  /**
+   * Nombre de una categoría sin tamaños: si tiene un solo producto, el del producto (del pollo de
+   * mercado solo se proyecta el sin menudencia: la opción se llama como él).
+   */
+  private plainLabel(category: string): string {
+    const products = this.of(category)
+    return products.length === 1 ? products[0].name : category
+  }
+
   /** Opciones del selector: por categoría, «Todas las brasas» y luego cada tamaño. */
   get choices(): ProductChoice[] {
     return this.categories.flatMap((category) => {
       const subs = this.subcategories(category)
-      if (!subs.length) return [{ category, subcategory: null, label: category }]
+      if (!subs.length) return [{ category, subcategory: null, label: this.plainLabel(category) }]
       return [
         { category, subcategory: null, label: allOfLabel(category) },
         ...subs.map((subcategory) => ({ category, subcategory, label: subcategory })),
@@ -50,7 +64,7 @@ export class Catalog {
   /** Nombre corto de la selección: "Todas las brasas" o "Brasa chica". */
   label(sel: ProductSelection): string {
     if (sel.subcategory) return sel.subcategory
-    return this.subcategories(sel.category).length ? allOfLabel(sel.category) : sel.category
+    return this.subcategories(sel.category).length ? allOfLabel(sel.category) : this.plainLabel(sel.category)
   }
 
   /** Para resúmenes: "Todas las brasas (chica, mediana y grande)" o "Brasa chica". */
@@ -88,24 +102,4 @@ export class Catalog {
   kg(units: Units): number {
     return Object.entries(units).reduce((s, [id, u]) => s + u * (this.byId.get(id)?.kg_per_unit ?? 0), 0)
   }
-}
-
-/** Productos agrupados por subcategoría (Brasa chica, mediana...), en el orden en que llegan. */
-export function bySubcategory(products: Product[]): { name: string | null; products: Product[] }[] {
-  const groups: { name: string | null; products: Product[] }[] = []
-  for (const p of products) {
-    const name = p.subcategory ?? null
-    const last = groups.at(-1)
-    if (last?.name === name) last.products.push(p)
-    else groups.push({ name, products: [p] })
-  }
-  return groups
-}
-
-export const sumUnits = (units: Units | undefined) => Object.values(units ?? {}).reduce((a, b) => a + b, 0)
-
-export function addUnits(a: Units, b: Units): Units {
-  const out = { ...a }
-  for (const [id, u] of Object.entries(b)) out[id] = (out[id] ?? 0) + u
-  return out
 }

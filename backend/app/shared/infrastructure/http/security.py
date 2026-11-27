@@ -8,6 +8,8 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
+from app.shared.infrastructure.http.paths import API_PATH_PREFIXES, API_PREFIX
+
 logger = logging.getLogger("app.http")
 
 # Solo recursos propios; las fuentes de Google son la única excepción (index.html).
@@ -37,7 +39,7 @@ HEADERS = {
 }
 HSTS = "max-age=31536000; includeSubDomains"
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-NO_STORE_PREFIXES = ("/api/", "/ingest/")
+NO_STORE_PREFIXES = API_PATH_PREFIXES
 # Swagger y ReDoc (solo en local) cargan scripts de un CDN: sin CSP.
 DOCS_PREFIXES = ("/docs", "/redoc")
 
@@ -64,7 +66,7 @@ def install_security(app: FastAPI, https: bool, trusted_origins: tuple[str, ...]
         path = request.url.path
         if (
             request.method in UNSAFE_METHODS
-            and path.startswith("/api/")
+            and path.startswith(f"{API_PREFIX}/")
             and _cross_site(request, trusted_origins)
         ):
             logger.warning(

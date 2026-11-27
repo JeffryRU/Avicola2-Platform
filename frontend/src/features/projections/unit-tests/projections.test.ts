@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { addDays, daysText, weekStart } from '@/shared/domain/dates'
 import { myDays, versusReal, weekAgg, type MyDay } from '@/features/projections/domain/aggregation'
-import { Catalog } from '@/features/catalog/domain/catalog'
-import { emptyDays, newDraft, submittableDraft } from '@/features/projections/domain/draft'
+import { Catalog } from '@/features/catalog'
+import {
+  copyPreviousSheets,
+  emptyDays,
+  newDraft,
+  normalizeDraft,
+  openNewSheets,
+  previousSheets,
+  submittableDraft,
+} from '@/features/projections/domain/draft'
 import { parseCell } from '@/shared/domain/format'
 import { projectionsTable } from '@/features/projections/domain/export'
 import { tableToCsv } from '@/shared/domain/export'
@@ -18,6 +26,7 @@ const TODAY = '2026-11-02'
 const projection = (seller: string, date: string, units: Record<string, number>): Projection => ({
   id: `${seller}-${date}`,
   submission_id: 's',
+  sheet: 1,
   seller,
   date,
   category: 'BRASA',
@@ -40,13 +49,13 @@ describe('borrador de proyección', () => {
 
   it('rechaza más de 7 días o unidades fuera de rango', () => {
     expect(submittableDraft(TODAY).safeParse({ ...newDraft(TODAY, 'BRASA'), days: 8 }).success).toBe(false)
-    const big = { ...newDraft(TODAY, 'BRASA'), days: 1, units: { [TODAY]: { B1: 10000 } } }
+    const big = { ...newDraft(TODAY, 'BRASA'), days: 1, units: { [TODAY]: { B1: 100_000 } } }
     expect(submittableDraft(TODAY).safeParse(big).success).toBe(false)
   })
 
-  it('las celdas aceptan solo dígitos (máximo 4)', () => {
+  it('las celdas aceptan solo dígitos (máximo 5)', () => {
     expect(parseCell('12a3')).toBe(123)
-    expect(parseCell('123456')).toBe(1234)
+    expect(parseCell('123456')).toBe(12345)
     expect(parseCell('')).toBeNull()
   })
 
@@ -133,5 +142,58 @@ describe('exportación', () => {
     })
     expect(csv.startsWith('\uFEFF"Producto"')).toBe(true)
     expect(csv).toContain('"Pollo ""entero"""')
+  })
+})
+
+describe('hojas de registro (INS-06)', () => {
+  const day = '2026-11-03'
+  const draft = { ...newDraft(day, 'BRASA'), days: 2 }
+  const days = new Map([[day, { category: 'BRASA', units: { B1: 10, B2: 4 }, sheet: 1 }]])
+
+  it('la hoja nueva abre en blanco y es la siguiente a la vigente', () => {
+    const previous = previousSheets(draft, days)
+    expect(previous).toEqual([{ date: day, sheet: 1, units: { B1: 10, B2: 4 } }])
+    const opened = openNewSheets(draft, previous, new Set(['B1', 'B2']))
+    expect(opened.units).toEqual({ [day]: {}, [addDays(day, 1)]: {} })
+  })
+
+  it('no toma como hoja anterior la de otra categoría', () => {
+    expect(previousSheets({ ...draft, category: 'OTRA' }, days)).toEqual([])
+  })
+
+  it('con un tamaño elegido, lo que no se ve conserva la hoja anterior', () => {
+    const opened = openNewSheets(draft, previousSheets(draft, days), new Set(['B1']))
+    expect(opened.units[day]).toEqual({ B2: 4 })
+  })
+
+  it('copiar la hoja anterior no pisa lo ya escrito', () => {
+    const previous = previousSheets(draft, days)
+    const visible = new Set(['B1', 'B2'])
+    const blank = openNewSheets(draft, previous, visible)
+    expect(copyPreviousSheets(blank, previous, visible).units[day]).toEqual({ B1: 10, B2: 4 })
+    const typed = { ...blank, units: { ...blank.units, [day]: { B1: 7 } } }
+    expect(copyPreviousSheets(typed, previous, visible).units[day]).toEqual({ B1: 7 })
+  })
+})
+
+describe('borrador guardado frente al catálogo actual (normalizeDraft)', () => {
+  const noDays = new Map<string, MyDay>()
+
+  it('una categoría que ya no existe pasa a la primera y se vacían las unidades', () => {
+    const stored = { ...newDraft('2026-11-03', 'YA NO EXISTE'), units: { '2026-11-03': { X: 4 } } }
+    const d = normalizeDraft(stored, catalog, noDays)
+    expect(d.category).toBe(catalog.categories[0])
+    expect(d.units).toEqual({})
+  })
+
+  it('un tamaño que ya no existe vuelve a «todos»', () => {
+    const d = normalizeDraft({ ...newDraft('2026-11-03', 'BRASA'), subcategory: 'Brasa enorme' }, catalog, noDays)
+    expect(d.subcategory).toBeNull()
+    expect(d.category).toBe('BRASA')
+  })
+
+  it('en el paso 1 un borrador válido no cambia', () => {
+    const stored = newDraft('2026-11-03', 'BRASA')
+    expect(normalizeDraft(stored, catalog, noDays)).toBe(stored)
   })
 })

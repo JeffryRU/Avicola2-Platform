@@ -1,10 +1,12 @@
 import { z } from 'zod'
 import type { HttpClient } from '@/shared/application/ports'
+import { endpoints } from '@/shared/infrastructure/api/endpoints'
 import type { IsoDate } from '@/shared/domain/dates'
 import type { DateRange, ProjectionsGateway } from '@/features/projections/application/ports'
 import {
   dailyUnitsSchema,
   projectionSchema,
+  storeOrderSchema,
   submissionResultSchema,
   suggestionSchema,
   type Submission,
@@ -18,15 +20,24 @@ export class HttpProjectionsGateway implements ProjectionsGateway {
     this.http = http
   }
 
-  projections = (r: DateRange) => this.http.get('/projections', z.array(projectionSchema), rangeQuery(r))
-  sales = (r: DateRange) => this.http.get('/sales', z.array(dailyUnitsSchema), rangeQuery(r))
-  suggestions = (category: string, start: IsoDate, days: number) =>
-    this.http.get('/suggestions', suggestionSchema, { category, start, days })
+  projections = (r: DateRange) => this.http.get(endpoints.projections.list, z.array(projectionSchema), rangeQuery(r))
+  sales = (r: DateRange) => this.http.get(endpoints.sales.list, z.array(dailyUnitsSchema), rangeQuery(r))
+  modelProjections = (r: DateRange) => this.http.get(endpoints.model.list, z.array(dailyUnitsSchema), rangeQuery(r))
+  storeOrders = (r: DateRange) =>
+    this.http.get(endpoints.storeOrders.list, z.array(storeOrderSchema), { date_from: r.from, date_to: r.to })
+  suggestions = (category: string, start: IsoDate, days: number, seller?: string) =>
+    this.http.get(endpoints.suggestions.get, suggestionSchema, { category, start, days, on_behalf: seller })
 
   submit = (s: Submission) =>
     this.http.post(
-      '/projections',
-      { submission_id: s.submission_id, category: s.category, days: s.days },
+      endpoints.projections.list,
+      {
+        submission_id: s.submission_id,
+        category: s.category,
+        days: s.days,
+        // El backend solo acepta otro vendedor si quien envía es supervisor.
+        ...(s.author && s.author !== s.seller ? { seller: s.seller } : {}),
+      },
       submissionResultSchema,
     )
 }
