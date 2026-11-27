@@ -20,7 +20,13 @@
         0
       ],
       "webhookId": "d4a10005-0901-4c0e-9f00-000000000901",
-      "notes": "Credencial: el token del bot de BotFather. Solo responde a los chats de ARIS_TELEGRAM_CHAT_IDS."
+      "notes": "Credencial: el token del bot de BotFather. Solo responde a los chats de ARIS_TELEGRAM_CHAT_IDS.",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     },
     {
       "parameters": {
@@ -120,7 +126,13 @@
         960,
         -200
       ],
-      "webhookId": "d4a10005-0905-4c0e-9f00-000000000905"
+      "webhookId": "d4a10005-0905-4c0e-9f00-000000000905",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     },
     {
       "parameters": {
@@ -198,7 +210,13 @@
         480,
         560
       ],
-      "webhookId": "d4a10005-0908-4c0e-9f00-000000000908"
+      "webhookId": "d4a10005-0908-4c0e-9f00-000000000908",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     },
     {
       "parameters": {
@@ -216,7 +234,13 @@
         720,
         -60
       ],
-      "webhookId": "d4a10005-0909-4c0e-9f00-000000000909"
+      "webhookId": "d4a10005-0909-4c0e-9f00-000000000909",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     },
     {
       "parameters": {
@@ -328,7 +352,13 @@
         120
       ],
       "webhookId": "d4a10005-0931-4c0e-9f00-000000000931",
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     },
     {
       "parameters": {
@@ -345,7 +375,13 @@
         380
       ],
       "webhookId": "d4a10005-0932-4c0e-9f00-000000000932",
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     },
     {
       "parameters": {
@@ -742,7 +778,13 @@
         380
       ],
       "webhookId": "d4a10005-0933-4c0e-9f00-000000000933",
-      "notes": "getFile de la foto más grande (la última de message.photo) y la descarga como binario."
+      "notes": "getFile de la foto más grande (la última de message.photo) y la descarga como binario.",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     },
     {
       "parameters": {
@@ -762,7 +804,13 @@
         80
       ],
       "webhookId": "d4a10005-0934-4c0e-9f00-000000000934",
-      "notes": "HTML: el backend no escapa, así que se escapan < > & aquí y los bloques entre ``` (tablas) van en <pre> para que se vean alineados."
+      "notes": "HTML: el backend no escapa, así que se escapan < > & aquí y los bloques entre ``` (tablas) van en <pre> para que se vean alineados.",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     },
     {
       "parameters": {
@@ -783,7 +831,13 @@
         3360,
         300
       ],
-      "webhookId": "d4a10005-0935-4c0e-9f00-000000000935"
+      "webhookId": "d4a10005-0935-4c0e-9f00-000000000935",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     },
     {
       "parameters": {
@@ -801,7 +855,13 @@
         2700,
         480
       ],
-      "webhookId": "d4a10005-0936-4c0e-9f00-000000000936"
+      "webhookId": "d4a10005-0936-4c0e-9f00-000000000936",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     },
     {
       "parameters": {
@@ -819,7 +879,13 @@
         1160,
         580
       ],
-      "webhookId": "d4a10005-0937-4c0e-9f00-000000000937"
+      "webhookId": "d4a10005-0937-4c0e-9f00-000000000937",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     },
     {
       "parameters": {
@@ -837,7 +903,13 @@
         2260,
         580
       ],
-      "webhookId": "d4a10005-0938-4c0e-9f00-000000000938"
+      "webhookId": "d4a10005-0938-4c0e-9f00-000000000938",
+      "credentials": {
+        "telegramApi": {
+          "id": "aviplannerTelegram",
+          "name": "Telegram (AviPlanner)"
+        }
+      }
     }
   ],
   "connections": {
