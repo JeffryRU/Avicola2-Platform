@@ -135,6 +135,10 @@ class Settings(BaseSettings):
     assistant_history_days: int = Field(90, ge=1)
     # Horas sin mensajes tras las que el chat de Telegram o WhatsApp empieza otra conversación.
     assistant_channel_idle_hours: int = Field(12, ge=1)
+    # Roles que pueden mandar el export de ARIS por Telegram o WhatsApp con su cuenta vinculada
+    # (separados por comas). Los chats de ARIS_TELEGRAM_CHAT_IDS o ARIS_WHATSAPP_NUMBERS (en n8n)
+    # pueden siempre.
+    aris_channel_roles: str = "general_supervisor"
 
     # Carpeta con catalog.yaml, schemas.yaml, tables.yaml y planning_seed.yaml.
     config_dir: Path = BACKEND_DIR / "config"

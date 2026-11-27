@@ -56,6 +56,8 @@ services:
       # Historial del asistente y chats de Telegram/WhatsApp (ADR 0024).
       ASSISTANT_HISTORY_DAYS: ${ASSISTANT_HISTORY_DAYS:-90}
       ASSISTANT_CHANNEL_IDLE_HOURS: ${ASSISTANT_CHANNEL_IDLE_HOURS:-12}
+      # Roles que mandan el export de ARIS por Telegram o WhatsApp con su chat vinculado.
+      ARIS_CHANNEL_ROLES: ${ARIS_CHANNEL_ROLES:-general_supervisor}
       AUTH_TOKEN_TTL_HOURS: ${AUTH_TOKEN_TTL_HOURS:-12}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-}
       # Frontend servido aparte (Vercel reenviando /api aquí): su dominio, para no bloquearlo.

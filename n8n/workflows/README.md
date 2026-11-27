@@ -191,8 +191,7 @@ Quien tenga el export de ARIS (DESPACHO y/o VENTAS, en Excel o CSV) lo deja en u
 ## 05_telegram_aris
 
 ```
-Telegram Trigger → Tipo de mensaje ─┬ Excel o CSV → ¿chat autorizado? → POST /api/internal/aris → responder → ¿200? → aviso
-                                    │                   └→ «no autorizado» (le dice su id)
+Telegram Trigger → Tipo de mensaje ─┬ Excel o CSV → POST /api/internal/aris (con el chat) → responder (o «no autorizado») → ¿200? → aviso
                                     ├ Texto → «escribiendo…» → POST /api/internal/channel/message → ¿200? ─┬→ responder (HTML, tablas en <pre>)
                                     │                                                                      │   └→ ¿trae archivos? → un ítem por archivo → descargar → sendDocument
                                     │                                                                      └→ «no pude responderte» (429: espera un minuto)
@@ -206,7 +205,7 @@ Un solo bot atiende ARIS y el asistente (Telegram solo admite un webhook por bot
 
 1. **Bot.** En Telegram, habla con **@BotFather** → `/newbot`. Copia el token.
 2. **Credencial.** En n8n, crea una credencial **Telegram API** llamada `Telegram (AviPlanner)` con ese token (el workflow ya la usa en todos sus nodos de Telegram, con el id `aviplannerTelegram`).
-3. **Autorizados para ARIS.** Solo afecta al Excel o CSV. Activa el workflow y envía un Excel: el bot te contestará el id de tu chat. Ponlo en `ARIS_TELEGRAM_CHAT_IDS` (separados por comas; un grupo también sirve) y reinicia n8n.
+3. **Autorizados para ARIS.** Solo afecta al Excel o CSV, y lo decide el backend: puede quien tenga el chat vinculado a una cuenta con un rol de `ARIS_CHANNEL_ROLES` (backend; por defecto, `general_supervisor`), y la carga queda a su nombre. Además, los chats de `ARIS_TELEGRAM_CHAT_IDS` (n8n; ids separados por comas, un grupo también sirve) pueden siempre, sin vincular.
 4. **Asistente: credencial y variables.** El paso de la foto llama a la API de Anthropic con la credencial **`Anthropic (AviPlanner)`** (tipo Anthropic, la misma de `03` y `07`): elígela en el nodo *Leer la foto con Claude*. Variable opcional de n8n: `ASSISTANT_VISION_MODEL` (`claude-sonnet-5-5` por defecto; la lectura de fotos necesita un modelo con visión). También se usan `BACKEND_URL` e `INGEST_API_TOKEN`, como en ARIS.
 5. **Requisito:** n8n tiene que tener HTTPS público (`WEBHOOK_URL`), porque Telegram llama a su webhook. En Coolify se publica solo `/webhook/` (ver `docs/deploy.md`); hoy, en producción.
 
@@ -224,8 +223,7 @@ El asistente responde **como la persona vinculada**, con sus permisos. Sin vincu
 ## 06_whatsapp_aris
 
 ```
-WhatsApp Trigger → ¿es un mensaje? → Tipo de mensaje ─┬ Excel o CSV → ¿número autorizado? → enlace (Graph API) → descargar → POST /api/internal/aris → responder → ¿200? → aviso
-                                                      │                   └→ «no autorizado»
+WhatsApp Trigger → ¿es un mensaje? → Tipo de mensaje ─┬ Excel o CSV → enlace (Graph API) → descargar → POST /api/internal/aris (con el número) → responder (o «no autorizado») → ¿200? → aviso
                                                       ├ Texto → POST /api/internal/channel/message → ¿200? ─┬→ responder
                                                       │                                                     │   └→ ¿trae archivos? → un ítem por archivo → descargar → subir a /{phone-number-id}/media → enviar tipo document
                                                       │                                                     └→ «no pude responderte»
@@ -242,7 +240,7 @@ Un solo número atiende ARIS y el asistente (la app de Meta admite un webhook po
    - **WhatsApp API:** el token de acceso permanente (de un usuario del sistema) y el *Business Account ID*. Úsala en los nodos de la Graph API (*Pedir el enlace…*, *Descargar…*, *Subir a WhatsApp*, *Enviar el documento*) y en los de respuesta.
    - **WhatsApp OAuth API:** el *App ID* y el *App Secret*. Úsala en *Mensaje de WhatsApp*: n8n registra el webhook en Meta al activar el workflow.
    - **`Anthropic (AviPlanner)`** (tipo Anthropic, la misma de `03` y `07`): en el nodo *Leer la foto con Claude*.
-3. **Autorizados para ARIS.** Solo afecta al Excel o CSV: pon en `ARIS_WHATSAPP_NUMBERS` los números que pueden enviarlo, con código de país y sin «+» (por ejemplo, `51987654321`). Reinicia n8n.
+3. **Autorizados para ARIS.** Igual que en Telegram: el número vinculado a una cuenta con un rol de `ARIS_CHANNEL_ROLES`, o los de `ARIS_WHATSAPP_NUMBERS` (con código de país y sin «+», por ejemplo `51987654321`; reinicia n8n al cambiarla).
 4. **Variable opcional:** `ASSISTANT_VISION_MODEL` (`claude-sonnet-5-5` por defecto) para leer las fotos. Usa también `BACKEND_URL` e `INGEST_API_TOKEN`.
 5. **Para responder:** WhatsApp solo deja contestar en las 24 horas siguientes al mensaje de la persona. Aquí siempre es así, porque la respuesta va en el momento.
 

@@ -68,6 +68,11 @@ MAX_ARIS_BYTES = MAX_ARIS_MB * 1024 * 1024
 # Autor de las cargas que llegan por n8n, según el medio.
 ARIS_SERVICE_USER = "n8n"
 ARIS_SOURCES = {"drive": "Google Drive", "telegram": "Telegram", "whatsapp": "WhatsApp"}
+ARIS_CHAT_NOT_ALLOWED = (
+    "Este chat no puede cargar datos de ARIS. Pueden los supervisores generales con su cuenta "
+    "vinculada a este chat: en la app, entra al asistente, elige «Usar en Telegram o WhatsApp» y "
+    "envíame el código así: vincular ABC123"
+)
 
 SESSION_COOKIE = "nv_session"
 COOKIE_PATH = API_PREFIX
@@ -1040,14 +1045,25 @@ def aris_ingest(
     use_cases: UseCases,
     file: Annotated[UploadFile, File(description="Export de ARIS: Excel o CSV")],
     source: Annotated[str, Form(description="drive | telegram | whatsapp")] = "drive",
+    sender: Annotated[str, Form(max_length=64, description="Chat o número que lo envió")] = "",
+    listed: Annotated[bool, Form(description="El chat está en la lista de n8n")] = False,
 ) -> list[dict[str, Any]]:
-    """Lo mismo, para n8n (Google Drive, Telegram o WhatsApp), con X-Api-Token."""
+    """Lo mismo, para n8n (Google Drive, Telegram o WhatsApp), con X-Api-Token.
+
+    Desde un chat que no está en la lista de n8n (`listed`), carga solo si el chat está vinculado
+    a una cuenta con un rol de ARIS_CHANNEL_ROLES, y queda a nombre de esa persona.
+    """
     label = ARIS_SOURCES.get(source, source)
-    system = Seller(
+    uploader = Seller(
         f"{ARIS_SERVICE_USER}-{source}"[:50], f"n8n ({label})", None, GENERAL_SUPERVISOR
     )
+    if sender and not listed and source in ("telegram", "whatsapp"):
+        person = use_cases.channel_assistant.aris_uploader(source, sender)
+        if person is None:
+            raise ForbiddenError(ARIS_CHAT_NOT_ALLOWED)
+        uploader = person
     content = _read_upload(file)
-    return [asdict(r) for r in use_cases.import_aris(system, content, file.filename or "")]
+    return [asdict(r) for r in use_cases.import_aris(uploader, content, file.filename or "")]
 
 
 # --- Canales del asistente: Telegram y WhatsApp (ADR 0024) --------------------------------
