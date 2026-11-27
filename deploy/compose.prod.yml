@@ -159,6 +159,17 @@ services:
     # Solo en el propio servidor: el editor se abre con un túnel SSH (docs/deploy.md).
     ports:
       - "127.0.0.1:${N8N_PORT:-5678}:5678"
+    # Con N8N_PUBLIC_WEBHOOKS=true, el proxy de Coolify (Traefik) publica en N8N_DOMAIN solo
+    # /webhook/ (Telegram y WhatsApp llaman ahí). El editor y la API de n8n siguen cerrados.
+    # Solo un entorno por servidor puede activarlo (el nombre del router es fijo).
+    labels:
+      - traefik.enable=${N8N_PUBLIC_WEBHOOKS:-false}
+      - traefik.http.routers.aviplanner-n8n-webhooks.rule=Host(`${N8N_DOMAIN}`) && PathPrefix(`/webhook/`)
+      - traefik.http.routers.aviplanner-n8n-webhooks.entryPoints=https
+      - traefik.http.routers.aviplanner-n8n-webhooks.tls=true
+      - traefik.http.routers.aviplanner-n8n-webhooks.tls.certresolver=letsencrypt
+      - traefik.http.routers.aviplanner-n8n-webhooks.service=aviplanner-n8n-webhooks
+      - traefik.http.services.aviplanner-n8n-webhooks.loadbalancer.server.port=5678
     depends_on:
       backend: {condition: service_healthy}
     mem_limit: ${N8N_MEM_LIMIT:-1g}
