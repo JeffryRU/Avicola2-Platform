@@ -76,7 +76,7 @@ En el panel del asistente: botón **Historial** (lista de conversaciones, con bo
 
 Telegram solo admite un webhook por bot y la app de Meta uno por número, así que el asistente se
 agrega a los workflows que ya existen: `05_telegram_aris` y `06_whatsapp_aris`. Un Excel o CSV
-sigue yendo a ARIS (con la lista de autorizados de siempre). El texto y las fotos van al asistente.
+sigue yendo a ARIS: lo puede mandar quien tenga el chat vinculado a una cuenta con un rol de `ARIS_CHANNEL_ROLES` (supervisor general por defecto; la carga queda a su nombre) o un chat de la lista de n8n de siempre. El texto y las fotos van al asistente.
 
 **Vincular la cuenta.** En la app (panel del asistente → «Usar en Telegram o WhatsApp»), la
 persona pide un código de 6 caracteres que vale 10 minutos y lo envía al bot: `vincular ABC123`

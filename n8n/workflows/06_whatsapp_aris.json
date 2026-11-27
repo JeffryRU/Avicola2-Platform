@@ -55,41 +55,6 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "d4a10006-0103-4c0e-9f00-000000000103",
-              "leftValue": "={{ ($env.ARIS_WHATSAPP_NUMBERS || '').split(',').map(s => s.replace(/\\D/g, '')).includes($json.messages[0].from) }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "d4a10006-0003-4c0e-9f00-000000000003",
-      "name": "¿Número autorizado?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        860,
-        -200
-      ],
-      "notes": "Solo para el Excel o CSV de ARIS. El texto y las fotos no pasan por esta lista: el asistente exige cuenta vinculada."
-    },
-    {
-      "parameters": {
         "url": "=https://graph.facebook.com/v21.0/{{ $json.messages[0].document.id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "whatsAppApi",
@@ -152,6 +117,14 @@
             {
               "name": "source",
               "value": "whatsapp"
+            },
+            {
+              "name": "sender",
+              "value": "={{ $('Mensaje de WhatsApp').item.json.messages[0].from }}"
+            },
+            {
+              "name": "listed",
+              "value": "={{ String(($env.ARIS_WHATSAPP_NUMBERS || '').split(',').map(s => s.replace(/\\D/g, '')).includes($('Mensaje de WhatsApp').item.json.messages[0].from)) }}"
             }
           ]
         },
@@ -269,24 +242,6 @@
         600
       ],
       "webhookId": "d4a10006-0911-4c0e-9f00-000000000911"
-    },
-    {
-      "parameters": {
-        "operation": "send",
-        "phoneNumberId": "={{ $('Mensaje de WhatsApp').item.json.metadata.phone_number_id }}",
-        "recipientPhoneNumber": "={{ $('Mensaje de WhatsApp').item.json.messages[0].from }}",
-        "textBody": "=Este número no está autorizado para cargar datos de ARIS. Pide a un supervisor que agregue {{ $json.messages[0].from }} a ARIS_WHATSAPP_NUMBERS.",
-        "additionalFields": {}
-      },
-      "id": "d4a10006-0012-4c0e-9f00-000000000012",
-      "name": "No autorizado",
-      "type": "n8n-nodes-base.whatsApp",
-      "typeVersion": 1,
-      "position": [
-        1080,
-        -60
-      ],
-      "webhookId": "d4a10006-0912-4c0e-9f00-000000000912"
     },
     {
       "parameters": {
@@ -967,24 +922,6 @@
         []
       ]
     },
-    "¿Número autorizado?": {
-      "main": [
-        [
-          {
-            "node": "Pedir el enlace del archivo",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "No autorizado",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Pedir el enlace del archivo": {
       "main": [
         [
@@ -1045,7 +982,7 @@
       "main": [
         [
           {
-            "node": "¿Número autorizado?",
+            "node": "Pedir el enlace del archivo",
             "type": "main",
             "index": 0
           }

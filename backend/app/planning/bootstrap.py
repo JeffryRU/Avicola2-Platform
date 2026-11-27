@@ -349,6 +349,7 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             ChannelFileTokens(settings.auth_secret, FILE_MINUTES),
             clock,
             settings.assistant_channel_idle_hours,
+            frozenset(r.strip() for r in settings.aris_channel_roles.split(",") if r.strip()),
         ),
         ticket_account=acc.CurrentAccount(
             sellers, AssistantTickets(settings.auth_secret, settings.assistant_ticket_minutes)

@@ -411,3 +411,34 @@ def test_stock_photo_confirm_registers_stock(agent) -> None:
     r = login("despacho").get(f"/api/stock?date_from={day(0)}&date_to={day(0)}").json()
     lines = {(ln["product_id"], ln["units"]) for ln in r[0]["lines"]}
     assert lines == {("P0001", 30), ("P0101", 8)}
+
+
+# --- ARIS desde un chat vinculado -------------------------------------------------------------
+
+
+def _aris(sender: str, listed: bool = False):
+    from test_aris_import import _csv, _line
+
+    yesterday = datetime.now(UTC).date() - timedelta(days=1)
+    return TestClient(app).post(
+        "/api/internal/aris",
+        files={"file": ("aris.csv", _csv(_line(yesterday, 5)))},
+        data={"source": "telegram", "sender": sender, "listed": str(listed).lower()},
+    )
+
+
+def test_general_supervisor_loads_aris_from_a_linked_chat(agent) -> None:
+    _link("general", "500")
+    r = _aris("500")
+    assert r.status_code == 200, r.text
+    assert r.json()[0]["rows"] == 1
+
+
+def test_other_roles_or_unlinked_chats_cannot_load_aris(agent) -> None:
+    _link("supervisor", "501")
+    for sender in ("501", "502"):
+        r = _aris(sender)
+        assert r.status_code == 403
+        assert "vincular" in r.json()["detail"]
+    # Un chat de la lista de n8n (ARIS_TELEGRAM_CHAT_IDS) puede, vinculado o no.
+    assert _aris("502", listed=True).status_code == 200
