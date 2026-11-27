@@ -50,7 +50,7 @@ La carpeta [`deploy/`](../deploy) sirve igual para tres caminos. Elige uno:
 4. **Environment:** pega las variables del `.env` de producción.
 5. **Domains:**
    - `backend`: host `APP_DOMAIN`, puerto **8000**, HTTPS con **Let's Encrypt**.
-   - `n8n`: agrégalo **solo cuando haga falta un webhook público** (p. ej., Telegram): host `N8N_DOMAIN`, puerto **5678**. Con Dokploy queda expuesto todo n8n, editor incluido, protegido por su propio login. Activa la verificación en dos pasos del usuario de n8n. Con Coolify no hace falta: `N8N_PUBLIC_WEBHOOKS=true` publica solo `/webhook/` (etiquetas de Traefik en `compose.prod.yml`) y el editor sigue cerrado.
+   - `n8n`: agrégalo **solo cuando haga falta un webhook público** (p. ej., Telegram): host `N8N_DOMAIN`, puerto **5678**. Con Dokploy queda expuesto todo n8n, editor incluido, protegido por su propio login. Activa la verificación en dos pasos del usuario de n8n. Con Coolify se publica solo `/webhook/`: dale al servicio `n8n` el dominio `N8N_DOMAIN` (puerto 5678) y copia [`deploy/traefik/n8n-solo-webhooks.yaml`](../deploy/traefik/n8n-solo-webhooks.yaml), con tu dominio, a `/data/coolify/proxy/dynamic/` del servidor. El editor y la API de n8n responden 403.
 6. **Deploy.** Para que se actualice solo en cada `git push` a `main`, activa **Autodeploy**, o copia el webhook de la pestaña *Deployments* en GitHub.
 7. **Respaldos:** en *Volume Backups*, programa copias de los volúmenes `backups` (dumps de la base) y `lakehouse` hacia un destino S3 (Cloudflare R2, Backblaze B2 o un bucket de GCS con interoperabilidad S3).
 
