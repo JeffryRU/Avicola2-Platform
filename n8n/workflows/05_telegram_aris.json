@@ -30,41 +30,6 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "d4a10005-0102-4c0e-9f00-000000000102",
-              "leftValue": "={{ ($env.ARIS_TELEGRAM_CHAT_IDS || '').split(',').map(s => s.trim()).includes(String($json.message.chat.id)) }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "d4a10005-0002-4c0e-9f00-000000000002",
-      "name": "¿Chat autorizado?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        480,
-        -200
-      ],
-      "notes": "Solo para el Excel o CSV de ARIS. El texto y las fotos no pasan por esta lista: el asistente exige cuenta vinculada."
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "={{ $env.BACKEND_URL }}/api/internal/aris",
         "sendHeaders": true,
@@ -88,6 +53,14 @@
             {
               "name": "source",
               "value": "telegram"
+            },
+            {
+              "name": "sender",
+              "value": "={{ String($('Mensaje de Telegram').item.json.message.chat.id) }}"
+            },
+            {
+              "name": "listed",
+              "value": "={{ String(($env.ARIS_TELEGRAM_CHAT_IDS || '').split(',').map(s => s.trim()).includes(String($('Mensaje de Telegram').item.json.message.chat.id))) }}"
             }
           ]
         },
@@ -211,30 +184,6 @@
         560
       ],
       "webhookId": "d4a10005-0908-4c0e-9f00-000000000908",
-      "credentials": {
-        "telegramApi": {
-          "id": "aviplannerTelegram",
-          "name": "Telegram (AviPlanner)"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "chatId": "={{ $('Mensaje de Telegram').item.json.message.chat.id }}",
-        "text": "=Este chat no está autorizado para cargar datos de ARIS. Pide a un supervisor que agregue el id {{ $json.message.chat.id }} a ARIS_TELEGRAM_CHAT_IDS.",
-        "additionalFields": {
-          "appendAttribution": false
-        }
-      },
-      "id": "d4a10005-0009-4c0e-9f00-000000000009",
-      "name": "No autorizado",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        720,
-        -60
-      ],
-      "webhookId": "d4a10005-0909-4c0e-9f00-000000000909",
       "credentials": {
         "telegramApi": {
           "id": "aviplannerTelegram",
@@ -924,24 +873,6 @@
         ]
       ]
     },
-    "¿Chat autorizado?": {
-      "main": [
-        [
-          {
-            "node": "Cargar en el backend",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "No autorizado",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Cargar en el backend": {
       "main": [
         [
@@ -980,7 +911,7 @@
       "main": [
         [
           {
-            "node": "¿Chat autorizado?",
+            "node": "Cargar en el backend",
             "type": "main",
             "index": 0
           }

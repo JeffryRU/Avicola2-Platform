@@ -33,7 +33,8 @@ from app.planning.domain.channels import (
     parse_command,
 )
 from app.planning.domain.conversations import ASSISTANT, CHANNELS, Conversation
-from app.planning.domain.models import Product, SellerAccount
+from app.planning.domain.models import Product, Seller, SellerAccount
+from app.planning.domain.permissions import Permission, permissions_of
 from app.shared.domain.errors import DomainError, NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -114,8 +115,10 @@ class ChannelAssistant:
         files: FileTokens,
         clock: Clock,
         idle_hours: int,
+        aris_roles: frozenset[str] = frozenset(),
     ) -> None:
         self.sellers, self.links, self.conversations = sellers, links, conversations
+        self.aris_roles = aris_roles
         self.ask, self.history, self.drafts, self.files = ask, history, drafts, files
         self.clock, self.idle = clock, timedelta(hours=idle_hours)
 
@@ -161,6 +164,18 @@ class ChannelAssistant:
             dates=tuple(self.drafts.dates(account)),
             products=tuple(self.drafts.catalog(account)),
         )
+
+    def aris_uploader(self, channel: str, sender: str) -> Seller | None:
+        """Quién carga el export de ARIS enviado desde este chat: la persona vinculada, si su rol
+        está en ARIS_CHANNEL_ROLES y además puede cargar ARIS en la app. Si no, nadie."""
+        account = self._account(channel, clean_sender(channel, sender))
+        if account is None:
+            return None
+        seller = account.seller
+        allowed = seller.role in self.aris_roles
+        if not allowed or Permission.LOAD_ARIS not in permissions_of(seller.role):
+            return None
+        return seller
 
     def file(self, token: str) -> TableFile:
         """El Excel de una tabla para el canal: el token firmado dice de quién y de qué mensaje;
