@@ -219,6 +219,8 @@ class AssistantRequest:
     # Últimos mensajes de la conversación, del más viejo al más nuevo: `(rol, texto)`. La memoria
     # del agente sale del historial guardado (ADR 0024), así sobrevive a un reinicio de n8n.
     history: tuple[tuple[str, str], ...] = ()
+    # Desde dónde escribe la persona: `app`, `telegram` o `whatsapp` (cambia lo que se le ofrece).
+    channel: str = "app"
 
 
 class AssistantGateway(Protocol):
