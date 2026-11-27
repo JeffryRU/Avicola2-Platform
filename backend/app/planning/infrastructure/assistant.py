@@ -69,6 +69,7 @@ class N8nAssistant:
                 "history": [{"role": role, "text": text} for role, text in request.history],
                 # El flujo 07 lee la memoria como texto, una línea por mensaje.
                 "history_text": _history_text(request.history),
+                "channel": request.channel,
             },
             ensure_ascii=False,
         ).encode()
