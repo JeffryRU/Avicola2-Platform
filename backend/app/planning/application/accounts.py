@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass, replace
 
 from app.planning.application.ports import (
+    ChannelLinkRepository,
     Clock,
     EventPublisher,
     NotificationRepository,
@@ -297,9 +298,10 @@ class ResetPassword(_ManageAccount):
         hasher: PasswordHasher,
         passwords: TemporaryPasswords,
         events: EventPublisher,
+        links: ChannelLinkRepository | None = None,
     ):
         super().__init__(sellers, events)
-        self.hasher, self.passwords = hasher, passwords
+        self.hasher, self.passwords, self.links = hasher, passwords, links
 
     def __call__(self, actor: SellerAccount, username: str) -> NewCredentials:
         target = self._target(actor, username)
@@ -308,17 +310,31 @@ class ResetPassword(_ManageAccount):
             actor, target, password_hash=self.hasher.hash(temporary), revoke_sessions=True
         )
         name = updated.seller.username
+        if self.links:
+            # Los chats de Telegram y WhatsApp vinculados dejan de valer (ADR 0024).
+            self.links.delete_for(name)
         self._revoke_sessions(name, "Tu supervisor restableció tu contraseña.")
         logger.info("%s restableció la contraseña de %s", actor.seller.username, name)
         return NewCredentials(updated, temporary)
 
 
 class SetAccountActive(_ManageAccount):
+    def __init__(
+        self,
+        sellers: SellerRepository,
+        events: EventPublisher,
+        links: ChannelLinkRepository | None = None,
+    ):
+        super().__init__(sellers, events)
+        self.links = links
+
     def __call__(self, actor: SellerAccount, username: str, active: bool) -> SellerAccount:
         target = self._target(actor, username)
         updated = self._apply(actor, target, active=active, revoke_sessions=not active)
         name = updated.seller.username
         if not active:
+            if self.links:
+                self.links.delete_for(name)
             self._revoke_sessions(name, "Tu cuenta fue desactivada.")
         logger.info(
             "%s %s la cuenta %s", actor.seller.username, "activó" if active else "desactivó", name

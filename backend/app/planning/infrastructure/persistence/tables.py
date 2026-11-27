@@ -283,3 +283,77 @@ store_sales = Table(
     Column("unit_price", Numeric(12, 4, asdecimal=False), nullable=False),
     Index(None, "date", "material_code"),
 )
+
+# Asistente (ADR 0024): conversaciones y mensajes guardados, vinculaciones de Telegram y WhatsApp,
+# códigos de vinculación de un solo uso y borradores de fotos por confirmar. Los JSON van en texto
+# (portable entre motores).
+assistant_conversations = Table(
+    TABLES["assistant_conversations"],
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("username", String(50), nullable=False),
+    # app | telegram | whatsapp (domain/conversations.ALL_CHANNELS), no ENUM.
+    Column("channel", String(10), nullable=False),
+    Column("title", String(120), nullable=False, server_default=""),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("archived", Boolean, nullable=False, server_default=false()),
+    Index(None, "username", "updated_at"),
+)
+
+assistant_messages = Table(
+    TABLES["assistant_messages"],
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey(TABLES.fk("assistant_conversations"), ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("role", String(10), nullable=False),
+    Column("text", Text, nullable=False),
+    Column("blocks", Text),
+    Column("suggestions", Text),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Index(None, "conversation_id", "created_at"),
+)
+
+assistant_channel_links = Table(
+    TABLES["assistant_channel_links"],
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("channel", String(10), nullable=False),
+    # Id de chat (Telegram) o número sin «+» (WhatsApp).
+    Column("sender", String(64), nullable=False),
+    Column("username", String(50), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("channel", "sender"),
+    Index(None, "username"),
+)
+
+assistant_link_codes = Table(
+    TABLES["assistant_link_codes"],
+    metadata,
+    Column("code", String(8), primary_key=True),
+    Column("username", String(50), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Index(None, "username"),
+)
+
+assistant_drafts = Table(
+    TABLES["assistant_drafts"],
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("username", String(50), nullable=False),
+    Column("channel", String(10), nullable=False),
+    # projection | stock
+    Column("kind", String(15), nullable=False),
+    Column("payload", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    # pending | confirmed | discarded | expired (domain/channels), no ENUM.
+    Column("status", String(10), nullable=False),
+    Index(None, "username", "status"),
+)

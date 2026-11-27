@@ -2,6 +2,7 @@
 como quien pregunta, y el endpoint del chat (con el agente de n8n simulado)."""
 
 import json
+from dataclasses import replace
 
 import pytest
 from mcp_support import AGENT_TOKEN, call, day, login, ok, raw_post, submit, token
@@ -172,7 +173,10 @@ def test_each_role_gets_its_own_starters(agent) -> None:
 def test_message_goes_to_the_agent_as_that_person(agent) -> None:
     r = _ask("rnavarro", "¿Ya registré?")
     assert r.status_code == 200, r.text
-    assert r.json() == {"reply": "Hola.", "suggestions": ["¿Algo más?"]}
+    body = r.json()
+    assert (body["reply"], body["suggestions"]) == ("Hola.", ["¿Algo más?"])
+    assert body["message_id"]
+    assert body["blocks"] == [{"type": "text", "text": "Hola."}]
     sent = agent.requests[0]
     assert (sent.username, sent.role, sent.message) == ("rnavarro", "seller", "¿Ya registré?")
     assert sent.conversation == f"rnavarro:{CONVERSATION}"
@@ -233,6 +237,10 @@ def test_n8n_gateway_sends_the_secret_and_reads_the_reply(monkeypatch) -> None:
     assert seen["timeout"] == 30
     assert seen["body"]["ticket"] == "t"
     assert seen["body"]["user"]["role"] == "seller"
+    assert seen["body"]["history_text"] == ""
+    remembered = replace(request, history=(("user", "¿Cuánto?"), ("assistant", "120 kg.")))
+    adapter.N8nAssistant("http://n8n/x", "s3cret", 30).ask(remembered)
+    assert seen["body"]["history_text"] == "Persona: ¿Cuánto?\nAsistente: 120 kg."
 
 
 # --- Guardrails -------------------------------------------------------------------------------
@@ -318,8 +326,9 @@ def test_scope_goes_to_the_agent_and_follow_ups_stay_in_scope(agent) -> None:
     # Si ninguna sugerencia es de su tema, se ofrecen las de inicio de su rol.
     agent.reply = "Listo.<sugerencias>¿Cuánto es la saca de hoy?</sugerencias>"
     assert "¿Cuánto stock hay hoy?" in _ask("despacho").json()["suggestions"]
-    seller = _ask("rnavarro").json()["suggestions"]
-    assert not any("saca" in q for q in seller)
+    # Cada persona tiene sus conversaciones: otro id (el de otra persona no se puede usar).
+    seller = _ask("rnavarro", conversation="7d1f0c2a-9b3e-4c5d-8e6f-0a1b2c3d4e5f")
+    assert not any("saca" in q for q in seller.json()["suggestions"])
 
 
 # --- Respuesta en partes (streaming) --------------------------------------------------------
@@ -339,7 +348,9 @@ def _stream(username: str, message: str = "hola") -> list[dict]:
 
 def test_stream_without_streaming_agent_sends_everything_at_the_end(agent) -> None:
     events = _stream("rnavarro")
-    assert events[-1] == {"type": "done", "reply": "Hola.", "suggestions": ["¿Algo más?"]}
+    done = events[-1]
+    assert (done["type"], done["reply"], done["suggestions"]) == ("done", "Hola.", ["¿Algo más?"])
+    assert done["message_id"]
     assert all(e["type"] in ("delta", "done") for e in events)
 
 

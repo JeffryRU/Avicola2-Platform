@@ -1,22 +1,44 @@
 import { useEffect, useId, useRef, useState, type SyntheticEvent } from 'react'
-import { RotateCcw, SendHorizontal, X } from 'lucide-react'
+import { ArrowLeft, History, Smartphone, SquarePen, SendHorizontal, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { useRequiredSession } from '@/features/auth'
 import { ApiError } from '@/shared/application/ports'
 import { cn } from '@/shared/ui/lib/utils'
-import { currentSuggestions, MAX_MESSAGE, sendable, type ChatMessage } from '@/features/assistant/domain/assistant'
-import { useAskAssistant, useAssistantInfo } from '@/features/assistant/ui/hooks'
+import {
+  currentSuggestions,
+  lastSuggestions,
+  MAX_MESSAGE,
+  sendable,
+  toChatMessages,
+  type ChatMessage,
+} from '@/features/assistant/domain/assistant'
+import { AssistantBlocks } from '@/features/assistant/ui/components/assistant-blocks'
+import { AssistantHistory } from '@/features/assistant/ui/components/assistant-history'
+import { AssistantLink } from '@/features/assistant/ui/components/assistant-link'
+import {
+  useAskAssistant,
+  useAssistantInfo,
+  useOpenConversation,
+  useRefreshConversations,
+  useRememberedConversation,
+} from '@/features/assistant/ui/hooks'
 import {
   ASSISTANT_CLOSE,
+  ASSISTANT_BACK,
   ASSISTANT_DESCRIPTION,
   ASSISTANT_FAILED,
+  ASSISTANT_HISTORY,
   ASSISTANT_NEW,
   ASSISTANT_NOTE,
+  ASSISTANT_OPEN_FAILED,
   ASSISTANT_PLACEHOLDER,
   ASSISTANT_SEND,
   ASSISTANT_START,
   ASSISTANT_SUGGESTIONS,
   ASSISTANT_THINKING,
   ASSISTANT_TITLE,
+  ASSISTANT_TOOLBAR,
+  LINK_OPEN,
 } from '@/features/assistant/types/assistant'
 
 /** Mensajes del servidor que se muestran tal cual (límite, no disponible, pregunta inválida). */
@@ -35,10 +57,15 @@ export function AssistantPopup({ open, onClose }: { open: boolean; onClose: () =
   const { seller } = useRequiredSession()
   const info = useAssistantInfo(seller.username)
   const ask = useAskAssistant()
+  const openConversation = useOpenConversation()
+  const refreshHistory = useRefreshConversations(seller.username)
+  const remembered = useRememberedConversation(seller.username)
+  const [view, setView] = useState<'chat' | 'history' | 'link'>('chat')
+  const restored = useRef(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [latest, setLatest] = useState<string[]>([])
   const [draft, setDraft] = useState('')
-  const [conversation, setConversation] = useState(() => crypto.randomUUID())
+  const [conversation, setConversation] = useState<string>(() => crypto.randomUUID())
   const nextId = useRef(1)
   const bottom = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -52,10 +79,40 @@ export function AssistantPopup({ open, onClose }: { open: boolean; onClose: () =
   useEffect(() => {
     if (!open) return
     input.current?.focus()
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    // Un diálogo de dentro (tabla ampliada, confirmación) maneja su Escape y lo marca como atendido.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && onClose()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
+
+  /** Carga una conversación guardada y sigue con ella. */
+  function load(id: string, silent = false) {
+    openConversation.mutate(id, {
+      onSuccess: (detail) => {
+        const list = toChatMessages(detail, nextId.current)
+        nextId.current += list.length
+        setMessages(list)
+        setLatest(lastSuggestions(detail))
+        setConversation(detail.id)
+        remembered.write(detail.id)
+        setView('chat')
+      },
+      onError: () => {
+        if (silent) remembered.clear()
+        else toast.error(ASSISTANT_OPEN_FAILED)
+      },
+    })
+  }
+
+  const enabled = info.data?.enabled === true
+  // Al recargar, retoma la conversación que estaba abierta (si el servidor ya no la tiene, empieza de cero).
+  useEffect(() => {
+    if (!enabled || restored.current) return
+    restored.current = true
+    const id = remembered.read()
+    if (id) load(id, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled])
 
   if (!info.data?.enabled) return null
   const starters = info.data.suggestions
@@ -67,6 +124,8 @@ export function AssistantPopup({ open, onClose }: { open: boolean; onClose: () =
   const send = (raw: string) => {
     const message = sendable(raw)
     if (!message || ask.isPending) return
+    setView('chat')
+    remembered.write(conversation)
     add('user', message)
     setDraft('')
     // La respuesta se va escribiendo en su burbuja; al terminar se reemplaza por la final.
@@ -89,8 +148,9 @@ export function AssistantPopup({ open, onClose }: { open: boolean; onClose: () =
       },
       {
         onSuccess: (r) => {
-          write({ from: 'assistant', text: r.reply })
+          write({ from: 'assistant', text: r.reply, messageId: r.message_id ?? undefined, blocks: r.blocks })
           setLatest(r.suggestions)
+          void refreshHistory()
         },
         onError: (e) => write({ from: 'error', text: errorText(e) }),
       },
@@ -107,6 +167,8 @@ export function AssistantPopup({ open, onClose }: { open: boolean; onClose: () =
     setLatest([])
     setDraft('')
     setConversation(crypto.randomUUID())
+    remembered.clear()
+    setView('chat')
     input.current?.focus()
   }
 
@@ -132,16 +194,6 @@ export function AssistantPopup({ open, onClose }: { open: boolean; onClose: () =
         </div>
         <button
           type="button"
-          onClick={restart}
-          disabled={!messages.length || ask.isPending}
-          aria-label={ASSISTANT_NEW}
-          title={ASSISTANT_NEW}
-          className="grid size-9 flex-none place-items-center rounded-md text-chrome-muted transition-colors hover:bg-chrome-hover hover:text-chrome-foreground disabled:opacity-40"
-        >
-          <RotateCcw aria-hidden className="size-4.5" />
-        </button>
-        <button
-          type="button"
           onClick={onClose}
           aria-label={ASSISTANT_CLOSE}
           title={ASSISTANT_CLOSE}
@@ -151,20 +203,53 @@ export function AssistantPopup({ open, onClose }: { open: boolean; onClose: () =
         </button>
       </header>
 
+      <div
+        role="toolbar"
+        aria-label={ASSISTANT_TOOLBAR}
+        className="flex flex-wrap items-center gap-1 border-b border-border px-3 py-1.5 hc:border-b-2 hc:border-foreground"
+      >
+        {view === 'chat' ? (
+          <ToolbarButton icon={History} label={ASSISTANT_HISTORY} onClick={() => setView('history')} />
+        ) : (
+          <ToolbarButton icon={ArrowLeft} label={ASSISTANT_BACK} onClick={() => setView('chat')} />
+        )}
+        <ToolbarButton
+          icon={SquarePen}
+          label={ASSISTANT_NEW}
+          onClick={restart}
+          disabled={ask.isPending || (!messages.length && view === 'chat')}
+        />
+        <ToolbarButton icon={Smartphone} label={LINK_OPEN} onClick={() => setView('link')} pressed={view === 'link'} />
+      </div>
+
       <div className="flex-1 overflow-y-auto px-4 py-4" aria-live="polite">
-        {!messages.length && <p className="text-sm text-muted-foreground">{ASSISTANT_START}</p>}
-        <ul className="grid gap-3">
+        {view === 'history' && (
+          <AssistantHistory
+            username={seller.username}
+            current={conversation}
+            onOpen={(id) => load(id)}
+            onDeleted={(id) => id === conversation && restart()}
+          />
+        )}
+        {view === 'link' && <AssistantLink />}
+        {view === 'chat' && !messages.length && <p className="text-sm text-muted-foreground">{ASSISTANT_START}</p>}
+        <ul className={cn('grid gap-3', view !== 'chat' && 'hidden')}>
           {messages.map((m) => (
             <li
               key={m.id}
               className={cn(
-                'max-w-[85%] rounded-lg px-3 py-2 text-base whitespace-pre-line',
+                'rounded-lg px-3 py-2 text-base',
+                m.from === 'assistant' && m.blocks?.some((b) => b.type === 'table') ? 'max-w-full' : 'max-w-[85%]',
                 m.from === 'user' && 'justify-self-end bg-primary text-primary-foreground',
                 m.from === 'assistant' && 'justify-self-start bg-muted text-foreground hc:border hc:border-foreground',
                 m.from === 'error' && 'justify-self-start bg-bad-soft text-bad hc:text-foreground',
               )}
             >
-              {m.text}
+              {m.from === 'assistant' ? (
+                <AssistantBlocks message={m} busy={ask.isPending} onAsk={send} />
+              ) : (
+                <p className="whitespace-pre-line">{m.text}</p>
+              )}
             </li>
           ))}
           {/* «Pensando…» solo hasta que empieza a llegar el texto. */}
@@ -181,7 +266,7 @@ export function AssistantPopup({ open, onClose }: { open: boolean; onClose: () =
       </div>
 
       <div className="border-t border-border px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] hc:border-t-2 hc:border-foreground">
-        {suggestions.length > 0 && (
+        {view === 'chat' && suggestions.length > 0 && (
           <div role="group" aria-label={ASSISTANT_SUGGESTIONS} className="mb-3 flex flex-wrap gap-2">
             {suggestions.map((q) => (
               <button
@@ -195,7 +280,7 @@ export function AssistantPopup({ open, onClose }: { open: boolean; onClose: () =
             ))}
           </div>
         )}
-        <form onSubmit={submit} className="flex items-center gap-2">
+        <form onSubmit={submit} className={cn('flex items-center gap-2', view !== 'chat' && 'hidden')}>
           <input
             ref={input}
             value={draft}
@@ -218,5 +303,33 @@ export function AssistantPopup({ open, onClose }: { open: boolean; onClose: () =
         <p className="mt-2 text-xs text-muted-foreground">{ASSISTANT_NOTE}</p>
       </div>
     </section>
+  )
+}
+
+function ToolbarButton({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  pressed,
+}: {
+  icon: typeof History
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  pressed?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={pressed}
+      title={label}
+      className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-ink-2 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40 aria-pressed:bg-selected hc:text-foreground"
+    >
+      <Icon aria-hidden className="size-4" />
+      <span>{label}</span>
+    </button>
   )
 }

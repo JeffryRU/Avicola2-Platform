@@ -5,6 +5,9 @@ import type { AssistantGateway } from '@/features/assistant/application/ports'
 import {
   ASSISTANT_TIMEOUT_MS,
   assistantInfoSchema,
+  conversationDetailSchema,
+  conversationListSchema,
+  linkCodeSchema,
   assistantReplySchema,
   streamEventSchema,
   type AssistantReply,
@@ -26,6 +29,45 @@ export class HttpAssistantGateway implements AssistantGateway {
     this.http.post(endpoints.assistant.messages, { message, conversation }, assistantReplySchema, {
       timeoutMs: ASSISTANT_TIMEOUT_MS,
     })
+
+  conversations = (limit = 30) => this.http.get(endpoints.assistant.conversations, conversationListSchema, { limit })
+
+  conversation = (id: string) => this.http.get(endpoints.assistant.conversation(id), conversationDetailSchema)
+
+  linkCode = () => this.http.post(endpoints.assistant.linkCode, {}, linkCodeSchema)
+
+  deleteConversation = async (id: string): Promise<void> => {
+    await this.plainRequest('DELETE', endpoints.assistant.conversation(id))
+  }
+
+  downloadTable = async (messageId: string, index: number): Promise<Blob> => {
+    const response = await this.plainRequest('GET', endpoints.assistant.tableXlsx(messageId, index))
+    return await response.blob()
+  }
+
+  /** `fetch` con la cookie de sesión, para lo que no es JSON (archivos, 204). */
+  private async plainRequest(method: 'GET' | 'DELETE', path: string): Promise<Response> {
+    const requestId = crypto.getRandomValues(new Uint32Array(2)).join('').slice(0, 12)
+    let response: Response
+    try {
+      response = await fetch(apiUrl(this.baseUrl, path), {
+        method,
+        credentials: 'same-origin',
+        headers: { [REQUEST_ID_HEADER]: requestId },
+      })
+    } catch {
+      throw new ApiError('No se pudo conectar con el servidor.', 0, requestId)
+    }
+    if (!response.ok) {
+      const detail: unknown = await response.json().catch(() => null)
+      const text =
+        detail && typeof detail === 'object' && 'detail' in detail && typeof detail.detail === 'string'
+          ? detail.detail
+          : `El servidor respondió ${String(response.status)}.`
+      throw new ApiError(text, response.status, requestId)
+    }
+    return response
+  }
 
   /**
    * Con `fetch` (axios no lee el cuerpo mientras llega): una línea JSON por evento. La cookie de
@@ -84,7 +126,13 @@ export class HttpAssistantGateway implements AssistantGateway {
           if (!parsed.success) continue
           const event = parsed.data
           if (event.type === 'delta') onDelta(event.text)
-          else if (event.type === 'done') return { reply: event.reply, suggestions: event.suggestions }
+          else if (event.type === 'done')
+            return {
+              reply: event.reply,
+              suggestions: event.suggestions,
+              message_id: event.message_id,
+              blocks: event.blocks,
+            }
           else throw new ApiError(event.message, 503, requestId)
         }
         if (done) throw new ApiError(STREAM_BROKEN, 0, requestId)

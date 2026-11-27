@@ -15,6 +15,9 @@ from app.core.config import Settings, get_settings
 from app.planning.application import accounts as acc
 from app.planning.application import aris as ar
 from app.planning.application import assistant as asst
+from app.planning.application import assistant_history as ah
+from app.planning.application import channel_drafts as cd
+from app.planning.application import channels as ch
 from app.planning.application import editing as ed
 from app.planning.application import export as ex
 from app.planning.application import notifications as nt
@@ -23,10 +26,12 @@ from app.planning.application import saca as sc
 from app.planning.application import stock as st
 from app.planning.application import use_cases as uc
 from app.planning.domain.accounts import LockoutPolicy
+from app.planning.domain.channels import FILE_MINUTES
 from app.planning.infrastructure.aris_history import ArisHistory, ArisOrSimulatedSales
 from app.planning.infrastructure.aris_import import SqlArisData
 from app.planning.infrastructure.arrival_model import AdaptiveArrivalModel
 from app.planning.infrastructure.assistant import N8nAssistant, load_guardrails, load_starters
+from app.planning.infrastructure.assistant_tables import XlsxTableExporter
 from app.planning.infrastructure.clock import ZoneClock
 from app.planning.infrastructure.demand_model.store import SqlDemandModelStore
 from app.planning.infrastructure.events import event_bus
@@ -36,6 +41,11 @@ from app.planning.infrastructure.forecast import (
     WeekdayAverageForecaster,
 )
 from app.planning.infrastructure.orders import LoadedOrders, LoadedStoreOrders
+from app.planning.infrastructure.persistence.assistant import (
+    SqlChannelLinkRepository,
+    SqlConversationRepository,
+    SqlDraftRepository,
+)
 from app.planning.infrastructure.persistence.cached import (
     CachedProductRepository,
     CachedSellerRepository,
@@ -60,6 +70,7 @@ from app.planning.infrastructure.persistence.stock import SqlStockRepository
 from app.planning.infrastructure.sales import SimulatedSalesSource
 from app.planning.infrastructure.security import (
     AssistantTickets,
+    ChannelFileTokens,
     JwtTokenService,
     RandomTemporaryPasswords,
     ScryptPasswordHasher,
@@ -91,7 +102,9 @@ def _assistant_guardrails(config_dir: Path) -> tuple:
     return tuple(load_guardrails(config_dir))
 
 
-def _assistant(settings: Settings) -> asst.AskAssistant:
+def _assistant(
+    settings: Settings, history: SqlConversationRepository, clock: ZoneClock
+) -> asst.AskAssistant:
     gateway = (
         N8nAssistant(
             settings.assistant_webhook_url,
@@ -114,6 +127,8 @@ def _assistant(settings: Settings) -> asst.AskAssistant:
         limiter.allow,
         _assistant_starters(settings.config_dir),
         _assistant_guardrails(settings.config_dir),
+        history,
+        clock,
     )
 
 
@@ -168,6 +183,10 @@ class PlanningUseCases:
     list_production: pr.ListProduction
     forecast_arrival: pr.ForecastArrival
     ask_assistant: asst.AskAssistant
+    assistant_history: ah.AssistantHistory
+    purge_assistant: ah.PurgeAssistantData
+    create_link_code: ch.CreateLinkCode
+    channel_assistant: ch.ChannelAssistant
     # Cuenta dueña de un pase del asistente (lo usa el MCP cuando consulta el agente de n8n).
     ticket_account: acc.CurrentAccount
 
@@ -213,6 +232,27 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
     closing_lead = timedelta(
         minutes=minutes, seconds=settings.planning_scheduler_seconds if minutes else 0
     )
+    conversations = SqlConversationRepository(session)
+    channel_links = SqlChannelLinkRepository(session)
+    draft_repo = SqlDraftRepository(session)
+    ask_assistant = _assistant(settings, conversations, clock)
+    submit_projection = uc.SubmitProjection(
+        products,
+        projections,
+        clock,
+        settings.planning_max_days,
+        on_submitted=nt.NotifyProjectionSubmitted(sellers, notifier, event_bus),
+        rules=ed.EditingRules(editing, unlocks),
+        projected=frozenset(settings.planning_projected_categories),
+        projected_products=frozenset(settings.planning_projected_products),
+        history=history,
+    )
+    register_stock = st.RegisterStock(products, stock, clock, settings.stock_locations)
+    editing_window = ed.GetEditingWindow(editing, unlocks, clock)
+    assistant_history = ah.AssistantHistory(conversations, XlsxTableExporter(), clock)
+    channel_drafts = cd.ChannelDrafts(
+        products, draft_repo, submit_projection, register_stock, editing_window, clock
+    )
     return PlanningUseCases(
         authenticate=acc.Authenticate(sellers, hasher, tokens, clock, lockout),
         current_account=acc.CurrentAccount(sellers, tokens),
@@ -222,24 +262,14 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         save_preferences=acc.SavePreferences(sellers),
         list_accounts=acc.ListAccounts(sellers),
         create_account=acc.CreateAccount(sellers, hasher, passwords),
-        reset_password=acc.ResetPassword(sellers, hasher, passwords, event_bus),
-        set_account_active=acc.SetAccountActive(sellers, event_bus),
+        reset_password=acc.ResetPassword(sellers, hasher, passwords, event_bus, channel_links),
+        set_account_active=acc.SetAccountActive(sellers, event_bus, channel_links),
         edit_account=acc.EditAccount(sellers, event_bus),
         change_role=acc.ChangeRole(sellers, event_bus, notifications),
         get_catalog=uc.GetCatalog(products),
         list_sellers=uc.ListSellers(sellers),
         list_projections=uc.ListProjections(projections, aris),
-        submit_projection=uc.SubmitProjection(
-            products,
-            projections,
-            clock,
-            settings.planning_max_days,
-            on_submitted=nt.NotifyProjectionSubmitted(sellers, notifier, event_bus),
-            rules=ed.EditingRules(editing, unlocks),
-            projected=frozenset(settings.planning_projected_categories),
-            projected_products=frozenset(settings.planning_projected_products),
-            history=history,
-        ),
+        submit_projection=submit_projection,
         get_sales=uc.GetSales(sales),
         model_projections=uc.ModelProjections(
             sellers, order_history, products, SqlDemandModelStore(session)
@@ -274,14 +304,14 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
             sellers, projections, notifier, clock, editing.policy, closing_lead
         ),
         announce=nt.Announce(sellers, notifier),
-        editing_window=ed.GetEditingWindow(editing, unlocks, clock),
+        editing_window=editing_window,
         request_unlock=ed.RequestUnlock(editing, unlocks, sellers, notifier, event_bus, clock),
         list_unlocks=ed.ListUnlocks(unlocks, clock),
         decide_unlock=ed.DecideUnlock(unlocks, sellers, notifier, event_bus, clock),
         update_cutoff=ed.UpdateCutoff(editing, event_bus, clock),
         grant_editing=ed.GrantEditing(editing, unlocks, sellers, notifier, event_bus, clock),
         revoke_editing=ed.RevokeEditing(unlocks, sellers, notifier, event_bus, clock),
-        register_stock=st.RegisterStock(products, stock, clock, settings.stock_locations),
+        register_stock=register_stock,
         list_stock=st.ListStock(stock),
         stock_options=st.GetStockOptions(
             products, settings.stock_locations, settings.saca_stock_lot_days
@@ -303,7 +333,23 @@ def build_use_cases(session: Session, settings: Settings) -> PlanningUseCases:
         register_production=pr.RegisterProduction(products, production, clock),
         list_production=pr.ListProduction(production),
         forecast_arrival=pr.ForecastArrival(products, production, clock, arrival_model),
-        ask_assistant=_assistant(settings),
+        ask_assistant=ask_assistant,
+        assistant_history=assistant_history,
+        purge_assistant=ah.PurgeAssistantData(
+            conversations, channel_links, draft_repo, clock, settings.assistant_history_days
+        ),
+        create_link_code=ch.CreateLinkCode(channel_links, clock),
+        channel_assistant=ch.ChannelAssistant(
+            sellers,
+            channel_links,
+            conversations,
+            ask_assistant,
+            assistant_history,
+            channel_drafts,
+            ChannelFileTokens(settings.auth_secret, FILE_MINUTES),
+            clock,
+            settings.assistant_channel_idle_hours,
+        ),
         ticket_account=acc.CurrentAccount(
             sellers, AssistantTickets(settings.auth_secret, settings.assistant_ticket_minutes)
         ),

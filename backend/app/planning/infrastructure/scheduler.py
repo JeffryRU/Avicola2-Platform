@@ -32,6 +32,8 @@ TRAIN_WINDOW_HOURS = 3
 # Cada cuánto se vuelve a precalentar la saca (si la historia no cambió, es casi gratis).
 WARM_EVERY_SECONDS = 300
 _warmed_at = 0.0
+# Día de la última limpieza del historial del asistente (una vez por día y proceso).
+_purged_on = None
 
 
 def check_missed_projections(settings: Settings) -> int:
@@ -116,6 +118,19 @@ def warm_saca(settings: Settings, force: bool = False) -> int:
     return 0
 
 
+def purge_assistant(settings: Settings) -> int:
+    """Una vez al día borra las conversaciones del asistente más viejas que la retención
+    (ASSISTANT_HISTORY_DAYS), con los códigos y borradores vencidos. Devuelve 0 (no es un aviso)."""
+    global _purged_on  # noqa: PLW0603 (marca por proceso)
+    today = ZoneClock(settings.tz).today()
+    if _purged_on == today:
+        return 0
+    with SessionLocal() as session:
+        build_use_cases(session, settings).purge_assistant()
+    _purged_on = today
+    return 0
+
+
 def check_cutoffs(settings: Settings) -> int:
     """Una revisión completa: aviso previo al corte, aviso de corte pasado y saca del cierre."""
     return (
@@ -124,6 +139,7 @@ def check_cutoffs(settings: Settings) -> int:
         + snapshot_saca(settings)
         + train_demand_model(settings)
         + warm_saca(settings)
+        + purge_assistant(settings)
     )
 
 

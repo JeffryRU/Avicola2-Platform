@@ -144,6 +144,15 @@ export const endpoints = {
     messages: '/assistant/messages',
     /** POST {message, conversation} → NDJSON: `delta` (texto que llega), y `done` o `error`. */
     stream: '/assistant/messages/stream',
+    /** GET ?limit&before → [{id, title, channel, updated_at, preview}] (ADR 0024). */
+    conversations: '/assistant/conversations',
+    /** GET → la conversación con sus mensajes; DELETE → la archiva (204). */
+    conversation: (id: string) => `/assistant/conversations/${encodeURIComponent(id)}`,
+    /** GET → Excel de la tabla `index` de un mensaje guardado. */
+    tableXlsx: (messageId: string, index: number) =>
+      `/assistant/messages/${encodeURIComponent(messageId)}/tables/${String(index)}.xlsx`,
+    /** POST → {code, expires_at}: código para vincular Telegram o WhatsApp. */
+    linkCode: '/assistant/channels/link-code',
   },
 
   status: {

@@ -92,3 +92,42 @@ class RandomTemporaryPasswords:
             chars = "".join(secrets.choice(self._ALPHABET) for _ in range(12))
             if any(c.isdigit() for c in chars) and any(c.isalpha() for c in chars):
                 return f"{chars[:4]}-{chars[4:8]}-{chars[8:]}"
+
+
+class ChannelFileTokens:
+    """Token de un solo archivo para los canales (ADR 0024): una tabla de un mensaje, de una
+    persona, que vence en pocos minutos. Otra audiencia: no abre la API ni vale como sesión."""
+
+    AUDIENCE = "aviplanner-channel-file"
+    ALGORITHM = "HS256"
+
+    def __init__(self, secret: str, ttl_minutes: int) -> None:
+        self.secret, self.ttl = secret, timedelta(minutes=ttl_minutes)
+
+    def issue(self, username: str, message_id: str, index: int) -> str:
+        now = datetime.now(UTC)
+        claims = {
+            "sub": username,
+            "mid": message_id,
+            "idx": index,
+            "aud": self.AUDIENCE,
+            "iat": now,
+            "exp": now + self.ttl,
+        }
+        return jwt.encode(claims, self.secret, algorithm=self.ALGORITHM)
+
+    def decode(self, token: str) -> tuple[str, str, int] | None:
+        try:
+            claims = jwt.decode(
+                token,
+                self.secret,
+                algorithms=[self.ALGORITHM],
+                audience=self.AUDIENCE,
+                options={"require": ["sub", "mid", "idx", "exp"]},
+            )
+        except jwt.PyJWTError:
+            return None
+        sub, mid, idx = claims["sub"], claims["mid"], claims["idx"]
+        if not (isinstance(sub, str) and isinstance(mid, str) and isinstance(idx, int)):
+            return None
+        return sub, mid, idx

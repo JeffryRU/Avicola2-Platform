@@ -571,3 +571,93 @@ class AssistantMessageIn(BaseModel):
 class AssistantReplyOut(BaseModel):
     reply: str
     suggestions: list[str]
+    # Mensaje guardado en el historial y la respuesta en bloques de texto y de tabla (ADR 0024).
+    message_id: str | None = None
+    blocks: list[dict[str, Any]] = []
+
+
+class ConversationSummaryOut(BaseModel):
+    id: str
+    title: str
+    channel: str
+    updated_at: datetime
+    preview: str
+
+
+class StoredMessageOut(BaseModel):
+    id: str
+    role: str
+    text: str
+    blocks: list[dict[str, Any]]
+    suggestions: list[str]
+    created_at: datetime
+
+
+class ConversationOut(BaseModel):
+    id: str
+    title: str
+    channel: str
+    messages: list[StoredMessageOut]
+
+
+class LinkCodeOut(BaseModel):
+    code: str
+    expires_at: datetime
+
+
+class ChannelMessageIn(BaseModel):
+    channel: str = Field(min_length=1, max_length=10)
+    sender: str = Field(min_length=1, max_length=64)
+    text: str = Field(min_length=1, max_length=4000)
+
+
+# El campo `date` de ExtractionIn tapa el tipo `date` dentro de la clase.
+DateOrNone = date | None
+
+
+class ExtractedRowIn(BaseModel):
+    product: str = Field(max_length=120)
+    units: int | None = Field(None, ge=0, le=1_000_000)
+    kg: float | None = Field(None, ge=0, le=10_000_000)
+    lot_date: date | None = None
+
+
+class ExtractionIn(BaseModel):
+    kind: str = Field(max_length=15)
+    date: DateOrNone = None
+    rows: list[ExtractedRowIn] = Field(default_factory=list, max_length=200)
+    notes: str = Field("", max_length=1000)
+
+
+class ChannelPhotoIn(BaseModel):
+    channel: str = Field(min_length=1, max_length=10)
+    sender: str = Field(min_length=1, max_length=64)
+    extraction: ExtractionIn
+
+
+class ChannelFileOut(BaseModel):
+    name: str
+    url: str
+
+
+class ChannelReplyOut(BaseModel):
+    text: str
+    files: list[ChannelFileOut]
+    suggestions: list[str]
+
+
+class ChannelProductOut(BaseModel):
+    id: str
+    name: str
+    category: str
+    unit: str
+
+
+class ChannelContextOut(BaseModel):
+    linked: bool
+    name: str = ""
+    can_project: bool = False
+    can_stock: bool = False
+    today: date | None = None
+    dates: list[date] = []
+    products: list[ChannelProductOut] = []

@@ -9,6 +9,7 @@ import re
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Any
 
 from app.planning.domain.permissions import Permission
 
@@ -46,6 +47,9 @@ class StarterGroup:
 class AssistantAnswer:
     reply: str
     suggestions: tuple[str, ...]
+    # Mensaje guardado en el historial y la respuesta en bloques de texto y tabla (ADR 0024).
+    message_id: str | None = None
+    blocks: tuple[dict[str, Any], ...] = ()
 
 
 def clean_question(text: str) -> str | None:
