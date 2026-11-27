@@ -39,7 +39,7 @@
       "id": "c1a2b3c4-0701-4d5e-8f00-000000000002",
       "name": "Agente de la app",
       "type": "@n8n/n8n-nodes-langchain.agent",
-      "typeVersion": 2,
+      "typeVersion": 2.2,
       "position": [
         260,
         0
@@ -54,27 +54,24 @@
           "value": "={{ $env.ASSISTANT_MODEL || 'claude-haiku-5-5' }}"
         },
         "options": {
-          "baseURL": "={{ $env.ASSISTANT_LLM_URL || 'https://ai.devlumlabs.com/api/v1' }}",
-          "maxTokens": 1200,
-          "timeout": 60000,
-          "maxRetries": 2
+          "maxTokensToSample": 1200
         }
       },
       "id": "c1a2b3c4-0701-4d5e-8f00-000000000003",
-      "name": "Modelo (API compatible con OpenAI)",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1.2,
+      "name": "Claude (Anthropic)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
       "position": [
         100,
         240
       ],
       "credentials": {
-        "openAiApi": {
-          "id": "aviplannerAsistenteLlm",
-          "name": "LLM del asistente (AviPlanner)"
+        "anthropicApi": {
+          "id": "aviplannerAnthropic",
+          "name": "Anthropic (AviPlanner)"
         }
       },
-      "notes": "Cualquier API compatible con OpenAI Chat Completions (ASSISTANT_LLM_URL; por defecto Devlum AI). Modelo en ASSISTANT_MODEL (claude-haiku-5-5 por defecto: necesita soportar tools). La clave va en la credencial, nunca en el repo."
+      "notes": "API de Anthropic. Modelo en ASSISTANT_MODEL (claude-haiku-5-5 por defecto). Sin temperature: estos modelos rechazan valores distintos al predeterminado. La clave va en la credencial, nunca en el repo."
     },
     {
       "parameters": {
@@ -131,7 +128,7 @@
         ]
       ]
     },
-    "Modelo (API compatible con OpenAI)": {
+    "Claude (Anthropic)": {
       "ai_languageModel": [
         [
           {
