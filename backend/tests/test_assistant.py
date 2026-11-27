@@ -238,6 +238,7 @@ def test_n8n_gateway_sends_the_secret_and_reads_the_reply(monkeypatch) -> None:
     assert seen["body"]["ticket"] == "t"
     assert seen["body"]["user"]["role"] == "seller"
     assert seen["body"]["history_text"] == ""
+    assert seen["body"]["channel"] == "app"
     remembered = replace(request, history=(("user", "¿Cuánto?"), ("assistant", "120 kg.")))
     adapter.N8nAssistant("http://n8n/x", "s3cret", 30).ask(remembered)
     assert seen["body"]["history_text"] == "Persona: ¿Cuánto?\nAsistente: 120 kg."

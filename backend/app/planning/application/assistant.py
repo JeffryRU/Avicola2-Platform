@@ -108,7 +108,7 @@ class AskAssistant:
     def __call__(
         self, account: SellerAccount, message: str, conversation: str, channel: str = APP
     ) -> AssistantAnswer:
-        request = self._request(account, message, conversation)
+        request = self._request(account, message, conversation, channel)
         if isinstance(request, AssistantAnswer):
             return self._record(account, message, conversation, channel, request)
         try:
@@ -128,7 +128,7 @@ class AskAssistant:
         que se agrega), y al final `done` con la respuesta completa y sus sugerencias (reemplaza
         lo mostrado) o `error`. Sin streaming en el agente, llega todo en una sola parte.
         """
-        request = self._request(account, message, conversation)
+        request = self._request(account, message, conversation, channel)
 
         def events() -> Iterator[dict]:
             if isinstance(request, AssistantAnswer):
@@ -157,7 +157,7 @@ class AskAssistant:
         return events()
 
     def _request(
-        self, account: SellerAccount, message: str, conversation: str
+        self, account: SellerAccount, message: str, conversation: str, channel: str = APP
     ) -> AssistantRequest | AssistantAnswer:
         """Valida la pregunta y arma lo que va al agente (o la respuesta del guardrail)."""
         message = message.strip()
@@ -189,6 +189,7 @@ class AskAssistant:
             permissions=tuple(sorted(p.value for p in permissions_of(seller.role))),
             scope=self.starters.scope(account),
             history=self._recent(conversation),
+            channel=channel,
         )
 
     def _recent(self, conversation: str) -> tuple[tuple[str, str], ...]:

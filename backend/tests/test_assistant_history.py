@@ -159,6 +159,7 @@ def test_agent_gets_the_saved_conversation_as_memory(agent) -> None:
     assert first.history == ()
     # La memoria sale del historial guardado: sobrevive a un reinicio del agente.
     assert second.history == (("user", "¿Cuánto proyecto?"), ("assistant", "Hola."))
+    assert second.channel == "app"
 
 
 def test_other_user_gets_404_and_cannot_write_in_it(agent) -> None:

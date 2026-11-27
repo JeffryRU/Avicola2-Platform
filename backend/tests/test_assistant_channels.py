@@ -166,6 +166,8 @@ def test_linked_chat_asks_as_that_person(agent) -> None:
     assert reply["suggestions"] == ["¿Y mañana?", "¿Por tipo?"]
     sent = agent.requests[0]
     assert (sent.username, sent.role) == ("rnavarro", "seller")
+    # El agente sabe que es Telegram: ahí puede ofrecer registrar con una foto.
+    assert sent.channel == "telegram"
     # Aparece en el historial de la app con su canal.
     listed = login("rnavarro").get("/api/assistant/conversations").json()
     assert [(c["channel"], c["title"]) for c in listed] == [("telegram", "¿Cuánto proyecto?")]
