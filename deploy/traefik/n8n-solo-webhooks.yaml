@@ -1,0 +1,19 @@
+# AviPlanner: del n8n de producción solo /webhook/ es público (Telegram, WhatsApp).
+# Todo lo demás (editor, API) responde 403. Copiar a /data/coolify/proxy/dynamic/ (docs/deploy.md), con el dominio de N8N_DOMAIN.
+http:
+  middlewares:
+    aviplanner-n8n-cerrado:
+      ipAllowList:
+        sourceRange:
+          - 127.0.0.1/32
+  routers:
+    aviplanner-n8n-cerrado:
+      rule: "Host(`n8n.13-140-234-184.sslip.io`) && !PathPrefix(`/webhook/`)"
+      entryPoints:
+        - https
+      priority: 10000
+      middlewares:
+        - aviplanner-n8n-cerrado
+      service: noop@internal
+      tls:
+        certResolver: letsencrypt
